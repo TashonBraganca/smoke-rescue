@@ -26,11 +26,20 @@ def settings():
     return cfg.get("Port", 8090), token
 
 
-async def call(method: str, params: dict, timeout: float = 120.0) -> dict:
+async def call(method: str, params: dict, timeout: float = 900.0) -> dict:
     port, token = settings()
     auth = base64.b64encode(f"mcp-unity:{token}".encode()).decode()
-    async with websockets.connect(f"ws://localhost:{port}/McpUnity", additional_headers={"Authorization": f"Basic {auth}"},
-                                  max_size=64 * 1024 * 1024) as ws:
+    # The editor restarts its server after every script reload; retry the connection for up to 90 s.
+    for attempt in range(45):
+        try:
+            ws = await websockets.connect(f"ws://localhost:{port}/McpUnity", additional_headers={"Authorization": f"Basic {auth}"},
+                                          max_size=64 * 1024 * 1024)
+            break
+        except OSError:
+            await asyncio.sleep(2)
+    else:
+        raise ConnectionError("mcp-unity server not reachable on port %d after 90 s; is the editor open?" % port)
+    async with ws:
         req_id = str(uuid.uuid4())
         await ws.send(json.dumps({"id": req_id, "method": method, "params": params}))
         while True:
@@ -56,7 +65,7 @@ def main(argv):
     else:
         print(__doc__)
         return 2
-    print(json.dumps(resp, indent=1)[:20000])
+    print(json.dumps(resp, indent=1))
     result = resp.get("result", resp)
     return 0 if (isinstance(result, dict) and result.get("success", True)) and "error" not in resp else 1
 
