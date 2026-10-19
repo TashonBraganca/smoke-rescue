@@ -85,3 +85,18 @@ def test_run_report_preserves_per_robot_contract_and_saves_evidence(ground_truth
     assert details["robot_A"]["matched_poses"] == 400
     assert (output / "report.md").is_file()
     assert (output / "evaluation.rrd").stat().st_size > 0
+
+
+def test_merge_error_is_zero_for_truth_and_exactly_ten_cm_for_a_ten_cm_offset():
+    import numpy as np
+    from scipy.spatial.transform import Rotation
+    from brain.evaluator import transform_error
+    T_true = np.eye(4)
+    T_true[:3, :3] = Rotation.from_euler("xyz", [3, -40, 7], degrees=True).as_matrix()
+    T_true[:3, 3] = [2.0, -0.1, 5.5]
+    err_m, err_deg = transform_error(T_true.copy(), T_true)
+    assert err_m < 1e-9 and err_deg < 1e-6
+    offset = np.eye(4)
+    offset[:3, 3] = [0.06, 0.0, 0.08]          # 10 cm in the B map frame
+    err_m, err_deg = transform_error(T_true @ offset, T_true)
+    assert abs(err_m - 0.10) < 1e-9 and err_deg < 1e-6
