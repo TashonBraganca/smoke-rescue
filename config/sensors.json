@@ -8,7 +8,12 @@
     "cx": 319.5,
     "cy": 239.5,
     "rate_hz": 15,
-    "mount": { "height_m": 0.5, "forward_offset_m": 0.32, "pitch_down_deg": 10.0 }
+    "mount": {
+      "height_m": 1.6,
+      "forward_offset_m": 0.25,
+      "pitch_down_deg": 10.0,
+      "note": "Human eye height on a sensor mast, at Tashon's request (2026-10-20); the spec's original mount was 0.5 m high, 0.32 m forward."
+    }
   },
   "rgb_noise": {
     "gaussian_sigma_8bit": 2.0,
@@ -20,21 +25,33 @@
     "sigma_coeff_mm_per_m2": 1.5,
     "grazing_angle_invalid_deg": 80.0,
     "edge_dropout_px": 1,
-    "smoke_dropout": { "per_unit_density": 0.35, "max": 0.6 }
+    "smoke_dropout": {
+      "per_unit_density": 0.35,
+      "max": 0.6
+    }
   },
   "imu": {
     "rate_hz": 200,
     "accel_noise_density": 0.002,
     "accel_bias_random_walk": 0.0003,
     "gyro_noise_density": 0.00017,
-    "gyro_bias_random_walk": 0.00002
+    "gyro_bias_random_walk": 2e-05
   },
   "odometry": {
     "rate_hz": 50,
     "scale_error": 0.02,
-    "slip": { "events_per_minute": 1.5, "duration_s": 0.5, "overshoot_min": 0.1, "overshoot_max": 0.3 }
+    "slip": {
+      "events_per_minute": 1.5,
+      "duration_s": 0.5,
+      "overshoot_min": 0.1,
+      "overshoot_max": 0.3
+    }
   },
-  "headlight": { "cone_deg": 40.0, "intensity_lumen": 900, "range_m": 10.0 },
+  "headlight": {
+    "cone_deg": 40.0,
+    "intensity_lumen": 900,
+    "range_m": 10.0
+  },
   "limits": {
     "max_forward_mps": 0.8,
     "max_reverse_mps": 0.3,

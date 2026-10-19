@@ -64,8 +64,24 @@ namespace SmokeRescue.Robots
             // The camera sits on the front face of the body (SIMULATION_SPEC 4.1). With a downloaded body that is
             // longer than the spec's 0.32 m offset assumes, move the mount forward so the camera never sees its own shell.
             float front = FrontOfBody(visual);
-            if (front + 0.03f > robot.CameraMount.localPosition.z)
-                robot.CameraMount.localPosition = new Vector3(0f, robot.CameraMount.localPosition.y, front + 0.03f);
+            float bodyTop = TopOfBody(visual);
+            if (robot.CameraMount.localPosition.y < bodyTop + 0.3f)
+            {
+                // Low mount on the body's face: keep the lens just ahead of the shell so it never sees itself.
+                if (front + 0.03f > robot.CameraMount.localPosition.z)
+                    robot.CameraMount.localPosition = new Vector3(0f, robot.CameraMount.localPosition.y, front + 0.03f);
+            }
+            else
+            {
+                // High mount (human eye height): a sensor mast from the back of the torso up to the camera head.
+                float mastBase = bodyTop - 0.02f, mastTop = robot.CameraMount.localPosition.y - 0.04f;
+                float z = robot.CameraMount.localPosition.z - 0.06f;
+                Part(visual, PrimitiveType.Cylinder, "SensorMast", new Vector3(0f, (mastBase + mastTop) / 2f, z),
+                    new Vector3(0.035f, (mastTop - mastBase) / 2f, 0.035f), new Color(0.15f, 0.15f, 0.16f));
+                Part(visual, PrimitiveType.Cube, "SensorHead", new Vector3(0f, robot.CameraMount.localPosition.y, z - 0.02f),
+                    new Vector3(0.16f, 0.07f, 0.1f), new Color(0.1f, 0.1f, 0.11f));
+                Part(visual, PrimitiveType.Cube, "MastBand", new Vector3(0f, mastTop - 0.12f, z), new Vector3(0.05f, 0.08f, 0.05f), spec.Colour);
+            }
 
             var lightGo = new GameObject("Headlight");
             lightGo.transform.SetParent(robot.CameraMount, false);
@@ -200,6 +216,14 @@ namespace SmokeRescue.Robots
                 foreach (var t in rear) rz += t.position.z;
                 if (fz / front.Count < rz / rear.Count) root.localRotation = Quaternion.Euler(0f, 180f, 0f) * root.localRotation;
             }
+        }
+
+        static float TopOfBody(GameObject visual)
+        {
+            float top = 0f;
+            foreach (var r in visual.GetComponentsInChildren<Renderer>())
+                top = Mathf.Max(top, visual.transform.InverseTransformPoint(r.bounds.max).y);
+            return top;
         }
 
         /// <summary>Forward extent (local z) of the whole body. A rigged body is often one skinned mesh, so

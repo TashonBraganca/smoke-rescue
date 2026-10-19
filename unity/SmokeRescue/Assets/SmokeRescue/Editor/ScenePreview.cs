@@ -97,7 +97,7 @@ namespace SmokeRescue.Editor
                     var eye = new Vector3(e[0], e[1], e[2]);
                     go.transform.SetPositionAndRotation(eye, Quaternion.LookRotation(new Vector3(t[0], t[1], t[2]) - eye));
                     RgbdFrame f = null;
-                    for (int i = 0; i < 12; i++) f = rgbd.CaptureSync(i / 15.0);
+                    for (int i = 0; i < 12; i++) { atm.Apply(3f + i / 15f); f = rgbd.CaptureSync(i / 15.0); }
                     File.WriteAllBytes(Path.Combine(dir, v.Value<string>("name") + ".png"), SensorPng.EncodeRgbAsync(f.Rgb, f.Width, f.Height).Result);
                 }
             }
