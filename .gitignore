@@ -43,3 +43,7 @@ assets_cache/
 # Unity batchmode logs
 unity/*.log
 # Evidence images are kept out of git LFS churn; STATUS.md links them
+
+# Imported models are rebuilt from assets_cache/ by Tools > Smoke Rescue > Place Furniture (keeps LFS quota free)
+unity/SmokeRescue/Assets/SmokeRescue/Art/Models/
+unity/SmokeRescue/Assets/SmokeRescue/Art/Models.meta

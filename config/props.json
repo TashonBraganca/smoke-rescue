@@ -1,52 +1,339 @@
 {
   "version": 1,
-  "note": "Maps each landmark kind in floorplan.json to models. 'polyhaven' parts are downloaded by tools/fetch_models.py and normalised in Blender by tools/blender/normalize_model.py. 'blender' parts are built by tools/blender/build_props.py. Offsets are in the landmark's local frame (x right, z forward, metres, yaw degrees about +y), before the landmark yaw is applied. 'fit' scales a model uniformly so its largest horizontal extent or its height matches the number given.",
+  "note": "Maps each landmark kind in floorplan.json to models. 'polyhaven' parts are downloaded by tools/fetch_models.py and normalised in Blender by tools/blender/normalize_model.py. 'blender' parts are built by tools/blender/build_props.py. Offsets are in the landmark's local frame (x right, z forward, metres, yaw degrees about +y), before the landmark yaw is applied. 'fit' scales a model uniformly so its largest horizontal extent or its height matches the number given. 'downloaded' parts are paths under assets_cache/ to models chosen from assets_cache/candidates/ (Objaverse/Sketchfab, licences in CREDITS.md); 'credit' is the source model name.",
   "landmarks": {
-    "red_velvet_sofa":          [ { "polyhaven": "sofa_02", "tint_hint": "deep red velvet" } ],
-    "brick_fireplace":          [ { "blender": "fireplace_brick" } ],
-    "large_rug_patterned":      [ { "blender": "rug_patterned" } ],
-    "coat_rack_with_coats":     [ { "blender": "coat_rack" } ],
-    "large_landscape_painting": [ { "polyhaven": "fancy_picture_frame_01", "fit_width": 1.4, "offset": [0, 1.5, 0] } ],
-    "console_table_with_vase":  [ { "polyhaven": "ClassicConsole_01" }, { "polyhaven": "antique_ceramic_vase_01", "offset": [0, "top", 0] } ],
-    "kitchen_island":           [ { "blender": "kitchen_island" } ],
-    "tall_steel_fridge":        [ { "blender": "fridge" } ],
-    "dining_table_six_chairs":  [ { "polyhaven": "dining_table" },
-                                  { "polyhaven": "dining_chair_02", "offset": [-0.55, 0, -0.65], "yaw": 0 },
-                                  { "polyhaven": "dining_chair_02", "offset": [0.0, 0, -0.65], "yaw": 0 },
-                                  { "polyhaven": "dining_chair_02", "offset": [0.55, 0, -0.65], "yaw": 0 },
-                                  { "polyhaven": "dining_chair_02", "offset": [-0.55, 0, 0.65], "yaw": 180 },
-                                  { "polyhaven": "dining_chair_02", "offset": [0.0, 0, 0.65], "yaw": 180 },
-                                  { "polyhaven": "dining_chair_02", "offset": [0.55, 0, 0.65], "yaw": 180 } ],
-    "stove_and_hood":           [ { "polyhaven": "electric_stove" }, { "blender": "range_hood", "offset": [0, 1.75, 0] } ],
-    "framed_family_photos":     [ { "polyhaven": "hanging_picture_frame_01", "offset": [-0.6, 1.5, 0] },
-                                  { "polyhaven": "hanging_picture_frame_02", "offset": [0.0, 1.6, 0] },
-                                  { "polyhaven": "hanging_picture_frame_03", "offset": [0.6, 1.45, 0] } ],
-    "grandfather_clock":        [ { "polyhaven": "vintage_grandfather_clock_01" } ],
-    "blue_double_bed":          [ { "polyhaven": "GothicBed_01", "tint_hint": "blue bedding" } ],
-    "tall_wardrobe":            [ { "polyhaven": "GothicCabinet_01" } ],
-    "clawfoot_bathtub":         [ { "blender": "clawfoot_bathtub" } ],
-    "sink_with_mirror":         [ { "blender": "sink_with_mirror" } ],
-    "clothes_racks_both_sides": [ { "blender": "clothes_rack", "offset": [-1.0, 0, 0] }, { "blender": "clothes_rack", "offset": [1.0, 0, 0] } ],
-    "floor_to_ceiling_bookshelves": [ { "polyhaven": "wooden_bookshelf_worn", "offset": [-0.9, 0, 0] },
-                                      { "polyhaven": "wooden_bookshelf_worn", "offset": [0.0, 0, 0] },
-                                      { "polyhaven": "wooden_bookshelf_worn", "offset": [0.9, 0, 0] } ],
-    "wooden_desk_with_lamp":    [ { "polyhaven": "WoodenTable_01" }, { "polyhaven": "desk_lamp_arm_01", "offset": [0.4, "top", 0.1] } ],
-    "antique_globe":            [ { "blender": "globe_stand" } ],
-    "bunk_bed":                 [ { "blender": "bunk_bed" } ],
-    "toy_chest_and_toys":       [ { "polyhaven": "vintage_wooden_drawer_01" }, { "polyhaven": "rubber_duck_toy", "offset": [0.2, "top", 0] }, { "polyhaven": "football", "offset": [0.6, 0, 0.3] } ],
-    "washer_and_dryer":         [ { "blender": "washer", "offset": [-0.35, 0, 0] }, { "blender": "washer", "offset": [0.35, 0, 0], "variant": "dryer" } ],
-    "water_heater_and_pipes":   [ { "blender": "water_heater" } ]
+    "red_velvet_sofa": [
+      {
+        "downloaded": "candidates/red_sofa/5384d703c1094899a45ae0a9a8dee909/model.glb",
+        "credit": "Antique Sofa"
+      }
+    ],
+    "brick_fireplace": [
+      {
+        "downloaded": "candidates/fireplace/e9854400c0c1410db01c8db897ef5359/model.glb",
+        "credit": "Fireplace"
+      }
+    ],
+    "large_rug_patterned": [
+      {
+        "downloaded": "candidates/rug/0ce2fc1e54724cb79cbb08ab2182760a/model.glb",
+        "credit": "Persian Tabriz Pictorial Carpet"
+      }
+    ],
+    "coat_rack_with_coats": [
+      {
+        "downloaded": "candidates/coat_rack/7818b79c9c87488287c9a1cf62bf1548/model.glb",
+        "credit": "Coat Rack & Bowler Hat"
+      }
+    ],
+    "large_landscape_painting": [
+      {
+        "polyhaven": "fancy_picture_frame_01",
+        "fit_width": 1.4,
+        "offset": [
+          0,
+          1.5,
+          0
+        ]
+      }
+    ],
+    "console_table_with_vase": [
+      {
+        "polyhaven": "ClassicConsole_01"
+      },
+      {
+        "polyhaven": "antique_ceramic_vase_01",
+        "offset": [
+          0,
+          "top",
+          0
+        ]
+      }
+    ],
+    "kitchen_island": [
+      {
+        "downloaded": "candidates/kitchen_island/d5a4e03f45da445a9d84e77d8a9f93a4/model.glb",
+        "credit": "Office Kitchen Island"
+      }
+    ],
+    "tall_steel_fridge": [
+      {
+        "downloaded": "candidates/fridge/ebe62ed6dd9b446a9c9b7d7d6a8086e7/model.glb",
+        "credit": "French Door Refrigerator - Stainless"
+      }
+    ],
+    "dining_table_six_chairs": [
+      {
+        "polyhaven": "dining_table"
+      },
+      {
+        "polyhaven": "dining_chair_02",
+        "offset": [
+          -0.55,
+          0,
+          -0.65
+        ],
+        "yaw": 0
+      },
+      {
+        "polyhaven": "dining_chair_02",
+        "offset": [
+          0.0,
+          0,
+          -0.65
+        ],
+        "yaw": 0
+      },
+      {
+        "polyhaven": "dining_chair_02",
+        "offset": [
+          0.55,
+          0,
+          -0.65
+        ],
+        "yaw": 0
+      },
+      {
+        "polyhaven": "dining_chair_02",
+        "offset": [
+          -0.55,
+          0,
+          0.65
+        ],
+        "yaw": 180
+      },
+      {
+        "polyhaven": "dining_chair_02",
+        "offset": [
+          0.0,
+          0,
+          0.65
+        ],
+        "yaw": 180
+      },
+      {
+        "polyhaven": "dining_chair_02",
+        "offset": [
+          0.55,
+          0,
+          0.65
+        ],
+        "yaw": 180
+      }
+    ],
+    "stove_and_hood": [
+      {
+        "polyhaven": "electric_stove"
+      },
+      {
+        "downloaded": "candidates/range_hood/a8c9ef47afd541b0a13a1df1e0dfe0b8/model.glb",
+        "credit": "Kitchen Hood Model 3D fbx",
+        "offset": [
+          0,
+          1.55,
+          0
+        ]
+      }
+    ],
+    "framed_family_photos": [
+      {
+        "polyhaven": "hanging_picture_frame_01",
+        "offset": [
+          -0.6,
+          1.5,
+          0
+        ]
+      },
+      {
+        "polyhaven": "hanging_picture_frame_02",
+        "offset": [
+          0.0,
+          1.6,
+          0
+        ]
+      },
+      {
+        "polyhaven": "hanging_picture_frame_03",
+        "offset": [
+          0.6,
+          1.45,
+          0
+        ]
+      }
+    ],
+    "grandfather_clock": [
+      {
+        "polyhaven": "vintage_grandfather_clock_01"
+      }
+    ],
+    "blue_double_bed": [
+      {
+        "polyhaven": "GothicBed_01",
+        "tint_hint": "blue bedding"
+      }
+    ],
+    "tall_wardrobe": [
+      {
+        "polyhaven": "GothicCabinet_01"
+      }
+    ],
+    "clawfoot_bathtub": [
+      {
+        "downloaded": "candidates/clawfoot_bathtub/536dbfc2fdbe4dec9203ab390b9a6eda/model.glb",
+        "credit": "Bathtub Game Ready Asset"
+      }
+    ],
+    "sink_with_mirror": [
+      {
+        "downloaded": "candidates/sink_with_mirror/c976dd7dddab48a3a2848ff560a3c7b6/model.glb",
+        "credit": "Sink and mirror"
+      }
+    ],
+    "clothes_racks_both_sides": [
+      {
+        "blender": "clothes_rack",
+        "offset": [
+          -1.0,
+          0,
+          0
+        ]
+      },
+      {
+        "blender": "clothes_rack",
+        "offset": [
+          1.0,
+          0,
+          0
+        ]
+      }
+    ],
+    "floor_to_ceiling_bookshelves": [
+      {
+        "polyhaven": "wooden_bookshelf_worn",
+        "offset": [
+          -0.9,
+          0,
+          0
+        ]
+      },
+      {
+        "polyhaven": "wooden_bookshelf_worn",
+        "offset": [
+          0.0,
+          0,
+          0
+        ]
+      },
+      {
+        "polyhaven": "wooden_bookshelf_worn",
+        "offset": [
+          0.9,
+          0,
+          0
+        ]
+      }
+    ],
+    "wooden_desk_with_lamp": [
+      {
+        "polyhaven": "WoodenTable_01"
+      },
+      {
+        "polyhaven": "desk_lamp_arm_01",
+        "offset": [
+          0.4,
+          "top",
+          0.1
+        ]
+      }
+    ],
+    "antique_globe": [
+      {
+        "downloaded": "candidates/antique_globe/0318ad51a7294885b452ff4f408353ba/model.glb",
+        "credit": "Floor Globe"
+      }
+    ],
+    "bunk_bed": [
+      {
+        "downloaded": "candidates/bunk_bed/9fb7c54715dd41b98b3dc67b367cf81d/model.glb",
+        "credit": "Simple Bunk Bed"
+      }
+    ],
+    "toy_chest_and_toys": [
+      {
+        "downloaded": "candidates/toy_chest/8ce01f03c4c54c1bb69f6ba47a590586/model.glb",
+        "credit": "Toy Box"
+      }
+    ],
+    "washer_and_dryer": [
+      {
+        "downloaded": "candidates/clothes_dryer/79e4cdde40034be5be40eb4d9c9c92a2/model.glb",
+        "credit": "Washer Dryer SBS"
+      }
+    ],
+    "water_heater_and_pipes": [
+      {
+        "downloaded": "candidates/water_heater/4d2647ed28d646e38637060e3d2000f2/model.glb",
+        "credit": "Water Heater Obj"
+      }
+    ]
   },
   "filler": {
-    "living":    ["ArmChair_01", "CoffeeTable_01", "Television_01", "potted_plant_01"],
-    "foyer":     ["Ottoman_01", "potted_plant_02"],
-    "kitchen":   ["vintage_electric_kettle"],
-    "hallway":   ["side_table_01"],
-    "bedroom_1": ["ClassicNightstand_01", "alarm_clock_01"],
-    "bathroom":  [],
-    "closet":    ["cardboard_box_01"],
-    "study":     ["ArmChair_01", "book_encyclopedia_set_01"],
-    "bedroom_2": ["painted_wooden_chair_01", "dartboard"],
-    "laundry":   ["wicker_basket_01"]
-  }
+    "living": [
+      "ArmChair_01",
+      "CoffeeTable_01",
+      "Television_01",
+      "potted_plant_01"
+    ],
+    "foyer": [
+      "Ottoman_01",
+      "potted_plant_02"
+    ],
+    "kitchen": [
+      "vintage_electric_kettle"
+    ],
+    "hallway": [
+      "side_table_01"
+    ],
+    "bedroom_1": [
+      "ClassicNightstand_01",
+      "alarm_clock_01"
+    ],
+    "bathroom": [],
+    "closet": [
+      "cardboard_box_01"
+    ],
+    "study": [
+      "ArmChair_01",
+      "book_encyclopedia_set_01"
+    ],
+    "bedroom_2": [
+      "painted_wooden_chair_01",
+      "dartboard"
+    ],
+    "laundry": [
+      "wicker_basket_01"
+    ]
+  },
+  "robot_body": {
+    "downloaded": "candidates/robot/5dcbee77730640269cef5bd2587e328a/model.glb",
+    "credit": "**OLD** Spot Mini (Rigged)"
+  },
+  "survivor_candidates": [
+    {
+      "downloaded": "candidates/survivor/47ebe15d4c0545b88d2846bff9918208/model.glb",
+      "credit": "man 4k"
+    },
+    {
+      "downloaded": "candidates/survivor/208e5cf748404521894bf30c95f25c12/model.glb",
+      "credit": "Debra - Detective Woman (Game Model)"
+    },
+    {
+      "downloaded": "candidates/survivor/450e29de3c1541d78943e3265012ee48/model.glb",
+      "credit": "Woman In Red"
+    },
+    {
+      "downloaded": "candidates/survivor/a169a23fa24f4df39daace6c55b24194/model.glb",
+      "credit": "Jamal - LOD Man character"
+    }
+  ]
 }
