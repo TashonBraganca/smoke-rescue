@@ -24,6 +24,11 @@ namespace SmokeRescue.Sensors
         public SensorConfig Config { get; private set; }
         public Camera Camera { get; private set; }
         public bool NoiseEnabled { get; set; } = true;
+        /// <summary>Exposure in EV100, applied through the camera's physical parameters (f/1.4, ISO 100).</summary>
+        public float ExposureEv { get; set; } = 3f;
+        /// <summary>Deterministic exposure loop: after each frame, move EV toward a mid-grey mean (damped, clamped).</summary>
+        public bool AutoExposure { get; set; } = true;
+        public const float ExposureMinEv = 0f, ExposureMaxEv = 9f, TargetGrey = 105f / 255f;
         public bool IsCapturing { get; private set; }
         public Func<Vector3, float> LocalDensity { get; set; } = _ => 0;
         /// <summary>Caller supplies normalized proximity to fire for configured exposure flicker.</summary>
@@ -122,6 +127,7 @@ namespace SmokeRescue.Sensors
             IsCapturing = true; rgbDone = depthDone = failed = false;
             timestamp = simTimestamp;
             capturePose = new Pose(transform.position, transform.rotation);
+            ApplyExposure();
             captureNoise = NoiseEnabled; captureFire = NearFire; captureDensity = LocalDensity;
             depthPass.Armed = true;
             int previousRenderCount = depthPass.RenderCount;
@@ -214,6 +220,7 @@ namespace SmokeRescue.Sensors
             if (!rgbDone || !depthDone) return;
             try
             {
+                if (AutoExposure) UpdateExposure(rgb);
                 var millimetres = noise.Process(rgb, depth, capturePose, captureNoise, captureDensity, captureFire);
                 var frame = new RgbdFrame(timestamp, Config.camera.width, Config.camera.height, rgb, millimetres);
                 IsCapturing = false; rgb = null; depth = null;
@@ -225,6 +232,30 @@ namespace SmokeRescue.Sensors
                 CaptureFailed?.Invoke(error.ToString());
             }
         }
+        void ApplyExposure()
+        {
+            // EV100 = log2(N^2 / t) at ISO 100, so t = N^2 / 2^EV.
+            Camera.aperture = 1.4f;
+            Camera.iso = 100;
+            Camera.shutterSpeed = 1.96f / Mathf.Pow(2f, ExposureEv);
+        }
+
+        /// <summary>Mean linear luminance of a pixel subsample against mid-grey; half a step per frame toward it.</summary>
+        void UpdateExposure(byte[] frameRgb)
+        {
+            double sum = 0;
+            int n = 0;
+            for (int i = 0; i < frameRgb.Length; i += 3 * 37)
+            {
+                float lum = (0.2126f * frameRgb[i] + 0.7152f * frameRgb[i + 1] + 0.0722f * frameRgb[i + 2]) / 255f;
+                sum += Mathf.Pow(Mathf.Max(lum, 1f / 255f), 2.2f);
+                n++;
+            }
+            float meanLin = (float)(sum / Mathf.Max(n, 1));
+            float targetLin = Mathf.Pow(TargetGrey, 2.2f);
+            ExposureEv = Mathf.Clamp(ExposureEv + 0.6f * Mathf.Log(meanLin / targetLin, 2f), ExposureMinEv, ExposureMaxEv);
+        }
+
         void OnDestroy() { disposing = true; ReleaseWhenReadbacksFinish(); }
         void ReleaseWhenReadbacksFinish() { if (pendingReadbacks == 0) ReleaseResources(); }
         void ReleaseResources()

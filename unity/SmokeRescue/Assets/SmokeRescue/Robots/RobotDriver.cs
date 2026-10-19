@@ -56,6 +56,7 @@ namespace SmokeRescue.Robots
 
         const float Lookahead = 0.45f;
         const float WaypointTolerance = 0.12f;
+        const float CornerTolerance = 0.35f;
         const float TurnInPlaceDeg = 35f;
         const float DoorSlowRadius = 0.9f;
         const float StrideLength = 0.25f;
@@ -125,7 +126,10 @@ namespace SmokeRescue.Robots
         (float, float) PursuitCommand()
         {
             // Advance through reached waypoints.
-            while (target < route.Count && Vector2.Distance(Position, route[target]) < WaypointTolerance)
+            // Intermediate corners may be cut within CornerTolerance so the robot starts turning before it noses up to a
+            // wall; the final waypoint and look-around stops are still reached exactly.
+            while (target < route.Count && Vector2.Distance(Position, route[target]) <
+                   (target == route.Count - 1 || lookIndices.Contains(target) ? WaypointTolerance : CornerTolerance))
             {
                 if (lookIndices.Remove(target))
                 {

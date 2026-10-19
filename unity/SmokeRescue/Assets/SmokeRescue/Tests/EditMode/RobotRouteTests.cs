@@ -39,6 +39,12 @@ namespace SmokeRescue.Tests.EditMode
                 furniture = FurnitureBuilder.Place(plan);
                 ScenePreview.PlaceSurvivors();
                 survivors = GameObject.Find(ScenePreview.SurvivorsRoot);
+                Physics.SyncTransforms();
+                // Control: furniture must be visible to the overlap queries, or this test proves nothing.
+                // The living-room sofa landmark stands at (3.0, 1.2); a robot-sized capsule there must hit it.
+                int props = LayerMask.GetMask(HouseBuilder.PropsLayer);
+                var hit = Physics.OverlapCapsule(new Vector3(3f, 0.3f, 1.0f), new Vector3(3f, 0.3f, 1.4f), 0.18f, props);
+                Assert.IsNotEmpty(hit, "control failed: no Props collider at the sofa, furniture is not in the physics scene");
             }
             var root = new GameObject("Robots");
             try

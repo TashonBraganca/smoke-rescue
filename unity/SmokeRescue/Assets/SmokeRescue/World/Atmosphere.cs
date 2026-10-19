@@ -41,7 +41,9 @@ namespace SmokeRescue.World
     {
         public const string RootName = "Atmosphere";
         /// <summary>Fixed camera exposure (EV100). Interior lit by fires and 900 lm headlights.</summary>
-        public static float FixedExposureEv = 3.0f;
+        public static float FixedExposureEv = 3.0f;   // recorded in meta.json; kept for reference
+        public const float ExposureLimitMinEv = 0f;
+        public const float ExposureLimitMaxEv = 9f;
 
         FloorPlan plan;
         Scenario scenario;
@@ -73,9 +75,13 @@ namespace SmokeRescue.World
             var env = profile.Add<VisualEnvironment>(true);
             env.skyType.Override(0);                         // no sky: black night outside, no sky ambient
             env.skyAmbientMode.Override(SkyAmbientMode.Static);
+            // Exposure comes from each camera's own aperture, shutter and ISO. The robot sensors run their own
+            // deterministic exposure loop on those (RgbdCamera.AutoExposure). HDRP's automatic exposure did not adapt for
+            // cameras rendered on demand (54 to 66 percent of haze pixels clipped), and a single fixed EV blew out
+            // frames half a metre from a lit wall while leaving dark rooms black.
             var exposure = profile.Add<Exposure>(true);
-            exposure.mode.Override(ExposureMode.Fixed);
-            exposure.fixedExposure.Override(FixedExposureEv);
+            exposure.mode.Override(ExposureMode.UsePhysicalCamera);
+            exposure.compensation.Override(0f);
             a.fog = profile.Add<Fog>(true);
             float haze = scenario.smoke.global_haze;
             a.fog.enabled.Override(haze > 0f);

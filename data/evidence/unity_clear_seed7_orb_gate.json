@@ -1,0 +1,40 @@
+{
+  "run_id": "unity_clear_seed7",
+  "robots": {
+    "robot_A": {
+      "frames": 1126,
+      "median": 1133.0,
+      "p5": 755.25,
+      "min": 0,
+      "low_stretches_s": [
+        [
+          38.0,
+          38.0
+        ],
+        [
+          49.066667,
+          50.133333
+        ],
+        [
+          97.066667,
+          98.0
+        ]
+      ],
+      "pass": false
+    },
+    "robot_B": {
+      "frames": 1126,
+      "median": 1219.0,
+      "p5": 1036.5,
+      "min": 2,
+      "low_stretches_s": [
+        [
+          26.266667,
+          27.466667
+        ]
+      ],
+      "pass": false
+    }
+  },
+  "pass": false
+}
