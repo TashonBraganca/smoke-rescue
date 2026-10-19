@@ -109,3 +109,34 @@ def test_runner_rejects_output_ancestor_that_would_expose_other_recordings(tmp_p
     robot = tmp_path / "recording/robot_A"
     with pytest.raises(ValueError, match="disjoint"):
         slam_runner.run_orbslam3(robot, tmp_path)
+
+
+def test_tracking_states_report_loss_separately_from_exported_poses(tmp_path):
+    path = tmp_path / 'tracking.csv'
+    path.write_text('timestamp,state,imu_samples,imu_first,imu_last,imu_initialized\n'
+                    '0,1,0,0,0,0\n0.1,2,21,0,0.1,0\n'
+                    '0.2,3,20,0.105,0.2,1\n0.3,4,20,0.205,0.3,1\n')
+    result = slam_runner.tracking_state_summary(path, np.array([0., .1, .2, .3]), 10)
+    assert result['state_counts'] == {'1': 1, '2': 1, '3': 1, '4': 1}
+    assert result['state_tracking_lost_s'] == pytest.approx(.2)
+    assert result['imu_initialized'] is True
+    assert result['imu_first_initialized_frame_s'] == .2
+
+
+def test_crash_with_partial_tracking_row_keeps_original_error(tmp_path, monkeypatch):
+    robot = Path(__file__).parents[2] / 'data/fixtures/tiny_2robots/robot_A'
+    monkeypatch.setattr(slam_runner.subprocess, 'check_output', lambda *a, **k: 'sha256:test\n')
+
+    def crash(command, **kwargs):
+        (tmp_path / 'tracking.csv').write_text('timestamp,state\n0,')
+        kwargs['stdout'].write('Creation of new map with id: 0\n')
+        raise subprocess.CalledProcessError(125, command)
+
+    monkeypatch.setattr(slam_runner.subprocess, 'run', crash)
+    with pytest.raises(subprocess.CalledProcessError):
+        slam_runner.run_orbslam3(robot, tmp_path)
+    metadata = json.loads((tmp_path / 'slam_meta.json').read_text())
+    assert metadata['status'] == 'failed'
+    assert metadata['maps_created'] == 1
+    assert '125' in metadata['error']
+    assert metadata['tracking_diagnostics_error']

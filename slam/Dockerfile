@@ -72,6 +72,7 @@ RUN patch -d /opt/ORB_SLAM3 -p1 < /tmp/orbslam3_shutdown.patch \
 
 COPY slam/CMakeLists.txt /opt/smoke-rescue-runner/CMakeLists.txt
 COPY slam/rgbd_runner.cc /opt/smoke-rescue-runner/rgbd_runner.cc
+COPY slam/imu_feed.h /opt/smoke-rescue-runner/imu_feed.h
 
 RUN cmake -S /opt/smoke-rescue-runner -B /opt/smoke-rescue-runner/build \
         -DCMAKE_BUILD_TYPE=Release \

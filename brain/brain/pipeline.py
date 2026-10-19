@@ -19,8 +19,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def input_hash(robot_dir: Path) -> str:
+def input_hash(robot_dir: Path, mode: str = "rgbd") -> str:
     h = hashlib.sha256()
+    if mode == "rgbd_inertial":
+        from brain.slam_runner import inertial_calibration
+        h.update(mode.encode())
+        h.update((robot_dir / "imu.txt").read_bytes())
+        h.update(json.dumps(inertial_calibration(robot_dir), sort_keys=True).encode())
     for name in ("associations.txt", "camera.yaml"):
         h.update((robot_dir / name).read_bytes())
     for sub in ("rgb", "depth"):
@@ -45,6 +50,7 @@ def main() -> None:
     ap.add_argument("--out", type=Path)
     ap.add_argument("--device", default="mps", choices=["mps", "cpu"])
     ap.add_argument("--force-slam", action="store_true")
+    ap.add_argument("--slam-mode", choices=("rgbd", "rgbd_inertial"), default="rgbd")
     ap.add_argument("--no-viewer", action="store_true")
     args = ap.parse_args()
     rec = args.recording.resolve()
@@ -55,13 +61,14 @@ def main() -> None:
 
     for robot in meta["robots"]:
         rdir, odir = rec / robot, out / robot
-        key = input_hash(rdir)
+        key = input_hash(rdir, args.slam_mode)
         cache = odir / "pipeline_input_hash.txt"
         if not args.force_slam and cache.exists() and cache.read_text() == key and (odir / "CameraTrajectory.txt").exists():
             print(f"[pipeline] {robot}: SLAM inputs unchanged, reusing {odir}", flush=True)
         else:
             odir.mkdir(parents=True, exist_ok=True)
-            timings[f"slam_{robot}"] = step(f"C7 SLAM {robot}", ["brain.slam_runner", str(rdir), str(odir)])
+            timings[f"slam_{robot}"] = step(f"C7 SLAM {robot}", ["brain.slam_runner", str(rdir), str(odir),
+                                                                  "--mode", args.slam_mode])
             cache.write_text(key)
         timings[f"map_{robot}"] = step(f"dense map {robot}", ["brain.dense_map", str(rdir), str(odir)])
 

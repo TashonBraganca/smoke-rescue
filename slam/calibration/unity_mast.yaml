@@ -1,0 +1,55 @@
+%YAML:1.0
+---
+File.version: "1.0"
+Camera.type: "PinHole"
+
+Camera1.fx: 415.692
+Camera1.fy: 415.692
+Camera1.cx: 319.5
+Camera1.cy: 239.5
+Camera1.k1: 0.0
+Camera1.k2: 0.0
+Camera1.p1: 0.0
+Camera1.p2: 0.0
+Camera1.k3: 0.0
+Camera.width: 640
+Camera.height: 480
+Camera.fps: 15
+Camera.RGB: 1
+
+Stereo.ThDepth: 40.0
+Stereo.b: 0.07732
+RGBD.DepthMapFactor: 1000.0
+
+ORBextractor.nFeatures: 1250
+ORBextractor.scaleFactor: 1.2
+ORBextractor.nLevels: 8
+ORBextractor.iniThFAST: 20
+ORBextractor.minThFAST: 7
+
+Viewer.KeyFrameSize: 0.05
+Viewer.KeyFrameLineWidth: 1.0
+Viewer.GraphLineWidth: 0.9
+Viewer.PointSize: 2.0
+Viewer.CameraSize: 0.08
+Viewer.CameraLineWidth: 3.0
+Viewer.ViewpointX: 0.0
+Viewer.ViewpointY: -0.7
+Viewer.ViewpointZ: -1.8
+Viewer.ViewpointF: 500.0
+
+# Camera optical to IMU body, p_body = T_b_c1 * p_camera.
+IMU.T_b_c1: !!opencv-matrix
+   rows: 4
+   cols: 4
+   dt: f
+   data: [1, 0, 0, 0,
+          0, 0.984807753012, 0.173648177667, -1.6,
+          0, -0.173648177667, 0.984807753012, 0.25,
+          0, 0, 0, 1]
+IMU.NoiseGyro: 0.000170000000
+IMU.NoiseAcc: 0.002000000000
+IMU.GyroWalk: 0.000020000000
+IMU.AccWalk: 0.000300000000
+IMU.Frequency: 200.000000000000
+IMU.InsertKFsWhenLost: 1
