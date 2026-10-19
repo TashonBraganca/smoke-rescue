@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="4" result="Passed" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-10-19 17:45:25Z" end-time="2026-10-19 17:45:25Z" duration="0.1144361">
+  <test-suite type="TestSuite" id="1000" name="SmokeRescue" fullname="SmokeRescue" runstate="Runnable" testcasecount="4" result="Passed" start-time="2026-10-19 17:45:25Z" end-time="2026-10-19 17:45:25Z" duration="0.114436" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+    <test-suite type="Assembly" id="1007" name="SmokeRescue.Tests.EditMode.dll" fullname="/Volumes/Tashon/opencv/smoke-rescue/unity/SmokeRescue/Library/ScriptAssemblies/SmokeRescue.Tests.EditMode.dll" runstate="Runnable" testcasecount="4" result="Passed" start-time="2026-10-19 17:45:25Z" end-time="2026-10-19 17:45:25Z" duration="0.111774" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="39645" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <test-suite type="TestSuite" id="1008" name="SmokeRescue" fullname="SmokeRescue" runstate="Runnable" testcasecount="4" result="Passed" start-time="2026-10-19 17:45:25Z" end-time="2026-10-19 17:45:25Z" duration="0.111568" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1009" name="Tests" fullname="SmokeRescue.Tests" runstate="Runnable" testcasecount="4" result="Passed" start-time="2026-10-19 17:45:25Z" end-time="2026-10-19 17:45:25Z" duration="0.111448" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1010" name="EditMode" fullname="SmokeRescue.Tests.EditMode" runstate="Runnable" testcasecount="4" result="Passed" start-time="2026-10-19 17:45:25Z" end-time="2026-10-19 17:45:25Z" duration="0.111309" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestFixture" id="1002" name="HouseBuilderTests" fullname="SmokeRescue.Tests.EditMode.HouseBuilderTests" classname="SmokeRescue.Tests.EditMode.HouseBuilderTests" runstate="Runnable" testcasecount="4" result="Passed" start-time="2026-10-19 17:45:25Z" end-time="2026-10-19 17:45:25Z" duration="0.110899" total="4" passed="4" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-case id="1004" name="CapsuleWalksThroughEveryDoorWithoutCollision" fullname="SmokeRescue.Tests.EditMode.HouseBuilderTests.CapsuleWalksThroughEveryDoorWithoutCollision" methodname="CapsuleWalksThroughEveryDoorWithoutCollision" classname="SmokeRescue.Tests.EditMode.HouseBuilderTests" runstate="Runnable" seed="978526092" result="Passed" start-time="2026-10-19 17:45:25Z" end-time="2026-10-19 17:45:25Z" duration="0.086544" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1003" name="EveryDoorGapMatchesItsWidthWithin2cm" fullname="SmokeRescue.Tests.EditMode.HouseBuilderTests.EveryDoorGapMatchesItsWidthWithin2cm" methodname="EveryDoorGapMatchesItsWidthWithin2cm" classname="SmokeRescue.Tests.EditMode.HouseBuilderTests" runstate="Runnable" seed="1926327812" result="Passed" start-time="2026-10-19 17:45:25Z" end-time="2026-10-19 17:45:25Z" duration="0.004297" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1005" name="RebuildingTwiceGivesAnIdenticalHierarchy" fullname="SmokeRescue.Tests.EditMode.HouseBuilderTests.RebuildingTwiceGivesAnIdenticalHierarchy" methodname="RebuildingTwiceGivesAnIdenticalHierarchy" classname="SmokeRescue.Tests.EditMode.HouseBuilderTests" runstate="Runnable" seed="1941572035" result="Passed" start-time="2026-10-19 17:45:25Z" end-time="2026-10-19 17:45:25Z" duration="0.009574" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+              </test-case>
+              <test-case id="1006" name="WallsAreOnTheWallsLayerAndFloorsCoverThePlan" fullname="SmokeRescue.Tests.EditMode.HouseBuilderTests.WallsAreOnTheWallsLayerAndFloorsCoverThePlan" methodname="WallsAreOnTheWallsLayerAndFloorsCoverThePlan" classname="SmokeRescue.Tests.EditMode.HouseBuilderTests" runstate="Runnable" seed="992355170" result="Passed" start-time="2026-10-19 17:45:25Z" end-time="2026-10-19 17:45:25Z" duration="0.005443" asserts="0">
+                <properties>
+                  <property name="retryIteration" value="0" />
+                  <property name="repeatIteration" value="0" />
+                </properties>
+                <output><![CDATA[Saving results to: /Users/tashonbraganca/Library/Application Support/DefaultCompany/SmokeRescue/TestResults.xml
+]]></output>
+              </test-case>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

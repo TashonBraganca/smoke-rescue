@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "mcp-unity": {
+      "command": "node",
+      "args": ["unity/SmokeRescue/Library/PackageCache/com.gamelovers.mcp-unity@382a43a30f4d/Server~/build/index.js"],
+      "env": { "MCP_UNITY_AUTH_TOKEN_PATH": "unity/SmokeRescue/Library/McpUnity/bridge-token" }
+    }
+  }
+}
