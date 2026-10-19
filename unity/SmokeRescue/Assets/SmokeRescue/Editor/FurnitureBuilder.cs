@@ -70,6 +70,15 @@ namespace SmokeRescue.Editor
             return root;
         }
 
+        /// <summary>The quadruped body model named by props.json "robot_body", imported like furniture. Null if absent.</summary>
+        public static GameObject RobotBodyPrefab()
+        {
+            var cfg = JObject.Parse(File.ReadAllText(Path.Combine(FloorPlan.ConfigDir, "props.json")));
+            return cfg["robot_body"] is JObject part ? LoadModel(part, out _) : null;
+        }
+
+        public static GameObject LoadPart(JObject part) => LoadModel(part, out _);
+
         static GameObject LoadModel(JObject part, out string label)
         {
             string rel;

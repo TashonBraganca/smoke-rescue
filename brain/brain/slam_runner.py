@@ -35,6 +35,20 @@ def align_keyframes(camera: np.ndarray, keyframe_path: Path) -> dict:
             "max_keyframe_position_difference_m": float(np.max(differences))}
 
 
+def dedupe_tum(path: Path) -> int:
+    """Rewrite a TUM file keeping only the first row of each timestamp, in time order. Returns rows dropped."""
+    lines = [l for l in path.read_text().splitlines() if l.strip() and not l.startswith("#")]
+    seen, keep = set(), []
+    for l in lines:
+        t = l.split()[0]
+        if t not in seen:
+            seen.add(t)
+            keep.append(l)
+    keep.sort(key=lambda l: float(l.split()[0]))
+    path.write_text("\n".join(keep) + "\n")
+    return len(lines) - len(keep)
+
+
 def run_orbslam3(robot_dir: Path | str, out_dir: Path | str) -> tuple[Path, Path]:
     robot_dir, out_dir = Path(robot_dir).resolve(), Path(out_dir).resolve()
     if (out_dir == robot_dir or robot_dir in out_dir.parents
@@ -67,6 +81,11 @@ def run_orbslam3(robot_dir: Path | str, out_dir: Path | str) -> tuple[Path, Path
         with (out_dir / "slam.log").open("w") as log:
             subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, check=True)
         meta["wall_time_s"] = time.perf_counter() - started
+        # When ORB-SLAM3 loses tracking it starts a new map in its Atlas and writes the lost frames with a repeated
+        # timestamp. Keep the first row per timestamp and record how many maps were created, so a reset is reported
+        # (and visible in ATE) instead of crashing the pipeline.
+        meta["maps_created"] = (out_dir / "slam.log").read_text().count("Creation of new map with id")
+        meta["duplicate_rows_dropped"] = dedupe_tum(camera_path) + dedupe_tum(keyframe_path)
         camera = read_tum(camera_path)
         meta.update(tracking_summary(times, camera, reader.camera.fps))
         shutil.copyfile(keyframe_path, out_dir / "KeyFrameTrajectory.raw.txt")

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using Newtonsoft.Json.Linq;
 using SmokeRescue.World;
@@ -52,7 +53,7 @@ namespace SmokeRescue.Robots
 
             robot.Body = new GameObject("Body").transform;
             robot.Body.SetParent(root.transform, false);
-            var visual = PlaceholderVisual(spec.Colour);
+            var visual = BodyPrefab != null ? QuadrupedVisual(BodyPrefab, spec.Colour, robot) : PlaceholderVisual(spec.Colour);
             visual.transform.SetParent(robot.Body, false);
 
             robot.CameraMount = new GameObject("CameraMount").transform;
@@ -60,12 +61,21 @@ namespace SmokeRescue.Robots
             robot.CameraMount.localPosition = new Vector3(0f, mount.Value<float>("height_m"), mount.Value<float>("forward_offset_m"));
             robot.CameraMount.localRotation = Quaternion.Euler(mount.Value<float>("pitch_down_deg"), 0f, 0f);
 
+            // The camera sits on the front face of the body (SIMULATION_SPEC 4.1). With a downloaded body that is
+            // longer than the spec's 0.32 m offset assumes, move the mount forward so the camera never sees its own shell.
+            float front = FrontOfBody(visual);
+            if (front + 0.03f > robot.CameraMount.localPosition.z)
+                robot.CameraMount.localPosition = new Vector3(0f, robot.CameraMount.localPosition.y, front + 0.03f);
+
             var lightGo = new GameObject("Headlight");
             lightGo.transform.SetParent(robot.CameraMount, false);
             var light = lightGo.AddComponent<Light>();
             light.type = LightType.Spot;
-            light.spotAngle = head.Value<float>("cone_deg");
-            light.innerSpotAngle = head.Value<float>("cone_deg") * 0.25f;   // soft falloff, no hard-edged disc
+            // Floodlight, not the spec's hard 40 degree spot: the sharp edge of a 40 degree cone gave ORB a ring of
+            // strong corners that move with the camera, and ORB-SLAM3 lost tracking on them during turns (clear run,
+            // robot_A at 12.8 s and 74.7 s). A 100 degree cone with a broad falloff has no edge inside the 75 x 60 view.
+            light.spotAngle = 100f;
+            light.innerSpotAngle = 15f;
             light.range = head.Value<float>("range_m");
             light.lightUnit = UnityEngine.Rendering.LightUnit.Lumen;
             light.intensity = head.Value<float>("intensity_lumen");
@@ -75,6 +85,13 @@ namespace SmokeRescue.Robots
             robot.ApplyPose();
             return robot;
         }
+
+        /// <summary>Downloaded quadruped model (set by the editor before robots are created). Null uses the placeholder box body.</summary>
+        public static GameObject BodyPrefab;
+        /// <summary>Target body length in metres (SIMULATION_SPEC 4.1: about 0.7 m).</summary>
+        public const float BodyLength = 0.75f;
+
+        readonly List<(Transform t, Quaternion rest, float phase, float amp)> legJoints = new List<(Transform, Quaternion, float, float)>();
 
         public void Step(float dt)
         {
@@ -92,6 +109,107 @@ namespace SmokeRescue.Robots
             float sway = SwayDegrees * moving * Mathf.Sin(Driver.GaitPhase);
             Body.localPosition = new Vector3(0f, bob, 0f);
             Body.localRotation = Quaternion.Euler(0f, 0f, sway);
+            // Trot: diagonal pairs (FL+RR, FR+RL) swing in opposite phase; knees lag hips by a quarter cycle.
+            foreach (var (t, rest, phase, amp) in legJoints)
+                t.localRotation = rest * Quaternion.Euler(amp * moving * Mathf.Sin(Driver.GaitPhase + phase), 0f, 0f);
+        }
+
+        /// <summary>Instantiates the rigged quadruped, scales it to BodyLength, puts its feet on the floor, adds a colour band.</summary>
+        static GameObject QuadrupedVisual(GameObject prefab, Color colour, Robot robot)
+        {
+            var visual = new GameObject("Visual");
+            var model = Object.Instantiate(prefab, visual.transform, false);
+            model.name = "Quadruped";
+            Orient(model);
+            var b = Bounds(model);
+            float length = Mathf.Max(b.size.z, 1e-3f);
+            model.transform.localScale *= BodyLength / length;
+            b = Bounds(model);
+            model.transform.localPosition -= new Vector3(b.center.x, b.min.y, b.center.z);
+            foreach (var t in model.GetComponentsInChildren<Transform>())
+            {
+                t.gameObject.layer = LayerMask.NameToLayer("Robots");
+                string n = t.name;
+                bool upper = n.Contains("upperLeg"), lower = n.Contains("lowerLeg");
+                if (!upper && !lower) continue;
+                bool pairA = n.Contains("_FL") || n.Contains("_RR");
+                float phase = (pairA ? 0f : Mathf.PI) + (lower ? Mathf.PI / 2f : 0f);
+                robot.legJoints.Add((t, t.localRotation, phase, upper ? 18f : 22f));
+            }
+            b = Bounds(model);
+            Part(visual, PrimitiveType.Cube, "Band", new Vector3(0f, b.max.y + 0.005f, -0.05f), new Vector3(b.size.x * 0.5f, 0.012f, b.size.z * 0.35f), colour);
+            return visual;
+        }
+
+        /// <summary>
+        /// Downloaded rigs come in arbitrary axes. Pick the pitch (0, 90, -90, 180 degrees) that puts the lower-leg
+        /// joints lowest (feet down), then turn 180 degrees about y if the front legs (FL, FR) are behind the rear ones.
+        /// </summary>
+        static void Orient(GameObject model)
+        {
+            var lower = new List<Transform>();
+            var front = new List<Transform>();
+            var rear = new List<Transform>();
+            foreach (var t in model.GetComponentsInChildren<Transform>())
+            {
+                if (t.name.Contains("lowerLeg")) lower.Add(t);
+                if (t.name.Contains("upperLeg") && (t.name.Contains("_FL") || t.name.Contains("_FR"))) front.Add(t);
+                if (t.name.Contains("upperLeg") && (t.name.Contains("_RL") || t.name.Contains("_RR"))) rear.Add(t);
+            }
+            if (lower.Count == 0) return;
+            var root = model.transform;
+            var start = root.localRotation;
+            Quaternion best = start;
+            float bestScore = float.MaxValue;
+            foreach (var pitch in new[] { 0f, 90f, -90f, 180f })
+            foreach (var roll in new[] { 0f, 90f, -90f })
+            {
+                root.localRotation = Quaternion.Euler(pitch, 0f, roll) * start;
+                var b = Bounds(model);
+                float feet = 0f;
+                foreach (var t in lower) feet += t.position.y;
+                feet /= lower.Count;
+                // Lowest feet relative to the body, and the body longer along z than tall.
+                float score = (feet - b.center.y) / Mathf.Max(b.size.y, 1e-3f) + (b.size.z < b.size.y ? 1f : 0f);
+                if (score < bestScore) { bestScore = score; best = root.localRotation; }
+            }
+            root.localRotation = best;
+            if (front.Count > 0 && rear.Count > 0)
+            {
+                float fz = 0f, rz = 0f;
+                foreach (var t in front) fz += t.position.z;
+                foreach (var t in rear) rz += t.position.z;
+                if (fz / front.Count < rz / rear.Count) root.localRotation = Quaternion.Euler(0f, 180f, 0f) * root.localRotation;
+            }
+        }
+
+        /// <summary>Forward extent (local z) of the whole body. A rigged body is often one skinned mesh, so
+        /// filtering renderers by height (torso only) can miss it entirely.</summary>
+        static float FrontOfBody(GameObject visual)
+        {
+            float front = float.MinValue;
+            foreach (var r in visual.GetComponentsInChildren<Renderer>())
+            {
+                var b = r.bounds;
+                for (int i = 0; i < 8; i++)
+                {
+                    var corner = new Vector3((i & 1) == 0 ? b.min.x : b.max.x, (i & 2) == 0 ? b.min.y : b.max.y, (i & 4) == 0 ? b.min.z : b.max.z);
+                    front = Mathf.Max(front, visual.transform.InverseTransformPoint(corner).z);
+                }
+            }
+            return front == float.MinValue ? 0f : front;
+        }
+
+        static Bounds Bounds(GameObject go)
+        {
+            var rs = go.GetComponentsInChildren<Renderer>();
+            if (rs.Length == 0) return new Bounds(go.transform.position, Vector3.zero);
+            var b = rs[0].bounds;
+            for (int i = 1; i < rs.Length; i++) b.Encapsulate(rs[i].bounds);
+            var parent = go.transform.parent;
+            if (parent == null) return b;
+            // Return bounds in the parent's frame (the Visual root sits at the robot origin, yaw 0 at creation).
+            return new Bounds(parent.InverseTransformPoint(b.center), b.size);
         }
 
         /// <summary>Box body, four legs and a colour band: stands in until the downloaded quadruped is wired in.</summary>

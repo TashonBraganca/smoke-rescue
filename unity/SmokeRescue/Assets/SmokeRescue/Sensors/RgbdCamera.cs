@@ -29,6 +29,9 @@ namespace SmokeRescue.Sensors
         /// <summary>Caller supplies normalized proximity to fire for configured exposure flicker.</summary>
         public float NearFire { get; set; }
         public event Action<RgbdFrame> FrameReady;
+        /// <summary>Last rendered RGB and linear-depth targets, for on-screen display (showcase picture-in-picture).</summary>
+        public RenderTexture ColorTexture => colorTarget;
+        public RenderTexture DepthTexture => depthTarget;
         public event Action<string> CaptureFailed;
         RenderTexture colorTarget, depthTarget;
         CustomPassVolume passVolume;

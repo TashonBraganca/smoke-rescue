@@ -45,10 +45,10 @@ namespace SmokeRescue.Editor
                     volume.priority = 1000f;
                     var profile = ScriptableObject.CreateInstance<VolumeProfile>();
                     var exposure = profile.Add<Exposure>(true);
-                    exposure.mode.Override(ExposureMode.Automatic);
-                    exposure.adaptationMode.Override(AdaptationMode.Fixed);
-                    exposure.limitMin.Override(-10f);
-                    exposure.limitMax.Override(20f);
+                    // Fixed EV for an 8000 lux shadowless sun. Auto exposure did not settle once the scene's
+                    // Atmosphere volume existed, and captures came out white.
+                    exposure.mode.Override(ExposureMode.Fixed);
+                    exposure.fixedExposure.Override(11f);
                     profile.Add<Fog>(true).enabled.Override(false);
                     volume.sharedProfile = profile;
                 }

@@ -110,6 +110,15 @@ namespace SmokeRescue.World
                 l.shadows = LightShadows.Soft;
             }
 
+            // Dim battery emergency lighting in every room, so walls and furniture beyond the headlight carry
+            // world-fixed texture. Without it the house was black outside the headlight and SLAM lost tracking.
+            foreach (var r in plan.rooms)
+            {
+                var c = new Vector3((r.rect[0] + r.rect[2]) / 2f, plan.wall_height - 0.2f, (r.rect[1] + r.rect[3]) / 2f);
+                var l = AddPointLight(go, $"RoomLight_{r.id}", c, new Color(1f, 0.86f, 0.7f), 300f, 9f);
+                l.shadows = LightShadows.None;
+            }
+
             var rng = new System.Random(scenario.seed);
             foreach (var f in plan.fires)
             {
