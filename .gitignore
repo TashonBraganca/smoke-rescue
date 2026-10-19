@@ -47,3 +47,6 @@ unity/*.log
 # Imported models are rebuilt from assets_cache/ by Tools > Smoke Rescue > Place Furniture (keeps LFS quota free)
 unity/SmokeRescue/Assets/SmokeRescue/Art/Models/
 unity/SmokeRescue/Assets/SmokeRescue/Art/Models.meta
+
+# Detector weights are downloaded by ultralytics on first use
+brain/*.pt

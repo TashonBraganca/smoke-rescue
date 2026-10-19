@@ -160,6 +160,26 @@ def main() -> None:
             f"{c['msg_id']} {c['from']}->{c['to']} kf {c['query_kf']} vs {c['match_kf']} rank {c['rank']}: {c['reason']} "
             f"(inliers {c.get('inliers')}, fitness {c.get('fitness', 0):.2f})"))))
 
+    # Survivors found by the robots' detector (in A's frame after the merge) and per-frame detection boxes.
+    surv_path = run / "merge" / "survivors_merged.json"
+    if surv_path.exists():
+        found = json.loads(surv_path.read_text())
+        for k in range(len(found)):
+            shown = [f for f in found if f["first_seen_t"] <= found[k]["first_seen_t"]]
+            events.append((found[k]["first_seen_t"], lambda sh=shown: rr.log("world/survivors", rr.Points3D(
+                [f["position_a"] for f in sh], radii=0.18, colors=[(235, 60, 60)], labels=[f"survivor {f['id']}" for f in sh]))))
+            events.append((found[k]["first_seen_t"], lambda f=found[k]: rr.log("log/merge", rr.TextLog(
+                f"SURVIVOR {f['id']} found by {', '.join(f['seen_by'])} ({f['n_frames']} frames)", level=rr.TextLogLevel.WARN))))
+    for r in robots:
+        det_path = run / r / "detections.json"
+        if det_path.exists():
+            for d in json.loads(det_path.read_text()):
+                x0, y0, x1, y1 = d["box"]
+                events.append((d["t"], lambda r=r, x0=x0, y0=y0, x1=x1, y1=y1, c=d["conf"]: rr.log(
+                    f"world/{r}/camera/rgb/detections", rr.Boxes2D(array=[[x0, y0, x1 - x0, y1 - y0]], array_format=rr.Box2DFormat.XYWH,
+                                                                labels=[f"person {c:.2f}"], colors=[(235, 60, 60)]))))
+                events.append((d["t"] + 0.3, lambda r=r: rr.log(f"world/{r}/camera/rgb/detections", rr.Clear(recursive=False))))
+
     for line in (rec / "radio.txt").read_text().splitlines():
         if line.startswith("#") or not line.strip():
             continue
