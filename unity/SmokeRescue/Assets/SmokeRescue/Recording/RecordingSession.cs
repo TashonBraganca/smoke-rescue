@@ -59,7 +59,14 @@ namespace SmokeRescue.Recording
             var scenario = Scenario.Load(scenarioFile);
             var sensorCfg = SensorConfig.Load();
             string root = Path.GetFullPath(Path.Combine(FloorPlan.ConfigDir, "..", "data", "recordings", runId));
-            if (Directory.Exists(root)) Directory.Delete(root, true);
+            if (Directory.Exists(root))
+            {
+                // Move the old run aside first: a recursive delete of thousands of files can race with macOS
+                // (Spotlight, .DS_Store) and throw "Directory not empty", which aborted a full recording.
+                string trash = root + ".old_" + DateTime.Now.Ticks;
+                Directory.Move(root, trash);
+                try { Directory.Delete(trash, true); } catch (IOException e) { Debug.LogWarning($"[SmokeRescue] could not delete {trash}: {e.Message}"); }
+            }
             Directory.CreateDirectory(root);
 
             var atmosphere = Atmosphere.Build(plan, scenario);

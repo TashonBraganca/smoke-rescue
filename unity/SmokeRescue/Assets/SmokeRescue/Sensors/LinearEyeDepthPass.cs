@@ -5,6 +5,7 @@ using UnityEngine.Rendering.HighDefinition;
 namespace SmokeRescue.Sensors
 {
     /// <summary>Exports opaque geometry eye z before fog. Each pass belongs to one sensor camera.</summary>
+    [System.Serializable]
     public sealed class LinearEyeDepthPass : CustomPass
     {
         public Camera SensorCamera;

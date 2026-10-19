@@ -14,13 +14,32 @@ namespace SmokeRescue.Tests.EditMode
         const float Dt = 1f / 60f;
 
         [Test]
-        public void BothRobotsDriveTheirRoutesWithinLimitsWithoutCollisions()
+        public void BothRobotsDriveTheirRoutesWithinLimitsWithoutCollisions() => DriveRoutes(withFurniture: false);
+
+        /// <summary>Same routes with every landmark and survivor in place (needs assets_cache/ from tools/fetch_*.py).</summary>
+        [Test]
+        public void BothRobotsMissAllFurnitureAndSurvivors() => DriveRoutes(withFurniture: true);
+
+        static void DriveRoutes(bool withFurniture)
         {
             ProjectSetup.EnsureLayers();
             var plan = FloorPlan.Load();
             var scenario = Scenario.Load("scenario_haze_2agents.json");
             var limits = RobotLimits.Load();
+            var existingHouse = GameObject.Find(HouseBuilder.RootName);
+            if (existingHouse != null) existingHouse.SetActive(false);
             var house = HouseBuilder.Build(plan, MaterialLibrary.GreyBox);
+            GameObject furniture = null, survivors = null;
+            var existingFurniture = GameObject.Find(FurnitureBuilder.RootName);
+            var existingSurvivors = GameObject.Find(ScenePreview.SurvivorsRoot);
+            if (withFurniture)
+            {
+                if (existingFurniture != null) existingFurniture.SetActive(false);
+                if (existingSurvivors != null) existingSurvivors.SetActive(false);
+                furniture = FurnitureBuilder.Place(plan);
+                ScenePreview.PlaceSurvivors();
+                survivors = GameObject.Find(ScenePreview.SurvivorsRoot);
+            }
             var root = new GameObject("Robots");
             try
             {
@@ -61,12 +80,21 @@ namespace SmokeRescue.Tests.EditMode
                     Assert.Greater(maxBob, 0.003f, $"gait bob not visible: {report.Last()}");
                     Assert.IsEmpty(hits, report.Last());
                 }
-                Debug.Log("[SmokeRescue] C3 route report\n" + string.Join("\n", report));
+                Debug.Log($"[SmokeRescue] C3 route report (furniture {withFurniture})\n" + string.Join("\n", report));
             }
             finally
             {
                 Object.DestroyImmediate(root);
                 Object.DestroyImmediate(house);
+                if (existingHouse != null) existingHouse.SetActive(true);
+                if (withFurniture)
+                {
+                    if (furniture != null) Object.DestroyImmediate(furniture);
+                    if (survivors != null) Object.DestroyImmediate(survivors);
+                    // Rebuild the scene's own copies so the test leaves the open scene as it found it.
+                    if (existingFurniture != null) { Object.DestroyImmediate(existingFurniture); FurnitureBuilder.Place(plan); }
+                    if (existingSurvivors != null) { Object.DestroyImmediate(existingSurvivors); ScenePreview.PlaceSurvivors(); }
+                }
             }
         }
     }

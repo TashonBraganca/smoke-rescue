@@ -7,6 +7,8 @@ namespace SmokeRescue.Editor
     /// <summary>Recording entry points. Each run rebuilds robots and atmosphere from config, then records on a fixed clock.</summary>
     public static class RecorderMenu
     {
+        /// <summary>Use the downloaded quadruped body instead of the placeholder box.</summary>
+        public static bool UseQuadruped = true;
         [MenuItem("Tools/Smoke Rescue/Record/Clear 10 s test")]
         public static void ClearTest() => Run("scenario_clear_2agents.json", "unity_clear_test10", 10f);
 
@@ -21,6 +23,7 @@ namespace SmokeRescue.Editor
 
         static void Run(string scenario, string runId, float maxSeconds = float.PositiveInfinity, bool noise = true)
         {
+            SmokeRescue.Robots.Robot.BodyPrefab = UseQuadruped ? FurnitureBuilder.RobotBodyPrefab() : null;
             var r = RecordingSession.Record(scenario, runId, maxSeconds, noise, msg => Debug.Log($"[SmokeRescue] {runId} {msg}"));
             Debug.Log($"[SmokeRescue] Recording done: {r.dir}");
         }

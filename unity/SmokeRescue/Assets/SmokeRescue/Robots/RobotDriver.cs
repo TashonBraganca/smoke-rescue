@@ -58,7 +58,8 @@ namespace SmokeRescue.Robots
         const float WaypointTolerance = 0.12f;
         const float TurnInPlaceDeg = 35f;
         const float DoorSlowRadius = 0.9f;
-        const float StrideLength = 0.25f;                // metres per gait cycle, one trot step pair
+        const float StrideLength = 0.25f;
+        const float TurnInPlaceDps = 30f;                // metres per gait cycle, one trot step pair
 
         public RobotDriver(Scenario.Robot spec, Scenario.LookAround look, RobotLimits limits, FloorPlan plan)
         {
@@ -151,7 +152,9 @@ namespace SmokeRescue.Robots
             {
                 // Stop, then rotate in place until roughly aligned.
                 mode = Mathf.Abs(headingErr) < 4f ? Mode.Driving : Mode.Turning;
-                float w = Mathf.Clamp(headingErr * 2.5f, -wMax, wMax);
+                // Turn in place at half the yaw-rate limit: 2 degrees per camera frame keeps visual tracking stable.
+                float wTurn = Mathf.Min(wMax, TurnInPlaceDps);
+                float w = Mathf.Clamp(headingErr * 2.5f, -wTurn, wTurn);
                 return (0f, Speed > 0.02f ? 0f : w);
             }
 
