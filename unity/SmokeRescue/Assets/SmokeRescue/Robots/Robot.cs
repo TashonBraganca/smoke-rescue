@@ -65,7 +65,7 @@ namespace SmokeRescue.Robots
             var light = lightGo.AddComponent<Light>();
             light.type = LightType.Spot;
             light.spotAngle = head.Value<float>("cone_deg");
-            light.innerSpotAngle = head.Value<float>("cone_deg") * 0.6f;
+            light.innerSpotAngle = head.Value<float>("cone_deg") * 0.25f;   // soft falloff, no hard-edged disc
             light.range = head.Value<float>("range_m");
             light.lightUnit = UnityEngine.Rendering.LightUnit.Lumen;
             light.intensity = head.Value<float>("intensity_lumen");

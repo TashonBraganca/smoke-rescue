@@ -61,17 +61,22 @@ namespace SmokeRescue.Sensors
             Camera.fieldOfView = config.camera.vertical_fov_deg;
             Camera.aspect = (float)config.camera.width / config.camera.height;
             Camera.nearClipPlane = Mathf.Min(0.01f, config.depth.min_m * 0.5f);
-            Camera.farClipPlane = config.depth.max_m + 1;
+            // RGB must see the whole house; depth beyond max_m is invalidated by the noise model, not by clipping.
+            // A 9 m far plane left far walls undrawn and the clear colour showed through doorways.
+            Camera.farClipPlane = 60f;
             Camera.allowMSAA = false;
             Camera.allowDynamicResolution = false;
             Camera.rect = new Rect(0, 0, 1, 1);
             Camera.ResetProjectionMatrix();
             var hd = GetComponent<HDAdditionalCameraData>();
             hd.antialiasing = HDAdditionalCameraData.AntialiasingMode.None;
+            hd.clearColorMode = HDAdditionalCameraData.ClearColorMode.Color;   // night outside: black, never a sky colour
+            hd.backgroundColorHDR = Color.black;
             hd.customRenderingSettings = true;
             SetFrameSetting(hd, FrameSettingsField.CustomPass, true);
-            // Fixed neutral exposure. Scene volumes cannot change the camera's exposure multiplier.
-            SetFrameSetting(hd, FrameSettingsField.ExposureControl, false);
+            // Exposure comes from the scene's Atmosphere volume (fixed EV100, so frames stay deterministic).
+            // With exposure control off HDRP ignores that volume and the headlight spot clips to white.
+            SetFrameSetting(hd, FrameSettingsField.ExposureControl, true);
             SetFrameSetting(hd, FrameSettingsField.Postprocess, false);
             SetFrameSetting(hd, FrameSettingsField.DepthOfField, false);
             SetFrameSetting(hd, FrameSettingsField.MotionBlur, false);

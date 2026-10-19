@@ -9,7 +9,8 @@
     "Unity.RenderPipelines.HighDefinition.Runtime",
     "Unity.RenderPipelines.Core.Runtime",
     "SmokeRescue.Robots",
-    "SmokeRescue.Sensors"
+    "SmokeRescue.Sensors",
+    "SmokeRescue.Radio"
   ],
   "includePlatforms": [
     "Editor"
