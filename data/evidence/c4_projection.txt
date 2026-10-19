@@ -1,0 +1,7 @@
+projection_error_px=0.000793604
+depth_error_cm=0.308327
+projected_uv=381.163900,201.395200
+unity_uv=381.163400,201.394500
+sampled_pixel=381,201
+sampled_depth_mm=3000
+rgb_variance=2932.955

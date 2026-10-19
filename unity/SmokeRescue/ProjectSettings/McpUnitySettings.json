@@ -1,6 +1,6 @@
 {
     "Port": 8090,
-    "RequestTimeoutSeconds": 10,
+    "RequestTimeoutSeconds": 900,
     "AutoStartServer": true,
     "AllowBatchModeServer": false,
     "EnableInfoLogs": false,

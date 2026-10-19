@@ -1,0 +1,3 @@
+#!/bin/sh
+# Shorthand for tools/unity_bridge.py: tools/ub menu "Tools/Smoke Rescue/Build House"
+exec uv run -q --with websockets python "$(dirname "$0")/unity_bridge.py" "$@"

@@ -1,0 +1,8 @@
+scene=isolated textured quads, not House
+noise=enabled
+frames_per_camera=150
+sim_duration_s=10
+wall_duration_s=107.196103
+paired_fps=1.399305
+individual_camera_frames_per_s=2.798609
+submit_ms_per_pair=1.929
