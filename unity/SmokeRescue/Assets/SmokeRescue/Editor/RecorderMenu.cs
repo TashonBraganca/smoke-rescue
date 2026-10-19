@@ -15,6 +15,9 @@ namespace SmokeRescue.Editor
         [MenuItem("Tools/Smoke Rescue/Record/Clear 10 s test, no noise")]
         public static void ClearTestNoNoise() => Run("scenario_clear_2agents.json", "unity_clear_test10_nonoise", 10f, noise: false);
 
+        [MenuItem("Tools/Smoke Rescue/Record/Haze 20 s test")]
+        public static void HazeTest() => Run("scenario_haze_2agents.json", "unity_haze_test20", 20f);
+
         [MenuItem("Tools/Smoke Rescue/Record/Clear full run")]
         public static void ClearFull() => Run("scenario_clear_2agents.json", "unity_clear_seed7");
 

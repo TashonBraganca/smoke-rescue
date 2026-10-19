@@ -192,7 +192,7 @@ namespace SmokeRescue.Recording
                 ["recorded_offline"] = true,
                 ["clock_hz"] = ClockHz,
                 ["noise"] = noise,
-                ["exposure_ev100"] = Atmosphere.FixedExposureEv,
+                ["exposure"] = $"per-sensor deterministic auto exposure, target grey {RgbdCamera.TargetGrey * 255:0}, EV100 {RgbdCamera.ExposureMinEv} to {RgbdCamera.ExposureMaxEv}",
             };
             File.WriteAllText(Path.Combine(root, "meta.json"), JsonConvert.SerializeObject(meta, Formatting.Indented));
             result.wallSeconds = wall.Elapsed.TotalSeconds;
