@@ -70,6 +70,7 @@ def main() -> None:
                                                 "--neutral-images", str(assets / "coco128/images/train2017"),
                                                 "--assets", str(assets), "--device", args.device])
     timings["merge"] = step("C9 merge", ["brain.merge", str(rec), str(out)])
+    timings["detect"] = step("C12 survivor detection", ["brain.detect", str(rec), str(out)])
     timings["evaluate"] = step("C10 evaluate", ["brain.evaluator", str(rec), str(out)])
     if not args.no_viewer:
         timings["viewer"] = step("C11 replay", ["brain.viewer", str(out), "--recording", str(rec)])

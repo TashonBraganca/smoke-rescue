@@ -10,7 +10,7 @@ from evo.core import metrics, sync
 from evo.core.trajectory import PoseTrajectory3D
 
 from brain.io import RecordingReader
-from brain.oracle import Trajectory, load_floorplan, load_trajectory, truth_folder
+from brain.oracle import Trajectory, load_floorplan, load_survivors, load_trajectory, truth_folder
 from brain.trajectory import read_tum, tracking_summary, validate_tum
 
 
@@ -165,6 +165,26 @@ def evaluate_map(recording: Path, out_dir: Path, details: dict, pair: tuple[str,
             result["coverage_pct"] = 100.0 * len(cells & seen) / len(cells)
     return result
 
+def evaluate_survivors(recording: Path, out_dir: Path, details: dict, robot_a: str) -> dict | None:
+    """Match merged survivor detections (robot A map frame) to the oracle's survivors within 1 m on the floor plane."""
+    path = out_dir / "merge" / "survivors_merged.json"
+    truth = load_survivors(recording)
+    if not path.exists() or not truth or robot_a not in details:
+        return None
+    found = json.loads(path.read_text())
+    T = alignment_matrix(details[robot_a])
+    est = [(f["id"], T[:3, :3] @ np.asarray(f["position_a"]) + T[:3, 3]) for f in found]
+    matches, used = [], set()
+    for s in truth:
+        q = np.asarray(s["position_house"], float)
+        best = min(((np.linalg.norm((p - q)[[0, 2]]), fid, p) for fid, p in est if fid not in used), default=None, key=lambda x: x[0])
+        if best and best[0] <= 1.0:
+            used.add(best[1])
+            matches.append({"survivor": s["id"], "detection": best[1], "error_m": float(best[0])})
+    false = [{"detection": fid, "position_house": p.round(2).tolist()} for fid, p in est if fid not in used]
+    return {"total": len(truth), "found": len(matches), "matches": matches, "false_detections": false}
+
+
 def evaluate_run(recording: Path | str, out_dir: Path | str) -> dict:
     recording, out_dir = Path(recording), Path(out_dir)
     metadata = json.loads((recording / "meta.json").read_text())
@@ -190,6 +210,9 @@ def evaluate_run(recording: Path | str, out_dir: Path | str) -> dict:
     if len(pair) == 2:
         report.update(evaluate_merge(out_dir, details, pair, recording))
         report.update(evaluate_map(recording, out_dir, details, pair))
+        surv = evaluate_survivors(recording, out_dir, details, pair[0])
+        if surv is not None:
+            report["survivors"] = surv
     # Association and alignment evidence goes in a separate file.
     (out_dir / "ate_details.json").write_text(json.dumps(details, indent=2, allow_nan=False) + "\n")
     (out_dir / "report.json").write_text(json.dumps(report, indent=2, allow_nan=False) + "\n")
@@ -221,6 +244,11 @@ def evaluate_run(recording: Path | str, out_dir: Path | str) -> dict:
         paragraphs.append(f"False merges (accepted matches whose registration is more than 50 cm wrong at the matched place): {report['false_merges']}.")
     if report.get("map_median_error_m") is not None:
         paragraphs.append(f"Merged map median distance to the true surfaces: {report['map_median_error_m'] * 100:.1f} cm.")
+    if report.get("survivors"):
+        sv = report["survivors"]
+        errs = ", ".join(f"{m['survivor']} {m['error_m'] * 100:.0f} cm" for m in sv["matches"]) or "none"
+        paragraphs.append(f"Survivors found by the robots' person detector: {sv['found']} of {sv['total']} (position error: {errs}); "
+                          f"{len(sv['false_detections'])} false detection(s).")
     if report.get("coverage_pct") is not None:
         paragraphs.append(f"Floor coverage (proxy: floor cells with a merged-map point within 3 m of a camera): {report['coverage_pct']:.1f} percent.")
     (out_dir / "report.md").write_text("\n".join(paragraphs) + "\n")
