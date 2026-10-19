@@ -39,3 +39,7 @@ assets_inbox/
 
 # Downloaded texture and model cache, rebuilt by tools/fetch_assets.py
 assets_cache/
+
+# Unity batchmode logs
+unity/*.log
+# Evidence images are kept out of git LFS churn; STATUS.md links them

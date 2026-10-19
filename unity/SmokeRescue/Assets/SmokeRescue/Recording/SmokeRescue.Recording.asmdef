@@ -1,0 +1,24 @@
+{
+  "name": "SmokeRescue.Recording",
+  "rootNamespace": "SmokeRescue.Recording",
+  "references": [
+    "SmokeRescue.World",
+    "SmokeRescue.Robots",
+    "SmokeRescue.Sensors",
+    "SmokeRescue.Radio",
+    "SmokeRescue.Oracle",
+    "Unity.RenderPipelines.HighDefinition.Runtime",
+    "Unity.RenderPipelines.Core.Runtime"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "Newtonsoft.Json.dll"
+  ],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

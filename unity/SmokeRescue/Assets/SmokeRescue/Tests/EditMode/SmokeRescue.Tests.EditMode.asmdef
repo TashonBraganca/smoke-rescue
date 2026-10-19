@@ -1,0 +1,28 @@
+{
+  "name": "SmokeRescue.Tests.EditMode",
+  "rootNamespace": "SmokeRescue.Tests.EditMode",
+  "references": [
+    "SmokeRescue.World",
+    "SmokeRescue.Editor",
+    "UnityEngine.TestRunner",
+    "UnityEditor.TestRunner",
+    "Unity.RenderPipelines.HighDefinition.Runtime",
+    "Unity.RenderPipelines.Core.Runtime"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "Newtonsoft.Json.dll",
+    "nunit.framework.dll"
+  ],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
