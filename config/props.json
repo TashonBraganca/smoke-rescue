@@ -211,7 +211,7 @@
       {
         "polyhaven": "wooden_bookshelf_worn",
         "offset": [
-          -0.9,
+          -1.4,
           0,
           0
         ]
@@ -227,20 +227,140 @@
       {
         "polyhaven": "wooden_bookshelf_worn",
         "offset": [
-          0.9,
+          1.4,
           0,
           0
+        ]
+      },
+      {
+        "blender": "books_lowpoly",
+        "offset": [
+          -1.15,
+          0.11,
+          -0.02
+        ]
+      },
+      {
+        "blender": "books_lowpoly",
+        "offset": [
+          -1.7,
+          0.39,
+          -0.02
+        ]
+      },
+      {
+        "blender": "books_lowpoly",
+        "offset": [
+          -1.15,
+          0.67,
+          -0.02
+        ]
+      },
+      {
+        "blender": "books_lowpoly",
+        "offset": [
+          -1.7,
+          0.96,
+          -0.02
+        ]
+      },
+      {
+        "blender": "books_lowpoly",
+        "offset": [
+          -1.15,
+          1.28,
+          -0.02
+        ]
+      },
+      {
+        "blender": "books_lowpoly",
+        "offset": [
+          0.25,
+          0.11,
+          -0.02
+        ]
+      },
+      {
+        "blender": "books_lowpoly",
+        "offset": [
+          -0.3,
+          0.39,
+          -0.02
+        ]
+      },
+      {
+        "blender": "books_lowpoly",
+        "offset": [
+          0.25,
+          0.67,
+          -0.02
+        ]
+      },
+      {
+        "blender": "books_lowpoly",
+        "offset": [
+          -0.3,
+          0.96,
+          -0.02
+        ]
+      },
+      {
+        "blender": "books_lowpoly",
+        "offset": [
+          0.25,
+          1.28,
+          -0.02
+        ]
+      },
+      {
+        "blender": "books_lowpoly",
+        "offset": [
+          1.65,
+          0.11,
+          -0.02
+        ]
+      },
+      {
+        "blender": "books_lowpoly",
+        "offset": [
+          1.0999999999999999,
+          0.39,
+          -0.02
+        ]
+      },
+      {
+        "blender": "books_lowpoly",
+        "offset": [
+          1.65,
+          0.67,
+          -0.02
+        ]
+      },
+      {
+        "blender": "books_lowpoly",
+        "offset": [
+          1.0999999999999999,
+          0.96,
+          -0.02
+        ]
+      },
+      {
+        "blender": "books_lowpoly",
+        "offset": [
+          1.65,
+          1.28,
+          -0.02
         ]
       }
     ],
     "wooden_desk_with_lamp": [
       {
-        "polyhaven": "WoodenTable_01"
+        "polyhaven": "metal_office_desk"
       },
       {
         "polyhaven": "desk_lamp_arm_01",
         "offset": [
-          0.4,
+          0.5,
           "top",
           0.1
         ]
@@ -335,5 +455,23 @@
       "downloaded": "candidates/survivor/a169a23fa24f4df39daace6c55b24194/model.glb",
       "credit": "Jamal - LOD Man character"
     }
-  ]
+  ],
+  "survivors_posed": {
+    "s1": {
+      "downloaded": "models/survivors/s1.glb",
+      "credit": "man 4k (CC-BY 4.0), posed lying on side"
+    },
+    "s2": {
+      "downloaded": "models/survivors/s2.glb",
+      "credit": "Debra - Detective Woman (CC-BY 4.0), posed slumped against wall"
+    },
+    "s3": {
+      "downloaded": "models/survivors/s3.glb",
+      "credit": "Woman In Red (CC-BY 4.0), posed collapsed face down"
+    },
+    "s4": {
+      "downloaded": "models/survivors/s4.glb",
+      "credit": "man 4k (CC-BY 4.0), posed curled on side"
+    }
+  }
 }

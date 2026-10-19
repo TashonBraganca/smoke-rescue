@@ -1,0 +1,667 @@
+{
+  "e9854400c0c1410db01c8db897ef5359": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "77bafdbbaef04f83a83c8f45e049745f": {
+    "review": "rejected",
+    "notes": [
+      "Outdoor fire pit, not an indoor fireplace.",
+      "Blender render not reviewed."
+    ]
+  },
+  "c95276929eda4cfb842f73d29b071893": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "d74fe57bb6e04a218280415d40ad34d8": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "19b2316028234cb68c1f0bf7b956a35f": {
+    "review": "rejected",
+    "notes": [
+      "Underwear-only character. Clothed full-body candidates fit the house better.",
+      "Blender render not reviewed."
+    ]
+  },
+  "208e5cf748404521894bf30c95f25c12": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified.",
+      "Clothed adult. Rig is present in the source GLB, but deformation and lying/slumped poses remain unverified."
+    ]
+  },
+  "450e29de3c1541d78943e3265012ee48": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified.",
+      "Clothed adult. Rig is present in the source GLB, but deformation and lying/slumped poses remain unverified."
+    ]
+  },
+  "a169a23fa24f4df39daace6c55b24194": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified.",
+      "Clothed adult. Rig is present in the source GLB, but deformation and lying/slumped poses remain unverified."
+    ]
+  },
+  "60947a1819a1407685cb4332e894e585": {
+    "review": "rejected",
+    "notes": [
+      "Head and shoulders only, not a full survivor.",
+      "Blender render not reviewed."
+    ]
+  },
+  "47ebe15d4c0545b88d2846bff9918208": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified.",
+      "Clothed adult. Rig is present in the source GLB, but deformation and lying/slumped poses remain unverified."
+    ]
+  },
+  "536dbfc2fdbe4dec9203ab390b9a6eda": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "37e8af16ab894a37b4e1bb4b6088e8b1": {
+    "review": "rejected",
+    "notes": [
+      "Source-thumbnail comparison found a better match among the retained candidates. Excluded from the shortlist.",
+      "Blender render not reviewed."
+    ]
+  },
+  "060c08152f024faca391673fe9ac6b74": {
+    "review": "rejected",
+    "notes": [
+      "Source-thumbnail comparison found a better match among the retained candidates. Excluded from the shortlist.",
+      "Blender render not reviewed."
+    ]
+  },
+  "7427e2c0c32c44b89deb058f6583742a": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified.",
+      "Untextured fallback retained because this slot lacks enough suitable textured candidates."
+    ]
+  },
+  "3350f81025974c53808a2efd2b31d4fd": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "8ce01f03c4c54c1bb69f6ba47a590586": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified.",
+      "Configured mesh filter removes room and retains box and toys. Check the filtered output in Blender."
+    ]
+  },
+  "ca49ab1ebfe64ca0a241e0b1fe82efa0": {
+    "review": "rejected",
+    "notes": [
+      "Source-thumbnail comparison found a better match among the retained candidates. Excluded from the shortlist.",
+      "Blender render not reviewed."
+    ]
+  },
+  "27ad3793a9f54fed89a3fb17202551f0": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "319ee0cc94e3486db3a14cc23d1039f7": {
+    "review": "rejected",
+    "notes": [
+      "Source-thumbnail comparison found a better match among the retained candidates. Excluded from the shortlist.",
+      "Blender render not reviewed."
+    ]
+  },
+  "e12493a7481548129179d926b9a15b35": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "cb973bae6b464956a51e2f0f1d5367a1": {
+    "review": "rejected",
+    "notes": [
+      "Source-thumbnail comparison found a better match among the retained candidates. Excluded from the shortlist.",
+      "Blender render not reviewed."
+    ]
+  },
+  "79e4cdde40034be5be40eb4d9c9c92a2": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified.",
+      "Contains washer and dryer in one mesh. Requires separating the dryer before production use."
+    ]
+  },
+  "8358b47f171d43e98f473083ce55b36e": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified.",
+      "Washer-dryer combination, not a dedicated tumble dryer."
+    ]
+  },
+  "34270b2281e641deb39b16f69ed84346": {
+    "review": "rejected",
+    "notes": [
+      "Hair dryer, not a clothes dryer.",
+      "Blender render not reviewed."
+    ]
+  },
+  "55bbda3c447840cb9981fc20720b732f": {
+    "review": "rejected",
+    "notes": [
+      "Hanging drying net, not an appliance.",
+      "Blender render not reviewed."
+    ]
+  },
+  "ea0080f2433b41578145944a3d0b350c": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "df3b970c9a7244cf86aedf6bca7052b9": {
+    "review": "rejected",
+    "notes": [
+      "Source-thumbnail comparison found a better match among the retained candidates. Excluded from the shortlist.",
+      "Blender render not reviewed."
+    ]
+  },
+  "44b527d7d10d428b9930732553f479a2": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "a8c9ef47afd541b0a13a1df1e0dfe0b8": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "f2de7240cfe64ebebff8f6d78f7f7879": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "a3ec10632d83426aaa5dad54422a6aec": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "692668cdcc5f414a86388614964159c0": {
+    "review": "rejected",
+    "notes": [
+      "Source-thumbnail comparison found a better match among the retained candidates. Excluded from the shortlist.",
+      "Blender render not reviewed."
+    ]
+  },
+  "48525ce6c6e0495b9be36c8e420a1567": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified.",
+      "Configured mesh filter removes the ottoman. Check retained cushion and frame meshes in Blender."
+    ]
+  },
+  "9bf97c25da904a60a24a44f6ff4d0885": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "ac7eaf38f20645fb90ed71c8aae60a79": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "90be7242f24749c3a8e0b0a69c616fc1": {
+    "review": "rejected",
+    "notes": [
+      "Source-thumbnail comparison found a better match among the retained candidates. Excluded from the shortlist.",
+      "Blender render not reviewed."
+    ]
+  },
+  "03550a3529c24611a12aa158747374e0": {
+    "review": "rejected",
+    "notes": [
+      "Source-thumbnail comparison found a better match among the retained candidates. Excluded from the shortlist.",
+      "Blender render not reviewed."
+    ]
+  },
+  "5384d703c1094899a45ae0a9a8dee909": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "5dcbee77730640269cef5bd2587e328a": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "22a0941a83bf4adeaa8ab44050d3c58e": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified.",
+      "Low-poly fallback. The rigged Spot Mini is the preferred realistic option."
+    ]
+  },
+  "5d114e1b5c224ae39b36fdbb3fae5a1e": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified.",
+      "Low-poly fallback. The rigged Spot Mini is the preferred realistic option."
+    ]
+  },
+  "71354fd599e34db898a7d083851b792a": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "72e821fc75d9473183a63d548959693b": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "7818b79c9c87488287c9a1cf62bf1548": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "c460c415c8ad4d46a0f866b2b66bdd8d": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "f7125e65dd004381aa3e9882ef74e963": {
+    "review": "rejected",
+    "notes": [
+      "Source-thumbnail comparison found a better match among the retained candidates. Excluded from the shortlist.",
+      "Blender render not reviewed."
+    ]
+  },
+  "341fa8a777e94883841409438756f747": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "0318ad51a7294885b452ff4f408353ba": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "21f7d2b8d4c743c4a15fe7103460c186": {
+    "review": "rejected",
+    "notes": [
+      "Source-thumbnail comparison found a better match among the retained candidates. Excluded from the shortlist.",
+      "Blender render not reviewed."
+    ]
+  },
+  "78b47132c6be42bcb664545a69b380d9": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "8f4379efce054c3d9057a6cc06dc28af": {
+    "review": "rejected",
+    "notes": [
+      "Electric kettle, not a domestic tank heater.",
+      "Blender render not reviewed."
+    ]
+  },
+  "040d561dc4e9403a9985dd904d2b67ce": {
+    "review": "rejected",
+    "notes": [
+      "Source-thumbnail comparison found a better match among the retained candidates. Excluded from the shortlist.",
+      "Blender render not reviewed."
+    ]
+  },
+  "6ec8b6d1a924455bbb7e3e3e55827b2d": {
+    "review": "rejected",
+    "notes": [
+      "Source-thumbnail comparison found a better match among the retained candidates. Excluded from the shortlist.",
+      "Blender render not reviewed."
+    ]
+  },
+  "376cab2e7b9c4434b047e5d2b7a77116": {
+    "review": "rejected",
+    "notes": [
+      "Source-thumbnail comparison found a better match among the retained candidates. Excluded from the shortlist.",
+      "Blender render not reviewed."
+    ]
+  },
+  "20d4386b22d44ade878e5551c55d8565": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "3028f5b45b1b40ba8725a48086973754": {
+    "review": "rejected",
+    "notes": [
+      "Source-thumbnail comparison found a better match among the retained candidates. Excluded from the shortlist.",
+      "Blender render not reviewed."
+    ]
+  },
+  "4d2647ed28d646e38637060e3d2000f2": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "839051d97dab406fbf7fb2e1304546ba": {
+    "review": "rejected",
+    "notes": [
+      "Kettle, not a domestic tank heater.",
+      "Blender render not reviewed."
+    ]
+  },
+  "064f46139ef747e7b92a28bd2f5b2536": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified.",
+      "Untextured fallback retained because this slot lacks enough suitable textured candidates."
+    ]
+  },
+  "67549616d13246cfb1a540f9d6969078": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "a27aa928a6664473a0ebfbe2c7f72b23": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "d81d81853a9f478ca9fac019eabcf453": {
+    "review": "rejected",
+    "notes": [
+      "Futuristic damaged appliance, unsuitable for a lived-in family house.",
+      "Blender render not reviewed."
+    ]
+  },
+  "82c91049303f4664a56cc0eaffa8d662": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "4b765920f7c34676acda91c0bfd87abd": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified.",
+      "Cabinet sets and presentation geometry may need isolation; overall height is not necessarily worktop height."
+    ]
+  },
+  "524fb34efd68497e96471cf5bd67b17b": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified.",
+      "Cabinet sets and presentation geometry may need isolation; overall height is not necessarily worktop height."
+    ]
+  },
+  "d5a4e03f45da445a9d84e77d8a9f93a4": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified.",
+      "Cabinet sets and presentation geometry may need isolation; overall height is not necessarily worktop height."
+    ]
+  },
+  "bc547563aace4159bb24a5ddb30823d9": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified.",
+      "Cabinet sets and presentation geometry may need isolation; overall height is not necessarily worktop height."
+    ]
+  },
+  "9fb7c54715dd41b98b3dc67b367cf81d": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "a12d3b4d31514effa311b5f1b0ab8a53": {
+    "review": "rejected",
+    "notes": [
+      "Source-thumbnail comparison found a better match among the retained candidates. Excluded from the shortlist.",
+      "Blender render not reviewed."
+    ]
+  },
+  "e3f81d29bf234b728a154b41f50bbb9b": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "a7685bd7b2354157b4c1a8264892acf0": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "86b3b05dc1c64e009a5ecb0afbe23c86": {
+    "review": "rejected",
+    "notes": [
+      "Source-thumbnail comparison found a better match among the retained candidates. Excluded from the shortlist.",
+      "Blender render not reviewed."
+    ]
+  },
+  "fb0a0301abf6431485b70e497aa3f5bc": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "1120ca810d0c46289d3b7071103067ac": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "fa968bf5d57a4265bedb233293870dc2": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "8001f9f214f94388840f0ce40cd13937": {
+    "review": "rejected",
+    "notes": [
+      "Source-thumbnail comparison found a better match among the retained candidates. Excluded from the shortlist.",
+      "Blender render not reviewed."
+    ]
+  },
+  "9664d8fba94f4e43af6b1a3d1d155f89": {
+    "review": "rejected",
+    "notes": [
+      "Plain draped textile, not a large patterned area rug.",
+      "Blender render not reviewed."
+    ]
+  },
+  "0ce2fc1e54724cb79cbb08ab2182760a": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "0f5cd303517e4d4080834c0f6cece5b4": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "2071bda681b642218b6829b82e4fd93b": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "35793d480f784aa5ab3549eca2160e65": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "ebe62ed6dd9b446a9c9b7d7d6a8086e7": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "f9fd65542a414ef4b8b5227d49e87d87": {
+    "review": "rejected",
+    "notes": [
+      "Chest freezer, not a tall refrigerator.",
+      "Blender render not reviewed."
+    ]
+  },
+  "517e1f1e66d14d3db379e92351a2a283": {
+    "review": "rejected",
+    "notes": [
+      "Source-thumbnail comparison found a better match among the retained candidates. Excluded from the shortlist.",
+      "Blender render not reviewed."
+    ]
+  },
+  "38a739d5361547b7b8b7d87ab73c9fa3": {
+    "review": "rejected",
+    "notes": [
+      "Source-thumbnail comparison found a better match among the retained candidates. Excluded from the shortlist.",
+      "Blender render not reviewed."
+    ]
+  },
+  "f797e187b19c45e89c87ce8826421f90": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified.",
+      "Untextured fallback retained because this slot lacks enough suitable textured candidates.",
+      "No clothes included. Realistic clothed garment rails remain a search shortfall."
+    ]
+  },
+  "cf1318446c104bb58c90f3282200a6e4": {
+    "review": "rejected",
+    "notes": [
+      "Source-thumbnail comparison found a better match among the retained candidates. Excluded from the shortlist.",
+      "Blender render not reviewed."
+    ]
+  },
+  "e36505afd27d4b71bfb1e12744672ce2": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified.",
+      "No clothes included. Realistic clothed garment rails remain a search shortfall."
+    ]
+  },
+  "775375ae59be45dc9d7dcde1bc87a07f": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified.",
+      "Untextured fallback retained because this slot lacks enough suitable textured candidates.",
+      "No clothes included. Realistic clothed garment rails remain a search shortfall."
+    ]
+  },
+  "e5cf10304ffb4c11bc7841b584ccd706": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "c976dd7dddab48a3a2848ff560a3c7b6": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  },
+  "6e20541ed8f543b28d2e71aef79b7b5e": {
+    "review": "source_thumbnail_checked",
+    "notes": [
+      "Source thumbnail inspected. Blender normalization and render review are pending.",
+      "Front direction has not been verified."
+    ]
+  }
+}

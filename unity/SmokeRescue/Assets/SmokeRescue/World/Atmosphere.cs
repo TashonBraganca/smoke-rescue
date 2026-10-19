@@ -51,6 +51,9 @@ namespace SmokeRescue.World
         Fog fog;
         readonly List<(Light light, float baseIntensity, float seed)> fireLights = new List<(Light, float, float)>();
         readonly List<(LocalVolumetricFog volume, string room)> roomFogs = new List<(LocalVolumetricFog, string)>();
+        readonly List<(Transform t, Vector3 scale, Vector3 pos, float seed)> flames = new List<(Transform, Vector3, Vector3, float)>();
+        static Texture3D smokeNoise;
+        static Texture2D sootTexture;
 
         public SmokeField Field => field;
 
@@ -106,6 +109,11 @@ namespace SmokeRescue.World
                 lvf.parameters.size = new Vector3(r.rect[2] - r.rect[0], plan.wall_height, r.rect[3] - r.rect[1]);
                 lvf.parameters.albedo = new Color(0.72f, 0.7f, 0.66f);
                 lvf.parameters.positiveFade = lvf.parameters.negativeFade = new Vector3(0.05f, 0.1f, 0.05f);
+                // Billowing smoke: a 3D noise mask, tiled about every 2.5 m, drifted from sim time in Apply.
+                lvf.parameters.maskMode = LocalVolumetricFogMaskMode.Texture;
+                lvf.parameters.volumeMask = SmokeNoise();
+                lvf.parameters.textureTiling = new Vector3((r.rect[2] - r.rect[0]) / 2.5f, plan.wall_height / 2.5f, (r.rect[3] - r.rect[1]) / 2.5f);
+                lvf.parameters.textureScrollingSpeed = Vector3.zero;
                 a.roomFogs.Add((lvf, r.id));
             }
 
@@ -139,7 +147,8 @@ namespace SmokeRescue.World
                     l.shadows = i == 0 ? LightShadows.Soft : LightShadows.None;
                     a.fireLights.Add((l, lm, (float)rng.NextDouble() * 100f));
                 }
-                FlameVisual(fgo, f.intensity);
+                a.flames.AddRange(FlameVisual(fgo, f.intensity));
+                SootDecals(fgo, f, plan);
             }
             a.Apply(0f);
             return a;
@@ -160,6 +169,14 @@ namespace SmokeRescue.World
                 float d = scenario.smoke.Density(room, t);
                 volume.gameObject.SetActive(d > 1e-3f);
                 volume.parameters.meanFreePath = SmokeField.MeanFreePath(d);
+                volume.parameters.textureOffset = new Vector3(0.011f * t, -0.017f * t, 0.007f * t);   // slow rising drift
+            }
+            foreach (var (tr, scale, pos, seed) in flames)
+            {
+                float h = 0.6f + 0.8f * Mathf.PerlinNoise(seed, t * 3.1f);
+                float w = 0.8f + 0.35f * Mathf.PerlinNoise(seed + 5f, t * 4.3f);
+                tr.localScale = new Vector3(scale.x * w, scale.y * h, scale.z * w);
+                tr.localPosition = pos + new Vector3(0.05f * (Mathf.PerlinNoise(seed + 9f, t * 2f) - 0.5f), (h - 1f) * scale.y * 0.5f, 0.05f * (Mathf.PerlinNoise(seed + 13f, t * 2f) - 0.5f));
             }
             if (fog != null && scenario.smoke.ramp_per_minute > 0f)
                 fog.meanFreePath.value = SmokeField.MeanFreePath(Mathf.Clamp01(scenario.smoke.global_haze + scenario.smoke.ramp_per_minute * t / 60f));
@@ -188,27 +205,152 @@ namespace SmokeRescue.World
             return l;
         }
 
-        /// <summary>Glowing flame tongues: emissive stretched spheres. Stands in until a VFX Graph fire is added.</summary>
-        static void FlameVisual(GameObject parent, float intensity)
+        /// <summary>Flame tongues: emissive stretched spheres whose height and sway flicker from sim time in Apply,
+        /// plus a glowing ember bed. Stands in until a VFX Graph fire is authored.</summary>
+        static List<(Transform, Vector3, Vector3, float)> FlameVisual(GameObject parent, float intensity)
         {
-            var mat = new Material(Shader.Find("HDRP/Unlit"));
-            mat.SetColor("_UnlitColor", new Color(1f, 0.42f, 0.08f));
-            mat.SetColor("_EmissiveColor", new Color(1f, 0.38f, 0.06f) * 40f * intensity);
-            HDMaterial.ValidateMaterial(mat);
-            var rng = new System.Random(parent.name.GetHashCode());
-            for (int i = 0; i < 7; i++)
+            var tongues = new List<(Transform, Vector3, Vector3, float)>();
+            Material Emissive(Color c, float power)
             {
-                var s = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                DestroyImmediate(s.GetComponent<Collider>());
-                s.name = "Flame";
-                s.transform.SetParent(parent.transform, false);
-                float h = 0.25f + (float)rng.NextDouble() * 0.45f * (0.5f + intensity);
-                s.transform.localPosition = new Vector3((float)rng.NextDouble() * 0.5f - 0.25f, h / 2f, (float)rng.NextDouble() * 0.5f - 0.25f);
-                s.transform.localScale = new Vector3(0.12f, h, 0.12f);
-                var r = s.GetComponent<MeshRenderer>();
-                r.sharedMaterial = mat;
-                r.shadowCastingMode = ShadowCastingMode.Off;
+                var m = new Material(Shader.Find("HDRP/Unlit"));
+                m.SetColor("_UnlitColor", c);
+                m.SetColor("_EmissiveColor", c * power * intensity);
+                HDMaterial.ValidateMaterial(m);
+                return m;
             }
+            var outer = Emissive(new Color(1f, 0.33f, 0.05f), 30f);
+            var inner = Emissive(new Color(1f, 0.75f, 0.3f), 60f);
+            var embers = Emissive(new Color(0.9f, 0.18f, 0.02f), 12f);
+            var rng = new System.Random(parent.name.GetHashCode());
+            var bed = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            DestroyImmediate(bed.GetComponent<Collider>());
+            bed.name = "EmberBed";
+            bed.transform.SetParent(parent.transform, false);
+            bed.transform.localScale = new Vector3(0.7f, 0.02f, 0.7f);
+            bed.transform.localPosition = new Vector3(0f, 0.02f, 0f);
+            bed.GetComponent<MeshRenderer>().sharedMaterial = embers;
+            for (int i = 0; i < 11; i++)
+            {
+                var sph = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                DestroyImmediate(sph.GetComponent<Collider>());
+                sph.name = "Flame";
+                sph.transform.SetParent(parent.transform, false);
+                bool core = i < 4;
+                float h = (core ? 0.2f : 0.3f) + (float)rng.NextDouble() * 0.5f * (0.5f + intensity);
+                var scale = new Vector3(core ? 0.08f : 0.14f, h, core ? 0.08f : 0.14f);
+                var pos = new Vector3((float)rng.NextDouble() * 0.5f - 0.25f, h / 2f, (float)rng.NextDouble() * 0.5f - 0.25f);
+                sph.transform.localScale = scale;
+                sph.transform.localPosition = pos;
+                var r = sph.GetComponent<MeshRenderer>();
+                r.sharedMaterial = core ? inner : outer;
+                r.shadowCastingMode = ShadowCastingMode.Off;
+                tongues.Add((sph.transform, scale, pos, (float)rng.NextDouble() * 100f));
+            }
+            return tongues;
+        }
+
+        /// <summary>Scorch marks around a fire: a decal on the floor, one on the ceiling above, and one on each wall
+        /// closer than 1.5 m (SIMULATION_SPEC 3.3).</summary>
+        static void SootDecals(GameObject parent, FloorPlan.Fire f, FloorPlan plan)
+        {
+            var mat = new Material(Shader.Find("HDRP/Decal"));
+            mat.SetTexture("_BaseColorMap", Soot());
+            mat.SetColor("_BaseColor", new Color(0.04f, 0.035f, 0.03f, 1f));
+            mat.SetFloat("_AffectAlbedo", 1f);
+            mat.SetFloat("_AffectNormal", 0f);
+            mat.SetFloat("_AffectMetal", 0f);
+            mat.SetFloat("_AffectAO", 0f);
+            mat.SetFloat("_AffectSmoothness", 1f);
+            mat.SetFloat("_DecalBlend", 0.95f);
+            mat.enableInstancing = true;
+            HDMaterial.ValidateMaterial(mat);
+            void Decal(string name, Vector3 pos, Quaternion rot, Vector3 size)
+            {
+                var go = new GameObject(name);
+                go.transform.SetParent(parent.transform, false);
+                go.transform.SetPositionAndRotation(pos, rot);
+                var d = go.AddComponent<DecalProjector>();
+                d.material = mat;
+                d.size = size;
+                d.pivot = Vector3.zero;
+            }
+            var c = new Vector3(f.at[0], 0f, f.at[1]);
+            float s = 1.6f + 1.2f * f.intensity;
+            Decal("SootFloor", c + Vector3.up * 0.05f, Quaternion.Euler(90f, 0f, 0f), new Vector3(s, s, 0.3f));
+            Decal("SootCeiling", c + Vector3.up * (plan.wall_height - 0.05f), Quaternion.Euler(-90f, 0f, 0f), new Vector3(s * 1.4f, s * 1.4f, 0.3f));
+            var room = plan.FindRoom(f.room);
+            if (room == null) return;
+            var r = room.Rect;
+            (float dist, Vector3 wallPoint, Quaternion facing)[] walls =
+            {
+                (c.x - r.xMin, new Vector3(r.xMin, 1.2f, c.z), Quaternion.Euler(0f, -90f, 0f)),
+                (r.xMax - c.x, new Vector3(r.xMax, 1.2f, c.z), Quaternion.Euler(0f, 90f, 0f)),
+                (c.z - r.yMin, new Vector3(c.x, 1.2f, r.yMin), Quaternion.Euler(0f, 180f, 0f)),
+                (r.yMax - c.z, new Vector3(c.x, 1.2f, r.yMax), Quaternion.identity),
+            };
+            foreach (var (dist, p, rot) in walls)
+                if (dist < 1.5f) Decal("SootWall", p, rot, new Vector3(s, 2.4f, 0.6f));
+        }
+
+        /// <summary>Tileable fractal value noise in 32^3, generated once.</summary>
+        static Texture3D SmokeNoise()
+        {
+            if (smokeNoise != null) return smokeNoise;
+            const int n = 32;
+            var rng = new System.Random(4242);
+            var lattice = new float[8 * 8 * 8];
+            for (int i = 0; i < lattice.Length; i++) lattice[i] = (float)rng.NextDouble();
+            float L(int x, int y, int z) => lattice[((z & 7) * 8 + (y & 7)) * 8 + (x & 7)];
+            float Smooth(float t) => t * t * (3f - 2f * t);
+            float Value(float x, float y, float z)
+            {
+                int xi = Mathf.FloorToInt(x), yi = Mathf.FloorToInt(y), zi = Mathf.FloorToInt(z);
+                float tx = Smooth(x - xi), ty = Smooth(y - yi), tz = Smooth(z - zi);
+                float c00 = Mathf.Lerp(L(xi, yi, zi), L(xi + 1, yi, zi), tx), c10 = Mathf.Lerp(L(xi, yi + 1, zi), L(xi + 1, yi + 1, zi), tx);
+                float c01 = Mathf.Lerp(L(xi, yi, zi + 1), L(xi + 1, yi, zi + 1), tx), c11 = Mathf.Lerp(L(xi, yi + 1, zi + 1), L(xi + 1, yi + 1, zi + 1), tx);
+                return Mathf.Lerp(Mathf.Lerp(c00, c10, ty), Mathf.Lerp(c01, c11, ty), tz);
+            }
+            var cols = new Color[n * n * n];
+            for (int z = 0; z < n; z++)
+            for (int y = 0; y < n; y++)
+            for (int x = 0; x < n; x++)
+            {
+                float fx = x * 8f / n, fy = y * 8f / n, fz = z * 8f / n;
+                float v = 0.55f * Value(fx, fy, fz) + 0.3f * Value(fx * 2f, fy * 2f, fz * 2f) + 0.15f * Value(fx * 4f, fy * 4f, fz * 4f);
+                v = Mathf.Clamp01(0.25f + 1.1f * v);
+                cols[(z * n + y) * n + x] = new Color(v, v, v, v);
+            }
+            smokeNoise = new Texture3D(n, n, n, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Repeat, name = "SmokeNoise" };
+            smokeNoise.SetPixels(cols);
+            smokeNoise.Apply();
+            return smokeNoise;
+        }
+
+        /// <summary>Radial soot stain with ragged edges: dark centre, noisy falloff to transparent.</summary>
+        static Texture2D Soot()
+        {
+            if (sootTexture != null) return sootTexture;
+            const int n = 256;
+            var rng = new System.Random(77);
+            float[] offs = new float[16];
+            for (int i = 0; i < offs.Length; i++) offs[i] = (float)rng.NextDouble();
+            var px = new Color[n * n];
+            for (int y = 0; y < n; y++)
+            for (int x = 0; x < n; x++)
+            {
+                float u = x / (n - 1f) * 2f - 1f, v = y / (n - 1f) * 2f - 1f;
+                float r = Mathf.Sqrt(u * u + v * v);
+                float ang = Mathf.Atan2(v, u);
+                // Irregular, not star-shaped: the edge wobbles with low-frequency noise around the circle.
+                float edge = 0.7f + 0.22f * (Mathf.PerlinNoise(Mathf.Cos(ang) * 1.3f + offs[0] * 10f, Mathf.Sin(ang) * 1.3f + offs[1] * 10f) - 0.5f);
+                float grain = 0.6f * Mathf.PerlinNoise(x * 0.04f + offs[2] * 50f, y * 0.04f + offs[3] * 50f) + 0.4f * Mathf.PerlinNoise(x * 0.15f, y * 0.15f);
+                float a = Mathf.Clamp01((edge - r) / 0.45f) * (0.55f + 0.45f * grain);
+                px[y * n + x] = new Color(0.05f, 0.045f, 0.04f, a);
+            }
+            sootTexture = new Texture2D(n, n, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp, name = "Soot" };
+            sootTexture.SetPixels(px);
+            sootTexture.Apply();
+            return sootTexture;
         }
     }
 }

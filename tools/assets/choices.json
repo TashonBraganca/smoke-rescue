@@ -1,0 +1,218 @@
+{
+  "fridge": {
+    "axis": "height",
+    "target": 1.85,
+    "uids": [
+      "ebe62ed6dd9b446a9c9b7d7d6a8086e7",
+      "2071bda681b642218b6829b82e4fd93b",
+      "0f5cd303517e4d4080834c0f6cece5b4",
+      "35793d480f784aa5ab3549eca2160e65"
+    ],
+    "recommended": "ebe62ed6dd9b446a9c9b7d7d6a8086e7",
+    "reason": "Provisional source-thumbnail pick. French Door Refrigerator - Stainless has a closed steel exterior, handles and dispenser. Geometry is light; inspect its PBR detail in Blender."
+  },
+  "kitchen_island": {
+    "axis": "height",
+    "target": 0.9,
+    "uids": [
+      "524fb34efd68497e96471cf5bd67b17b",
+      "d5a4e03f45da445a9d84e77d8a9f93a4",
+      "bc547563aace4159bb24a5ddb30823d9",
+      "4b765920f7c34676acda91c0bfd87abd"
+    ],
+    "recommended": "524fb34efd68497e96471cf5bd67b17b",
+    "reason": "Provisional source-thumbnail pick. Shaker kitchen island has cabinet doors, a worktop and household clutter. Remove its presentation floor and check counter height before promotion."
+  },
+  "range_hood": {
+    "axis": "width",
+    "target": 0.9,
+    "uids": [
+      "a8c9ef47afd541b0a13a1df1e0dfe0b8",
+      "44b527d7d10d428b9930732553f479a2",
+      "f2de7240cfe64ebebff8f6d78f7f7879",
+      "a3ec10632d83426aaa5dad54422a6aec"
+    ],
+    "recommended": "44b527d7d10d428b9930732553f479a2",
+    "reason": "Provisional source-thumbnail pick. The glass-canopy Kitchen Hood is a believable domestic extractor with underside detail."
+  },
+  "clawfoot_bathtub": {
+    "axis": "horizontal",
+    "target": 1.7,
+    "uids": [
+      "3350f81025974c53808a2efd2b31d4fd",
+      "536dbfc2fdbe4dec9203ab390b9a6eda",
+      "7427e2c0c32c44b89deb058f6583742a"
+    ],
+    "recommended": "3350f81025974c53808a2efd2b31d4fd",
+    "reason": "Provisional source-thumbnail pick. Bathtub has sculpted claw feet, enamel and a separate tap assembly."
+  },
+  "sink_with_mirror": {
+    "axis": "width",
+    "target": 0.75,
+    "uids": [
+      "c976dd7dddab48a3a2848ff560a3c7b6",
+      "6e20541ed8f543b28d2e71aef79b7b5e",
+      "e5cf10304ffb4c11bc7841b584ccd706"
+    ],
+    "recommended": "6e20541ed8f543b28d2e71aef79b7b5e",
+    "reason": "Provisional source-thumbnail pick. Sink and vanity includes the mirror, basin and cabinet in one matching set."
+  },
+  "washing_machine": {
+    "axis": "height",
+    "target": 0.85,
+    "uids": [
+      "67549616d13246cfb1a540f9d6969078",
+      "82c91049303f4664a56cc0eaffa8d662",
+      "a27aa928a6664473a0ebfbe2c7f72b23"
+    ],
+    "recommended": "67549616d13246cfb1a540f9d6969078",
+    "reason": "Provisional source-thumbnail pick. Washing Machine by Francesco Coldesina looks like a domestic front loader with modelled controls and drum."
+  },
+  "clothes_dryer": {
+    "axis": "height",
+    "target": 0.85,
+    "uids": [
+      "ea0080f2433b41578145944a3d0b350c",
+      "8358b47f171d43e98f473083ce55b36e",
+      "79e4cdde40034be5be40eb4d9c9c92a2"
+    ],
+    "recommended": "ea0080f2433b41578145944a3d0b350c",
+    "reason": "Provisional source-thumbnail pick. Modern Clothes Dryer is a standalone domestic appliance. The two other options are washer-dryer combinations, and one contains a pair."
+  },
+  "water_heater": {
+    "axis": "height",
+    "target": 1.5,
+    "uids": [
+      "4d2647ed28d646e38637060e3d2000f2",
+      "20d4386b22d44ade878e5551c55d8565",
+      "064f46139ef747e7b92a28bd2f5b2536"
+    ],
+    "recommended": "4d2647ed28d646e38637060e3d2000f2",
+    "reason": "Provisional source-thumbnail pick. Water Heater Obj is a textured tank with pipes. Only two textured domestic tanks were found; the third is an untextured fallback."
+  },
+  "bunk_bed": {
+    "axis": "height",
+    "target": 1.7,
+    "uids": [
+      "9fb7c54715dd41b98b3dc67b367cf81d",
+      "a7685bd7b2354157b4c1a8264892acf0",
+      "e3f81d29bf234b728a154b41f50bbb9b"
+    ],
+    "recommended": "9fb7c54715dd41b98b3dc67b367cf81d",
+    "reason": "Provisional source-thumbnail pick. Simple Bunk Bed has a ladder, rails and used bedding. Alternatives have less detail or brighter materials."
+  },
+  "coat_rack": {
+    "axis": "height",
+    "target": 1.8,
+    "uids": [
+      "72e821fc75d9473183a63d548959693b",
+      "7818b79c9c87488287c9a1cf62bf1548",
+      "c460c415c8ad4d46a0f866b2b66bdd8d"
+    ],
+    "recommended": "72e821fc75d9473183a63d548959693b",
+    "reason": "Provisional source-thumbnail pick. Coat Rack has curved branches and aged metal. These alternatives have no coats."
+  },
+  "clothes_rack": {
+    "axis": "height",
+    "target": 1.7,
+    "uids": [
+      "775375ae59be45dc9d7dcde1bc87a07f",
+      "f797e187b19c45e89c87ce8826421f90",
+      "e36505afd27d4b71bfb1e12744672ce2"
+    ],
+    "recommended": "775375ae59be45dc9d7dcde1bc87a07f",
+    "reason": "Provisional source-thumbnail pick. clothing-rack has a full garment rail and hangers. No realistic downloaded rail with clothes was found; two options have no textures."
+  },
+  "antique_globe": {
+    "axis": "height",
+    "target": 1.0,
+    "uids": [
+      "0318ad51a7294885b452ff4f408353ba",
+      "341fa8a777e94883841409438756f747",
+      "78b47132c6be42bcb664545a69b380d9"
+    ],
+    "recommended": "0318ad51a7294885b452ff4f408353ba",
+    "reason": "Provisional source-thumbnail pick. Floor Globe has an antique map, wooden floor stand and meridian ring."
+  },
+  "fireplace": {
+    "axis": "width",
+    "target": 1.6,
+    "uids": [
+      "c95276929eda4cfb842f73d29b071893",
+      "e9854400c0c1410db01c8db897ef5359",
+      "d74fe57bb6e04a218280415d40ad34d8"
+    ],
+    "recommended": "c95276929eda4cfb842f73d29b071893",
+    "reason": "Provisional source-thumbnail pick. Sketchup Fireplace has a stone mantel, hearth and grate. Other options are much more ornate, and no suitable brick mantel was found."
+  },
+  "rug": {
+    "axis": "horizontal",
+    "target": 2.8,
+    "uids": [
+      "1120ca810d0c46289d3b7071103067ac",
+      "0ce2fc1e54724cb79cbb08ab2182760a",
+      "fa968bf5d57a4265bedb233293870dc2",
+      "fb0a0301abf6431485b70e497aa3f5bc"
+    ],
+    "recommended": "1120ca810d0c46289d3b7071103067ac",
+    "reason": "Provisional source-thumbnail pick. Persian Malayer Carpet has a detailed red pattern and fringe. It needs decimation from its scanned geometry."
+  },
+  "toy_chest": {
+    "axis": "width",
+    "target": 0.9,
+    "uids": [
+      "8ce01f03c4c54c1bb69f6ba47a590586",
+      "e12493a7481548129179d926b9a15b35",
+      "27ad3793a9f54fed89a3fb17202551f0"
+    ],
+    "recommended": "8ce01f03c4c54c1bb69f6ba47a590586",
+    "reason": "Provisional source-thumbnail pick. Toy Box includes a painted box and toys. Its room must be removed with the configured mesh filter.",
+    "settings": {
+      "8ce01f03c4c54c1bb69f6ba47a590586": {
+        "keep_mesh": "^(Box_|Ball|Bear|Dog|Tongue|Eye|SpaceDogRetop|Helmet|Cookie)",
+        "scale_reference": "^Box_"
+      }
+    }
+  },
+  "red_sofa": {
+    "axis": "horizontal",
+    "target": 2.2,
+    "uids": [
+      "ac7eaf38f20645fb90ed71c8aae60a79",
+      "48525ce6c6e0495b9be36c8e420a1567",
+      "9bf97c25da904a60a24a44f6ff4d0885",
+      "5384d703c1094899a45ae0a9a8dee909"
+    ],
+    "recommended": "48525ce6c6e0495b9be36c8e420a1567",
+    "reason": "Provisional source-thumbnail pick. Sofa double Velvet red has red fabric, cushions and metal legs. Remove the ottoman before use.",
+    "settings": {
+      "48525ce6c6e0495b9be36c8e420a1567": {
+        "drop_mesh": "feet rack|stichborderpoof"
+      }
+    }
+  },
+  "robot": {
+    "axis": "horizontal",
+    "target": 1.0,
+    "uids": [
+      "71354fd599e34db898a7d083851b792a",
+      "5dcbee77730640269cef5bd2587e328a",
+      "5d114e1b5c224ae39b36fdbb3fae5a1e",
+      "22a0941a83bf4adeaa8ab44050d3c58e"
+    ],
+    "recommended": "5dcbee77730640269cef5bd2587e328a",
+    "reason": "Provisional source-thumbnail pick. Spot Mini by Greg McKechnie is textured and skinned, with named joints for all four legs. Two alternatives are explicitly low-poly fallbacks."
+  },
+  "survivor": {
+    "axis": "height",
+    "target": 1.75,
+    "uids": [
+      "47ebe15d4c0545b88d2846bff9918208",
+      "208e5cf748404521894bf30c95f25c12",
+      "450e29de3c1541d78943e3265012ee48",
+      "a169a23fa24f4df39daace6c55b24194"
+    ],
+    "recommended": "47ebe15d4c0545b88d2846bff9918208",
+    "reason": "Provisional source-thumbnail pick. man 4k is a clothed, textured adult with a skin. All four choices need pose review; none is verified lying or slumped."
+  }
+}

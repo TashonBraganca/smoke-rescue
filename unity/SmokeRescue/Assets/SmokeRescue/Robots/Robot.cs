@@ -138,6 +138,25 @@ namespace SmokeRescue.Robots
             }
             b = Bounds(model);
             Part(visual, PrimitiveType.Cube, "Band", new Vector3(0f, b.max.y + 0.005f, -0.05f), new Vector3(b.size.x * 0.5f, 0.012f, b.size.z * 0.35f), colour);
+            // ID letter on both flanks (SIMULATION_SPEC 4.1), from the robot id's last character.
+            string id = robot.RobotId.Length > 0 ? robot.RobotId.Substring(robot.RobotId.Length - 1) : "?";
+            var tex = LetterTexture(id[0], colour);
+            foreach (var side in new[] { -1f, 1f })
+            {
+                var q = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                Object.DestroyImmediate(q.GetComponent<Collider>());
+                q.name = $"IdPlate_{(side < 0 ? "L" : "R")}";
+                q.transform.SetParent(visual.transform, false);
+                q.transform.localPosition = new Vector3(side * (b.size.x / 2f + 0.004f), b.center.y + b.size.y * 0.25f, -0.05f);
+                q.transform.localRotation = Quaternion.Euler(0f, side < 0 ? 90f : -90f, 0f);
+                q.transform.localScale = new Vector3(0.16f, 0.16f, 1f);
+                var m = new Material(Shader.Find("HDRP/Unlit"));
+                m.SetTexture("_UnlitColorMap", tex);
+                m.SetColor("_UnlitColor", Color.white);
+                UnityEngine.Rendering.HighDefinition.HDMaterial.ValidateMaterial(m);
+                q.GetComponent<MeshRenderer>().sharedMaterial = m;
+                q.layer = LayerMask.NameToLayer("Robots");
+            }
             return visual;
         }
 
@@ -198,6 +217,32 @@ namespace SmokeRescue.Robots
                 }
             }
             return front == float.MinValue ? 0f : front;
+        }
+
+        /// <summary>A 5x7 bitmap letter in the robot colour on black, 64 px, for the ID plates.</summary>
+        static Texture2D LetterTexture(char c, Color colour)
+        {
+            var glyphs = new Dictionary<char, string[]>
+            {
+                ['A'] = new[] { "01110", "10001", "10001", "11111", "10001", "10001", "10001" },
+                ['B'] = new[] { "11110", "10001", "10001", "11110", "10001", "10001", "11110" },
+                ['C'] = new[] { "01111", "10000", "10000", "10000", "10000", "10000", "01111" },
+                ['D'] = new[] { "11110", "10001", "10001", "10001", "10001", "10001", "11110" },
+            };
+            var g = glyphs.TryGetValue(char.ToUpperInvariant(c), out var rows) ? rows : glyphs['A'];
+            const int n = 64;
+            var tex = new Texture2D(n, n, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, name = $"Id_{c}" };
+            var px = new Color[n * n];
+            for (int y = 0; y < n; y++)
+            for (int x = 0; x < n; x++)
+            {
+                int gx = (x - 12) / 8, gy = 6 - (y - 4) / 8;
+                bool on = x >= 12 && gx < 5 && y >= 4 && gy >= 0 && gy < 7 && g[gy][gx] == '1';
+                px[y * n + x] = on ? colour : new Color(0.06f, 0.06f, 0.07f);
+            }
+            tex.SetPixels(px);
+            tex.Apply();
+            return tex;
         }
 
         static Bounds Bounds(GameObject go)

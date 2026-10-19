@@ -11,6 +11,7 @@ cube-projected at each material's real-world tile size from config/materials.jso
 
 import json
 import math
+import shutil
 import sys
 from pathlib import Path
 
@@ -295,6 +296,29 @@ def world_bbox(objs):
 
 
 def build(name):
+    cfg = json.loads((ROOT / "config/props.json").read_text())
+    downloaded = [p for parts in cfg["landmarks"].values() for p in parts
+                  if p.get("blender") == name and p.get("downloaded")]
+    if downloaded:
+        sources = {p["downloaded"] for p in downloaded}
+        if len(sources) != 1:
+            raise ValueError(f"Conflicting downloaded candidates for {name}")
+        source = (ROOT / "assets_cache" / sources.pop()).resolve()
+        if not source.is_relative_to((ROOT / "assets_cache").resolve()):
+            raise ValueError("Downloaded props must stay inside assets_cache")
+        meta = json.loads(source.with_name("meta.json").read_text())
+        if meta.get("status") != "ready":
+            raise ValueError(f"Downloaded prop {name} has not been normalized and rendered")
+        report = json.loads(source.with_name("normalization.json").read_text())
+        if report["tris_after"] > 150_000 or abs(report["floor_min_z"]) > 0.001:
+            raise ValueError(f"Downloaded prop {name} fails the triangle or floor-origin check")
+        OUT.mkdir(parents=True, exist_ok=True)
+        out = OUT / f"blender_{name}.glb"
+        shutil.copyfile(source, out)
+        report.update(name=name, output=str(out), candidate=meta["uid"])
+        out.with_suffix(".json").write_text(json.dumps(report, indent=2))
+        print("REPORT", json.dumps(report))
+        return
     bpy.ops.wm.read_factory_settings(use_empty=True)
     _materials.clear()
     PROPS[name]()
@@ -317,7 +341,10 @@ def build(name):
 
 def main():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
-    for name in argv or list(PROPS):
+    cfg = json.loads((ROOT / "config/props.json").read_text())
+    names = list(dict.fromkeys(list(PROPS) + [p["blender"] for parts in cfg["landmarks"].values()
+                                            for p in parts if p.get("blender") and p.get("downloaded")]))
+    for name in argv or names:
         build(name)
 
 

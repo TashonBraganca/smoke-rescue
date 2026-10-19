@@ -32,6 +32,7 @@ namespace SmokeRescue.Editor
                 QualitySettings.renderPipeline = asset;
             }
             PlayerSettings.colorSpace = ColorSpace.Linear;
+            PlayerSettings.runInBackground = true;   // showcase and play-mode tests keep running when the editor is not focused
             AssetDatabase.SaveAssets();
             Debug.Log($"[SmokeRescue] Project setup done. Pipeline: {GraphicsSettings.defaultRenderPipeline?.name}");
         }

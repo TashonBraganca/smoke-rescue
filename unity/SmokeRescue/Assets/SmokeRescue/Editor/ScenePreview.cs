@@ -66,6 +66,44 @@ namespace SmokeRescue.Editor
             finally { Object.DestroyImmediate(root); }
         }
 
+        /// <summary>
+        /// Robot's-eye views: a sensor camera (scene lighting, exposure loop warmed up over 12 frames, noise off) at each
+        /// pose in data/evidence/custom_views.json; writes data/evidence/sensor/&lt;name&gt;.png. Builds the haze atmosphere.
+        /// </summary>
+        [MenuItem("Tools/Smoke Rescue/Capture Sensor Views")]
+        public static void SensorViews()
+        {
+            var plan = FloorPlan.Load();
+            var atm = Atmosphere.Build(plan, Scenario.Load("scenario_haze_2agents.json"));
+            var views = JArray.Parse(File.ReadAllText(Path.Combine(EvidenceCapture.EvidenceDir, "custom_views.json")));
+            var dir = Path.Combine(EvidenceCapture.EvidenceDir, "sensor");
+            Directory.CreateDirectory(dir);
+            var go = new GameObject("SensorViewCamera");
+            try
+            {
+                go.AddComponent<Camera>();
+                go.AddComponent<HDAdditionalCameraData>();
+                var rgbd = go.AddComponent<RgbdCamera>();
+                rgbd.Initialize(SensorConfig.Load(), 1);
+                rgbd.NoiseEnabled = false;
+                rgbd.LocalDensity = atm.Field.Density;
+                var light = new GameObject("Headlight").AddComponent<Light>();
+                light.transform.SetParent(go.transform, false);
+                light.type = LightType.Spot; light.spotAngle = 100f; light.innerSpotAngle = 15f; light.range = 10f;
+                light.lightUnit = UnityEngine.Rendering.LightUnit.Lumen; light.intensity = 900f;
+                foreach (JObject v in views)
+                {
+                    var e = v["eye"].ToObject<float[]>(); var t = v["target"].ToObject<float[]>();
+                    var eye = new Vector3(e[0], e[1], e[2]);
+                    go.transform.SetPositionAndRotation(eye, Quaternion.LookRotation(new Vector3(t[0], t[1], t[2]) - eye));
+                    RgbdFrame f = null;
+                    for (int i = 0; i < 12; i++) f = rgbd.CaptureSync(i / 15.0);
+                    File.WriteAllBytes(Path.Combine(dir, v.Value<string>("name") + ".png"), SensorPng.EncodeRgbAsync(f.Rgb, f.Width, f.Height).Result);
+                }
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+
         /// <summary>Survivors from the haze scenario, laid on their side on the floor (the downloaded figures are standing;
         /// proper lying, slumped and curled poses need rig posing and are logged as a known issue).</summary>
         [MenuItem("Tools/Smoke Rescue/Place Survivors")]
@@ -81,13 +119,17 @@ namespace SmokeRescue.Editor
             for (int i = 0; i < scenario.survivors.Count; i++)
             {
                 var s = scenario.survivors[i];
-                var prefab = FurnitureBuilder.LoadPart(models[pick[i % pick.Length]]);
+                // Pre-posed survivors (tools/blender/pose_survivor.py) stand on their own floor contact; otherwise fall
+                // back to laying a standing figure on its back.
+                var posedPart = cfg["survivors_posed"]?[s.id] as JObject;
+                var posed = posedPart != null ? FurnitureBuilder.LoadPart(posedPart) : null;
+                var prefab = posed != null ? posed : FurnitureBuilder.LoadPart(models[pick[i % pick.Length]]);
                 if (prefab == null) { Debug.LogWarning($"[SmokeRescue] survivor model missing for {s.id}"); continue; }
                 var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
                 go.name = $"Survivor_{s.id}_{s.pose}";
                 go.transform.SetParent(root.transform, false);
-                // Lie on the side: head toward the yaw direction, then drop onto the floor.
-                go.transform.SetPositionAndRotation(new Vector3(s.at[0], 0f, s.at[1]), Quaternion.Euler(0f, s.yaw, 0f) * Quaternion.Euler(90f, 0f, 90f));
+                var lay = posed != null ? Quaternion.identity : Quaternion.Euler(90f, 0f, 90f);
+                go.transform.SetPositionAndRotation(new Vector3(s.at[0], 0f, s.at[1]), Quaternion.Euler(0f, s.yaw, 0f) * lay);
                 var b = FurnitureBuilder.RenderBounds(go);
                 go.transform.position += new Vector3(s.at[0] - b.center.x, -b.min.y + 0.01f, s.at[1] - b.center.z);
                 foreach (var t in go.GetComponentsInChildren<Transform>()) t.gameObject.layer = LayerMask.NameToLayer(HouseBuilder.PropsLayer);

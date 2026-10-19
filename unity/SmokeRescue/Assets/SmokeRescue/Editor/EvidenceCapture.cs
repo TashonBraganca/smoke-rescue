@@ -73,6 +73,20 @@ namespace SmokeRescue.Editor
             }
         }
 
+        /// <summary>Renders the views listed in data/evidence/custom_views.json: [{"name","eye":[x,y,z],"target":[x,y,z],"fov"}].</summary>
+        [MenuItem("Tools/Smoke Rescue/Capture Custom Views")]
+        public static void CaptureCustomViews()
+        {
+            var views = Newtonsoft.Json.Linq.JArray.Parse(File.ReadAllText(Path.Combine(EvidenceDir, "custom_views.json")));
+            foreach (Newtonsoft.Json.Linq.JObject v in views)
+            {
+                var e = v["eye"].ToObject<float[]>(); var t = v["target"].ToObject<float[]>();
+                var eye = new Vector3(e[0], e[1], e[2]);
+                Render($"custom/{v.Value<string>("name")}.png", eye, Quaternion.LookRotation(new Vector3(t[0], t[1], t[2]) - eye),
+                    v.Value<float?>("fov") ?? 60f, 800, 600, sceneLighting: v.Value<bool?>("scene_lighting") ?? false);
+            }
+        }
+
         /// <summary>One image per landmark, from 2.4 m in front of it at eye height, looking back at it.</summary>
         [MenuItem("Tools/Smoke Rescue/Capture Landmarks")]
         public static void CaptureLandmarks()
