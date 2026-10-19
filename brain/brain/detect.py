@@ -31,6 +31,19 @@ MERGE_M = 1.3        # scenario survivors are at least 3 m apart
 MIN_FRAMES = 3
 
 
+def place_box(box, depth_m: np.ndarray, cam, T_map_cam: np.ndarray) -> np.ndarray | None:
+    """Map-frame point for a detection box: median valid depth of the box's central 40 percent, box centre ray."""
+    x0, y0, x1, y1 = box
+    cxb, cyb, w, h = (x0 + x1) / 2, (y0 + y1) / 2, x1 - x0, y1 - y0
+    patch = depth_m[max(0, int(cyb - 0.2 * h)):int(cyb + 0.2 * h) + 1, max(0, int(cxb - 0.2 * w)):int(cxb + 0.2 * w) + 1]
+    valid = patch[(patch > 0.3) & (patch < 6.0)]
+    if valid.size < 10:
+        return None
+    z = float(np.median(valid))
+    p_cam = np.array([(cxb - cam.cx) * z / cam.fx, (cyb - cam.cy) * z / cam.fy, z, 1.0])
+    return (T_map_cam @ p_cam)[:3]
+
+
 def detect_robot(recording: Path, run: Path, robot: str, model) -> list[dict]:
     reader = RecordingReader(recording / robot)
     cam = reader.camera
@@ -49,15 +62,9 @@ def detect_robot(recording: Path, run: Path, robot: str, model) -> list[dict]:
             T = pose_matrix(traj[j])
             for b in res.boxes:
                 x0, y0, x1, y1 = [float(v) for v in b.xyxy[0]]
-                cxb, cyb = (x0 + x1) / 2, (y0 + y1) / 2
-                w, h = x1 - x0, y1 - y0
-                patch = f.depth_m[int(cyb - 0.2 * h):int(cyb + 0.2 * h) + 1, int(cxb - 0.2 * w):int(cxb + 0.2 * w) + 1]
-                valid = patch[(patch > 0.3) & (patch < 6.0)]
-                if valid.size < 10:
+                p_map = place_box((x0, y0, x1, y1), f.depth_m, cam, T)
+                if p_map is None:
                     continue
-                z = float(np.median(valid))
-                p_cam = np.array([(cxb - cam.cx) * z / cam.fx, (cyb - cam.cy) * z / cam.fy, z, 1.0])
-                p_map = (T @ p_cam)[:3]
                 dets.append({"t": float(times[i]), "frame": i, "conf": float(b.conf), "box": [x0, y0, x1, y1], "p": p_map.tolist()})
     clusters: list[dict] = []
     for d in sorted(dets, key=lambda d: d["t"]):
