@@ -3,41 +3,24 @@
   "robots": {
     "robot_A": {
       "frames": 1028,
-      "median": 989.0,
-      "p5": 372.4,
-      "min": 68,
+      "median": 1013.0,
+      "p5": 582.0,
+      "min": 85,
       "low_stretches_s": [
         [
-          45.733333,
-          46.666667
-        ],
-        [
-          84.4,
-          86.4
+          35.733333,
+          35.866667
         ]
       ],
       "pass": false
     },
     "robot_B": {
       "frames": 1028,
-      "median": 1124.0,
-      "p5": 575.35,
-      "min": 68,
-      "low_stretches_s": [
-        [
-          24.666667,
-          24.933333
-        ],
-        [
-          25.2,
-          26.4
-        ],
-        [
-          26.8,
-          26.8
-        ]
-      ],
-      "pass": false
+      "median": 1183.5,
+      "p5": 598.1,
+      "min": 281,
+      "low_stretches_s": [],
+      "pass": true
     }
   },
   "pass": false

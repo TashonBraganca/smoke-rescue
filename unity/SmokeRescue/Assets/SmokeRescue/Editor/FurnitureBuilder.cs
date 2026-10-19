@@ -55,6 +55,7 @@ namespace SmokeRescue.Editor
                     float oz = off != null ? off[2].Value<float>() : 0f;
                     go.transform.localPosition = new Vector3(ox, oy, oz);
                     go.transform.localRotation = Quaternion.Euler(0f, part.Value<float?>("yaw") ?? 0f, 0f);
+                    if (part["hide_materials"] is JArray hide) DropSubmeshes(go, hide.Values<string>().ToArray());
                     if (part["fit_width"] != null) FitWidth(go, part.Value<float>("fit_width"));
                     var b = RenderBounds(go);
                     lastTop = b.max.y;
@@ -197,6 +198,30 @@ namespace SmokeRescue.Editor
             var b = RenderBounds(go);
             float w = Mathf.Max(b.size.x, b.size.z);
             if (w > 1e-3f) go.transform.localScale *= width / w;
+        }
+
+        /// <summary>Removes the submeshes whose material name contains any of the given words, for example the glass
+        /// panes of picture frames, which glTFast imports as dark mirrors that hide the artwork behind them.</summary>
+        static void DropSubmeshes(GameObject go, string[] words)
+        {
+            foreach (var mf in go.GetComponentsInChildren<MeshFilter>())
+            {
+                var mr = mf.GetComponent<MeshRenderer>();
+                var src = mf.sharedMesh;
+                if (mr == null || src == null) continue;
+                var mats = mr.sharedMaterials;
+                var keep = Enumerable.Range(0, Mathf.Min(mats.Length, src.subMeshCount))
+                    .Where(i => mats[i] == null || !words.Any(w => mats[i].name.ToLowerInvariant().Contains(w))).ToList();
+                if (keep.Count == src.subMeshCount) continue;
+                if (keep.Count == 0) { mr.enabled = false; continue; }
+                var mesh = Object.Instantiate(src);
+                mesh.name = src.name + "_trimmed";
+                mesh.subMeshCount = keep.Count;
+                for (int k = 0; k < keep.Count; k++) mesh.SetTriangles(src.GetTriangles(keep[k]), k);
+                mesh.RecalculateBounds();
+                mf.sharedMesh = mesh;
+                mr.sharedMaterials = keep.Select(i => mats[i]).ToArray();
+            }
         }
 
         static void AddBoxCollider(GameObject go, Bounds worldBounds)
