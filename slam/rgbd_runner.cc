@@ -83,6 +83,9 @@ int main(int argc, char** argv) {
         }
         fs::create_directories(output_folder);
 
+        cv::FileStorage camera_settings(settings.string(), cv::FileStorage::READ);
+        const bool expects_rgb = static_cast<int>(camera_settings["Camera.RGB"]) != 0;
+
         const std::vector<AssociatedFrame> frames = load_associations(associations);
         ORB_SLAM3::System slam(
             vocabulary.string(),
@@ -108,6 +111,12 @@ int main(int argc, char** argv) {
                     + std::to_string(frames[index].rgb_timestamp)
                 );
             }
+            // imread decodes BGR, whereas Camera.RGB selects the input order.
+            if (expects_rgb && rgb.channels() == 3) {
+                cv::cvtColor(rgb, rgb, cv::COLOR_BGR2RGB);
+            } else if (expects_rgb && rgb.channels() == 4) {
+                cv::cvtColor(rgb, rgb, cv::COLOR_BGRA2RGBA);
+            }
 
             if (image_scale != 1.0F) {
                 const cv::Size size(
@@ -115,7 +124,7 @@ int main(int argc, char** argv) {
                     static_cast<int>(rgb.rows * image_scale)
                 );
                 cv::resize(rgb, rgb, size);
-                cv::resize(depth, depth, size);
+                cv::resize(depth, depth, size, 0, 0, cv::INTER_NEAREST);
             }
 
             const auto started = std::chrono::steady_clock::now();
