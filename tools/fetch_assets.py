@@ -154,6 +154,21 @@ def stripes(paper: np.ndarray, colors: list[str], motif: str, stripe_px: int) ->
     return linear_to_srgb(img * paper_variation(paper))
 
 
+def stain_field(strength: float, seed: int) -> np.ndarray:
+    """Aperiodic darkening over the texture: blotchy smoke and water stains plus soot streaks running down."""
+    rng = np.random.default_rng(seed)
+    field = np.zeros((SIZE, SIZE), np.float32)
+    for cells, amp in ((4, 0.55), (9, 0.3), (23, 0.15)):
+        g = rng.random((cells + 1, cells + 1)).astype(np.float32)
+        g[-1, :] = g[0, :]; g[:, -1] = g[:, 0]          # tileable at the texture edge
+        field += amp * np.asarray(Image.fromarray(g).resize((SIZE, SIZE), Image.BICUBIC))
+    field = (field - field.min()) / (field.max() - field.min() + 1e-6)
+    streaks = np.asarray(Image.fromarray(rng.random((1, 64)).astype(np.float32)).resize((SIZE, SIZE), Image.BICUBIC))
+    fade = np.linspace(1.0, 0.2, SIZE, dtype=np.float32)[:, None]   # stronger near the top (ceiling side)
+    dark = np.clip(0.65 * field + 0.35 * streaks * fade, 0, 1)
+    return 1.0 - strength * dark ** 1.5
+
+
 def build_mask(rough: np.ndarray | None, ao: np.ndarray | None, metallic: float = 0.0, smoothness: float | None = None) -> np.ndarray:
     smooth = 1.0 - (rough if rough is not None else np.full((SIZE, SIZE), 0.6, np.float32))
     if smoothness is not None:
@@ -208,6 +223,16 @@ def build(name: str, spec: dict) -> dict:
 
     if albedo is None:
         raise RuntimeError(f"{name}: no albedo map")
+    if spec.get("repeat_inside", 1) > 1:
+        # Tile the pattern n x n inside one texture, so the stains below can vary across n repeats.
+        n = spec["repeat_inside"]
+        small = lambda a: np.asarray(Image.fromarray((np.clip(a, 0, 1) * 255).astype(np.uint8)).resize((SIZE // n, SIZE // n), Image.LANCZOS)).astype(np.float32) / 255.0
+        albedo = np.tile(small(albedo), (n, n, 1) if albedo.ndim == 3 else (n, n))
+        normal = np.tile(small(normal), (n, n, 1)) if normal is not None else None
+        rough = np.tile(small(rough), (n, n)) if rough is not None else None
+        ao = np.tile(small(ao), (n, n)) if ao is not None else None
+    if spec.get("stains", 0) > 0:
+        albedo = albedo * stain_field(spec["stains"], seed=sum(map(ord, name)))[..., None]
     if normal is None:
         normal = flat_normal()
     out = OUT / name
