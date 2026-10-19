@@ -531,6 +531,31 @@
           "glass"
         ]
       }
+    ],
+    "bedroom1_art_dartboard": [
+      {
+        "polyhaven": "dartboard",
+        "fit_width": 0.45,
+        "offset": [
+          0,
+          1.45,
+          0
+        ]
+      }
+    ],
+    "bedroom1_art_clock": [
+      {
+        "polyhaven": "vintage_telephone_wall_clock",
+        "fit_width": 0.34,
+        "offset": [
+          0,
+          1.25,
+          0
+        ],
+        "hide_materials": [
+          "glass"
+        ]
+      }
     ]
   },
   "filler": {

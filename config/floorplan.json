@@ -642,6 +642,24 @@
         7.86
       ],
       "yaw": 180
+    },
+    {
+      "room": "bedroom_1",
+      "kind": "bedroom1_art_dartboard",
+      "at": [
+        4.895,
+        9.6
+      ],
+      "yaw": 270
+    },
+    {
+      "room": "bedroom_1",
+      "kind": "bedroom1_art_clock",
+      "at": [
+        4.815,
+        10.7
+      ],
+      "yaw": 270
     }
   ],
   "fires": [
