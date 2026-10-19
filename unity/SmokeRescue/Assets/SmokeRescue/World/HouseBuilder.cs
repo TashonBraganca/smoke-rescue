@@ -21,6 +21,7 @@ namespace SmokeRescue.World
         public const string RootName = "House";
         public const string WallsLayer = "Walls";
         public const string CeilingLayer = "Ceiling";
+        public const string PropsLayer = "Props";
         public const string StructureMaterial = "paint_white_textured";
         public const string TrimMaterial = "prop_wood_cabinet";
         public const string GroundMaterial = "concrete_rough";
@@ -201,6 +202,7 @@ namespace SmokeRescue.World
         static void BuildDoor(FloorPlan plan, Rect fp, FloorPlan.Door d, GameObject parent, Material trim)
         {
             var go = Child(parent, $"Door_{d.id}");
+            int propsLayer = LayerMask.NameToLayer(PropsLayer);
             bool alongX = d.RunsAlongX;
             float at = alongX ? d.at[1] : d.at[0];
             float pos = alongX ? d.at[0] : d.at[1];
@@ -216,8 +218,10 @@ namespace SmokeRescue.World
             AddBox(go, "Jamb_B", P(pos + w / 2 + CasingWidth / 2, D / 2), S(CasingWidth, D, depth), trim, collider: true);
             AddBox(go, "Head", P(pos, D + CasingWidth / 2), S(w + 2 * CasingWidth, CasingWidth, depth), trim, collider: false);
 
-            float angle = d.state switch { "open" => 90f, "half" => 45f, "closed" => 0f, _ => -1f };
-            if (angle < 0f) return;  // removed: an open cased opening
+            // "open" means fully open: swung back nearly flat against the wall, the way people leave a door so
+            // it does not stick into the room. "half" stands at 45 degrees into the room.
+            float angle = d.state switch { "open" => 175f, "half" => 45f, "closed" => 0f, _ => -1f };
+            if (angle < 0f) { SetLayer(go, propsLayer); return; }  // removed: an open cased opening
 
             // Swing into the first room that is not outside.
             string swingRoom = d.between[0] == "outside" ? d.between[1] : d.between[0];
@@ -227,18 +231,25 @@ namespace SmokeRescue.World
 
             var hinge = new GameObject("Hinge");
             hinge.transform.SetParent(go.transform, false);
-            hinge.transform.position = P(pos - w / 2 + 0.01f, 0f, side * (line.thickness / 2 - LeafThickness / 2));
+            // Hinge just outside the wall face, so a fully open leaf lies in front of the wall, not inside it.
+            hinge.transform.position = P(pos - w / 2 + 0.01f, 0f, side * (line.thickness / 2 + LeafThickness / 2 + 0.005f));
             // Closed, the leaf extends along +x (or +z). Euler(0, +90, 0) turns +x to -z, and +z to +x.
             float yaw = alongX ? -side * angle : side * angle;
             hinge.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
             float leafLen = w - 0.02f;
-            var leaf = AddBox(hinge, "Leaf", Vector3.zero, Vector3.one, trim, collider: true);
+            var leaf = AddBox(hinge, $"Leaf_{d.id}", Vector3.zero, Vector3.one, trim, collider: true);
             leaf.transform.localPosition = alongX ? new Vector3(leafLen / 2, (D - 0.02f) / 2, 0) : new Vector3(0, (D - 0.02f) / 2, leafLen / 2);
             leaf.GetComponent<MeshFilter>().sharedMesh = WorldMesh.Box(leaf.transform.position,
                 alongX ? new Vector3(leafLen, D - 0.02f, LeafThickness) : new Vector3(LeafThickness, D - 0.02f, leafLen), $"Leaf_{d.id}");
             var col = leaf.GetComponent<BoxCollider>();
             col.center = Vector3.zero;
             col.size = leaf.GetComponent<MeshFilter>().sharedMesh.bounds.size;
+            SetLayer(go, propsLayer);
+        }
+
+        static void SetLayer(GameObject go, int layer)
+        {
+            foreach (var t in go.GetComponentsInChildren<Transform>()) t.gameObject.layer = layer;
         }
 
         // ------------------------------------------------------------------ helpers
