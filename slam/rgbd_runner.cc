@@ -10,6 +10,8 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iomanip>
+#include <memory>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -21,6 +23,7 @@
 #include <opencv2/imgproc.hpp>
 
 #include <System.h>
+#include "imu_feed.h"
 
 namespace fs = std::filesystem;
 
@@ -63,15 +66,19 @@ std::vector<AssociatedFrame> load_associations(const fs::path& path) {
 }
 
 int main(int argc, char** argv) {
-    if (argc != 3) {
-        std::cerr << "Usage: smoke_rescue_rgbd ROBOT_FOLDER OUTPUT_FOLDER\n";
+    if (argc < 3 || argc > 5) {
+        std::cerr << "Usage: smoke_rescue_rgbd ROBOT_FOLDER OUTPUT_FOLDER [rgbd|rgbd_inertial] [SETTINGS]\n";
         return 2;
     }
 
     try {
         const fs::path robot_folder = fs::path(argv[1]);
         const fs::path output_folder = fs::path(argv[2]);
-        const fs::path settings = robot_folder / "camera.yaml";
+        const std::string mode = argc >= 4 ? argv[3] : "rgbd";
+        if (mode != "rgbd" && mode != "rgbd_inertial")
+            throw std::runtime_error("unknown mode: " + mode);
+        const bool inertial = mode == "rgbd_inertial";
+        const fs::path settings = argc == 5 ? fs::path(argv[4]) : robot_folder / "camera.yaml";
         const fs::path associations = robot_folder / "associations.txt";
         const fs::path vocabulary = "/opt/ORB_SLAM3/Vocabulary/ORBvoc.txt";
 
@@ -87,16 +94,42 @@ int main(int argc, char** argv) {
         const bool expects_rgb = static_cast<int>(camera_settings["Camera.RGB"]) != 0;
 
         const std::vector<AssociatedFrame> frames = load_associations(associations);
+        for (std::size_t i = 0; i < frames.size(); ++i) {
+            if (!std::isfinite(frames[i].rgb_timestamp) ||
+                std::abs(frames[i].rgb_timestamp - frames[i].depth_timestamp) > 1e-5 ||
+                (i && frames[i].rgb_timestamp <= frames[i-1].rgb_timestamp))
+                throw std::runtime_error("RGB-D timestamps must be synchronous and increasing");
+        }
+        std::unique_ptr<ImuFeed> imu;
+        std::size_t first_frame = 0;
+        if (inertial) {
+            std::ifstream input(robot_folder / "imu.txt");
+            if (!input) throw std::runtime_error("cannot open imu.txt");
+            auto samples = load_imu(input);
+            const double frequency = static_cast<double>(camera_settings["IMU.Frequency"]);
+            // Unity's first image is t=0; its first IMU sample is t=0.005.
+            // Skip unbracketed startup images instead of inventing a measurement.
+            while (first_frame < frames.size() && frames[first_frame].rgb_timestamp < samples.front().t)
+                ++first_frame;
+            if (first_frame + 1 >= frames.size() || frames.back().rgb_timestamp > samples.back().t)
+                throw std::runtime_error("IMU does not cover RGB-D recording");
+            std::cout << std::setprecision(9) << "IMU samples " << samples.size()
+                      << ", span " << samples.front().t << " to " << samples.back().t
+                      << ", skipped startup images " << first_frame << '\n';
+            imu = std::make_unique<ImuFeed>(std::move(samples), 1.0 / frequency);
+        }
         ORB_SLAM3::System slam(
             vocabulary.string(),
             settings.string(),
-            ORB_SLAM3::System::RGBD,
+            inertial ? ORB_SLAM3::System::IMU_RGBD : ORB_SLAM3::System::RGBD,
             false
         );
         const float image_scale = slam.GetImageScale();
 
         std::cout << "Processing " << frames.size() << " RGB-D frames without a viewer\n";
-        for (std::size_t index = 0; index < frames.size(); ++index) {
+        std::ofstream tracking(output_folder / "tracking.csv");
+        tracking << "timestamp,state,imu_samples,imu_first,imu_last,imu_initialized\n";
+        for (std::size_t index = first_frame; index < frames.size(); ++index) {
             cv::Mat rgb = cv::imread(
                 (robot_folder / frames[index].rgb_path).string(),
                 cv::IMREAD_UNCHANGED
@@ -128,7 +161,22 @@ int main(int argc, char** argv) {
             }
 
             const auto started = std::chrono::steady_clock::now();
-            slam.TrackRGBD(rgb, depth, frames[index].rgb_timestamp);
+            std::vector<ORB_SLAM3::IMU::Point> measurements;
+            if (inertial && index > first_frame) {
+                auto batch = imu->between(frames[index-1].rgb_timestamp, frames[index].rgb_timestamp);
+                for (const auto& s : batch) {
+                    // The prior endpoint remains in ORB-SLAM3's queue. Do not enqueue it twice.
+                    if (index > first_frame + 1 && s.t == frames[index-1].rgb_timestamp) continue;
+                    measurements.emplace_back(s.a[0], s.a[1], s.a[2], s.w[0], s.w[1], s.w[2], s.t);
+                }
+            }
+            slam.TrackRGBD(rgb, depth, frames[index].rgb_timestamp, measurements);
+            tracking << std::setprecision(9) << frames[index].rgb_timestamp << ','
+                     << slam.GetTrackingState() << ',' << measurements.size() << ','
+                     << (measurements.empty() ? 0 : measurements.front().t) << ','
+                     << (measurements.empty() ? 0 : measurements.back().t) << ','
+                     << (inertial && slam.GetTimeFromIMUInit() > 0) << '\n';
+            if (index % 15 == 0) tracking.flush();
             const auto elapsed = std::chrono::steady_clock::now() - started;
 
             double frame_period = 0.0;
