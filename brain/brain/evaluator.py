@@ -67,7 +67,26 @@ def transform_error(T_est: np.ndarray, T_true: np.ndarray) -> tuple[float, float
     return float(np.linalg.norm(d[:3, 3])), angle
 
 
-def evaluate_merge(out_dir: Path, details: dict, pair: tuple[str, str]) -> dict:
+def gt_pose_at(truth: Trajectory, t: float) -> np.ndarray:
+    """Ground-truth camera-to-house pose at the nearest truth sample to t."""
+    from scipy.spatial.transform import Rotation
+    i = int(np.argmin(np.abs(truth.timestamps - t)))
+    T = np.eye(4)
+    T[:3, :3] = Rotation.from_quat(truth.quaternions_xyzw[i]).as_matrix()
+    T[:3, 3] = truth.positions[i]
+    return T
+
+
+def local_true_transform(slam_a: np.ndarray, t_a: float, gt_a: Trajectory, slam_b: np.ndarray, t_b: float, gt_b: Trajectory) -> np.ndarray:
+    """True T_A_B at the matched pair of keyframes: maps B's map into A's map so that B's keyframe lands where ground
+    truth says it is relative to A's keyframe. Independent of drift elsewhere on either trajectory."""
+    from brain.merge import pose_matrix
+    Sa = pose_matrix(slam_a[int(np.argmin(np.abs(slam_a[:, 0] - t_a)))])
+    Sb = pose_matrix(slam_b[int(np.argmin(np.abs(slam_b[:, 0] - t_b)))])
+    return Sa @ np.linalg.inv(gt_pose_at(gt_a, t_a)) @ gt_pose_at(gt_b, t_b) @ np.linalg.inv(Sb)
+
+
+def evaluate_merge(out_dir: Path, details: dict, pair: tuple[str, str], recording: Path | None = None) -> dict:
     """Merge error against T_true = align_A^-1 align_B. A proxy: it includes each robot's own SLAM drift."""
     merge_dir = out_dir / "merge"
     if not (merge_dir / "merge.json").exists():
@@ -77,19 +96,39 @@ def evaluate_merge(out_dir: Path, details: dict, pair: tuple[str, str]) -> dict:
     a, b = pair
     T_true = np.linalg.inv(alignment_matrix(details[a])) @ alignment_matrix(details[b])
     false_merges, per_match = 0, []
+    local = recording is not None
+    if local:
+        gt = {r: load_trajectory(recording, r) for r in pair}
+        traj = {r: read_tum(out_dir / r / "KeyFrameTrajectory.txt") for r in pair}
     for c in cands:
         if c.get("accepted") and "T_A_B" in c:
             err_m, err_deg = transform_error(np.asarray(c["T_A_B"]), T_true)
-            per_match.append({"t": c["t"], "msg_id": c["msg_id"], "query_kf": c["query_kf"], "match_kf": c["match_kf"],
-                              "error_m": err_m, "error_deg": err_deg, "used_in_pose_graph": c.get("used_in_pose_graph")})
-            false_merges += int(err_m > 0.5)
+            row = {"t": c["t"], "msg_id": c["msg_id"], "query_kf": c["query_kf"], "match_kf": c["match_kf"],
+                   "error_m": err_m, "error_deg": err_deg, "used_in_pose_graph": c.get("used_in_pose_graph")}
+            if local:
+                ta = c["match_t"] if c["to"] == a else c["query_t"]
+                tb = c["query_t"] if c["to"] == a else c["match_t"]
+                T_loc = local_true_transform(traj[a], ta, gt[a], traj[b], tb, gt[b])
+                row["local_error_m"], row["local_error_deg"] = transform_error(np.asarray(c["T_A_B"]), T_loc)
+                false_merges += int(row["local_error_m"] > 0.5)
+            else:
+                false_merges += int(err_m > 0.5)
+            per_match.append(row)
     merges = []
     if m.get("merged"):
         err_m, err_deg = transform_error(np.asarray(m["T_A_B"]), T_true)
         first_m, first_deg = transform_error(np.asarray(m["T_A_B_first"]), T_true)
-        merges.append({"t": m["t_merge"], "pair": list(pair), "accepted_matches": m["accepted"],
-                       "rejected_candidates": m["rejected"], "transform_error_m": err_m, "transform_error_deg": err_deg,
-                       "first_match_error_m": first_m, "first_match_error_deg": first_deg})
+        entry = {"t": m["t_merge"], "pair": list(pair), "accepted_matches": m["accepted"],
+                 "rejected_candidates": m["rejected"], "transform_error_m": err_m, "transform_error_deg": err_deg,
+                 "first_match_error_m": first_m, "first_match_error_deg": first_deg}
+        used = [r for r in per_match if r.get("used_in_pose_graph") and "local_error_m" in r]
+        if used:
+            # Headline merge error: registration error at the matched places (median over pose-graph matches).
+            entry["local_error_m"] = float(np.median([r["local_error_m"] for r in used]))
+            entry["local_error_deg"] = float(np.median([r["local_error_deg"] for r in used]))
+            entry["global_error_m"], entry["global_error_deg"] = err_m, err_deg
+            entry["transform_error_m"], entry["transform_error_deg"] = entry["local_error_m"], entry["local_error_deg"]
+        merges.append(entry)
     (out_dir / "merge_details.json").write_text(json.dumps({"T_true_A_B": T_true.tolist(), "matches": per_match}, indent=2) + "\n")
     return {"merges": merges, "false_merges": false_merges}
 
@@ -149,7 +188,7 @@ def evaluate_run(recording: Path | str, out_dir: Path | str) -> dict:
               f"{tracking['tracking_lost_s']:.6f} s missing poses", flush=True)
     pair = tuple(metadata["robots"][:2])
     if len(pair) == 2:
-        report.update(evaluate_merge(out_dir, details, pair))
+        report.update(evaluate_merge(out_dir, details, pair, recording))
         report.update(evaluate_map(recording, out_dir, details, pair))
     # Association and alignment evidence goes in a separate file.
     (out_dir / "ate_details.json").write_text(json.dumps(details, indent=2, allow_nan=False) + "\n")
@@ -173,13 +212,13 @@ def evaluate_run(recording: Path | str, out_dir: Path | str) -> dict:
         paragraphs.append(
             f"Maps of {mg['pair'][0]} and {mg['pair'][1]} merged at t = {mg['t']:.2f} s after {mg['accepted_matches']} accepted "
             f"and {mg['rejected_candidates']} rejected candidates. Transform error {mg['transform_error_m'] * 100:.1f} cm and "
-            f"{mg['transform_error_deg']:.2f} degrees after pose-graph optimisation "
-            f"({mg['first_match_error_m'] * 100:.1f} cm, {mg['first_match_error_deg']:.2f} degrees from the first agreeing match). "
-            "The true transform comes from aligning each robot's SLAM trajectory to ground truth, so it includes each robot's drift.")
+            f"{mg['transform_error_deg']:.2f} degrees (median over the matches used in the pose graph). "
+            "Merge error is measured at the matched places: ground truth says where each matched keyframe sits relative to the other, independent of drift elsewhere."
+            + (f" Against whole-trajectory alignment, which also counts each robot's accumulated drift, it is {mg['global_error_m'] * 100:.1f} cm and {mg['global_error_deg']:.2f} degrees." if 'global_error_m' in mg else ""))
     if not report.get("merges"):
         paragraphs.append("No merge happened in this run.")
     if report.get("false_merges") is not None:
-        paragraphs.append(f"False merges (accepted matches more than 50 cm from the true transform): {report['false_merges']}.")
+        paragraphs.append(f"False merges (accepted matches whose registration is more than 50 cm wrong at the matched place): {report['false_merges']}.")
     if report.get("map_median_error_m") is not None:
         paragraphs.append(f"Merged map median distance to the true surfaces: {report['map_median_error_m'] * 100:.1f} cm.")
     if report.get("coverage_pct") is not None:

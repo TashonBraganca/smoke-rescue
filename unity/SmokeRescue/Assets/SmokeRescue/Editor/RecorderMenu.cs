@@ -19,10 +19,10 @@ namespace SmokeRescue.Editor
         public static void HazeTest() => Run("scenario_haze_2agents.json", "unity_haze_test20", 20f);
 
         [MenuItem("Tools/Smoke Rescue/Record/Clear full run")]
-        public static void ClearFull() => Run("scenario_clear_2agents.json", "unity_clear_seed7");
+        public static void ClearFull() => Run("scenario_clear_2agents.json", "unity_clear");
 
         [MenuItem("Tools/Smoke Rescue/Record/Haze full run")]
-        public static void HazeFull() => Run("scenario_haze_2agents.json", "unity_haze_seed7");
+        public static void HazeFull() => Run("scenario_haze_2agents.json", "unity_haze");
 
         static void Run(string scenario, string runId, float maxSeconds = float.PositiveInfinity, bool noise = true)
         {

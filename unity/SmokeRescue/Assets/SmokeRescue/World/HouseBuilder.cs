@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.Rendering.HighDefinition;
 
 namespace SmokeRescue.World
 {
@@ -59,6 +60,7 @@ namespace SmokeRescue.World
             BuildWalls(plan, fp, walls, materials(StructureMaterial), wallsLayer);
             foreach (var room in plan.rooms) BuildFinishes(plan, fp, room, finishes, materials(room.walls));
             foreach (var door in plan.doors) BuildDoor(plan, fp, door, doors, materials(TrimMaterial));
+            BuildWindows(plan, fp, Child(root, "Windows"), materials(TrimMaterial), GlassMaterial());
 
             foreach (var room in plan.rooms)
             {
@@ -250,6 +252,65 @@ namespace SmokeRescue.World
         static void SetLayer(GameObject go, int layer)
         {
             foreach (var t in go.GetComponentsInChildren<Transform>()) t.gameObject.layer = layer;
+        }
+
+        // ------------------------------------------------------------------ windows
+
+        /// <summary>
+        /// One covered window per exterior wall of each room (SIMULATION_SPEC 3.2: windows exist but show night).
+        /// Frame and dark glass sit on the inside face; walls stay solid. Positions avoid doors (0.8 m) and landmarks (1.2 m).
+        /// </summary>
+        static void BuildWindows(FloorPlan plan, Rect fp, GameObject parent, Material trim, Material glass)
+        {
+            const float w = 1.0f, h = 1.2f, sill = 0.9f, frame = 0.06f;
+            int props = LayerMask.NameToLayer(PropsLayer);
+            foreach (var room in plan.rooms)
+            {
+                Rect r = room.Rect;
+                var edges = new[]
+                {
+                    (true, r.yMin, r.xMin, r.xMax, Vector3.forward), (true, r.yMax, r.xMin, r.xMax, Vector3.back),
+                    (false, r.xMin, r.yMin, r.yMax, Vector3.right), (false, r.xMax, r.yMin, r.yMax, Vector3.left),
+                };
+                foreach (var (alongX, at, a, b, n) in edges)
+                {
+                    bool exterior = alongX ? (Near(at, fp.yMin) || Near(at, fp.yMax)) : (Near(at, fp.xMin) || Near(at, fp.xMax));
+                    if (!exterior || b - a < 2.2f) continue;
+                    float plane = at + (alongX ? n.z : n.x) * (plan.exterior_wall_thickness / 2 + 0.004f);
+                    // Candidate positions along the wall, centre first; take the first clear one.
+                    float mid = (a + b) / 2;
+                    foreach (var pos in new[] { mid, mid - 1.2f, mid + 1.2f, mid - 2.2f, mid + 2.2f })
+                    {
+                        if (pos - w / 2 < a + 0.4f || pos + w / 2 > b - 0.4f) continue;
+                        Vector2 p2 = alongX ? new Vector2(pos, at) : new Vector2(at, pos);
+                        if (plan.doors.Any(d => Vector2.Distance(new Vector2(d.at[0], d.at[1]), p2) < w / 2 + d.width / 2 + 0.8f)) continue;
+                        if (plan.landmarks.Any(l => Vector2.Distance(new Vector2(l.at[0], l.at[1]), p2) < 1.2f)) continue;
+                        var win = Child(parent, $"Window_{room.id}_{(alongX ? "Z" : "X")}{at:0}");
+                        Vector3 C(float along, float y, float off) => alongX ? new Vector3(along, y, plane + n.z * off) : new Vector3(plane + n.x * off, y, along);
+                        Vector3 Sz(float along, float y, float depth) => alongX ? new Vector3(along, y, depth) : new Vector3(depth, y, along);
+                        AddQuad(win, "Glass", C(pos, sill + h / 2, 0.002f), n, w, h, glass);
+                        AddBox(win, "FrameTop", C(pos, sill + h + frame / 2, 0.02f), Sz(w + 2 * frame, frame, 0.04f), trim, collider: false);
+                        AddBox(win, "FrameSill", C(pos, sill - frame / 2, 0.03f), Sz(w + 2 * frame, frame, 0.06f), trim, collider: false);
+                        AddBox(win, "FrameL", C(pos - w / 2 - frame / 2, sill + h / 2, 0.02f), Sz(frame, h, 0.04f), trim, collider: false);
+                        AddBox(win, "FrameR", C(pos + w / 2 + frame / 2, sill + h / 2, 0.02f), Sz(frame, h, 0.04f), trim, collider: false);
+                        AddBox(win, "Mullion", C(pos, sill + h / 2, 0.015f), Sz(0.03f, h, 0.02f), trim, collider: false);
+                        foreach (var t in win.GetComponentsInChildren<Transform>()) t.gameObject.layer = props;
+                        break;
+                    }
+                }
+            }
+        }
+
+        static Material glassMat;
+        static Material GlassMaterial()
+        {
+            if (glassMat != null) return glassMat;
+            glassMat = new Material(Shader.Find("HDRP/Lit")) { name = "NightGlass" };
+            glassMat.SetColor("_BaseColor", new Color(0.015f, 0.02f, 0.03f));
+            glassMat.SetFloat("_Smoothness", 0.95f);
+            glassMat.SetFloat("_Metallic", 0f);
+            HDMaterial.ValidateMaterial(glassMat);
+            return glassMat;
         }
 
         // ------------------------------------------------------------------ helpers

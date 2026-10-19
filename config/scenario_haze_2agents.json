@@ -44,7 +44,7 @@
   "survivors": [
     { "id": "s1", "room": "living",    "at": [5.6, 2.0],  "yaw": 30,  "pose": "lying_on_side" },
     { "id": "s2", "room": "bathroom",  "at": [5.6, 9.0],  "yaw": 90,  "pose": "slumped_against_wall" },
-    { "id": "s3", "room": "study",     "at": [10.0, 12.6],"yaw": 180, "pose": "collapsed_at_desk" },
+    { "id": "s3", "room": "study",     "at": [11.0, 12.2],"yaw": 90,  "pose": "collapsed_at_desk" },
     { "id": "s4", "room": "bedroom_2", "at": [13.2, 12.4],"yaw": 0,   "pose": "curled_on_bed" }
   ],
   "radio": { "range_m": 12.0, "max_walls": 1, "broadcast_period_s": 2.0, "budget_bytes_per_s": 2048 }
