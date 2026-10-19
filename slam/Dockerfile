@@ -64,6 +64,12 @@ RUN git init /opt/ORB_SLAM3 \
         -DCMAKE_CXX_STANDARD=14 \
     && cmake --build /opt/ORB_SLAM3/build --target ORB_SLAM3 --parallel 4
 
+# The pinned upstream Shutdown() has its worker wait commented out. Exporting
+# poses while local mapping or global BA still writes them races those workers.
+COPY slam/orbslam3_shutdown.patch /tmp/orbslam3_shutdown.patch
+RUN patch -d /opt/ORB_SLAM3 -p1 < /tmp/orbslam3_shutdown.patch \
+    && cmake --build /opt/ORB_SLAM3/build --target ORB_SLAM3 --parallel 4
+
 COPY slam/CMakeLists.txt /opt/smoke-rescue-runner/CMakeLists.txt
 COPY slam/rgbd_runner.cc /opt/smoke-rescue-runner/rgbd_runner.cc
 
