@@ -401,34 +401,29 @@
     "living": [
       "ArmChair_01",
       "CoffeeTable_01",
-      "Television_01",
       "potted_plant_01"
     ],
     "foyer": [
       "Ottoman_01",
       "potted_plant_02"
     ],
-    "kitchen": [
-      "vintage_electric_kettle"
-    ],
+    "kitchen": [],
     "hallway": [
       "side_table_01"
     ],
     "bedroom_1": [
-      "ClassicNightstand_01",
-      "alarm_clock_01"
+      "ClassicNightstand_01"
     ],
     "bathroom": [],
     "closet": [
       "cardboard_box_01"
     ],
     "study": [
-      "ArmChair_01",
-      "book_encyclopedia_set_01"
+      "ArmChair_01"
     ],
     "bedroom_2": [
       "painted_wooden_chair_01",
-      "dartboard"
+      "ClassicNightstand_01"
     ],
     "laundry": [
       "wicker_basket_01"
