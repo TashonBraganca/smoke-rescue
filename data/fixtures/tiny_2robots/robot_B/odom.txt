@@ -1,0 +1,3 @@
+# odometry data
+# TUM RGB-D fr3/long_office_household does not provide this sensor
+# no data rows

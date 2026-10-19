@@ -1,0 +1,11 @@
+{
+  "id": "clear_2agents",
+  "description": "Same routes as haze_2agents with no smoke at all. Used first, to prove SLAM and merging before smoke makes it harder.",
+  "inherits": "scenario_haze_2agents.json",
+  "seed": 7,
+  "smoke": {
+    "global_haze": 0.0,
+    "rooms": { "default": 0.0 },
+    "ramp_per_minute": 0.0
+  }
+}

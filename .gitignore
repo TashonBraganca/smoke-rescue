@@ -1,0 +1,41 @@
+# Unity generated
+unity/SmokeRescue/[Ll]ibrary/
+unity/SmokeRescue/[Tt]emp/
+unity/SmokeRescue/[Oo]bj/
+unity/SmokeRescue/[Bb]uild/
+unity/SmokeRescue/[Bb]uilds/
+unity/SmokeRescue/[Ll]ogs/
+unity/SmokeRescue/[Uu]serSettings/
+unity/SmokeRescue/[Mm]emoryCaptures/
+unity/SmokeRescue/*.csproj
+unity/SmokeRescue/*.sln
+unity/SmokeRescue/*.slnx
+unity/SmokeRescue/.vsconfig
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+crashlytics-build.properties
+
+# Python
+brain/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Data, too big for git. Fixtures are the exception.
+data/recordings/
+data/runs/
+data/public/
+!data/fixtures/
+
+# Inbox for manual downloads
+assets_inbox/
+
+# Mac
+.DS_Store
+
+# Local agent settings
+.agent/settings.local.json
+
+# Downloaded texture and model cache, rebuilt by tools/fetch_assets.py
+assets_cache/

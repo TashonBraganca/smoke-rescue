@@ -1,0 +1,27 @@
+{
+  "id": "smoke_3agents",
+  "description": "Stretch goal. Three robots, heavier smoke that thickens over time. The third robot enters through the west door.",
+  "inherits": "scenario_haze_2agents.json",
+  "seed": 11,
+  "duration_s": 240,
+  "smoke": {
+    "global_haze": 0.3,
+    "rooms": { "kitchen": 0.7, "living": 0.55, "bedroom_2": 0.6, "default": 0.35 },
+    "ramp_per_minute": 0.05
+  },
+  "extra_robots": [
+    {
+      "id": "robot_C",
+      "color": "#E5484D",
+      "spawn": { "at": [-1.2, 7.0], "yaw": 90 },
+      "control": "scripted",
+      "cruise_speed": 0.45,
+      "doorway_speed": 0.3,
+      "route": [
+        [1.5, 7.0], [6.5, 7.0], [6.5, 9.0], [6.5, 7.0], [14.0, 7.0],
+        [14.0, 9.5], [14.0, 11.0], [13.0, 10.0]
+      ],
+      "look_around_at": [[6.5, 9.0], [14.0, 11.0]]
+    }
+  ]
+}

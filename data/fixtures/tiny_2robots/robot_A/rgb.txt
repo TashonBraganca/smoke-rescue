@@ -1,0 +1,18 @@
+# color images
+# Smoke Rescue shared simulation clock
+# timestamp filename
+0.000000 rgb/0.000000.png
+0.031755 rgb/0.031755.png
+0.063868 rgb/0.063868.png
+0.099990 rgb/0.099990.png
+0.131688 rgb/0.131688.png
+0.167740 rgb/0.167740.png
+0.199990 rgb/0.199990.png
+0.231657 rgb/0.231657.png
+0.267711 rgb/0.267711.png
+0.299727 rgb/0.299727.png
+0.331723 rgb/0.331723.png
+0.367727 rgb/0.367727.png
+0.399997 rgb/0.399997.png
+0.435644 rgb/0.435644.png
+0.467648 rgb/0.467648.png

@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "note": "Maps every material name used in floorplan.json to a CC0 PBR source. tile_m is the real-world size of one texture repeat in metres. Built by tools/fetch_assets.py into assets_cache/textures/<name>/ as albedo.png, normal.png (OpenGL convention), mask.png (HDRP mask map: R metallic, G AO, B detail, A smoothness).",
+  "materials": {
+    "wood_oak_planks":              { "source": "polyhaven", "id": "laminate_floor_02",    "tile_m": 2.0 },
+    "stone_tiles_large":            { "source": "polyhaven", "id": "floor_tiles_08",       "tile_m": 2.0 },
+    "ceramic_tiles_checker":        { "source": "ambientcg", "id": "Tiles074",             "tile_m": 1.2 },
+    "wood_herringbone":             { "source": "polyhaven", "id": "herringbone_parquet",  "tile_m": 1.5 },
+    "carpet_beige":                 { "source": "ambientcg", "id": "Carpet014",            "tile_m": 1.0 },
+    "mosaic_tiles_teal":            { "source": "ambientcg", "id": "Tiles068",             "tile_m": 0.6 },
+    "carpet_grey":                  { "source": "ambientcg", "id": "Carpet003",            "tile_m": 1.5 },
+    "wood_dark_walnut":             { "source": "polyhaven", "id": "dark_wooden_planks",   "tile_m": 2.0 },
+    "wood_light_maple":             { "source": "polyhaven", "id": "wooden_floor_02",      "tile_m": 2.0 },
+    "concrete_sealed":              { "source": "polyhaven", "id": "concrete_floor_02",    "tile_m": 3.0 },
+
+    "wallpaper_deep_green":         { "source": "recolor", "pattern": { "source": "polyhaven", "id": "floral_jacquard" }, "rotate": 90, "gamma": 2.2, "paper": { "source": "ambientcg", "id": "Wallpaper001A" }, "dark": "#0E3A28", "light": "#C2A55A", "tile_m": 0.5 },
+    "paint_warm_grey_textured":     { "source": "polyhaven", "id": "concrete_wall_003",    "tint": "#B3A99C", "tile_m": 2.0 },
+    "subway_tiles_white_and_paint": { "source": "ambientcg", "id": "Tiles010",             "tile_m": 0.8 },
+    "wainscot_panels_cream":        { "source": "polyhaven", "id": "white_planks_clean",   "tint": "#EFE4C8", "tile_m": 1.5 },
+    "wallpaper_blue_floral":        { "source": "recolor", "pattern": { "source": "polyhaven", "id": "floral_jacquard" }, "paper": { "source": "ambientcg", "id": "Wallpaper001A" }, "dark": "#1F3E7A", "light": "#DCE3EE", "tile_m": 0.7 },
+    "ceramic_tiles_large_white":    { "source": "ambientcg", "id": "Tiles107",             "tile_m": 1.2 },
+    "paint_white_textured":         { "source": "ambientcg", "id": "Plaster003",           "tile_m": 2.0 },
+    "wood_panels_mahogany":         { "source": "polyhaven", "id": "wooden_panels",        "tile_m": 2.0 },
+    "wallpaper_yellow_stripes":     { "source": "stripes", "paper": { "source": "ambientcg", "id": "Wallpaper001A" }, "colors": ["#E8C64A", "#F6E7A8"], "motif": "#B98A1E", "stripe_px": 96, "tile_m": 0.6 },
+    "brick_painted_white":          { "source": "ambientcg", "id": "Bricks060",            "tile_m": 1.5 },
+
+    "plaster_white":                { "source": "ambientcg", "id": "Plaster003",           "tile_m": 2.0 },
+    "concrete_rough":               { "source": "polyhaven", "id": "concrete_wall_003",    "tile_m": 2.5 },
+
+    "prop_brick_red":               { "source": "polyhaven", "id": "red_brick_03",          "tile_m": 1.0 },
+    "prop_steel_brushed":           { "source": "ambientcg", "id": "Metal009",              "metallic": 1.0, "tile_m": 1.0 },
+    "prop_marble_top":              { "source": "ambientcg", "id": "Marble006",             "tile_m": 1.5 },
+    "prop_coat_wool":               { "source": "polyhaven", "id": "caban",                 "tile_m": 0.5 },
+    "prop_denim":                   { "source": "polyhaven", "id": "denim_fabric",          "tile_m": 0.5 },
+    "prop_leather_red":             { "source": "polyhaven", "id": "leather_red_02",        "tile_m": 0.8 },
+    "prop_wood_cabinet":            { "source": "polyhaven", "id": "wood_cabinet_worn_long", "tile_m": 1.5 },
+    "prop_enamel_white":            { "source": "ambientcg", "id": "Plaster003",            "tint": "#F1F0EA", "smoothness": 0.85, "tile_m": 1.0 },
+    "prop_rug_red":                 { "source": "recolor", "pattern": { "source": "polyhaven", "id": "floral_jacquard" }, "paper": { "source": "ambientcg", "id": "Carpet016" }, "dark": "#5A1414", "light": "#D9B77A", "gamma": 1.4, "tile_m": 1.0 },
+    "prop_blanket_blue":            { "source": "recolor", "pattern": { "source": "polyhaven", "id": "fabric_pattern_05" }, "paper": { "source": "polyhaven", "id": "rough_linen" }, "dark": "#1E3A6E", "light": "#A9BEDF", "tile_m": 0.6 },
+    "prop_globe_map":               { "source": "recolor", "pattern": { "source": "ambientcg", "id": "Marble006" }, "paper": { "source": "ambientcg", "id": "Wallpaper001A" }, "dark": "#24507A", "light": "#C9B77E", "gamma": 0.7, "tile_m": 1.0 }
+  }
+}

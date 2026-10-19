@@ -1,0 +1,18 @@
+{
+  "run_id": "tiny_2robots",
+  "scenario": "tum_standin",
+  "seed": null,
+  "unity_version": null,
+  "sim_rate_hz": 30,
+  "robots": [
+    "robot_A",
+    "robot_B"
+  ],
+  "smoke_level": 0.0,
+  "recorded_offline": true,
+  "source": "TUM RGB-D fr3/long_office_household",
+  "imu": "not available in the source TUM RGB-D sequence",
+  "odom": "not available in the source TUM RGB-D sequence",
+  "radio": "synthetic always-connected link for the TUM stand-in",
+  "fixture_of": "tum_fr3_long_office_2halves"
+}

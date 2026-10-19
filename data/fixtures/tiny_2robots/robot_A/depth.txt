@@ -1,0 +1,18 @@
+# depth maps in millimetres
+# Smoke Rescue shared simulation clock
+# timestamp filename
+0.000032 depth/0.000032.png
+0.031767 depth/0.031767.png
+0.063891 depth/0.063891.png
+0.100001 depth/0.100001.png
+0.131702 depth/0.131702.png
+0.167749 depth/0.167749.png
+0.200001 depth/0.200001.png
+0.231688 depth/0.231688.png
+0.267736 depth/0.267736.png
+0.299740 depth/0.299740.png
+0.331785 depth/0.331785.png
+0.367798 depth/0.367798.png
+0.400061 depth/0.400061.png
+0.435660 depth/0.435660.png
+0.467662 depth/0.467662.png

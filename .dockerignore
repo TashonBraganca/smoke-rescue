@@ -1,0 +1,3 @@
+# Docker build context: only slam/ is needed by slam/Dockerfile
+*
+!slam/

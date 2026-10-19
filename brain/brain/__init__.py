@@ -1,0 +1,1 @@
+"""Smoke Rescue brain package."""
