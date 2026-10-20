@@ -684,6 +684,30 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void ARobotLeavesWhileFireIsClosingOnItsWayOut()
+        {
+            // Agent run 11: robot A searched beside a spreading fire until the air reached 70 C, and its route home was
+            // gone by then. Fire 1.6 m beside the way out, 3 m behind the robot, must end the search; control: 3.5 m.
+            string StateWithFireAt(Vector2 fire, out int closing)
+            {
+                var c = Settings(); c.grid_size_m = 12; c.robot_radius_m = .25f;
+                var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -5, 5, -2, 6);
+                closing = 0;
+                for (int i = 0; i < 90; i++)
+                {
+                    double t = i / 15.0; Motion(b, t, t < 3 ? 1f : 0); b.OnRgbd(Image(t, true)); b.OnAirTemperature(t, 20);
+                    if (t >= 3.2) { var g = Map(b); for (float dx = -.3f; dx <= .3f; dx += .1f) for (float dy = -.3f; dy <= .3f; dy += .1f) g.ObserveHeat(g.Cell(fire + new Vector2(dx, dy)), 500, t); }
+                    b.Step(t, 1f / 15); closing += b.DrainEvents().Count(e => e.kind == "escape_closing");
+                }
+                return b.Snapshot().state;
+            }
+            Assert.That(StateWithFireAt(new Vector2(1.9f, .8f), out int near), Is.EqualTo("return"));
+            Assert.That(near, Is.EqualTo(1));
+            Assert.That(StateWithFireAt(new Vector2(4.2f, .8f), out int far), Is.Not.EqualTo("return"), "control: fire 3.5 m from the way out");
+            Assert.That(far, Is.Zero);
+        }
+
+        [Test]
         public void AReturnEndsWithinHalfAMetreOfADoorwayStart()
         {
             // House reflex check: robot B stopped 0.3 m from its doorway start, where the return path ended, and replanned
