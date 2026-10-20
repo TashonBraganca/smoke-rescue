@@ -37,6 +37,8 @@ namespace SmokeRescue.Brain
         // Row-major [row * gridSize + column], increasing row is brain +y.
         // Occupancy: 0 unknown, 1 free, 255 occupied. Arrays are detached copies.
         public byte[] occupancy, peerExplored;
+        // 1 where this robot's own camera, or a linked partner's, has searched the floor; row-major like occupancy.
+        public byte[] searched;
         public PeerSnapshot[] peers;
         public SurvivorSnapshot[] survivors;
         public float[] heat;
