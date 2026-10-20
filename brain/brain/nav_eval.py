@@ -379,6 +379,8 @@ def evaluate(recording: Path | str, out: Path | str | None = None) -> dict:
     if not (recording / 'meta.json').exists():
         raise ValueError('recording is still running: meta.json is absent; use tools/watch_run.py')
     meta = json.loads((recording / 'meta.json').read_text())
+    if not meta.get('complete', True):
+        print(f"partial recording: checkpoint at {meta.get('sim_seconds_written')} s; scoring what has been written")
     out = Path(out) if out is not None else Path(__file__).resolve().parents[2] / 'data/runs' / recording.name / 'nav_eval'
     out.mkdir(parents=True, exist_ok=True)
     points = load_house_points(recording)
