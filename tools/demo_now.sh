@@ -5,7 +5,7 @@
 RUN="${1:-unity_haze}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 RRD="$ROOT/data/runs/$RUN/replay.rrd"
-VIDEO="$ROOT/data/evidence/walkthrough_burning_house_3x.mp4"
+VIDEO="$ROOT/data/evidence/walkthrough_burning_house_map_3x.mp4"
 [ -f "$RRD" ] || { echo "No replay at $RRD" >&2; exit 1; }
 
 cat "$ROOT/data/runs/$RUN/report.md"
