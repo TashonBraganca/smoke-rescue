@@ -113,7 +113,7 @@ namespace SmokeRescue.Recording
                     ["trace_path"] = Path.Combine(root, "agent_trace.jsonl"),
                     ["debug_dir"] = Path.Combine(root, "agent_debug"),
                     ["pose"] = JObject.FromObject(new { x = s.pose.position.x, y = s.pose.position.y, heading_deg = -s.pose.yawRad * Mathf.Rad2Deg }),
-                    ["mode"] = s.mode, ["state"] = s.state, ["heat_budget"] = s.heatBudget,
+                    ["mode"] = s.mode, ["state"] = s.state, ["heat_budget"] = s.heatBudget, ["torch"] = rig.robot.TorchMode,
                     ["goal"] = s.goal.HasValue ? new JArray(s.goal.Value.x, s.goal.Value.y) : null,
                     ["event"] = ev,
                     ["frame_times"] = new JArray(rig.thermalTimes.Skip(Math.Max(0, rig.thermalTimes.Count - 45)).Select(x => (object)x)),

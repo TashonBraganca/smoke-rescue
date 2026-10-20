@@ -44,6 +44,9 @@ PERCEPTION = [
 ACTIONS = [
     _fn("go_to", "Drive to a building position (x, y in metres) by the robot's own planner.",
         {"x": NUM, "y": NUM, "reason": STR}, ["x", "y", "reason"]),
+    _fn("approach_candidate", "Walk to a viewpoint 1.5 m short of an inspected warm region, on the line from the robot, "
+        "computed from the inspection itself. Use when inspect_candidate says uncertain.", {"evidence_id": EVIDENCE},
+        ["evidence_id"]),
     _fn("confirm_survivor", "Report a survivor at a building position. Needs an inspect_candidate result with verdict "
         "person.", {"x": NUM, "y": NUM, "evidence_id": EVIDENCE}, ["x", "y", "evidence_id"]),
     _fn("reject_candidate", "Mark a warm region as not a person so nobody inspects it again. Needs an "
@@ -79,6 +82,8 @@ class AgentContext:
     y: float
     heading_deg: float            # right-positive, 0 faces +y
     search_area: tuple[float, float, float, float] | None = None
+    event_kind: str = ""
+    torch: str = "wide"
     frame_times: list[float] = field(default_factory=list)   # recent thermal stamps, oldest first
 
 
@@ -190,6 +195,20 @@ class ToolRegistry:
         elif name == "go_to":
             if not self._in_area(float(args["x"]), float(args["y"])):
                 refusal = {"refused": True, "reason": "target is outside the building search area"}
+            elif self.ctx.event_kind in ("avoid_fire", "retreat"):
+                refusal = {"refused": True, "reason": "no go_to during a heat event: use track_fire_spread and avoid_area, "
+                           "and let the reflex layer back away"}
+        elif name == "approach_candidate":
+            refusal = self._need(args, ("inspect_candidate",), lambda ev: ev.get("x") is not None,
+                                 "the cited inspection has no position")
+            if refusal is None:
+                ev = self.evidence[args["evidence_id"]]
+                dx, dy = ev["x"] - self.ctx.x, ev["y"] - self.ctx.y
+                dist = max(1e-6, (dx * dx + dy * dy) ** 0.5)
+                k = max(0.0, dist - 1.5) / dist
+                args = {**args, "x": round(self.ctx.x + dx * k, 2), "y": round(self.ctx.y + dy * k, 2),
+                        "reason": f"closer look at an uncertain warm region ({ev['x']}, {ev['y']})"}
+                name = "go_to"
         elif name == "request_human_approval":
             refusal = self._need(args, tuple(f["function"]["name"] for f in PERCEPTION))
         elif name == "finish":

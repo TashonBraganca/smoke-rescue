@@ -36,7 +36,9 @@ Rules:
 
 Playbook by event kind:
 - survivor_candidate: scan_thermal, then inspect_candidate on the warm region; confirm_survivor or reject_candidate
-  with its evidence_id; if uncertain, go_to a point about 1.5 m closer on the same bearing. Tell your partner.
+  with its evidence_id; if uncertain, approach_candidate citing that inspection (never compute coordinates
+  yourself). If the colour image is dark, set the torch first so the second look can use both sensors. Tell your
+  partner.
 - avoid_fire or retreat: track_fire_spread, then avoid_area around the hot area citing that evidence. Never go_to
   toward heat. If fire spreads toward unexplored rooms, tell your partner and the commander.
 - sensor_switch (colour camera poor): assess_visibility, then set_torch citing it. Dark image (low brightness,
@@ -44,6 +46,8 @@ Playbook by event kind:
   After changing the torch, call assess_visibility again; if the colour image is now usable, scan_thermal to look
   for people with both sensors.
 - stuck: measure_opening straight ahead (bearing 0); if not passable, open_door or clear_debris citing it.
+- Every step: if the context says the torch is off or the event is periodic, call assess_visibility first; if the
+  colour image is not usable and the torch is off, set_torch wide citing it.
 - periodic (radio check-in): scan_thermal, act on what it finds, then send_team_message with one line for your
   partner and the commander: where you are searching, what you found (survivors, fire, blocked doors), and what
   you will do next, so the two of you do not search the same rooms.
@@ -68,9 +72,10 @@ class RobotAgent:
         ctx = AgentContext(robot=req["robot"], t=float(req["t"]), x=float(pose["x"]), y=float(pose["y"]),
                            heading_deg=float(pose["heading_deg"]),
                            search_area=tuple(req["search_area"]) if req.get("search_area") else None,
-                           frame_times=[float(s) for s in req.get("frame_times", [])])
+                           frame_times=[float(s) for s in req.get("frame_times", [])],
+                           event_kind=(req.get("event") or {}).get("kind", ""), torch=req.get("torch", "wide"))
         tools = ToolRegistry(Path(req["robot_dir"]), ctx, Path(req.get("debug_dir") or Path(self.trace_path).parent / "agent_debug"))
-        context = {k: req[k] for k in ("robot", "t", "pose", "mode", "state", "goal", "heat_budget", "air_c", "event",
+        context = {k: req[k] for k in ("robot", "t", "pose", "torch", "mode", "state", "goal", "heat_budget", "air_c", "event",
                                        "inbox", "orders", "survivors", "search_area") if k in req}
         messages = [{"role": "system", "content": SYSTEM},
                     {"role": "user", "content": "Decision needed. Context:\n" + json.dumps(context, default=str)}]

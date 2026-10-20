@@ -1,0 +1,160 @@
+{
+  "id": "house_agents",
+  "description": "Two autonomous robots with LLM agents search the original single-storey house (south-west block of the building) from the front and west doors. Four people inside, a spreading fire from the living room, debris in the hallway and foyer. The bathroom and bedroom 1 have no working lights and robot B enters with its torch off.",
+  "seed": 21,
+  "duration_s": 200,
+  "search_area": [
+    0,
+    0,
+    20,
+    14
+  ],
+  "dark_rooms": [
+    "bathroom",
+    "bedroom_1"
+  ],
+  "sim_rate_hz": 15,
+  "yaw_convention": "degrees about Unity +y. 0 faces +z (north), 90 faces +x (east).",
+  "smoke": {
+    "global_haze": 0.15,
+    "rooms": {
+      "kitchen": 0.35,
+      "living": 0.25,
+      "bedroom_2": 0.3,
+      "default": 0.15
+    },
+    "ramp_per_minute": 0.0
+  },
+  "robots": [
+    {
+      "id": "robot_A",
+      "color": "#F2A900",
+      "spawn": {
+        "at": [
+          10.0,
+          -1.2
+        ],
+        "yaw": 0
+      },
+      "control": "autonomous",
+      "cruise_speed": 0.5,
+      "doorway_speed": 0.3,
+      "route": [],
+      "look_around_at": [],
+      "torch": "wide"
+    },
+    {
+      "id": "robot_B",
+      "color": "#2FA3E6",
+      "spawn": {
+        "at": [
+          -1.2,
+          7.0
+        ],
+        "yaw": 90
+      },
+      "control": "autonomous",
+      "cruise_speed": 0.5,
+      "doorway_speed": 0.3,
+      "route": [],
+      "look_around_at": [],
+      "torch": "off"
+    }
+  ],
+  "look_around": {
+    "sweep_deg": 60,
+    "speed_dps": 25
+  },
+  "survivors": [
+    {
+      "id": "s1",
+      "room": "living",
+      "at": [
+        5.6,
+        2.0
+      ],
+      "yaw": 30,
+      "pose": "lying_on_side"
+    },
+    {
+      "id": "s2",
+      "room": "bathroom",
+      "at": [
+        5.6,
+        9.0
+      ],
+      "yaw": 90,
+      "pose": "slumped_against_wall"
+    },
+    {
+      "id": "s3",
+      "room": "study",
+      "at": [
+        11.0,
+        12.2
+      ],
+      "yaw": 90,
+      "pose": "collapsed_at_desk"
+    },
+    {
+      "id": "s4",
+      "room": "bedroom_2",
+      "at": [
+        13.2,
+        12.4
+      ],
+      "yaw": 0,
+      "pose": "curled_on_bed"
+    }
+  ],
+  "survivor_placement": "fixed",
+  "radio": {
+    "range_m": 12.0,
+    "max_walls": 1,
+    "broadcast_period_s": 2.0,
+    "budget_bytes_per_s": 2048
+  },
+  "fire": {
+    "spread": true,
+    "head_start_s": 60.0,
+    "note": "Whole-house fire from config/fire.json; the robots enter 60 s after ignition."
+  },
+  "obstacles": [
+    {
+      "room": "hallway",
+      "kind": "obstacle_wood_pile",
+      "at": [
+        6.3,
+        7.4
+      ],
+      "yaw": 15
+    },
+    {
+      "room": "hallway",
+      "kind": "obstacle_rubble",
+      "at": [
+        12.6,
+        7.45
+      ],
+      "yaw": 0
+    },
+    {
+      "room": "foyer",
+      "kind": "obstacle_burnt_crate",
+      "at": [
+        10.9,
+        4.4
+      ],
+      "yaw": 30
+    },
+    {
+      "room": "living",
+      "kind": "obstacle_waste_pile",
+      "at": [
+        5.3,
+        4.7
+      ],
+      "yaw": 60
+    }
+  ]
+}

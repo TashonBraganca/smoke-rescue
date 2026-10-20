@@ -47,6 +47,13 @@ namespace SmokeRescue.Editor
         [MenuItem("Tools/Smoke Rescue/Record/Dark room torch demo (no agents)")]
         public static void DarkTorchBaseline() => Run("scenario_dark_torch.json", "unity_dark_torch_reflex", 45f);
 
+        // Both robots in the original house only, so they cover it, meet and merge within the run.
+        [MenuItem("Tools/Smoke Rescue/Record/House agents run")]
+        public static void HouseAgents() => WithAgents(() => Run("scenario_house_agents.json", "unity_house_agents_v1"));
+
+        [MenuItem("Tools/Smoke Rescue/Record/House reflex run (no agents)")]
+        public static void HouseReflex() => Run("scenario_house_agents.json", "unity_house_reflex_v1");
+
         static void WithAgents(System.Action run)
         {
             RecordingSession.AgentUrl = System.Environment.GetEnvironmentVariable("SMOKE_AGENT_URL") ?? "http://localhost:8080";
