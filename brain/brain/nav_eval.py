@@ -336,6 +336,20 @@ def frame_link_report(events, receiver, robots, scenario):
     return result
 
 
+def indoor_report(indoor: np.ndarray, building: np.ndarray, searched: np.ndarray | None, cell: float, tolerance_m: float = .2) -> dict:
+    """How much of the robot's indoor layer (and its searched floor) lies outside the true building. Room rectangles
+    stop at the wall faces, so cells within tolerance_m of a room (door thresholds, wall cells) count as inside."""
+    tolerance_cells = int(round(tolerance_m / cell))
+    near = cv2.dilate(building.astype(np.uint8), np.ones((2 * tolerance_cells + 1,) * 2, np.uint8)) > 0
+    marked = indoor > 0
+    report = dict(indoor_cells=int(marked.sum()), indoor_cells_outside=int((marked & ~near).sum()),
+                  tolerance_m=tolerance_cells * cell)
+    report['indoor_outside_share'] = report['indoor_cells_outside'] / max(1, report['indoor_cells'])
+    if searched is not None:
+        report['searched_cells_outside'] = int(((searched == 255) & ~near).sum())
+    return report
+
+
 def floor_mask(floorplan: dict, scenario: dict, shape: tuple, origin, cell, occupied: np.ndarray) -> np.ndarray:
     """True floor a camera could search: cells inside the scenario's rooms that hold no wall or furniture.
     Evaluation only: the scenario's search_area picks which rooms belong to this run's building."""
@@ -428,6 +442,12 @@ def evaluate(recording: Path | str, out: Path | str | None = None) -> dict:
                 floor = floor_mask(floorplan, scenario, shape, origin, cell, truth_occupancy(points, shape, origin, cell))
                 covered = (searched == 255) & floor
                 map_report['searched_floor_share'] = float(covered.sum() / max(1, floor.sum()))
+                indoor = searched_for(robot_dir, map_t, 'indoor')
+                if indoor is not None:
+                    if common_shape is not None:
+                        indoor = sample_grid(indoor, own, source_origin, source_cell, fill=0)
+                    building = floor_mask(floorplan, scenario, shape, origin, cell, np.zeros(shape, bool))
+                    map_report['indoor'] = indoor_report(indoor, building, searched, cell)
                 team_searched = covered if team_searched is None else team_searched | covered
                 team_floor = int(floor.sum())
         report = dict(robot=robot, localization=localization, frame_check=convention, frame_link=link, lidar=lidar,

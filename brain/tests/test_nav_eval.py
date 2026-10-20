@@ -386,3 +386,29 @@ def test_link_errors_measure_translation_and_wrapped_yaw(local_recording):
     link = frame_link_report([event], 'robot_A', meta['robots'], load_scenario(meta))
     assert link['position_error_m'] == pytest.approx(.5)
     assert link['yaw_error_deg'] == pytest.approx(5)
+
+
+def test_indoor_report_counts_marked_cells_outside_the_building():
+    import numpy as np
+    from brain.nav_eval import indoor_report
+
+    building = np.zeros((40, 40), bool); building[10:30, 10:30] = True
+    indoor = np.zeros((40, 40), np.uint8); indoor[12:28, 12:28] = 255
+    searched = np.zeros((40, 40), np.uint8)
+    clean = indoor_report(indoor, building, searched, cell=.1)
+    assert clean['indoor_cells'] == 256 and clean['indoor_cells_outside'] == 0
+    # A threshold one cell past the wall face is tolerated; a strip of yard 1 m out is not.
+    indoor[20, 30] = 128; indoor[5, 12:22] = 128; searched[5, 12:16] = 255
+    leaked = indoor_report(indoor, building, searched, cell=.1)
+    assert leaked['indoor_cells_outside'] == 10 and leaked['searched_cells_outside'] == 4
+    assert abs(leaked['indoor_outside_share'] - 10 / 267) < 1e-9
+
+
+def test_sample_grid_fill_marks_cells_outside_the_source_map():
+    import numpy as np
+    from brain.nav_io import sample_grid
+
+    grid = np.full((2, 2), 255, np.uint8)
+    xy = np.array([[[.05, .05], [5.0, 5.0]]])
+    assert sample_grid(grid, xy, np.zeros(2), .1).tolist() == [[255, 128]]
+    assert sample_grid(grid, xy, np.zeros(2), .1, fill=0).tolist() == [[255, 0]]
