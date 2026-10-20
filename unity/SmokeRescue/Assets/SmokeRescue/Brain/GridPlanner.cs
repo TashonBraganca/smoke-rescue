@@ -69,7 +69,10 @@ namespace SmokeRescue.Brain
                 if (target < 0) continue;
                 Vector2 centre = sum / cluster.Count; float radius = c.peer_claim_radius_m;
                 foreach (int cell in cluster) radius = Mathf.Max(radius, Vector2.Distance(centre, grid.Centre(cell)) + grid.CellM * .707107f);
-                float score = targetCost - c.frontier_gain_weight * unknown.Count;
+                // Nearest worthwhile frontier first, so an area is finished before the robot walks on: the size bonus
+                // is capped, and slivers too small to hide a person (under furniture, wall seams) are ignored.
+                if (unknown.Count < c.frontier_min_information_cells) continue;
+                float score = targetCost - c.frontier_gain_weight * Math.Min(unknown.Count, c.frontier_gain_cap_cells);
                 if (best == null || score < best.score)
                     best = new FrontierChoice { position = grid.Centre(target), path = Reconstruct(parent, start, target),
                         cost = targetCost, score = score, information = unknown.Count, claimCentre = centre, claimRadius = radius };

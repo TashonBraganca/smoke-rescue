@@ -88,6 +88,10 @@ class AgentContext:
 
 
 class ToolRegistry:
+    # Close looks per spot, kept across steps (the server builds a new registry per step): (robot, cell) -> times.
+    _looks: dict = {}
+    MAX_LOOKS, LOOK_CELL_M, LOOK_MEMORY_S = 2, 1.5, 90.0
+
     def __init__(self, robot_dir: Path, ctx: AgentContext, debug_dir: Path | None = None):
         self.robot_dir = Path(robot_dir)
         self.ctx = ctx
@@ -203,6 +207,14 @@ class ToolRegistry:
                                  "the cited inspection has no position")
             if refusal is None:
                 ev = self.evidence[args["evidence_id"]]
+                key = (self.ctx.robot, round(ev["x"] / self.LOOK_CELL_M), round(ev["y"] / self.LOOK_CELL_M))
+                looks = [s for s in self._looks.get(key, []) if self.ctx.t - s < self.LOOK_MEMORY_S]
+                if len(looks) >= self.MAX_LOOKS:
+                    refusal = {"refused": True, "reason": f"already looked closer {len(looks)} times at this spot; leave it, "
+                               "tell your partner it is unconfirmed, and continue exploring"}
+                    self.refusals.append({"tool": name, "args": args, **refusal})
+                    return refusal
+                self._looks[key] = looks + [self.ctx.t]
                 dx, dy = ev["x"] - self.ctx.x, ev["y"] - self.ctx.y
                 dist = max(1e-6, (dx * dx + dy * dy) ** 0.5)
                 k = max(0.0, dist - 1.5) / dist
