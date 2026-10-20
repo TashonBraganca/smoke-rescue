@@ -57,5 +57,27 @@
     "max_reverse_mps": 0.3,
     "max_yaw_rate_dps": 60.0,
     "max_accel_mps2": 0.6
+  },
+  "thermal": {
+    "width": 320,
+    "height": 256,
+    "vertical_fov_deg": 40.916,
+    "fx": 343.121,
+    "fy": 343.121,
+    "cx": 159.5,
+    "cy": 127.5,
+    "rate_hz": 15,
+    "mount_right_offset_m": 0.03,
+    "netd_k": 0.05,
+    "fixed_pattern_k": 0.1,
+    "range_max_c": 650,
+    "note": "Modelled on a FLIR Boson 320 with a 50 deg HFOV lens (320x256, NETD under 50 mK); recorded on the 15 Hz sensor clock. PNG value = kelvin x 10."
+  },
+  "air_temperature": {
+    "rate_hz": 10,
+    "noise_c": 0.3,
+    "time_constant_s": 2.0,
+    "height_m": 0.6,
+    "note": "Body-mounted thermocouple: first-order lag, reads the air at the robot body."
   }
 }

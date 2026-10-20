@@ -58,7 +58,7 @@ namespace SmokeRescue.Recording
             cam = gameObject.GetComponent<Camera>() ?? gameObject.AddComponent<Camera>();
             if (GetComponent<HDAdditionalCameraData>() == null) gameObject.AddComponent<HDAdditionalCameraData>();
             cam.fieldOfView = 50f;
-            cam.cullingMask = ~(1 << LayerMask.NameToLayer(HouseBuilder.CeilingLayer));
+            cam.cullingMask = ~(1 << LayerMask.NameToLayer(HouseBuilder.CeilingLayer)) & ~(1 << LayerMask.NameToLayer("ThermalOnly"));
             cam.farClipPlane = 200f;
             cam.aperture = 1.4f; cam.iso = 100; cam.shutterSpeed = 1.96f / Mathf.Pow(2f, 2.5f);   // EV 2.5 overview
             var depthShader = Shader.Find("Hidden/SmokeRescue/DepthColormap");

@@ -67,7 +67,7 @@ namespace SmokeRescue.Editor
                 cam.aspect = (w + 2f) / (d + 2f);
                 cam.transform.position = new Vector3(plan.footprint[0] + w / 2, 30f, plan.footprint[1] + d / 2);
                 cam.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
-                cam.cullingMask = ~(1 << LayerMask.NameToLayer(HouseBuilder.CeilingLayer));
+                cam.cullingMask = ~(1 << LayerMask.NameToLayer(HouseBuilder.CeilingLayer)) & ~(1 << LayerMask.NameToLayer("ThermalOnly"));
                 cam.clearFlags = CameraClearFlags.SolidColor;
                 cam.backgroundColor = Color.black;
                 int px = 1600, py = Mathf.RoundToInt(px * (d + 2f) / (w + 2f));

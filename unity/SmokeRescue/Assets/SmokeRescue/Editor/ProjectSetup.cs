@@ -17,7 +17,7 @@ namespace SmokeRescue.Editor
 
         static readonly (int index, string name)[] Layers =
         {
-            (8, "Walls"), (9, "Ceiling"), (10, "Robots"), (11, "Props"),
+            (8, "Walls"), (9, "Ceiling"), (10, "Robots"), (11, "Props"), (12, "ThermalOnly"),
         };
 
         [MenuItem("Tools/Smoke Rescue/Setup Project")]

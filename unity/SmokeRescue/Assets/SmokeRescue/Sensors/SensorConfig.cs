@@ -14,6 +14,8 @@ namespace SmokeRescue.Sensors
         public DepthConfig depth;
         public ImuConfig imu;
         public OdometryConfig odometry;
+        public ThermalConfig thermal;
+        public AirTemperatureConfig air_temperature;
         [Serializable] public sealed class CameraConfig
         {
             public int width, height;
@@ -35,6 +37,12 @@ namespace SmokeRescue.Sensors
         }
         [Serializable] public sealed class OdometryConfig { public float rate_hz, scale_error; public Slip slip; }
         [Serializable] public sealed class Slip { public float events_per_minute, duration_s, overshoot_min, overshoot_max; }
+        [Serializable] public sealed class ThermalConfig
+        {
+            public int width, height;
+            public float vertical_fov_deg, fx, fy, cx, cy, rate_hz, mount_right_offset_m, netd_k, fixed_pattern_k, range_max_c;
+        }
+        [Serializable] public sealed class AirTemperatureConfig { public float rate_hz, noise_c, time_constant_s, height_m; }
 
         public static string ConfigDir => Path.GetFullPath(Path.Combine(Application.dataPath, "..", "..", "..", "config"));
         public static SensorConfig Load(string path = null)
@@ -58,6 +66,11 @@ namespace SmokeRescue.Sensors
                 odometry.slip.events_per_minute < 0 || odometry.slip.duration_s < 0 || odometry.slip.overshoot_min < 0 ||
                 odometry.slip.overshoot_max < odometry.slip.overshoot_min)
                 throw new InvalidDataException("Invalid or missing sensor calibration/noise parameters.");
+            if (thermal != null && (thermal.width < 3 || thermal.height < 3 || !(thermal.fx > 0) || !(thermal.rate_hz > 0) ||
+                !(thermal.vertical_fov_deg > 0 && thermal.vertical_fov_deg < 180) || thermal.netd_k < 0 || thermal.fixed_pattern_k < 0))
+                throw new InvalidDataException("Invalid thermal camera parameters.");
+            if (air_temperature != null && (!(air_temperature.rate_hz > 0) || air_temperature.noise_c < 0 || air_temperature.time_constant_s < 0))
+                throw new InvalidDataException("Invalid air temperature sensor parameters.");
         }
     }
 }

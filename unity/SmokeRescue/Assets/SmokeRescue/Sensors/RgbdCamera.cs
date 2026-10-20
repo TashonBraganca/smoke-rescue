@@ -75,6 +75,8 @@ namespace SmokeRescue.Sensors
             Camera.allowMSAA = false;
             Camera.allowDynamicResolution = false;
             Camera.rect = new Rect(0, 0, 1, 1);
+            int thermalOnly = LayerMask.NameToLayer("ThermalOnly");
+            if (thermalOnly >= 0) Camera.cullingMask &= ~(1 << thermalOnly);   // flame bodies exist only for thermal cameras
             Camera.ResetProjectionMatrix();
             var hd = GetComponent<HDAdditionalCameraData>();
             hd.antialiasing = HDAdditionalCameraData.AntialiasingMode.None;
