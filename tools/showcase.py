@@ -269,11 +269,10 @@ class Radio:
                 orders = [o["type"] for o in e.get("orders", [])]
                 if who == "commander":
                     if orders:
-                        self.items.append((t, -1, "commander", "Commander: " + (e.get("summary") or "assigned sectors"), []))
+                        self.items.append((t, -1, "commander", "Commander: " + (e.get("summary") or "relayed a message"), []))
                     continue
-                for o in e.get("orders", []):
-                    if o["type"] == "send_team_message":
-                        self.items.append((t + 0.01, side.get(who, 0), "radio", "\u201c" + o.get("text", "") + "\u201d", [("radio out", DIM)]))
+                # Team messages come from the robot's own team_message_sent events below; listing the order here as
+                # well showed every message twice.
                 if not used and not orders:
                     continue
                 chips = [("OpenCV " + x["name"] + (f" = {x['verdict']}" if x.get("verdict") else ""), CV) for x in used]
