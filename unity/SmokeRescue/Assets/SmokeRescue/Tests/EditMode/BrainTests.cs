@@ -1009,6 +1009,14 @@ namespace SmokeRescue.Tests.EditMode
             g.ObserveFree(g.Cell(new Vector2(-1.55f, 0)));
             typeof(OccupancyGrid).GetField("roofDirty", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).SetValue(g, true);
             Assert.That(g.Indoors(new Vector2(-.9f, 0)), Is.True, "control: the same spot under real ceiling evidence");
+            // An unmapped stretch of wall between that ceiling and the yard must not let "indoors" through.
+            var u = new OccupancyGrid(c);
+            for (float y = -2; y <= 2; y += .1f) for (float x = -3; x <= -.65f; x += .1f) u.ObserveFree(u.Cell(new Vector2(x, y)));   // room floor
+            for (float y = -2; y <= 2; y += .1f) for (float x = .55f; x <= 2; x += .1f) u.ObserveFree(u.Cell(new Vector2(x, y)));     // yard floor
+            var uroof = (byte[])typeof(OccupancyGrid).GetField("roofHits", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(u);
+            for (float y = -1; y <= 1; y += .1f) uroof[u.Cell(new Vector2(-.75f, y))] = 255;
+            Assert.That(u.Indoors(new Vector2(-1.05f, 0)), Is.True, "control: floor beside the ceiling");
+            Assert.That(u.Indoors(new Vector2(.65f, 0)), Is.False, "yard beyond 1.2 m of unseen wall");
         }
 
         /// <summary>A room seen from the test camera: ceiling at 2.8 m, floor, and a far wall wallM ahead; each pixel's depth
