@@ -34,8 +34,25 @@ namespace SmokeRescue.Oracle
             sb.Append(string.Format(CultureInfo.InvariantCulture, "{0:F6} {1:F6} {2:F6} {3:F6} {4:F6} {5:F6} {6:F6} {7:F6}\n", t, p.x, p.y, p.z, q.x, q.y, q.z, q.w));
         }
 
+        readonly Dictionary<string, StringBuilder> heat = new Dictionary<string, StringBuilder>();
+
+        /// <summary>True air temperature at a robot's body and the hottest floor surface within 1 m, for scoring heat
+        /// exposure. Never available to the robots.</summary>
+        public void Heat(string robotId, double t, float airC, float hottestSurfaceC)
+        {
+            if (!heat.TryGetValue(robotId, out var sb))
+                heat[robotId] = sb = new StringBuilder("# ground truth heat at the robot body, house frame\n# t air_c hottest_surface_within_1m_c\n");
+            sb.Append(string.Format(CultureInfo.InvariantCulture, "{0:F6} {1:F2} {2:F2}\n", t, airC, hottestSurfaceC));
+        }
+
+        /// <summary>Fire timeline from the fire simulation: collapses and room flashover times.</summary>
+        public void FireEvents(object events) =>
+            File.WriteAllText(Path.Combine(dir, "fire_events.json"), JsonConvert.SerializeObject(events, Formatting.Indented));
+
         public void Finish(Scenario scenario, string floorplanPath)
         {
+            foreach (var kv in heat)
+                File.WriteAllText(Path.Combine(dir, $"{kv.Key}_heat.txt"), kv.Value.ToString());
             foreach (var kv in trajectories)
                 File.WriteAllText(Path.Combine(dir, $"{kv.Key}_groundtruth.txt"), kv.Value.ToString());
             var survivors = new List<object>();

@@ -95,6 +95,15 @@ namespace SmokeRescue.World
                 float meanFlame = acc.flame / acc.n;
                 float radius = Mathf.Clamp(Mathf.Sqrt(burningArea / Mathf.PI), 0.15f, BlockM * 0.7f);
                 float height = Mathf.Lerp(0.4f, 2.2f, meanFlame) * Mathf.Clamp01(0.4f + burningArea / (BlockM * BlockM));
+                // Keep the flame body inside its room: billboards near a wall otherwise poke through it.
+                foreach (var room in plan.rooms)
+                {
+                    var rr = room.Rect;
+                    if (!rr.Contains(c)) continue;
+                    float m = Mathf.Min(radius + 0.15f, Mathf.Min(rr.width, rr.height) / 2f - 0.05f);
+                    c = new Vector2(Mathf.Clamp(c.x, rr.xMin + m, rr.xMax - m), Mathf.Clamp(c.y, rr.yMin + m, rr.yMax - m));
+                    break;
+                }
                 flames.Add((new Vector3(c.x, 0f, c.y), radius, height, Mathf.Max(acc.temp, 600f)));
             }
             return flames;

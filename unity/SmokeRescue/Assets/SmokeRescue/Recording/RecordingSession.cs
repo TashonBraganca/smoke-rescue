@@ -41,6 +41,10 @@ namespace SmokeRescue.Recording
         {
             public Robot robot;
             public RgbdCamera rgbd;
+            public ThermalCamera thermal;
+            public AirTemperatureSensor air;
+            public StringBuilder thermalTxt = Header("thermal images, 16-bit PNG, kelvin x 10, 0 = invalid");
+            public StringBuilder airTxt = new StringBuilder("# body air temperature, thermocouple with lag and noise\n# t temperature_c\n");
             public ImuSensor imu;
             public OdometrySensor odom;
             public string dir;
@@ -86,6 +90,19 @@ namespace SmokeRescue.Recording
                 rig.rgbd.Initialize(sensorCfg, scenario.seed * 1000 + i * 10 + 1);
                 rig.rgbd.NoiseEnabled = noise;
                 rig.rgbd.LocalDensity = atmosphere.Field.Density;
+                if (sensorCfg.thermal != null)
+                {
+                    var thGo = new GameObject("ThermalCamera");
+                    thGo.transform.SetParent(rig.robot.CameraMount, false);
+                    thGo.transform.localPosition = new Vector3(sensorCfg.thermal.mount_right_offset_m, 0f, 0f);
+                    thGo.AddComponent<Camera>();
+                    thGo.AddComponent<HDAdditionalCameraData>();
+                    rig.thermal = thGo.AddComponent<ThermalCamera>();
+                    rig.thermal.Initialize(sensorCfg.thermal, scenario.seed * 1000 + i * 10 + 4);
+                    rig.thermal.NoiseEnabled = noise;
+                }
+                if (sensorCfg.air_temperature != null)
+                    rig.air = new AirTemperatureSensor(sensorCfg.air_temperature, scenario.seed * 1000 + i * 10 + 5) { NoiseEnabled = noise };
                 rig.imu = new ImuSensor(sensorCfg, scenario.seed * 1000 + i * 10 + 2) { NoiseEnabled = noise };
                 rig.odom = new OdometrySensor(sensorCfg, scenario.seed * 1000 + i * 10 + 3) { NoiseEnabled = noise };
                 rig.imu.Reset(rig.robot.Body.position, rig.robot.Body.rotation);
@@ -93,6 +110,7 @@ namespace SmokeRescue.Recording
                 rig.dir = Path.Combine(root, spec.id);
                 Directory.CreateDirectory(Path.Combine(rig.dir, "rgb"));
                 Directory.CreateDirectory(Path.Combine(rig.dir, "depth"));
+                if (rig.thermal != null) Directory.CreateDirectory(Path.Combine(rig.dir, "thermal"));
                 rigs.Add(rig);
             }
 
@@ -102,6 +120,7 @@ namespace SmokeRescue.Recording
             var pending = new Queue<Task>();
             int camEvery = Mathf.RoundToInt(ClockHz / sensorCfg.camera.rate_hz);
             int radioEvery = Mathf.RoundToInt(ClockHz * scenario.radio.broadcast_period_s);
+            int airEvery = Mathf.RoundToInt(ClockHz / (sensorCfg.air_temperature?.rate_hz ?? 10f));
             const float dt = 1f / ClockHz;
             float duration = Mathf.Min(scenario.duration_s, maxSeconds);
             double finishedAt = double.NaN;
@@ -130,6 +149,17 @@ namespace SmokeRescue.Recording
                             rig.odomTxt.Append(ts).Append(' ').Append(F(o.Value.Vx)).Append(' ').Append(F(o.Value.Vy)).Append(' ').Append(F(o.Value.Wz)).Append('\n');
                     }
 
+                if (k % airEvery == 0)
+                    foreach (var rig in rigs)
+                    {
+                        var body = rig.robot.transform.position + Vector3.up * (sensorCfg.air_temperature?.height_m ?? 0.6f);
+                        float trueAir = atmosphere.Thermal.AirTemperatureC(body, (float)t);
+                        float hottest = HottestSurfaceNear(atmosphere, body, (float)t);
+                        oracle.Heat(rig.robot.RobotId, t, trueAir, hottest);
+                        var reading = rig.air?.Step(t, trueAir);
+                        if (reading.HasValue) rig.airTxt.Append(Fmt(t)).Append(' ').Append(reading.Value.ToString("F2", CultureInfo.InvariantCulture)).Append('\n');
+                    }
+
                 if (k % radioEvery == 0)
                     foreach (var from in rigs)
                         radioLog.Tick(t, from.robot.RobotId, rigs.Where(r => r != from).Select(r =>
@@ -152,6 +182,13 @@ namespace SmokeRescue.Recording
                     string rgbPath = Path.Combine(rig.dir, rgbRel), depthPath = Path.Combine(rig.dir, depthRel);
                     pending.Enqueue(SensorPng.EncodeRgbAsync(frame.Rgb, frame.Width, frame.Height).ContinueWith(x => File.WriteAllBytes(rgbPath, x.Result)));
                     pending.Enqueue(SensorPng.EncodeDepthAsync(frame.Depth, frame.Width, frame.Height).ContinueWith(x => File.WriteAllBytes(depthPath, x.Result)));
+                    if (rig.thermal != null)
+                    {
+                        var th = rig.thermal.CaptureSync(t);
+                        string thRel = $"thermal/{stamp}.png", thPath = Path.Combine(rig.dir, thRel);
+                        rig.thermalTxt.Append(stamp).Append(' ').Append(thRel).Append('\n');
+                        pending.Enqueue(SensorPng.EncodeDepthAsync(th.DeciKelvin, th.Width, th.Height).ContinueWith(x => File.WriteAllBytes(thPath, x.Result)));
+                    }
                     rig.frames++;
                 }
                 while (pending.Count > 48) pending.Dequeue().Wait();
@@ -169,12 +206,30 @@ namespace SmokeRescue.Recording
                 File.WriteAllText(Path.Combine(rig.dir, "imu.txt"), rig.imuTxt.ToString());
                 File.WriteAllText(Path.Combine(rig.dir, "odom.txt"), rig.odomTxt.ToString());
                 File.WriteAllText(Path.Combine(rig.dir, "camera.yaml"), CameraYaml(sensorCfg));
+                if (rig.thermal != null)
+                {
+                    File.WriteAllText(Path.Combine(rig.dir, "thermal.txt"), rig.thermalTxt.ToString());
+                    File.WriteAllText(Path.Combine(rig.dir, "thermal.yaml"), ThermalYaml(sensorCfg));
+                }
+                if (rig.air != null) File.WriteAllText(Path.Combine(rig.dir, "air_temp.txt"), rig.airTxt.ToString());
                 result.frames[rig.robot.RobotId] = rig.frames;
             }
             string radioText = radioLog.ToString();
             File.WriteAllText(Path.Combine(root, "radio.txt"), radioText);
             result.radioLines = radioText.Split('\n').Count(l => l.Length > 0 && l[0] != '#');
 
+            if (atmosphere.FireSpread != null)
+            {
+                var sim = atmosphere.FireSpread.Sim;
+                oracle.FireEvents(new
+                {
+                    head_start_s = atmosphere.FireSpread.HeadStart,
+                    note = "times are on the robots' clock (fire time minus head start)",
+                    collapses = sim.Collapses.Select(c => new { t = c.Time - atmosphere.FireSpread.HeadStart, c.Room,
+                        rect = new[] { c.CellRect.xMin, c.CellRect.yMin, c.CellRect.xMax, c.CellRect.yMax } }).ToArray(),
+                    flashover = sim.RoomStates.Where(r => r.FlashoverTime >= 0).Select(r => new { r.Room, t = r.FlashoverTime - atmosphere.FireSpread.HeadStart }).ToArray(),
+                });
+            }
             oracle.Finish(scenario, Path.Combine(FloorPlan.ConfigDir, "floorplan.json"));
             // Ceilings stay in: the cameras look 20 degrees above the horizon and map them too.
             result.truthPoints = oracle.ExportHouseTruth(new[] { GameObject.Find(HouseBuilder.RootName), GameObject.Find("Furniture") }, layerToSkip: -1);
@@ -192,6 +247,10 @@ namespace SmokeRescue.Recording
                 ["recorded_offline"] = true,
                 ["clock_hz"] = ClockHz,
                 ["noise"] = noise,
+                ["thermal"] = sensorCfg.thermal != null ? "thermal/<t>.png 16-bit kelvin x 10, 320x256, 15 Hz, see thermal.yaml" : null,
+                ["air_temperature"] = sensorCfg.air_temperature != null ? "air_temp.txt, 10 Hz, C" : null,
+                ["fire"] = atmosphere.FireSpread != null ? $"spreading fire (config/fire.json), head start {atmosphere.FireSpread.HeadStart} s" : "static fires",
+                ["camera_mount"] = sensorCfg.camera.mount,
                 ["exposure"] = $"per-sensor deterministic auto exposure, target grey {RgbdCamera.TargetGrey * 255:0}, EV100 {RgbdCamera.ExposureMinEv} to {RgbdCamera.ExposureMaxEv}",
             };
             File.WriteAllText(Path.Combine(root, "meta.json"), JsonConvert.SerializeObject(meta, Formatting.Indented));
@@ -237,6 +296,34 @@ namespace SmokeRescue.Recording
                 "Viewer.KeyFrameSize: 0.05", "Viewer.KeyFrameLineWidth: 1.0", "Viewer.GraphLineWidth: 0.9", "Viewer.PointSize: 2.0",
                 "Viewer.CameraSize: 0.08", "Viewer.CameraLineWidth: 3.0", "Viewer.ViewpointX: 0.0", "Viewer.ViewpointY: -0.7",
                 "Viewer.ViewpointZ: -1.8", "Viewer.ViewpointF: 500.0", "",
+            });
+        }
+
+        /// <summary>Hottest floor surface within 1 m of a point (for scoring how close a robot came to fire).</summary>
+        static float HottestSurfaceNear(Atmosphere atm, Vector3 p, float t)
+        {
+            float best = float.MinValue;
+            for (float dx = -1f; dx <= 1.001f; dx += 0.25f)
+            for (float dz = -1f; dz <= 1.001f; dz += 0.25f)
+            {
+                if (dx * dx + dz * dz > 1.0001f) continue;
+                best = Mathf.Max(best, atm.Thermal.Source.Sample(new Vector2(p.x + dx, p.z + dz), t).x);
+            }
+            return best;
+        }
+
+        static string ThermalYaml(SensorConfig c)
+        {
+            var k = c.thermal;
+            var ci = CultureInfo.InvariantCulture;
+            return string.Join("\n", new[]
+            {
+                "%YAML:1.0", "---", "# Long-wave infrared camera, pinhole, no distortion; PNG value = kelvin x 10",
+                $"Camera1.fx: {k.fx.ToString("0.000", ci)}", $"Camera1.fy: {k.fy.ToString("0.000", ci)}",
+                $"Camera1.cx: {k.cx.ToString("0.0", ci)}", $"Camera1.cy: {k.cy.ToString("0.0", ci)}",
+                $"Camera.width: {k.width}", $"Camera.height: {k.height}", $"Camera.fps: {Mathf.RoundToInt(k.rate_hz)}",
+                $"T_rgb_thermal.translation_m: [{k.mount_right_offset_m.ToString("0.000", ci)}, 0.0, 0.0]",
+                $"NETD_K: {k.netd_k.ToString("0.000", ci)}", $"Range_max_C: {k.range_max_c.ToString("0", ci)}", "",
             });
         }
 

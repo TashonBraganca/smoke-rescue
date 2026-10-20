@@ -65,6 +65,7 @@ namespace SmokeRescue.World
         FireVisuals fireVisuals;
         FlameBodies flameBodies;
         FireSimHeat fireSim;
+        BurnDamage burn;
         /// <summary>The spreading fire, or null when the scenario uses static fires.</summary>
         public FireSimHeat FireSpread => fireSim;
 
@@ -166,6 +167,7 @@ namespace SmokeRescue.World
                 a.fireSim = spread;
                 a.thermal = new ThermalField(plan, spread);
                 a.field.Override = spread.SmokeDensity;
+                a.burn = new BurnDamage(spread, go.transform, Soot());
             }
             else a.thermal = new ThermalField(plan, new StaticFireHeat(plan));
             a.fireVisuals = new FireVisuals(go.transform, plan.wall_height, scenario.seed);
@@ -218,6 +220,7 @@ namespace SmokeRescue.World
                 var burning = thermal.Source.Flames(t);
                 fireVisuals.Apply(t, burning);
                 flameBodies.Apply(t, burning);
+                burn?.Apply(t, burning);
             }
             if (fog != null && scenario.smoke.ramp_per_minute > 0f)
                 fog.meanFreePath.value = SmokeField.MeanFreePath(Mathf.Clamp01(scenario.smoke.global_haze + scenario.smoke.ramp_per_minute * t / 60f));
@@ -348,7 +351,7 @@ namespace SmokeRescue.World
         }
 
         /// <summary>Radial soot stain with ragged edges: dark centre, noisy falloff to transparent.</summary>
-        static Texture2D Soot()
+        internal static Texture2D Soot()
         {
             if (sootTexture != null) return sootTexture;
             const int n = 256;
