@@ -39,6 +39,14 @@ namespace SmokeRescue.Editor
         [MenuItem("Tools/Smoke Rescue/Record/Haze agents full run")]
         public static void HazeAgentsFull() => WithAgents(() => Run("scenario_haze_2agents.json", "unity_haze_agents_v1"));
 
+        // One robot, torch off, enters a room whose lights failed; a person is inside. The agent must measure the
+        // image, switch the torch on, and find the person.
+        [MenuItem("Tools/Smoke Rescue/Record/Dark room torch demo (agents)")]
+        public static void DarkTorchDemo() => WithAgents(() => Run("scenario_dark_torch.json", "unity_dark_torch_agents", 45f));
+
+        [MenuItem("Tools/Smoke Rescue/Record/Dark room torch demo (no agents)")]
+        public static void DarkTorchBaseline() => Run("scenario_dark_torch.json", "unity_dark_torch_reflex", 45f);
+
         static void WithAgents(System.Action run)
         {
             RecordingSession.AgentUrl = System.Environment.GetEnvironmentVariable("SMOKE_AGENT_URL") ?? "http://localhost:8080";

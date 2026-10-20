@@ -100,6 +100,14 @@ async def vision_tool(tool: str, request: Request):
     """Judge demo on one uploaded image: assess_visibility on an RGB PNG, or a thermal scan on a 16-bit thermal PNG
     (kelvin x 10). Full tools need registered depth, so this endpoint runs the image-only parts."""
     data = await request.body()
+    ctype = request.headers.get("content-type", "")
+    if ctype.startswith("multipart/form-data"):
+        # Browsers and curl -F send multipart; take the first file part without needing python-multipart.
+        from email.parser import BytesParser
+        from email.policy import default
+        msg = BytesParser(policy=default).parsebytes(b"Content-Type: " + ctype.encode() + b"\r\n\r\n" + data)
+        parts = [p for p in msg.iter_parts() if p.get_filename() or p.get_content_type().startswith("image/")]
+        data = parts[0].get_payload(decode=True) if parts else b""
     img = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_UNCHANGED)
     if img is None:
         raise HTTPException(400, "body must be a PNG or JPEG image")

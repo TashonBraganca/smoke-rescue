@@ -1,0 +1,86 @@
+{
+  "id": "dark_torch",
+  "description": "Torch demo: one robot with its torch off enters the apartment through the south door. Power and battery lighting failed in the apartment living room, kitchen and hall, so the colour camera sees almost nothing. A person lies 4 m inside. The agent has to measure the image with OpenCV, switch the torch on, and find the person.",
+  "seed": 11,
+  "duration_s": 45,
+  "search_area": [
+    0,
+    0,
+    40,
+    28
+  ],
+  "dark_rooms": [
+    "apt_living",
+    "apt_kitchen",
+    "apt_hall"
+  ],
+  "sim_rate_hz": 15,
+  "yaw_convention": "degrees about Unity +y. 0 faces +z (north), 90 faces +x (east).",
+  "smoke": {
+    "global_haze": 0.08,
+    "rooms": {
+      "default": 0.08
+    },
+    "ramp_per_minute": 0.0
+  },
+  "robots": [
+    {
+      "id": "robot_A",
+      "color": "#2FA3E6",
+      "spawn": {
+        "at": [
+          26.0,
+          -1.2
+        ],
+        "yaw": 0
+      },
+      "control": "autonomous",
+      "cruise_speed": 0.5,
+      "doorway_speed": 0.3,
+      "route": [],
+      "look_around_at": [
+        [
+          18.0,
+          11.0
+        ],
+        [
+          14.5,
+          4.6
+        ],
+        [
+          10.6,
+          11.0
+        ]
+      ],
+      "torch": "off"
+    }
+  ],
+  "look_around": {
+    "sweep_deg": 60,
+    "speed_dps": 25
+  },
+  "survivors": [
+    {
+      "id": "s1",
+      "room": "apt_living",
+      "at": [
+        28.5,
+        3.8
+      ],
+      "yaw": 90,
+      "pose": "lying_on_side"
+    }
+  ],
+  "survivor_placement": "fixed",
+  "radio": {
+    "range_m": 12.0,
+    "max_walls": 1,
+    "broadcast_period_s": 2.0,
+    "budget_bytes_per_s": 2048
+  },
+  "fire": {
+    "spread": false,
+    "note": "Static fires only, so the clear-air SLAM baseline stays comparable across runs."
+  },
+  "obstacles": []
+}
