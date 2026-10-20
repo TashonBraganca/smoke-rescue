@@ -1,0 +1,9 @@
+*
+!slam/
+slam/*
+!slam/Dockerfile.cv5
+!slam/CMakeLists.txt
+!slam/rgbd_runner.cc
+!slam/imu_feed.h
+!slam/orbslam3_opencv5.patch
+!slam/orbslam3_shutdown.patch

@@ -1,0 +1,240 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -9,31 +9,18 @@
+ 
+ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -Wall   -O3")
+ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall   -O3")
+-set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -march=native")
+-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native")
+-
+-# Check C++11 or C++0x support
+-include(CheckCXXCompilerFlag)
+-CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
+-CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
+-if(COMPILER_SUPPORTS_CXX11)
+-   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+-   add_definitions(-DCOMPILEDWITHC11)
+-   message(STATUS "Using flag -std=c++11.")
+-elseif(COMPILER_SUPPORTS_CXX0X)
+-   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
+-   add_definitions(-DCOMPILEDWITHC0X)
+-   message(STATUS "Using flag -std=c++0x.")
+-else()
+-   message(FATAL_ERROR "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Please use a different C++ compiler.")
+-endif()
++set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
++set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
++
++set(CMAKE_CXX_STANDARD 17)
++set(CMAKE_CXX_STANDARD_REQUIRED ON)
++set(CMAKE_CXX_EXTENSIONS OFF)
++add_definitions(-DCOMPILEDWITHC11)
+ 
+ LIST(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_modules)
+ 
+-find_package(OpenCV 4.4)
+-   if(NOT OpenCV_FOUND)
+-      message(FATAL_ERROR "OpenCV > 4.4 not found.")
+-   endif()
++find_package(OpenCV 5.0.0 EXACT REQUIRED COMPONENTS
++    core imgproc imgcodecs features flann calib geometry stereo highgui)
+ 
+ MESSAGE("OPENCV VERSION:")
+ MESSAGE(${OpenCV_VERSION})
+--- a/Thirdparty/DBoW2/CMakeLists.txt
++++ b/Thirdparty/DBoW2/CMakeLists.txt
+@@ -5,8 +5,8 @@
+   set(CMAKE_BUILD_TYPE Release)
+ endif()
+ 
+-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -Wall  -O3 -march=native ")
+-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall  -O3 -march=native")
++set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -Wall  -O3 ")
++set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall  -O3")
+ 
+ set(HDRS_DBOW2
+   DBoW2/BowVector.h
+@@ -29,13 +29,7 @@
+   DUtils/Timestamp.cpp)
+ 
+ 
+-find_package(OpenCV 4 QUIET)
+-if(NOT OpenCV_FOUND)
+-   find_package(OpenCV 3.0 QUIET)
+-   if(NOT OpenCV_FOUND)
+-      message(FATAL_ERROR "OpenCV > 3.0 not found.")
+-   endif()
+-endif()
++find_package(OpenCV 5.0.0 EXACT REQUIRED COMPONENTS core)
+ 
+ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
+ 
+--- a/Thirdparty/g2o/CMakeLists.txt
++++ b/Thirdparty/g2o/CMakeLists.txt
+@@ -54,8 +54,8 @@
+ ENDIF(OPENMP_FOUND AND G2O_USE_OPENMP)
+ 
+ # Compiler specific options for gcc
+-SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -march=native")
+-SET(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3 -march=native")
++SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
++SET(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3")
+ # SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
+ # SET(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3")
+ 
+--- a/include/CameraModels/GeometricCamera.h
++++ b/include/CameraModels/GeometricCamera.h
+@@ -23,7 +23,7 @@
+ 
+ #include <opencv2/core/core.hpp>
+ #include <opencv2/imgproc/imgproc.hpp>
+-#include <opencv2/features2d/features2d.hpp>
++#include <opencv2/features.hpp>
+ 
+ #include <boost/serialization/serialization.hpp>
+ #include <boost/serialization/access.hpp>
+--- a/include/FrameDrawer.h
++++ b/include/FrameDrawer.h
+@@ -25,7 +25,7 @@
+ #include "Atlas.h"
+ 
+ #include<opencv2/core/core.hpp>
+-#include<opencv2/features2d/features2d.hpp>
++#include<opencv2/features.hpp>
+ 
+ #include<mutex>
+ #include <unordered_set>
+--- a/include/ORBmatcher.h
++++ b/include/ORBmatcher.h
+@@ -22,7 +22,7 @@
+ 
+ #include<vector>
+ #include<opencv2/core/core.hpp>
+-#include<opencv2/features2d/features2d.hpp>
++#include<opencv2/features.hpp>
+ #include"sophus/sim3.hpp"
+ 
+ #include"MapPoint.h"
+--- a/include/SerializationUtils.h
++++ b/include/SerializationUtils.h
+@@ -26,7 +26,7 @@
+ #include <Eigen/Core>
+ 
+ #include <opencv2/core/core.hpp>
+-#include <opencv2/features2d/features2d.hpp>
++#include <opencv2/features.hpp>
+ 
+ #include <vector>
+ 
+--- a/include/Tracking.h
++++ b/include/Tracking.h
+@@ -21,7 +21,7 @@
+ #define TRACKING_H
+ 
+ #include <opencv2/core/core.hpp>
+-#include <opencv2/features2d/features2d.hpp>
++#include <opencv2/features.hpp>
+ 
+ #include "Viewer.h"
+ #include "FrameDrawer.h"
+--- a/src/CameraModels/KannalaBrandt8.cpp
++++ b/src/CameraModels/KannalaBrandt8.cpp
+@@ -17,6 +17,7 @@
+ */
+ 
+ #include "KannalaBrandt8.h"
++#include <opencv2/geometry.hpp>
+ 
+ #include <boost/serialization/export.hpp>
+ 
+--- a/src/Frame.cc
++++ b/src/Frame.cc
+@@ -17,6 +17,7 @@
+ */
+ 
+ #include "Frame.h"
++#include <opencv2/geometry.hpp>
+ 
+ #include "G2oTypes.h"
+ #include "MapPoint.h"
+--- a/src/LoopClosing.cc
++++ b/src/LoopClosing.cc
+@@ -982,7 +982,7 @@
+         unique_lock<mutex> lock(mMutexGBA);
+         mbStopGBA = true;
+ 
+-        mnFullBAIdx++;
++        mnFullBAIdx = true;
+ 
+         if(mpThreadGBA)
+         {
+@@ -1233,7 +1233,7 @@
+         unique_lock<mutex> lock(mMutexGBA);
+         mbStopGBA = true;
+ 
+-        mnFullBAIdx++;
++        mnFullBAIdx = true;
+ 
+         if(mpThreadGBA)
+         {
+@@ -1806,7 +1806,7 @@
+         unique_lock<mutex> lock(mMutexGBA);
+         mbStopGBA = true;
+ 
+-        mnFullBAIdx++;
++        mnFullBAIdx = true;
+ 
+         if(mpThreadGBA)
+         {
+@@ -2409,9 +2409,9 @@
+ 
+ 
+                     string strNameFile = pKF->mNameFile;
+-                    cv::Mat imLeft = cv::imread(strNameFile, CV_LOAD_IMAGE_UNCHANGED);
+-
+-                    cv::cvtColor(imLeft, imLeft, CV_GRAY2BGR);
++                    cv::Mat imLeft = cv::imread(strNameFile, cv::IMREAD_UNCHANGED);
++
++                    cv::cvtColor(imLeft, imLeft, cv::COLOR_GRAY2BGR);
+ 
+                     vector<MapPoint*> vpMapPointsKF = pKF->GetMapPointMatches();
+                     int num_MPs = 0;
+@@ -2424,7 +2424,7 @@
+                         num_MPs += 1;
+                         string strNumOBs = to_string(vpMapPointsKF[i]->Observations());
+                         cv::circle(imLeft, pKF->mvKeys[i].pt, 2, cv::Scalar(0, 255, 0));
+-                        cv::putText(imLeft, strNumOBs, pKF->mvKeys[i].pt, CV_FONT_HERSHEY_DUPLEX, 1, cv::Scalar(255, 0, 0));
++                        cv::putText(imLeft, strNumOBs, pKF->mvKeys[i].pt, cv::FONT_HERSHEY_DUPLEX, 1, cv::Scalar(255, 0, 0));
+                     }
+                     cout << "--It has " << num_MPs << " MPs matched in the map" << endl;
+ 
+--- a/src/ORBextractor.cc
++++ b/src/ORBextractor.cc
+@@ -54,7 +54,7 @@
+ 
+ #include <opencv2/core/core.hpp>
+ #include <opencv2/highgui/highgui.hpp>
+-#include <opencv2/features2d/features2d.hpp>
++#include <opencv2/features.hpp>
+ #include <opencv2/imgproc/imgproc.hpp>
+ #include <vector>
+ #include <iostream>
+--- a/src/Settings.cc
++++ b/src/Settings.cc
+@@ -24,6 +24,7 @@
+ #include "System.h"
+ 
+ #include <opencv2/core/persistence.hpp>
++#include <opencv2/stereo.hpp>
+ #include <opencv2/core/eigen.hpp>
+ 
+ #include <iostream>
+@@ -502,7 +503,7 @@
+         cv::stereoRectify(K1,camera1DistortionCoef(),K2,camera2DistortionCoef(),newImSize_,
+                           R12, t12,
+                           R_r1_u1,R_r2_u2,P1,P2,Q,
+-                          cv::CALIB_ZERO_DISPARITY,-1,newImSize_);
++                          cv::STEREO_ZERO_DISPARITY,-1,newImSize_);
+         cv::initUndistortRectifyMap(K1, camera1DistortionCoef(), R_r1_u1, P1.rowRange(0, 3).colRange(0, 3),
+                                     newImSize_, CV_32F, M1l_, M2l_);
+         cv::initUndistortRectifyMap(K2, camera2DistortionCoef(), R_r2_u2, P2.rowRange(0, 3).colRange(0, 3),

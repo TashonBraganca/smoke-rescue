@@ -66,6 +66,17 @@ std::vector<AssociatedFrame> load_associations(const fs::path& path) {
 }
 
 int main(int argc, char** argv) {
+    if (argc == 2 && std::string(argv[1]) == "--version") {
+        std::istringstream build(cv::getBuildInformation());
+        std::string line;
+        while (std::getline(build, line)) {
+            if (line.find("General configuration for OpenCV") != std::string::npos) {
+                std::cout << line << '\n';
+                return 0;
+            }
+        }
+        return 1;
+    }
     if (argc < 3 || argc > 5) {
         std::cerr << "Usage: smoke_rescue_rgbd ROBOT_FOLDER OUTPUT_FOLDER [rgbd|rgbd_inertial] [SETTINGS]\n";
         return 2;

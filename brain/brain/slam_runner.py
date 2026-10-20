@@ -138,7 +138,7 @@ def tracking_state_summary(path: Path, frame_times: np.ndarray, fps: float) -> d
 
 
 def run_orbslam3(robot_dir: Path | str, out_dir: Path | str,
-                mode: str = "rgbd") -> tuple[Path, Path]:
+                mode: str = "rgbd", image: str = "smoke-rescue-orbslam3-cv5") -> tuple[Path, Path]:
     if mode not in ("rgbd", "rgbd_inertial"):
         raise ValueError(f"unknown SLAM mode: {mode}")
     robot_dir, out_dir = Path(robot_dir).resolve(), Path(out_dir).resolve()
@@ -159,7 +159,6 @@ def run_orbslam3(robot_dir: Path | str, out_dir: Path | str,
             raise ValueError("inertial mode requires imu.txt")
         calibration = write_inertial_settings(robot_dir, out_dir / "inertial.yaml")
     docker = shutil.which("docker") or str(Path.home() / ".orbstack/bin/docker")
-    image = "smoke-rescue-orbslam3"
     image_id = subprocess.check_output(
         [docker, "image", "inspect", image, "--format", "{{.Id}}"], text=True
     ).strip()
@@ -221,8 +220,9 @@ def main() -> None:
     parser.add_argument("robot_dir", type=Path)
     parser.add_argument("out_dir", type=Path)
     parser.add_argument("--mode", choices=("rgbd", "rgbd_inertial"), default="rgbd")
+    parser.add_argument("--image", default="smoke-rescue-orbslam3-cv5")
     args = parser.parse_args()
-    run_orbslam3(args.robot_dir, args.out_dir, args.mode)
+    run_orbslam3(args.robot_dir, args.out_dir, args.mode, args.image)
 
 
 if __name__ == "__main__":
