@@ -175,6 +175,7 @@ namespace SmokeRescue.Recording
 
             Physics.SyncTransforms();
             var perf = new StagePerf();
+            bool truthExported = false;
             int rewindsBefore = FireSimHeat.Rewinds;
             perf.Counter("fire_rewinds", () => FireSimHeat.Rewinds - rewindsBefore);
             for (long k = 0; ; k++)
@@ -185,6 +186,7 @@ namespace SmokeRescue.Recording
                 // asked the fire simulation for a time older than the thermocouple had, and each such request reloaded
                 // the fire and replayed it from t = 0 (perf.txt: LiDAR smoke lookups 15 to 32 s per 10 sim s, growing).
                 atmosphere.Field.Time = (float)t;
+                if (k > 0 && k % (ClockHz * CheckpointS) == 0) Checkpoint(t, false);
                 if (k > 0 && k % (ClockHz * 10) == 0)
                 {
                     perf.Line(t, ("rgbd_noise", RgbdNoise.ProcessTime), ("lidar_sync", LidarSensor.SyncTime),
@@ -325,77 +327,85 @@ namespace SmokeRescue.Recording
             while (pending.Count > 0) pending.Dequeue().Wait();
             result.simSeconds = rigs.Count > 0 ? (rigs[0].frames - 1) / (double)sensorCfg.camera.rate_hz : 0;
 
-            foreach (var rig in rigs)
-            {
-                File.WriteAllText(Path.Combine(rig.dir, "rgb.txt"), rig.rgb.ToString());
-                File.WriteAllText(Path.Combine(rig.dir, "depth.txt"), rig.depth.ToString());
-                File.WriteAllText(Path.Combine(rig.dir, "associations.txt"), rig.assoc.ToString());
-                File.WriteAllText(Path.Combine(rig.dir, "imu.txt"), rig.imuTxt.ToString());
-                File.WriteAllText(Path.Combine(rig.dir, "odom.txt"), rig.odomTxt.ToString());
-                if (rig.lidarTxt != null) File.WriteAllText(Path.Combine(rig.dir, "lidar.txt"), rig.lidarTxt.ToString());
-                if (rig.brain != null) File.WriteAllText(Path.Combine(rig.dir, "brain_map.txt"), rig.mapTxt.ToString());
-                File.WriteAllText(Path.Combine(rig.dir, "camera.yaml"), CameraYaml(sensorCfg));
-                if (rig.thermal != null)
-                {
-                    File.WriteAllText(Path.Combine(rig.dir, "thermal.txt"), rig.thermalTxt.ToString());
-                    File.WriteAllText(Path.Combine(rig.dir, "thermal.yaml"), ThermalYaml(sensorCfg));
-                }
-                if (rig.air != null) File.WriteAllText(Path.Combine(rig.dir, "air_temp.txt"), rig.airTxt.ToString());
-                if (rig.brain != null)
-                {
-                    File.WriteAllText(Path.Combine(rig.dir, "decisions.jsonl"), rig.decisions.ToString());
-                    File.WriteAllText(Path.Combine(rig.dir, "brain_state.jsonl"), rig.brainState.ToString());
-                    oracle.Collisions(rig.robot.RobotId, rig.robot.Driver.CollisionSteps / (double)ClockHz);
-                }
-                result.frames[rig.robot.RobotId] = rig.frames;
-            }
-            string radioText = radioLog.ToString();
-            File.WriteAllText(Path.Combine(root, "radio.txt"), radioText);
-            WriteAgentLogs(world, rigs, root);
-            if (rigs.Count(r => r.brain != null) > 1) File.WriteAllText(Path.Combine(root, "brain_radio.txt"), brainRadio.ToString());
-            result.radioLines = radioText.Split('\n').Count(l => l.Length > 0 && l[0] != '#');
-
-            if (atmosphere.FireSpread != null)
-            {
-                var sim = atmosphere.FireSpread.Sim;
-                oracle.FireEvents(new
-                {
-                    head_start_s = atmosphere.FireSpread.HeadStart,
-                    note = "times are on the robots' clock (fire time minus head start)",
-                    collapses = sim.Collapses.Select(c => new { t = c.Time - atmosphere.FireSpread.HeadStart, c.Room,
-                        rect = new[] { c.CellRect.xMin, c.CellRect.yMin, c.CellRect.xMax, c.CellRect.yMax } }).ToArray(),
-                    flashover = sim.RoomStates.Where(r => r.FlashoverTime >= 0).Select(r => new { r.Room, t = r.FlashoverTime - atmosphere.FireSpread.HeadStart }).ToArray(),
-                });
-            }
-            oracle.Finish(scenario, Path.Combine(FloorPlan.ConfigDir, "floorplan.json"));
-            // Ceilings stay in: the cameras look 20 degrees above the horizon and map them too.
-            result.truthPoints = oracle.ExportHouseTruth(new[] { GameObject.Find(HouseBuilder.RootName), GameObject.Find("Furniture") }, layerToSkip: -1);
-
-            var meta = new Dictionary<string, object>
-            {
-                ["run_id"] = runId,
-                ["scenario"] = scenarioFile,
-                ["seed"] = scenario.seed,
-                ["unity_version"] = Application.unityVersion,
-                ["sim_rate_hz"] = sensorCfg.camera.rate_hz,
-                ["robots"] = rigs.Select(r => r.robot.RobotId).ToArray(),
-                ["smoke_level"] = scenario.smoke.global_haze,
-                ["smoke_rooms"] = scenario.smoke.rooms,
-                ["recorded_offline"] = true,
-                ["clock_hz"] = ClockHz,
-                ["noise"] = noise,
-                ["thermal"] = sensorCfg.thermal != null ? "thermal/<t>.png 16-bit kelvin x 10, 320x256, 15 Hz, see thermal.yaml" : null,
-                ["air_temperature"] = sensorCfg.air_temperature != null ? "air_temp.txt, 10 Hz, C" : null,
-                ["lidar"] = sensorCfg.lidar != null ? $"lidar.txt, planar 360 degree, {sensorCfg.lidar.beams} beams, {sensorCfg.lidar.rate_hz} Hz, {sensorCfg.lidar.mount.height_m} m up" : null,
-                ["fire"] = atmosphere.FireSpread != null ? $"spreading fire (config/fire.json), head start {atmosphere.FireSpread.HeadStart} s" : "static fires",
-                ["camera_mount"] = sensorCfg.camera.mount,
-                ["exposure"] = $"per-sensor deterministic auto exposure, target grey {RgbdCamera.TargetGrey * 255:0}, EV100 {RgbdCamera.ExposureMinEv} to {RgbdCamera.ExposureMaxEv}",
-            };
-            File.WriteAllText(Path.Combine(root, "meta.json"), JsonConvert.SerializeObject(meta, Formatting.Indented));
+            Checkpoint(result.simSeconds, true);
             result.wallSeconds = wall.Elapsed.TotalSeconds;
             Debug.Log($"[SmokeRescue] Recorded {runId}: {string.Join(", ", result.frames.Select(kv => $"{kv.Key} {kv.Value} frames"))}, " +
                       $"sim {result.simSeconds:0.0} s in {result.wallSeconds:0} s wall, {result.radioLines} radio lines, {result.truthPoints} truth points -> {root}");
             return result;
+            // Everything a scorer needs, written at the end and every checkpoint_s during the run, so a run that stops
+            // early (run 12: the editor quit at 163 s with no crash report and nothing could be scored) is still scored.
+            void Checkpoint(double tNow, bool final)
+            {
+                foreach (var rig in rigs)
+                {
+                    File.WriteAllText(Path.Combine(rig.dir, "rgb.txt"), rig.rgb.ToString());
+                    File.WriteAllText(Path.Combine(rig.dir, "depth.txt"), rig.depth.ToString());
+                    File.WriteAllText(Path.Combine(rig.dir, "associations.txt"), rig.assoc.ToString());
+                    File.WriteAllText(Path.Combine(rig.dir, "imu.txt"), rig.imuTxt.ToString());
+                    File.WriteAllText(Path.Combine(rig.dir, "odom.txt"), rig.odomTxt.ToString());
+                    if (rig.lidarTxt != null) File.WriteAllText(Path.Combine(rig.dir, "lidar.txt"), rig.lidarTxt.ToString());
+                    if (rig.brain != null) File.WriteAllText(Path.Combine(rig.dir, "brain_map.txt"), rig.mapTxt.ToString());
+                    File.WriteAllText(Path.Combine(rig.dir, "camera.yaml"), CameraYaml(sensorCfg));
+                    if (rig.thermal != null)
+                    {
+                        File.WriteAllText(Path.Combine(rig.dir, "thermal.txt"), rig.thermalTxt.ToString());
+                        File.WriteAllText(Path.Combine(rig.dir, "thermal.yaml"), ThermalYaml(sensorCfg));
+                    }
+                    if (rig.air != null) File.WriteAllText(Path.Combine(rig.dir, "air_temp.txt"), rig.airTxt.ToString());
+                    if (rig.brain != null)
+                    {
+                        File.WriteAllText(Path.Combine(rig.dir, "decisions.jsonl"), rig.decisions.ToString());
+                        File.WriteAllText(Path.Combine(rig.dir, "brain_state.jsonl"), rig.brainState.ToString());
+                        oracle.Collisions(rig.robot.RobotId, rig.robot.Driver.CollisionSteps / (double)ClockHz);
+                    }
+                    result.frames[rig.robot.RobotId] = rig.frames;
+                }
+                string radioText = radioLog.ToString();
+                File.WriteAllText(Path.Combine(root, "radio.txt"), radioText);
+                WriteAgentLogs(world, rigs, root);
+                if (rigs.Count(r => r.brain != null) > 1) File.WriteAllText(Path.Combine(root, "brain_radio.txt"), brainRadio.ToString());
+                result.radioLines = radioText.Split('\n').Count(l => l.Length > 0 && l[0] != '#');
+
+                if (atmosphere.FireSpread != null)
+                {
+                    var sim = atmosphere.FireSpread.Sim;
+                    oracle.FireEvents(new
+                    {
+                        head_start_s = atmosphere.FireSpread.HeadStart,
+                        note = "times are on the robots' clock (fire time minus head start)",
+                        collapses = sim.Collapses.Select(c => new { t = c.Time - atmosphere.FireSpread.HeadStart, c.Room,
+                            rect = new[] { c.CellRect.xMin, c.CellRect.yMin, c.CellRect.xMax, c.CellRect.yMax } }).ToArray(),
+                        flashover = sim.RoomStates.Where(r => r.FlashoverTime >= 0).Select(r => new { r.Room, t = r.FlashoverTime - atmosphere.FireSpread.HeadStart }).ToArray(),
+                    });
+                }
+                oracle.Finish(scenario, Path.Combine(FloorPlan.ConfigDir, "floorplan.json"));
+                // Ceilings stay in: the cameras look 20 degrees above the horizon and map them too.
+                if (!truthExported) result.truthPoints = oracle.ExportHouseTruth(new[] { GameObject.Find(HouseBuilder.RootName), GameObject.Find("Furniture") }, layerToSkip: -1);
+
+                var meta = new Dictionary<string, object>
+                {
+                    ["run_id"] = runId,
+                    ["complete"] = final, ["sim_seconds_written"] = Math.Round(tNow, 3),
+                    ["scenario"] = scenarioFile,
+                    ["seed"] = scenario.seed,
+                    ["unity_version"] = Application.unityVersion,
+                    ["sim_rate_hz"] = sensorCfg.camera.rate_hz,
+                    ["robots"] = rigs.Select(r => r.robot.RobotId).ToArray(),
+                    ["smoke_level"] = scenario.smoke.global_haze,
+                    ["smoke_rooms"] = scenario.smoke.rooms,
+                    ["recorded_offline"] = true,
+                    ["clock_hz"] = ClockHz,
+                    ["noise"] = noise,
+                    ["thermal"] = sensorCfg.thermal != null ? "thermal/<t>.png 16-bit kelvin x 10, 320x256, 15 Hz, see thermal.yaml" : null,
+                    ["air_temperature"] = sensorCfg.air_temperature != null ? "air_temp.txt, 10 Hz, C" : null,
+                    ["lidar"] = sensorCfg.lidar != null ? $"lidar.txt, planar 360 degree, {sensorCfg.lidar.beams} beams, {sensorCfg.lidar.rate_hz} Hz, {sensorCfg.lidar.mount.height_m} m up" : null,
+                    ["fire"] = atmosphere.FireSpread != null ? $"spreading fire (config/fire.json), head start {atmosphere.FireSpread.HeadStart} s" : "static fires",
+                    ["camera_mount"] = sensorCfg.camera.mount,
+                    ["exposure"] = $"per-sensor deterministic auto exposure, target grey {RgbdCamera.TargetGrey * 255:0}, EV100 {RgbdCamera.ExposureMinEv} to {RgbdCamera.ExposureMaxEv}",
+                };
+                File.WriteAllText(Path.Combine(root, "meta.json"), JsonConvert.SerializeObject(meta, Formatting.Indented));
+                truthExported = true;
+            }
         }
 
         /// <summary>
@@ -418,6 +428,7 @@ namespace SmokeRescue.Recording
         }
 
         const int MapEveryS = 5;
+        const int CheckpointS = 30;   // sim seconds between scoring checkpoints (Checkpoint in Record)
         /// <summary>The brain's own occupancy grid every 5 s, for the watcher and the evaluator (not read by any robot).
         /// EncodeArrayToPNG puts array row 0 at the bottom of the image, which is the grid's south edge, so north is up.</summary>
         static void WriteBrainMap(RobotRig rig, double t, Queue<Task> pending)

@@ -455,7 +455,9 @@ def evaluate(recording: Path | str, out: Path | str | None = None) -> dict:
                 if indoor is not None:
                     if common_shape is not None:
                         indoor = sample_grid(indoor, own, source_origin, source_cell, fill=0)
-                    building = floor_mask(floorplan, scenario, shape, origin, cell, np.zeros(shape, bool))
+                    # Every room of the floor plan counts as inside: a robot with no outline may walk through a door into
+                    # the next block of the building (run 12: robot A in office_link), which is indoors, not the yard.
+                    building = floor_mask(floorplan, None, shape, origin, cell, np.zeros(shape, bool))
                     map_report['indoor'] = indoor_report(indoor, building, searched, cell)
                 team_searched = covered if team_searched is None else team_searched | covered
                 team_floor = int(floor.sum())
