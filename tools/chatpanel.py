@@ -89,6 +89,8 @@ class ChatPanel:
 
         for r, who in self.side.items():
             dec = run / r / "decisions.jsonl"
+            if not dec.exists():
+                dec = rec / r / "decisions.jsonl"   # the brain writes decisions into the recording
             if dec.exists():
                 for line in dec.read_text().splitlines():
                     if not line.strip():
