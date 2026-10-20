@@ -99,6 +99,9 @@ class Radio:
                     if orders:
                         self.items.append((t, -1, "commander", "Commander: " + (e.get("summary") or "assigned sectors"), []))
                     continue
+                for o in e.get("orders", []):
+                    if o["type"] == "send_team_message":
+                        self.items.append((t + 0.01, side.get(who, 0), "radio", "\u201c" + o.get("text", "") + "\u201d", [("radio out", DIM)]))
                 if not used and not orders:
                     continue
                 chips = [("OpenCV " + x["name"] + (f" = {x['verdict']}" if x.get("verdict") else ""), CV) for x in used]

@@ -53,7 +53,7 @@ class OllamaBackend:
 
     def chat(self, messages: list[dict], tools: list[dict]) -> Reply:
         body = {"model": self.model, "messages": [_ollama_message(m) for m in messages], "tools": tools, "stream": False,
-                "think": False, "options": {"temperature": 0, "seed": self.seed, "num_ctx": 16384}}
+                "think": False, "options": {"temperature": 0, "seed": self.seed, "num_ctx": 8192}}
         start = time.perf_counter()
         r = self.client.post(f"{self.host}/api/chat", json=body)
         r.raise_for_status()
