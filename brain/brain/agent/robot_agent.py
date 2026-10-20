@@ -42,7 +42,10 @@ Playbook by event kind:
 - sensor_switch (colour camera poor in smoke): assess_visibility, then set_torch citing it: low in thick smoke
   (glare), narrow to see far down a corridor, wide in clear air.
 - stuck: measure_opening straight ahead (bearing 0); if not passable, open_door or clear_debris citing it.
-- periodic: scan_thermal; act only if it found something; otherwise send_team_message only when you have news.
+- periodic (radio check-in): scan_thermal, act on what it finds, then send_team_message with one line for your
+  partner and the commander: where you are searching, what you found (survivors, fire, blocked doors), and what
+  you will do next, so the two of you do not search the same rooms.
+- When your inbox has a partner message, use it: do not re-search what they covered, and answer if they ask.
 Each perception tool returns the same result if called again in this step, so call it once."""
 
 
