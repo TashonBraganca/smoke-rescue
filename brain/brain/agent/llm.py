@@ -14,6 +14,7 @@ import base64
 import hashlib
 import json
 import os
+import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -34,6 +35,17 @@ class Reply:
     latency_s: float = 0.0
     model: str = ""
     raw: dict = field(default_factory=dict)
+
+
+_append_lock = threading.Lock()
+
+
+def append_jsonl(path: Path, rec: dict) -> None:
+    """One trace line per call. Steps for both robots run at once (server threads), and a long line written by two
+    threads could interleave, so appends are serialised."""
+    line = json.dumps(rec, default=str) + "\n"
+    with _append_lock, Path(path).open("a") as f:
+        f.write(line)
 
 
 def request_key(messages: list[dict], tools: list[dict]) -> str:

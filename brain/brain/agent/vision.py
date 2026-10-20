@@ -12,6 +12,7 @@ from functools import lru_cache
 import hashlib
 import json
 import math
+import threading
 from pathlib import Path
 
 import cv2
@@ -404,6 +405,7 @@ def inspect_candidate(frame: Frame, bearing_deg: float, range_m: float, *, outpu
 
 PERSON_ONNX = Path(__file__).resolve().parents[3] / "data" / "models" / "onnx" / "yolo11m.onnx"
 _net = None
+_net_lock = threading.Lock()   # one cv2.dnn.Net is not safe to run from two server threads at once
 
 
 def detect_people_rgb(frame: Frame, *, min_conf: float = 0.35, model: Path | None = None) -> list[dict]:
@@ -416,15 +418,16 @@ def detect_people_rgb(frame: Frame, *, min_conf: float = 0.35, model: Path | Non
     path = Path(model) if model else PERSON_ONNX
     if not path.exists():
         return []
-    if _net is None:
-        _net = cv2.dnn.readNetFromONNX(str(path))
     img = cv2.cvtColor(frame.rgb, cv2.COLOR_RGB2BGR)
     h, w = img.shape[:2]
     s = 640 / max(h, w); nh, nw = int(round(h * s)), int(round(w * s)); top, left = (640 - nh) // 2, (640 - nw) // 2
     pad = np.full((640, 640, 3), 114, np.uint8)
     pad[top:top + nh, left:left + nw] = cv2.resize(img, (nw, nh))
-    _net.setInput(cv2.dnn.blobFromImage(pad, 1 / 255.0, (640, 640), swapRB=True))
-    out = _net.forward()[0].T                                   # 8400 x 84: cx cy w h, then 80 class scores
+    with _net_lock:
+        if _net is None:
+            _net = cv2.dnn.readNetFromONNX(str(path))
+        _net.setInput(cv2.dnn.blobFromImage(pad, 1 / 255.0, (640, 640), swapRB=True))
+        out = _net.forward()[0].T                               # 8400 x 84: cx cy w h, then 80 class scores
     conf = out[:, 4]
     keep = conf >= min_conf
     if not keep.any():

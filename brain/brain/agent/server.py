@@ -19,6 +19,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 from fastapi import FastAPI, HTTPException, Request
+from starlette.concurrency import run_in_threadpool
 
 from brain.agent.commander import Commander, simulated_operator
 from brain.agent.llm import make_backend
@@ -53,13 +54,14 @@ def health():
 async def robot_step(robot: str, request: Request):
     req = await request.json()
     req["robot"] = robot
-    return RobotAgent(backend(), Path(req.get("trace_path") or TRACE)).step(req)
+    # In a worker thread: the recorder sends both robots' steps at once, and a blocking call here would serialise them.
+    return await run_in_threadpool(RobotAgent(backend(), Path(req.get("trace_path") or TRACE)).step, req)
 
 
 @app.post("/commander/step")
 async def commander_step(request: Request):
     req = await request.json()
-    return Commander(backend(), Path(req.get("trace_path") or TRACE)).step(req)
+    return await run_in_threadpool(Commander(backend(), Path(req.get("trace_path") or TRACE)).step, req)
 
 
 @app.post("/approval")
@@ -139,8 +141,8 @@ async def perceive_people(request: Request):
     from brain.agent import vision
     req = await request.json()
     t0 = time.perf_counter()
-    frame = vision.load_frame(req["robot_dir"], float(req["t"]))
-    people = vision.detect_people_rgb(frame, min_conf=float(req.get("min_conf", 0.25)))
+    frame = await run_in_threadpool(vision.load_frame, req["robot_dir"], float(req["t"]))
+    people = await run_in_threadpool(lambda: vision.detect_people_rgb(frame, min_conf=float(req.get("min_conf", 0.25))))
     return {"t": float((frame.get("stamps") or {}).get("rgb", req["t"])), "people": people, "opencv": cv2.__version__, "ms": round((time.perf_counter() - t0) * 1000, 1)}
 
 
