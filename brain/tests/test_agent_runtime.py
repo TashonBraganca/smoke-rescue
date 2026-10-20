@@ -29,7 +29,7 @@ def fake_vision(monkeypatch, verdict="person"):
 
 def request(tmp_path):
     return {"robot": "robot_A", "robot_dir": str(tmp_path), "t": 10.0, "pose": {"x": 5.0, "y": 5.0, "heading_deg": 0.0},
-            "event": {"kind": "survivor_candidate"}, "search_area": [0, 0, 40, 28]}
+            "event": {"kind": "survivor_candidate"}}
 
 
 def run(tmp_path, turns):
@@ -68,14 +68,30 @@ def test_confirmation_far_from_the_inspected_spot_is_refused(tmp_path, monkeypat
     assert out["orders"] == []
 
 
-def test_torch_needs_visibility_evidence_and_go_to_stays_inside(tmp_path, monkeypatch):
+def test_torch_needs_visibility_evidence(tmp_path, monkeypatch):
     fake_vision(monkeypatch)
-    out, _ = run(tmp_path, [[ToolCall("set_torch", {"mode": "low", "evidence_id": "ev1"}),
-                             ToolCall("go_to", {"x": 50, "y": 5, "reason": "outside"})],
+    out, _ = run(tmp_path, [[ToolCall("set_torch", {"mode": "low", "evidence_id": "ev1"})],
                             [ToolCall("assess_visibility", {})],
                             [ToolCall("set_torch", {"mode": "low", "evidence_id": "vis1"})]])
     assert [o["type"] for o in out["orders"]] == ["set_torch"]
-    assert {r["tool"] for r in out["refusals"]} == {"set_torch", "go_to"}
+    assert {r["tool"] for r in out["refusals"]} == {"set_torch"}
+
+
+def test_a_building_outline_never_reaches_the_model(tmp_path, monkeypatch):
+    # No prior knowledge (Tashon, 2026-10-20): even if a request carried an outline, the model must not see it.
+    # Whether a go_to target is inside is decided by the brain from the robot's own ceiling evidence.
+    fake_vision(monkeypatch)
+    seen = []
+
+    class Capture(Scripted):
+        def chat(self, messages, tools):
+            seen.append(messages[1]["content"])   # the context the robot sends; the system prompt may say "no outline"
+            return super().chat(messages, tools)
+
+    req = {**request(tmp_path), "search_area": [0, 0, 20, 14], "outline": [[0, 0], [20, 14]]}
+    out = RobotAgent(Capture([[ToolCall("go_to", {"x": 50, "y": 5, "reason": "far"})]]), tmp_path / "t.jsonl").step(req)
+    assert seen and all('"search_area"' not in m and '"outline"' not in m and "[0, 0, 20, 14]" not in m for m in seen)
+    assert [o["type"] for o in out["orders"]] == ["go_to"]
 
 
 def test_replay_backend_reproduces_a_recorded_step(tmp_path, monkeypatch):

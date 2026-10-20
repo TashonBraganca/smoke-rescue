@@ -112,13 +112,12 @@ class RobotAgent:
         pose = req["pose"]
         ctx = AgentContext(robot=req["robot"], t=float(req["t"]), x=float(pose["x"]), y=float(pose["y"]),
                            heading_deg=float(pose["heading_deg"]),
-                           search_area=tuple(req["search_area"]) if req.get("search_area") else None,
                            frame_times=[float(s) for s in req.get("frame_times", [])],
                            event_kind=(req.get("event") or {}).get("kind", ""), torch=req.get("torch", "wide"))
         ctx.frontiers = list(req.get("frontiers") or [])
         tools = ToolRegistry(Path(req["robot_dir"]), ctx, Path(req.get("debug_dir") or Path(self.trace_path).parent / "agent_debug"))
         context = {k: req[k] for k in ("robot", "t", "pose", "torch", "mode", "state", "goal", "heat_budget", "air_c", "event",
-                                       "inbox", "orders", "survivors", "search_area", "frontiers", "lidar", "partners") if k in req}
+                                       "inbox", "orders", "survivors", "frontiers", "lidar", "partners") if k in req}
         messages = [{"role": "system", "content": SYSTEM},
                     {"role": "user", "content": "Decision needed. Context:\n" + json.dumps(context, default=str)}]
         step_id = f"{req['robot']}@{float(req['t']):.3f}"
