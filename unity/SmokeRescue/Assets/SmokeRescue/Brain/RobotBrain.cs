@@ -115,6 +115,7 @@ namespace SmokeRescue.Brain
             nearFire = fireNow;
 
             if (!completed && !returning && t >= c.mission_time_limit_s) BeginReturn(t, "Exploration time limit reached.");
+            CheckWayOut(t);
             if (!retreating && (airC > c.heat_retreat_c || budget < c.heat_retreat_fraction))
             {
                 ResetStuckRecovery(); retreating = true; sweeping = false; active = null; dwell = 0; ClearPath();
@@ -562,6 +563,38 @@ namespace SmokeRescue.Brain
         }
         void SetPath(List<Vector2> value, bool isFrontier = false) { frontierGoal = isFrontier && value.Count > 0; path = value; cursor = 0; goal = path.Count > 0 ? path[path.Count - 1] : (Vector2?)null; }
         void ClearPath() { frontierGoal = false; path.Clear(); cursor = 0; goal = null; lastPlan = double.NegativeInfinity; }
+        double nextWayOutCheck; bool hadWayOut;
+        /// <summary>
+        /// Keep a way out. Every escape_check_s while searching, plan the route home; if fire comes within
+        /// escape_fire_margin_m of it (beyond escape_ignore_m from the robot, where the avoid margins already act), the
+        /// route is about to close: return now. Agent run 11: robot A searched beside a spreading fire for 26 s with
+        /// its paths cut again and again, retreated only when the air reached 70 C, and by then its 15 m route home
+        /// was gone (95 s above 60 C, 383 C peak).
+        /// </summary>
+        void CheckWayOut(double t)
+        {
+            if (completed || returning || retreating || t < nextWayOutCheck) return;
+            nextWayOutCheck = t + c.escape_check_s;
+            var route = planner.Plan(motion.Pose.position, home);
+            if (route.Count == 0)
+            {
+                if (hadWayOut)
+                {
+                    hadWayOut = false; ResetStuckRecovery(); retreating = true; sweeping = false; active = null; dwell = 0; ClearPath();
+                    Emit(t, "escape_closing", "The known way out is closed; retreat to the coolest reachable floor.", "route_points", 0);
+                }
+                return;
+            }
+            hadWayOut = true;
+            float closest = float.PositiveInfinity; Vector2 at = motion.Pose.position;
+            foreach (var p in route)
+                if (Vector2.Distance(p, at) > c.escape_ignore_m) closest = Mathf.Min(closest, grid.FireDistance(grid.Cell(p)));
+            if (closest < c.escape_fire_margin_m)
+            {
+                Emit(t, "escape_closing", "Fire is closing on the way out; leave while it is open.", "fire_distance_m", closest, "margin_m", c.escape_fire_margin_m);
+                BeginReturn(t, "The way out was closing.");
+            }
+        }
         void BeginReturn(double t, string reason)
         {
             ResetStuckRecovery(); returning = true; active = null; dwell = 0; returnReason = reason; ClearPath();

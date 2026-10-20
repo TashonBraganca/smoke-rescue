@@ -122,6 +122,7 @@ namespace SmokeRescue.Brain
         public int frontier_information_radius_cells = 3;
         public float lookahead_m = 0.45f;
         public float goal_tolerance_m = 0.18f, return_arrive_m = 0.5f;
+        public float escape_check_s = 2f, escape_fire_margin_m = 2f, escape_ignore_m = 2f;
         public float open_speed_mps = 0.6f;
         public float near_speed_mps = 0.3f;
         public float near_obstacle_m = 1.0f;

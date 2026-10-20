@@ -38,7 +38,7 @@ namespace SmokeRescue.Recording
         static readonly HashSet<string> AgentTriggers = new HashSet<string>
             { "survivor_candidate", "survivor_view_ready", "sensor_switch", "avoid_fire", "retreat", "stuck",
               // The model chooses where to search next: ask it whenever an area is done or a route has failed.
-              "area_searched", "no_progress", "goal_blacklisted", "collision_hold", "no_frontier" };
+              "area_searched", "no_progress", "goal_blacklisted", "collision_hold", "no_frontier", "escape_closing" };
         const double AgentPeriodS = 20, AgentMinGapS = 4, CommanderPeriodS = 30, OrderHoldS = 15, ExploreHoldS = 60;
         const int FrontierOptions = 6;
 
