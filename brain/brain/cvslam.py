@@ -12,7 +12,7 @@ Pipeline, all image work in OpenCV 5.0:
      cv2.detail_PoseGraph Python binding exposes no methods in opencv-python 5.0.0.93.
   5. Every frame's pose = its keyframe's optimised pose times its own odometry offset.
 Output matches ORB-SLAM3's: CameraTrajectory.txt and KeyFrameTrajectory.txt (TUM, camera-to-world, first camera =
-world), plus cvslam_meta.json. Reads only the robot's own camera, depth and calibration; never oracle/.
+world), plus cvslam_meta.json. Reads only the robot's own camera, depth and calibration, never ground truth.
 """
 
 from __future__ import annotations

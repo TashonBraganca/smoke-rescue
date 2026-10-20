@@ -211,7 +211,9 @@ def scan_thermal(frame: Frame, *, human_band_c=(28.,40.), hot_min_c=200., min_pi
         p["size_plausible"] = _size_plausible(p["width_m"],p["height_m"])
     hot = [_region(frame,m,s,depth) for m,s in _components(valid & (c>=hot_min_c),min_pixels)]
     return _base("scan_thermal",frame,{"human_band_c":[lo,hi],"hot_min_c":hot_min_c,"min_pixels":min_pixels},
-        hotspots=hot,people=people,evidence=[f"{len(hot)} hot and {len(people)} warm connected components; warm candidates are not person confirmations."])
+        hotspots=hot,people=people,rgb_people=detect_people_rgb(frame),
+        evidence=[f"{len(hot)} hot and {len(people)} warm connected components; warm candidates are not person confirmations.",
+                  "rgb_people: OpenCV dnn YOLO11m person boxes on the colour image, a second sensor when thermal saturates."])
 
 
 def _plane_cue(f, mask, depth, sigma_m=0.):
@@ -373,11 +375,65 @@ def inspect_candidate(frame: Frame, bearing_deg: float, range_m: float, *, outpu
             reasons.append("Body-sized warm component has temperature structure and nonplanar depth without a background recess.")
         else: reasons.append("Temperature structure or nonplanar body shape is insufficient for confirmation.")
         result["reasons"] = reasons
+    if result["verdict"] == "uncertain":
+        # Second sensor: a confident RGB person detection at the same bearing and range. It never overrides a
+        # not_person verdict from planarity, a window recess or impossible size.
+        hits = [p for p in detect_people_rgb(frame) if abs(p["bearing_deg"] - bearing_deg) <= bearing_tolerance_deg
+                and (p["range_m"] is None or abs(p["range_m"] - range_m) <= range_tolerance_m)]
+        result["cues"]["rgb_dnn"] = {"model": PERSON_ONNX.name, "hits": hits}
+        if hits and max(h["confidence"] for h in hits) >= 0.5:
+            best = max(hits, key=lambda h: h["confidence"])
+            result["verdict"] = "person"
+            result["reasons"] = result["reasons"] + [f"OpenCV dnn person detector (YOLO11m) confidence {best['confidence']:.2f} "
+                                                     f"at bearing {best['bearing_deg']:.1f} deg, range {best['range_m']} m."]
     path = Path(output_dir)/f"{result['id']}.png"
     _debug(frame,mask,aligned,path)
     result["debug_crop"] = str(path)
     result["evidence"] = result["reasons"]+[f"Thermal crop left, projected RGB crop right: {path}"]
     return result
+
+
+PERSON_ONNX = Path(__file__).resolve().parents[3] / "data" / "models" / "onnx" / "yolo11m.onnx"
+_net = None
+
+
+def detect_people_rgb(frame: Frame, *, min_conf: float = 0.35, model: Path | None = None) -> list[dict]:
+    """People in the RGB image with OpenCV 5's dnn module running YOLO11m (ONNX, letterboxed 640x640, class 0).
+
+    Independent of thermal, so it still sees a person when the thermal camera saturates in a hot smoke layer, and it
+    fails where RGB fails (thick smoke, darkness). Returns boxes with confidence, bearing and median box depth.
+    """
+    global _net
+    path = Path(model) if model else PERSON_ONNX
+    if not path.exists():
+        return []
+    if _net is None:
+        _net = cv2.dnn.readNetFromONNX(str(path))
+    img = cv2.cvtColor(frame.rgb, cv2.COLOR_RGB2BGR)
+    h, w = img.shape[:2]
+    s = 640 / max(h, w); nh, nw = int(round(h * s)), int(round(w * s)); top, left = (640 - nh) // 2, (640 - nw) // 2
+    pad = np.full((640, 640, 3), 114, np.uint8)
+    pad[top:top + nh, left:left + nw] = cv2.resize(img, (nw, nh))
+    _net.setInput(cv2.dnn.blobFromImage(pad, 1 / 255.0, (640, 640), swapRB=True))
+    out = _net.forward()[0].T                                   # 8400 x 84: cx cy w h, then 80 class scores
+    conf = out[:, 4]
+    keep = conf >= min_conf
+    if not keep.any():
+        return []
+    b = out[keep, :4]; conf = conf[keep]
+    boxes = [[float((cx - bw / 2 - left) / s), float((cy - bh / 2 - top) / s), float(bw / s), float(bh / s)] for cx, cy, bw, bh in b]
+    idx = cv2.dnn.NMSBoxes(boxes, conf.tolist(), min_conf, 0.45)
+    people = []
+    for i in np.array(idx).reshape(-1):
+        x, y, bw, bh = boxes[i]
+        x0, y0, x1, y1 = max(0, int(x)), max(0, int(y)), min(w, int(x + bw)), min(h, int(y + bh))
+        z = frame.depth_m[y0 + (y1 - y0) // 4: y1 - (y1 - y0) // 4, x0 + (x1 - x0) // 4: x1 - (x1 - x0) // 4]
+        z = z[np.isfinite(z) & (z > 0)]
+        u = (x0 + x1) / 2
+        people.append({"confidence": _number(float(conf[i])), "bbox_rgb": [x0, y0, x1 - x0, y1 - y0],
+                       "bearing_deg": _number(math.degrees(math.atan2(u - frame.K[0, 2], frame.K[0, 0]))),
+                       "range_m": _number(float(np.median(z))) if z.size >= 10 else None})
+    return people
 
 
 def assess_visibility(frame: Frame) -> dict:
