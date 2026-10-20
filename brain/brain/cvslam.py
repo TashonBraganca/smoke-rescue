@@ -140,6 +140,8 @@ def run(robot_dir: Path, out_dir: Path, mode: str = "RGB_DEPTH", loops: bool = T
     meta = {"opencv": cv2.__version__, "odometry": f"cv2.Odometry {mode} COMMON, frame-to-frame",
             "frames": len(rows), "keyframes": len(keyframes), "odometry_failures": failures,
             "loop_edges": len(loop_edges), "loops_enabled": loops,
+            "loops": [{"from_frame": keyframes[i].idx, "to_frame": keyframes[j].idx, "T_from_to": np.round(Z, 6).tolist()}
+                      for i, j, Z in loop_edges],
             "pose_graph": "scipy least_squares (cv2.detail_PoseGraph has no Python methods in 5.0.0.93)" if loop_edges else "none",
             "tracking_s": round(t_track, 1), "ms_per_frame": round(1000 * t_track / max(1, len(rows)), 1),
             "settings": {"key_trans_m": KEY_TRANS_M, "key_rot_deg": KEY_ROT_DEG, "loop_radius_m": LOOP_RADIUS_M,
