@@ -1102,6 +1102,38 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void ARoomMappedOnlyByLidarIsSearchableButTheYardIsNot()
+        {
+            // House reflex check: rooms never became indoors, because the camera sees ceiling points only 4.5 m and
+            // more away, beyond the far wall of a small room. A room walled in on the robot's own LiDAR map must be
+            // searchable; ground in front of one facade must not, ceiling or not.
+            var c = Settings(); c.search_requires_ceiling = true;
+            var room = new RobotBrain(Calibration(), c, "A", 0);
+            Motion(room, 0); room.OnAirTemperature(0, 20); room.OnLidar(SegmentScan(0, Vector2.zero, 0, Box(-2, -2, 2.5f, 3))); room.Step(0, 1f / 60);
+            var g = Map(room);
+            Assert.That(g.Indoors(new Vector2(1, 1.5f)), Is.True, "inside a 4.5 x 5 m room seen only by the LiDAR");
+            Assert.That(room.FrontierOptions(0, 10), Is.Not.Empty, "its unsearched floor is offered");
+            var yard = new RobotBrain(Calibration(), c, "B", 0);
+            var facade = new[] { (new Vector2(-8, 3), new Vector2(8, 3)) };
+            Motion(yard, 0); yard.OnAirTemperature(0, 20); yard.OnLidar(SegmentScan(0, Vector2.zero, 0, facade)); yard.Step(0, 1f / 60);
+            var h = Map(yard);
+            Assert.That(h.Indoors(new Vector2(0, 2)), Is.False, "1 m in front of a facade");
+            Assert.That(yard.FrontierOptions(0, 10), Is.Empty, "nothing to search in front of a facade");
+        }
+
+        [Test]
+        public void ARoomWithAnOpenOutsideDoorIsWalledInButNotTheGroundOutside()
+        {
+            // Mapped open ground outside a 1 m door: the room's middle is walled in, floor 0.5 m outside the door is not.
+            var c = Settings(); c.grid_size_m = 30; var g = OpenGrid(c);
+            for (float x = -2; x <= 2; x += .05f) { g.ObserveOccupied(g.Cell(new Vector2(x, -2))); g.ObserveOccupied(g.Cell(new Vector2(x, 2))); }
+            for (float y = -2; y <= 2; y += .05f) { g.ObserveOccupied(g.Cell(new Vector2(-2, y))); if (Mathf.Abs(y) > .5f) g.ObserveOccupied(g.Cell(new Vector2(2, y))); }
+            Assert.That(g.Indoors(new Vector2(0, 0)), Is.True, "middle of the room, 2 m from the door");
+            Assert.That(g.Indoors(new Vector2(2.5f, 0)), Is.False, "0.5 m outside the door");
+            Assert.That(g.Indoors(new Vector2(8, 8)), Is.False, "open ground");
+        }
+
+        [Test]
         public void FloorOutsideAnOpenDoorIsNotIndoors()
         {
             // Run 8: through an open door the yard just outside sat within 1.5 m of the room's ceiling evidence.
@@ -1122,7 +1154,7 @@ namespace SmokeRescue.Tests.EditMode
             var a = new RobotBrain(Calibration(), c, "A", 0);
             Motion(a, 0); a.OnAirTemperature(0, 20); a.OnLidar(RoomScan(0, Vector2.zero, 0, 9f, 720)); a.Step(0, 1f / 60);
             a.DrainEvents();
-            Assert.That(a.FrontierOptions(0, 10), Is.Empty, "a room mapped only by LiDAR, ceiling never seen: nothing to search yet");
+            Assert.That(a.FrontierOptions(0, 10), Is.Empty, "an 18 m hall mapped only by LiDAR: not walled in within 10 m and no ceiling seen, nothing to search yet");
             // The log says why the list is empty: frontier cells dropped as not known to be indoors, none for other reasons.
             var why = a.DrainEvents().Single(e => e.kind == "frontier_options").numbers;
             Assert.That(why["frontiers"], Is.Zero);
@@ -1130,11 +1162,11 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(why["cells_claimed"] + why["cells_blacklisted"] + why["cells_visited"], Is.Zero);
             Motion(a, .1); a.OnAirTemperature(.1, 20); a.OnRgbd(RoomImage(.1, 7f)); a.OnLidar(RoomScan(.1, Vector2.zero, 0, 9f, 720)); a.Step(.1, .1f);
             var g = Map(a);
-            Assert.That(g.Indoors(new Vector2(0, 4.5f)), Is.True, "ceiling seen overhead");
-            Assert.That(g.Indoors(new Vector2(0, -4f)), Is.False, "behind the robot no ceiling was seen");
+            Assert.That(g.UnderCeiling(new Vector2(0, 4.5f)), Is.True, "ceiling seen overhead");
+            Assert.That(g.UnderCeiling(new Vector2(0, -4f)), Is.False, "behind the robot no ceiling was seen");
             // Beyond the far wall the camera mapped at 7 m: within 1.5 m of ceiling evidence in a straight line, but not
             // reachable without crossing the wall (run 5, the yard outside a wall).
-            Assert.That(g.Indoors(new Vector2(0, 7.6f)), Is.False, "beyond a wall");
+            Assert.That(g.UnderCeiling(new Vector2(0, 7.6f)), Is.False, "ceiling distance does not pass a wall");
             var options = a.FrontierOptions(.1, 10);
             Assert.That(options, Is.Not.Empty);
             Assert.That(options.All(f => g.Indoors(f.position)), Is.True);

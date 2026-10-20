@@ -60,7 +60,8 @@ def latest_map(robot_dir: Path) -> tuple[float, np.ndarray] | None:
 
 def searched_for(robot_dir: Path, map_t: float, layer: str = 'searched') -> np.ndarray | None:
     """A mask written beside the snapshot at map_t, south row first; None if absent. Layers: 'searched' (255 searched
-    by a camera), 'indoor' (255 ceiling seen, 128 within the indoor radius of one, 0 not known to be indoors)."""
+    by a camera), 'indoor' (255 ceiling seen, 128 within the indoor radius of one, 64 walled in on the robot's own
+    map, 0 not known to be indoors)."""
     path = robot_dir / 'brain_map' / f'{map_t:.6f}.{layer}.png'
     if not path.exists():
         return None

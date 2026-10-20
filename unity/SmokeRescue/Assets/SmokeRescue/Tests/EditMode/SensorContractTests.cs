@@ -185,7 +185,7 @@ namespace SmokeRescue.Tests.EditMode
             int n = c.camera.width * c.camera.height;
             var pose = new Pose(new Vector3(10, 20, 30), Quaternion.identity); int calls = 0;
             var output = new RgbdNoise(c, 6).Process(new byte[n * 3], Enumerable.Repeat(2f, n).ToArray(), pose, true,
-                point => { calls++; Assert.That(point.z, Is.EqualTo(31).Within(1e-5)); return 100; });
+                point => { System.Threading.Interlocked.Increment(ref calls); Assert.That(point.z, Is.EqualTo(31).Within(1e-5)); return 100; });
             double dropout = output.Count(v => v == 0) / (double)n;
             Assert.That(calls, Is.EqualTo(n)); Assert.That(dropout, Is.EqualTo(.6).Within(.03));
         }
