@@ -48,11 +48,21 @@ namespace SmokeRescue.Recording
             public double lastAgent = double.NegativeInfinity;
             public JObject trigger;
             public readonly List<JObject> inbox = new List<JObject>();     // delivered texts and orders, for the next step
-            public readonly List<JObject> outbox = new List<JObject>();    // texts waiting for a radio link
+            public readonly List<Outgoing> outbox = new List<Outgoing>();  // texts not yet heard by every listener
             public readonly List<double> thermalTimes = new List<double>();
             public readonly StringBuilder agentLog = new StringBuilder();
             public double lastPeople = double.NegativeInfinity;
         }
+
+        /// <summary>A team text and who has heard it. Delivery is tracked per listener: clearing the whole outbox when
+        /// any one listener heard it lost texts for the others (agent run 9: robot A's survivor report reached robot B
+        /// and was dropped before the command post heard it, so the commander never learned of the survivor).</summary>
+        sealed class Outgoing
+        {
+            public JObject message;
+            public readonly HashSet<string> heardBy = new HashSet<string>();
+        }
+        const string CommandPostId = "command_post";
 
         sealed class AgentWorld
         {
@@ -190,7 +200,7 @@ namespace SmokeRescue.Recording
                 case "send_team_message":
                     var msg = new JObject { ["from"] = rig.robot.RobotId, ["t"] = t, ["text"] = o.Value<string>("text"),
                         ["x"] = brain.Snapshot().pose.position.x, ["y"] = brain.Snapshot().pose.position.y };
-                    rig.outbox.Add(msg);
+                    rig.outbox.Add(new Outgoing { message = msg });
                     if (rig.outbox.Count > 5) rig.outbox.RemoveAt(0);
                     brain.Log(t, "team_message_sent", o.Value<string>("text") ?? "");
                     break;
@@ -209,28 +219,30 @@ namespace SmokeRescue.Recording
             foreach (var from in rigs)
             {
                 if (from.outbox.Count == 0) continue;
-                bool delivered = false;
-                foreach (var to in rigs.Where(r => r != from && r.brain != null))
-                    if (radio.Evaluate(from.robot.transform.position, to.robot.transform.position).delivered)
-                    {
-                        foreach (var m in from.outbox)
-                        {
-                            // The sender's position is in its own frame: convert it once the frames are linked, else drop it.
-                            var copy = (JObject)m.DeepClone();
-                            if (copy["x"] != null && to.brain.PartnerToOwn(from.robot.RobotId, new Vector2(copy.Value<float>("x"), copy.Value<float>("y")), out var own))
-                            { copy["x"] = Math.Round(own.x, 2); copy["y"] = Math.Round(own.y, 2); copy["position"] = "converted into your frame"; }
-                            else { copy.Remove("x"); copy.Remove("y"); copy["position"] = "unknown: your frames are not linked yet"; }
-                            to.inbox.Add(copy); to.brain.Log(t, "team_message_received", $"{m["from"]}: {m["text"]}");
-                        }
-                        delivered = true;
-                    }
-                if (radio.Evaluate(from.robot.transform.position, w.post).delivered)
+                var partners = rigs.Where(r => r != from && r.brain != null).ToList();
+                foreach (var to in partners)
                 {
-                    // The commander has no map: robot positions (each in its own frame) would mean nothing to it.
-                    foreach (var m in from.outbox) { var copy = (JObject)m.DeepClone(); copy.Remove("x"); copy.Remove("y"); w.postInbox.Add(copy); }
-                    delivered = true;
+                    if (!radio.Evaluate(from.robot.transform.position, to.robot.transform.position).delivered) continue;
+                    foreach (var m in from.outbox)
+                    {
+                        if (!m.heardBy.Add(to.robot.RobotId)) continue;
+                        // The sender's position is in its own frame: convert it once the frames are linked, else drop it.
+                        var copy = (JObject)m.message.DeepClone();
+                        if (copy["x"] != null && to.brain.PartnerToOwn(from.robot.RobotId, new Vector2(copy.Value<float>("x"), copy.Value<float>("y")), out var own))
+                        { copy["x"] = Math.Round(own.x, 2); copy["y"] = Math.Round(own.y, 2); copy["position"] = "converted into your frame"; }
+                        else { copy.Remove("x"); copy.Remove("y"); copy["position"] = "unknown: your frames are not linked yet"; }
+                        to.inbox.Add(copy); to.brain.Log(t, "team_message_received", $"{copy["from"]}: {copy["text"]}");
+                    }
                 }
-                if (delivered) from.outbox.Clear();   // otherwise the texts wait for a link
+                if (radio.Evaluate(from.robot.transform.position, w.post).delivered)
+                    foreach (var m in from.outbox)
+                    {
+                        if (!m.heardBy.Add(CommandPostId)) continue;
+                        // The commander has no map: robot positions (each in its own frame) would mean nothing to it.
+                        var copy = (JObject)m.message.DeepClone(); copy.Remove("x"); copy.Remove("y"); w.postInbox.Add(copy);
+                    }
+                // A text waits until every partner and the command post have heard it.
+                from.outbox.RemoveAll(m => m.heardBy.Count >= partners.Count + 1);
             }
             for (int i = w.postOutbox.Count - 1; i >= 0; i--)
             {

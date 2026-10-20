@@ -413,6 +413,11 @@ namespace SmokeRescue.Recording
             var searched = new byte[s.searched.Length];
             for (int i = 0; i < searched.Length; i++) searched[i] = s.searched[i] != 0 ? (byte)255 : (byte)0;
             string searchedPath = Path.Combine(rig.dir, $"brain_map/{Fmt(t)}.searched.png");
+            var indoor = rig.brain.IndoorMask();
+            for (int i = 0; i < indoor.Length; i++) indoor[i] = indoor[i] == 2 ? (byte)255 : indoor[i] == 1 ? (byte)128 : (byte)0;
+            string indoorPath = Path.Combine(rig.dir, $"brain_map/{Fmt(t)}.indoor.png");
+            pending.Enqueue(Task.Run(() => File.WriteAllBytes(indoorPath, ImageConversion.EncodeArrayToPNG(indoor,
+                UnityEngine.Experimental.Rendering.GraphicsFormat.R8_UNorm, (uint)size, (uint)size))));
             pending.Enqueue(Task.Run(() => File.WriteAllBytes(searchedPath, ImageConversion.EncodeArrayToPNG(searched,
                 UnityEngine.Experimental.Rendering.GraphicsFormat.R8_UNorm, (uint)size, (uint)size))));
             rig.mapTxt.Append(Fmt(t)).Append(' ').Append(F(s.pose.position.x)).Append(' ').Append(F(s.pose.position.y)).Append(' ')

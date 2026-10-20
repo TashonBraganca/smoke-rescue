@@ -92,6 +92,7 @@ namespace SmokeRescue.Brain
         public float collision_escape_s = 3f;
         public float collision_margin_m = 0.05f;
         public float lead_max_m = 1.0f;
+        public float agent_avoid_min_radius_m = 0.3f, agent_avoid_max_radius_m = 4f;
         public float frontier_cluster_max_m = 2.5f;
         public bool search_requires_ceiling = false;
         public float ceiling_min_height_m = 2.5f, ceiling_max_height_m = 3.5f, ceiling_radius_m = 0.6f, ceiling_wall_margin_m = 0.4f;
@@ -178,7 +179,7 @@ namespace SmokeRescue.Brain
                 stuck_turn_deg <= 0 || stuck_turn_deg > 90 || stuck_turn_timeout_s <= 0 ||
                 stuck_repeat_radius_m < cell_m || stuck_repeat_count < 2 || stuck_blacklist_s <= stuck_window_s)
                 throw new ArgumentException("Invalid stuck detection or recovery configuration.");
-            if (collision_margin_m < 0 || lead_max_m < cell_m || frontier_cluster_max_m < cell_m * 2 || ceiling_min_height_m <= obstacle_max_height_m || ceiling_max_height_m <= ceiling_min_height_m || ceiling_radius_m < 0 || ceiling_min_hits < 1 || ceiling_wall_margin_m < 0 ||
+            if (collision_margin_m < 0 || lead_max_m < cell_m || agent_avoid_min_radius_m < cell_m || agent_avoid_max_radius_m < agent_avoid_min_radius_m || frontier_cluster_max_m < cell_m * 2 || ceiling_min_height_m <= obstacle_max_height_m || ceiling_max_height_m <= ceiling_min_height_m || ceiling_radius_m < 0 || ceiling_min_hits < 1 || ceiling_wall_margin_m < 0 ||
                 keyframe_spacing_m <= 0 || keyframe_turn_deg <= 0 || keyframe_beams < 36 || keyframe_max < 2 || keyframes_per_message < 1 || keyframes_per_message > 16 ||
                 link_shortlist < 1 || link_max_candidates < 2 || link_turn_candidates < 1 || link_verifications_per_step < 1 || link_max_descriptor_distance <= 0 || link_window_m < 0 || link_step_m <= 0 ||
                 link_window_deg < 0 || link_step_deg <= 0 || link_min_fit <= 0 || link_min_fit > 1 || link_agree_m <= 0 || link_agree_deg <= 0 || link_min_separation_m < 0 ||

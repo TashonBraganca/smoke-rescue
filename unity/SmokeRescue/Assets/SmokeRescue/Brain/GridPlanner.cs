@@ -90,12 +90,13 @@ namespace SmokeRescue.Brain
             var boundary = new bool[grid.Count];
             for (int i = 0; i < grid.Count; i++)
             {
-                if (float.IsPositiveInfinity(distance[i]) || !grid.Walkable(i) || grid.PeerExplored(i) ||
-                    (excluded != null && excluded(grid.Centre(i)))) continue;
+                if (float.IsPositiveInfinity(distance[i]) || !grid.Walkable(i) || grid.PeerExplored(i)) continue;
                 int x = i % grid.Size, y = i / grid.Size;
                 for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++)
                     if (Math.Abs(dx) + Math.Abs(dy) == 1 && grid.Inside(x + dx, y + dy) && grid.Unsearched((y + dy) * grid.Size + x + dx))
                         boundary[i] = true;
+                // Filters run on boundary cells only, so a caller counting rejections counts frontier cells.
+                if (boundary[i] && excluded != null && excluded(grid.Centre(i))) boundary[i] = false;
             }
             var queue = new Queue<int>();
             for (int i = 0; i < grid.Count; i++)

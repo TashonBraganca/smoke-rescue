@@ -14,7 +14,6 @@ namespace SmokeRescue.Brain
         Vector2? agentGoal;
         double agentGoalUntil;
         string agentGoalReason;
-        Rect? sector;
 
         bool AgentGoalActive(double t) => agentGoal.HasValue && t <= agentGoalUntil && !returning && !retreating;
 
@@ -33,14 +32,26 @@ namespace SmokeRescue.Brain
         /// including heat and wall costs; unsearched_m2 is the floor no camera on the team has seen near it.</summary>
         public IReadOnlyList<BrainFrontier> FrontierOptions(double t, int max)
         {
-            System.Func<Vector2, bool> excluded = p => ClaimBlocks(p, t) || GoalBlacklisted(p, t) || VisitedGoal(p, t) || !InSearchArea(p);
-            var list = new List<BrainFrontier>();
-            foreach (var f in planner.Frontiers(motion.Pose.position, excluded))
+            // Frontier cells dropped by each filter, so a short list can be explained from the log (agent run 9: robot A
+            // was offered one 0.5 m2 frontier at 20 s with most of its LiDAR-mapped floor unsearched).
+            int claimed = 0, blacklisted = 0, visited = 0, outside = 0;
+            bool Excluded(Vector2 p)
+            {
+                if (ClaimBlocks(p, t)) { claimed++; return true; }
+                if (GoalBlacklisted(p, t)) { blacklisted++; return true; }
+                if (VisitedGoal(p, t)) { visited++; return true; }
+                if (!InSearchArea(p)) { outside++; return true; }
+                return false;
+            }
+            var list = new List<BrainFrontier>(); var all = planner.Frontiers(motion.Pose.position, Excluded);
+            foreach (var f in all)
             {
                 if (list.Count >= max) break;
                 list.Add(new BrainFrontier { id = list.Count, position = f.position, pathM = f.cost,
-                    unsearchedM2 = f.information * grid.CellM * grid.CellM, inSector = !sector.HasValue || sector.Value.Contains(f.position) });
+                    unsearchedM2 = f.information * grid.CellM * grid.CellM });
             }
+            Emit(t, "frontier_options", $"{all.Count} frontiers; boundary cells dropped as claimed by a partner, blacklisted, visited, or not known to be indoors.",
+                "frontiers", all.Count, "cells_claimed", claimed, "cells_blacklisted", blacklisted, "cells_visited", visited, "cells_not_indoors", outside);
             return list;
         }
 
@@ -83,13 +94,13 @@ namespace SmokeRescue.Brain
             // fire and the robot froze (agent run 9, robot B, 1.24 m inside a 2 m circle). Shrink it to leave the robot
             // outside with its fire clearance, or refuse it.
             float room = Vector2.Distance(centre, motion.Pose.position) - c.fire_clearance_m - c.robot_radius_m;
-            if (room < 0.3f)
+            if (room < c.agent_avoid_min_radius_m)
             {
                 Emit(t, "agent_order", "avoid_area refused: the robot is inside or at the edge of it; it backs off on heat by itself.",
                     "x_m", centre.x, "y_m", centre.y, "radius_m", radiusM);
                 return;
             }
-            radiusM = Mathf.Clamp(Mathf.Min(radiusM, room), 0.3f, 4f);
+            radiusM = Mathf.Clamp(Mathf.Min(radiusM, room), c.agent_avoid_min_radius_m, c.agent_avoid_max_radius_m);
             float temperature = c.fire_c + c.heat_decay_c_per_s * (float)Math.Max(1.0, seconds) + 50f;
             int cells = 0;
             for (float dx = -radiusM; dx <= radiusM; dx += grid.CellM)
@@ -103,13 +114,6 @@ namespace SmokeRescue.Brain
             lastPlan = double.NegativeInfinity;   // replan through the new margin at once
             Emit(t, "agent_order", "avoid_area around spreading fire, OpenCV evidence " + evidence + ".",
                 "x_m", centre.x, "y_m", centre.y, "radius_m", radiusM, "seconds", seconds, "cells", cells);
-        }
-
-        public void AssignSector(Rect area, double t, string from, string reason)
-        {
-            sector = area;
-            if (active == null && !AgentGoalActive(t)) ClearPath();
-            Emit(t, "sector_assigned", (from ?? "commander") + ": " + (reason ?? ""), "x0", area.xMin, "y0", area.yMin, "x1", area.xMax, "y1", area.yMax);
         }
 
         /// <summary>Logs agent decisions that act outside the brain (torch, arm, radio, approvals) next to its own.</summary>

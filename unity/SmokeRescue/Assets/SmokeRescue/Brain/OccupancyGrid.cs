@@ -351,6 +351,15 @@ namespace SmokeRescue.Brain
         /// <summary>Indoors: within ceiling_radius_m of floor where this robot's own camera has seen a ceiling
         /// (ceiling_min_hits returns in the ceiling height band on a cell that is not a wall). No outline or floor plan
         /// is involved: the yard has no ceiling, and a warm shape seen through a window lies outside.</summary>
+        /// <summary>The indoor layer for map snapshots: 2 where this robot's camera saw a ceiling away from walls, 1 within
+        /// ceiling_radius_m of that across known free floor, 0 elsewhere.</summary>
+        public byte[] CopyIndoors()
+        {
+            if (roofDirty || roofDistance == null) { RoofDistances(); roofDirty = false; }
+            var copy = new byte[Count];
+            for (int i = 0; i < Count; i++) copy[i] = roofDistance[i] == 0 ? (byte)2 : roofDistance[i] <= c.ceiling_radius_m ? (byte)1 : (byte)0;
+            return copy;
+        }
         public bool Indoors(Vector2 p)
         {
             int i = Cell(p); if (i < 0) return false;

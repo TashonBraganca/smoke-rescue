@@ -1121,7 +1121,13 @@ namespace SmokeRescue.Tests.EditMode
             var c = Settings(); c.search_requires_ceiling = true; c.ceiling_min_hits = 1;
             var a = new RobotBrain(Calibration(), c, "A", 0);
             Motion(a, 0); a.OnAirTemperature(0, 20); a.OnLidar(RoomScan(0, Vector2.zero, 0, 9f, 720)); a.Step(0, 1f / 60);
+            a.DrainEvents();
             Assert.That(a.FrontierOptions(0, 10), Is.Empty, "a room mapped only by LiDAR, ceiling never seen: nothing to search yet");
+            // The log says why the list is empty: frontier cells dropped as not known to be indoors, none for other reasons.
+            var why = a.DrainEvents().Single(e => e.kind == "frontier_options").numbers;
+            Assert.That(why["frontiers"], Is.Zero);
+            Assert.That(why["cells_not_indoors"], Is.GreaterThan(0));
+            Assert.That(why["cells_claimed"] + why["cells_blacklisted"] + why["cells_visited"], Is.Zero);
             Motion(a, .1); a.OnAirTemperature(.1, 20); a.OnRgbd(RoomImage(.1, 7f)); a.OnLidar(RoomScan(.1, Vector2.zero, 0, 9f, 720)); a.Step(.1, .1f);
             var g = Map(a);
             Assert.That(g.Indoors(new Vector2(0, 4.5f)), Is.True, "ceiling seen overhead");
@@ -1132,6 +1138,14 @@ namespace SmokeRescue.Tests.EditMode
             var options = a.FrontierOptions(.1, 10);
             Assert.That(options, Is.Not.Empty);
             Assert.That(options.All(f => g.Indoors(f.position)), Is.True);
+            // The agent has no outline either: the brain refuses a go_to where no ceiling was seen, and accepts one under it.
+            a.DrainEvents();
+            a.AgentGoTo(new Vector2(0, -4f), .1, 30, "behind");
+            a.AgentGoTo(new Vector2(0, 4.5f), .1, 30, "ahead");
+            var orders = a.DrainEvents().Where(e => e.kind == "agent_order").Select(e => e.reason).ToList();
+            Assert.That(orders, Has.Count.EqualTo(2));
+            Assert.That(orders[0], Does.StartWith("Refused go_to"));
+            Assert.That(orders[1], Does.StartWith("go_to: ahead"));
         }
 
         [Test]
