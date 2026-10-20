@@ -4,7 +4,7 @@ Perception tools run here and return evidence with an id. Action tools do not ac
 returned to the simulator as orders. The checks are code, not prompt: an action that claims something about the world
 must cite the id of a perception result that supports it, or it is refused and the refusal goes back to the model.
 
-    reg = ToolRegistry(robot_dir, context)       # context: pose, heading, search area, robot id, sim time
+    reg = ToolRegistry(robot_dir, context)       # context: own-frame pose, heading, robot id, sim time
     result = reg.call("scan_thermal", {})
     reg.call("confirm_survivor", {"x": 9.6, "y": 5.0, "evidence_id": result["people"][0]["inspect_id"]})
 """
@@ -43,8 +43,8 @@ PERCEPTION = [
 
 ACTIONS = [
     _fn("explore_frontier", "Search one of the frontiers listed in the context next (unsearched floor the robot can reach). "
-        "The robot's planner drives there, keeping clear of walls, and sweeps the area on arrival. Pick by: your sector "
-        "first, then more unsearched area, shorter path, and away from where your partner is searching.",
+        "The robot's planner drives there, keeping clear of walls, and sweeps the area on arrival. Pick by more "
+        "unsearched area, shorter path, and away from where your partner is searching.",
         {"frontier_id": {"type": "integer"}, "reason": STR}, ["frontier_id", "reason"]),
     _fn("go_to", "Drive to a building position (x, y in metres) by the robot's own planner.",
         {"x": NUM, "y": NUM, "reason": STR}, ["x", "y", "reason"]),
@@ -212,7 +212,7 @@ class ToolRegistry:
                 args = {**args, "x": float(match[0]["x"]), "y": float(match[0]["y"])}
         elif name == "go_to":
             if not self._in_area(float(args["x"]), float(args["y"])):
-                refusal = {"refused": True, "reason": "target is outside the building search area"}
+                refusal = {"refused": True, "reason": "target is outside the search area"}
             elif self.ctx.event_kind in ("avoid_fire", "retreat"):
                 refusal = {"refused": True, "reason": "no go_to during a heat event: use track_fire_spread and avoid_area, "
                            "and let the reflex layer back away"}

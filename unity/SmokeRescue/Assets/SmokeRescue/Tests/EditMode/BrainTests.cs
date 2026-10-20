@@ -185,7 +185,12 @@ namespace SmokeRescue.Tests.EditMode
         public void StuckEvidenceResetsAcrossMotionAndSensorGaps()
         {
             var b = BlockedBrain(out _); var all = new List<BrainEvent>();
-            b.SearchArea = Rect.MinMaxRect(-.2f, 3.5f, .2f, 4.1f);
+            // Only the end of the scripted route counts as searchable floor: a ceiling "seen" over x -0.2..0.2, y 3.5..4.1.
+            ((BrainConfig)typeof(RobotBrain).GetField("c", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(b)).search_requires_ceiling = true;
+            var grid = Map(b); var roof = (byte[])typeof(OccupancyGrid).GetField("roofHits", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(grid);
+            for (float x = -.15f; x <= .15f; x += .1f) for (float y = 3.55f; y <= 4.05f; y += .1f) roof[grid.Cell(new Vector2(x, y))] = 255;
+            typeof(OccupancyGrid).GetField("roofDirty", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).SetValue(grid, true);
+            ((BrainConfig)typeof(RobotBrain).GetField("c", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(b)).ceiling_radius_m = 0f;
             for (int tick = 0; tick <= 16; tick++) { DriveTick(b, tick); all.AddRange(b.DrainEvents()); }
             // The first interval moves; the last one is zero. Looking only at the latest sample is wrong.
             Motion(b, .825, .1f); DriveTick(b, 17); all.AddRange(b.DrainEvents());
@@ -679,8 +684,103 @@ namespace SmokeRescue.Tests.EditMode
             m.Claim = new BrainClaim { centre = near, radiusM = 2.5f, expiresAt = 15 };
             b.OnPeerMessage(Wire(m), .1);
             var after = b.FrontierOptions(.1, 10);
-            Assert.That(after.Any(f => Vector2.Distance(f.position, near) > 2.5f), Is.True, "frontiers outside the claim stay available");
-            Assert.That(after.All(f => Vector2.Distance(f.position, near) > 2.5f), Is.True, "frontiers inside the claim are skipped");
+            Assert.That(after.Any(), Is.True, "frontiers away from the claim stay available");
+            float exclusion = 2.5f + Settings().peer_claim_radius_m;   // the partner's claim plus the claim we would make
+            Assert.That(after.All(f => Vector2.Distance(f.position, near) > exclusion), Is.True, "no frontier whose own claim would overlap the partner's");
+            // No pick-then-yield loop: a step with the partner's claim live must not yield the goal it just chose.
+            Motion(b, .2); b.OnAirTemperature(.2, 20); b.OnLidar(RoomScan(.2, new Vector2(-3, 0), 0, 4f, 720)); b.Step(.2, .2f);
+            for (int i = 1; i <= 6; i++) { double t = .2 + i / 60.0; Motion(b, t); b.OnAirTemperature(t, 20); b.Step(t, 1f / 60); }
+            Assert.That(b.DrainEvents().Count(e => e.kind == "goal_yielded"), Is.Zero);
+        }
+
+        /// <summary>A 360 beam sweep of wall segments (building frame) from a true pose.</summary>
+        static LidarScan SegmentScan(double t, Vector2 p, float yaw, (Vector2 a, Vector2 b)[] walls, int beams = 720)
+        {
+            var ranges = new float[beams]; float inc = 2 * Mathf.PI / beams, min = -Mathf.PI;
+            for (int i = 0; i < beams; i++)
+            {
+                float ang = yaw + min + i * inc; var d = new Vector2(-Mathf.Sin(ang), Mathf.Cos(ang)); float best = 0;
+                foreach (var w in walls)
+                {
+                    Vector2 e = w.b - w.a; float den = d.x * e.y - d.y * e.x; if (Mathf.Abs(den) < 1e-6f) continue;
+                    Vector2 q = w.a - p; float r = (q.x * e.y - q.y * e.x) / den, u = (q.x * d.y - q.y * d.x) / den;
+                    if (r > .15f && r < 12f && u >= 0 && u <= 1 && (best == 0 || r < best)) best = r;
+                }
+                ranges[i] = best;
+            }
+            return new LidarScan(t, min, inc, .15f, 12f, 0f, .45f, ranges);
+        }
+        static (Vector2, Vector2)[] Box(float x0, float y0, float x1, float y1) => new[]
+        {
+            (new Vector2(x0, y0), new Vector2(x1, y0)), (new Vector2(x1, y0), new Vector2(x1, y1)),
+            (new Vector2(x1, y1), new Vector2(x0, y1)), (new Vector2(x0, y1), new Vector2(x0, y0)),
+        };
+        // A rectangle with off-centre pillars: only one turn and offset fits it, as in a furnished room.
+        static readonly (Vector2, Vector2)[] RoomOne = Box(-3, -2f, 5.5f, 4f).Concat(Box(2.2f, 1.6f, 2.9f, 2.3f)).Concat(Box(-2.4f, -1.6f, -1.9f, -.4f)).ToArray();
+        static readonly (Vector2, Vector2)[] RoomTwo = Box(-5, -1.5f, 2.5f, 3f).Concat(Box(-1.2f, -.6f, -.3f, .1f)).ToArray();
+
+        /// <summary>Two robots, each in its own frame, walking past each other: returns the brains after radio exchanges.</summary>
+        static (RobotBrain a, RobotBrain b, List<BrainEvent> eventsA) LinkWalk((Vector2, Vector2)[] roomA, (Vector2, Vector2)[] roomB)
+        {
+            var c = Settings(); c.frames_shared_at_start = false;
+            var a = new RobotBrain(Calibration(), c, "A", 0) { LinkDiagnostics = true }; var b = new RobotBrain(Calibration(), c, "B", 0);
+            Vector2 startB = new Vector2(.5f, 2.5f); float yawB = Mathf.PI;          // B faces A's -y
+            var eventsA = new List<BrainEvent>();
+            for (int tick = 0; tick <= 120; tick++)
+            {
+                double t = tick / 20.0; float d = Mathf.Min(.4f * (float)t, 2.4f), v = .4f * (float)t < 2.4f ? .4f : 0;
+                var truthA = new Vector2(0, d); var truthB = startB + new Vector2(0, -d);
+                Motion(a, t, v); Motion(b, t, v); a.OnAirTemperature(t, 20); b.OnAirTemperature(t, 20);
+                if (tick % 2 == 0) { a.OnLidar(SegmentScan(t, truthA, 0, roomA)); b.OnLidar(SegmentScan(t, truthB, yawB, roomB)); }
+                a.Step(t, .05f); b.Step(t, .05f);
+                if (tick % 40 == 0 && tick > 0)
+                {
+                    var ma = a.BuildMessage(t); var mb = b.BuildMessage(t);
+                    if (mb != null) a.OnPeerMessage(Wire(mb), t);
+                    if (ma != null) b.OnPeerMessage(Wire(ma), t);
+                }
+                eventsA.AddRange(a.DrainEvents()); b.DrainEvents();
+            }
+            return (a, b, eventsA);
+        }
+
+        [Test]
+        public void LidarFingerprintsLinkTwoRobotFramesWithoutAnyOperatorPose()
+        {
+            var (a, _, events) = LinkWalk(RoomOne, RoomOne);
+            Assert.That(events.Count(e => e.kind == "frame_linked"), Is.EqualTo(1), string.Join(" | ", events.Where(e => e.kind == "place_recognised" || e.kind == "place_rejected").Select(e => e.kind + ": " + e.reason + " " + string.Join(" ", e.numbers.Select(kv => $"{kv.Key}={kv.Value:F2}")))));
+            Assert.That(a.TryPartnerLink("B", out var link), Is.True);
+            // Truth: B's frame origin is its start (0.5, 2.5) in A's frame, turned 180 degrees.
+            // Each map stores walls in 10 cm cells, so each robot can sit up to half a cell off truth per axis: two maps
+            // can disagree by about 0.14 m before any matching error.
+            Assert.That(Vector2.Distance(link.position, new Vector2(.5f, 2.5f)), Is.LessThan(.15f), $"link at {link.position}");
+            Assert.That(Mathf.Abs(Mathf.DeltaAngle(link.yawRad * Mathf.Rad2Deg, 180f)), Is.LessThan(2f), $"link yaw {link.yawRad * Mathf.Rad2Deg}");
+            var peer = a.Snapshot().peers.Single();
+            Assert.That(peer.linked, Is.True);
+            Assert.That(Vector2.Distance(peer.pose.position, new Vector2(.5f, .1f)), Is.LessThan(.15f), "B's last pose converted into A's frame");
+        }
+
+        [Test]
+        public void OpenGroundAlongOneWallNeverLinks()
+        {
+            // Check run 3 found this: two robots outside, each seeing one long facade and empty space, matched each
+            // other's start (fingerprint distance 0.08). Empty sweeps and a single wall must never link maps.
+            var facade = new[] { (new Vector2(-20, 3), new Vector2(20, 3)) };
+            var (a, _, events) = LinkWalk(facade, facade);
+            Assert.That(events.Any(e => e.kind == "frame_linked"), Is.False);
+            Assert.That(events.Any(e => e.kind == "place_recognised"), Is.False, "not even a candidate");
+        }
+
+        [Test]
+        public void DifferentRoomsNeverLinkAndHoldBackThePartnersMap()
+        {
+            var (a, _, events) = LinkWalk(RoomOne, RoomTwo);
+            Assert.That(events.Any(e => e.kind == "frame_linked"), Is.False, "control: no shared place, no link");
+            Assert.That(a.TryPartnerLink("B", out _), Is.False);
+            var g = Map(a); int peerCells = 0;
+            for (int i = 0; i < g.Count; i++) if (g.PeerExplored(i)) peerCells++;
+            Assert.That(peerCells, Is.Zero, "an unlinked partner's map is never drawn into this frame");
+            Assert.That(a.Snapshot().peers.Single().linked, Is.False);
         }
 
         [Test]
@@ -802,8 +902,9 @@ namespace SmokeRescue.Tests.EditMode
             var sensor = JsonUtility.FromJson<SensorLimitDocument>(File.ReadAllText(sensorPath));
             Assert.That(c.limits.max_forward_mps, Is.EqualTo(sensor.limits.max_forward_mps));
             Assert.That(c.limits.max_yaw_rate_dps, Is.EqualTo(sensor.limits.max_yaw_rate_dps));
-            Assert.That(c.cell_m, Is.EqualTo(.1f)); Assert.That(c.grid_size_m, Is.EqualTo(44));
-            Assert.That(c.fixed_grid_origin, Is.True); Assert.That(c.grid_origin_x_m, Is.EqualTo(-2));
+            Assert.That(c.cell_m, Is.EqualTo(.1f)); Assert.That(c.grid_size_m, Is.EqualTo(50));
+            // Each robot's grid is centred on where it entered: no building coordinates.
+            Assert.That(c.fixed_grid_origin, Is.False); Assert.That(c.frames_shared_at_start, Is.False);
         }
         [Serializable] public sealed class SensorLimitDocument { public BrainConfig.MotionLimits limits; }
 
@@ -873,19 +974,21 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
-        public void FrontiersOutsideTheOperatorSearchAreaAreNeverGoals()
+        public void SearchNeedsACeilingSeenByTheRobotsOwnCamera()
         {
-            var a = new RobotBrain(Calibration(), Settings(), "A", 0, new EntryPose(0, -1, 0));
-            Room(a, -3, 3, -3, 3);
-            var planner = new GridPlanner(Map(a), Settings());
-            var from = new Vector2(-2, -2);
-            // Control: with no search area the nearest frontier lies outside the building (here x < 0 or y < 0).
-            var open = planner.SelectFrontier(from, p => !a.InSearchArea(p));
-            Assert.That(open.HasValue && (open.Value.x < 0 || open.Value.y < 0), Is.True, $"control frontier {open}");
-            a.SearchArea = Rect.MinMaxRect(0, 0, 10, 10);
-            var inside = planner.SelectFrontier(from, p => !a.InSearchArea(p));
-            Assert.That(inside.HasValue, Is.True);
-            Assert.That(inside.Value.x, Is.GreaterThanOrEqualTo(0)); Assert.That(inside.Value.y, Is.GreaterThanOrEqualTo(0));
+            // No outline: with search_requires_ceiling a frontier must lie near floor where the camera saw a ceiling.
+            var c = Settings(); c.search_requires_ceiling = true;
+            var a = new RobotBrain(Calibration(), c, "A", 0);
+            Motion(a, 0); a.OnAirTemperature(0, 20); a.OnLidar(RoomScan(0, Vector2.zero, 0, 6f, 720)); a.Step(0, 1f / 60);
+            Assert.That(a.FrontierOptions(0, 10), Is.Empty, "a room mapped only by LiDAR, ceiling never seen: nothing to search yet");
+            // A frame 4 m deep: its top rows reach 2.5 to 3.5 m up, a ceiling over the floor 3 to 4 m ahead.
+            Motion(a, .1); a.OnAirTemperature(.1, 20); a.OnRgbd(Image(.1, true, 4000)); a.OnLidar(RoomScan(.1, Vector2.zero, 0, 6f, 720)); a.Step(.1, .1f);
+            var g = Map(a);
+            Assert.That(g.Indoors(new Vector2(0, 3.6f)), Is.True, "ceiling seen overhead");
+            Assert.That(g.Indoors(new Vector2(0, -4f)), Is.False, "behind the robot no ceiling was seen");
+            var options = a.FrontierOptions(.1, 10);
+            Assert.That(options, Is.Not.Empty);
+            Assert.That(options.All(f => g.Indoors(f.position)), Is.True);
         }
 
         [Test]

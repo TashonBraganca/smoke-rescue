@@ -27,8 +27,12 @@ namespace SmokeRescue.Brain
             public BrainPose pose;
         }
 
-        public Result Match(LidarScan scan, BrainPose prior)
+        /// <summary>Window arguments override the per-sweep search (scan_window_*), for the wider search that links two
+        /// robots' frames from a fingerprint match.</summary>
+        public Result Match(LidarScan scan, BrainPose prior, float windowM = -1, float stepM = -1, float windowDeg = -1, float stepDeg = -1)
         {
+            if (windowM < 0) windowM = c.scan_window_m; if (stepM <= 0) stepM = c.scan_step_m;
+            if (windowDeg < 0) windowDeg = c.scan_window_deg; if (stepDeg <= 0) stepDeg = c.scan_step_deg;
             var result = new Result { pose = prior };
             // Beam endpoints in the body frame (x right, y forward), every scan_beam_stride-th valid return.
             int stride = Math.Max(1, c.scan_beam_stride), n = 0;
@@ -45,7 +49,7 @@ namespace SmokeRescue.Brain
 
             // Likelihood field in a window that holds every endpoint of every candidate.
             int centre = grid.Cell(prior.position); if (centre < 0) return result;
-            float reach = c.scan_match_range_m + c.scan_window_m + grid.CellM * 2;
+            float reach = c.scan_match_range_m + windowM + grid.CellM * 2;
             int half = Mathf.CeilToInt(reach / grid.CellM), side = 2 * half + 1;
             int x0 = centre % grid.Size - half, y0 = centre / grid.Size - half;
             var distance = grid.LidarDistanceWindow(x0, y0, side);
@@ -54,18 +58,18 @@ namespace SmokeRescue.Brain
             if (!any) return result;
             Vector2 windowOrigin = grid.Origin + new Vector2(x0, y0) * grid.CellM;
 
-            int steps = Mathf.RoundToInt(c.scan_window_m / c.scan_step_m), turns = Mathf.RoundToInt(c.scan_window_deg / c.scan_step_deg);
+            int steps = Mathf.RoundToInt(windowM / stepM), turns = Mathf.RoundToInt(windowDeg / stepDeg);
             int count = (2 * steps + 1) * (2 * steps + 1) * (2 * turns + 1);
             var scores = new float[count]; var poses = new Vector3[count]; float best = -1; int index = 0;
             for (int t = -turns; t <= turns; t++)
             {
-                float yaw = prior.yawRad + t * c.scan_step_deg * Mathf.Deg2Rad, cos = Mathf.Cos(yaw), sin = Mathf.Sin(yaw);
+                float yaw = prior.yawRad + t * stepDeg * Mathf.Deg2Rad, cos = Mathf.Cos(yaw), sin = Mathf.Sin(yaw);
                 for (int iy = -steps; iy <= steps; iy++) for (int ix = -steps; ix <= steps; ix++)
                 {
-                    float px = prior.position.x + ix * c.scan_step_m, py = prior.position.y + iy * c.scan_step_m, sum = 0;
+                    float px = prior.position.x + ix * stepM, py = prior.position.y + iy * stepM, sum = 0;
                     for (int b = 0; b < n; b++)
                         sum += Sample(field, side, windowOrigin, px + cos * bx[b] - sin * by[b], py + sin * bx[b] + cos * by[b]);
-                    float score = sum / n; scores[index] = score; poses[index] = new Vector3(ix * c.scan_step_m, iy * c.scan_step_m, t * c.scan_step_deg * Mathf.Deg2Rad);
+                    float score = sum / n; scores[index] = score; poses[index] = new Vector3(ix * stepM, iy * stepM, t * stepDeg * Mathf.Deg2Rad);
                     if (score > best) best = score;
                     if (t == 0 && ix == 0 && iy == 0) result.priorFit = score;
                     index++;

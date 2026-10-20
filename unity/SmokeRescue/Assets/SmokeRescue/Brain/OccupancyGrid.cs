@@ -17,6 +17,8 @@ namespace SmokeRescue.Brain
         readonly float[] odds, lidarOdds, heat, rise;
         readonly double[] heatTime;
         readonly bool[] hits, frees, observed;
+        readonly byte[] roofHits;
+        float[] roofDistance; bool roofDirty = true;
         readonly double[] localTime, ownHeatTime;
         readonly float[] ownHeat;
         readonly SortedDictionary<string, byte[]> peerLayers = new SortedDictionary<string, byte[]>(StringComparer.Ordinal);
@@ -36,7 +38,7 @@ namespace SmokeRescue.Brain
                 new Vector2(-Size * c.cell_m / 2, -Size * c.cell_m / 2);
             odds = new float[Count]; lidarOdds = new float[Count]; heat = new float[Count]; rise = new float[Count]; heatTime = new double[Count];
             hits = new bool[Count]; frees = new bool[Count]; observed = new bool[Count];
-            localTime = new double[Count]; peer = new byte[Count];
+            localTime = new double[Count]; peer = new byte[Count]; roofHits = new byte[Count];
             ownHeat = new float[Count]; ownHeatTime = new double[Count];
             for (int i = 0; i < Count; i++) { heat[i] = c.ambient_c; heatTime[i] = double.NegativeInfinity; ownHeat[i] = c.ambient_c; ownHeatTime[i] = double.NegativeInfinity; }
         }
@@ -102,12 +104,14 @@ namespace SmokeRescue.Brain
             }
             dirty = true; return marked;
         }
-        internal void ReplacePeerLayer(string sender, BrainMessage m, byte[] explored)
+        /// <summary>toOwn maps the sender's frame into this one (FrameLink); each own cell looks up the sender cell under it.</summary>
+        internal void ReplacePeerLayer(string sender, BrainMessage m, byte[] explored, BrainPose toOwn)
         {
-            var layer = new byte[Count];
+            var layer = new byte[Count]; float cos = Mathf.Cos(-toOwn.yawRad), sin = Mathf.Sin(-toOwn.yawRad);
             for (int i = 0; i < Count; i++)
             {
-                int cell = m.Cell(Centre(i)); if (cell < 0) continue;
+                Vector2 d = Centre(i) - toOwn.position;
+                int cell = m.Cell(new Vector2(cos * d.x - sin * d.y, sin * d.x + cos * d.y)); if (cell < 0) continue;
                 if (BrainMessage.Bit(m.Occupied, cell)) layer[i] = 255;
                 else if (BrainMessage.Bit(explored, cell)) layer[i] = 1;
             }
@@ -203,6 +207,12 @@ namespace SmokeRescue.Brain
                 float z = frame.Depth[v * frame.Width + u] * .001f;
                 if (z < s.depth.min_m || z > s.depth.max_m) continue;
                 var p = BackProject(u, v, z, s);
+                if (p.z >= c.ceiling_min_height_m && p.z <= c.ceiling_max_height_m)
+                {
+                    // A ceiling seen overhead: this floor is indoors. Walls are excluded when the roof is used.
+                    int roof = Cell(pose.Transform(p.x, p.y));
+                    if (roof >= 0 && roofHits[roof] < 255) { roofHits[roof]++; roofDirty = true; }
+                }
                 if (p.z > c.obstacle_max_height_m) continue;
                 Vector2 end = pose.Transform(p.x, p.y);
                 bool obstacle = p.z >= c.obstacle_min_height_m;
@@ -301,6 +311,19 @@ namespace SmokeRescue.Brain
         internal bool Passable(int i) => i >= 0 && i < Count && Occupancy(i) == 1 &&
             obstacleDistance[i] > c.robot_radius_m * .8f && fireDistance[i] > CellM;
         internal float ObstacleDistance(int i) => i < 0 || i >= Count ? 0 : obstacleDistance[i];
+        /// <summary>Indoors: within ceiling_radius_m of floor where this robot's own camera has seen a ceiling
+        /// (ceiling_min_hits returns in the ceiling height band on a cell that is not a wall). No outline or floor plan
+        /// is involved: the yard has no ceiling, and a warm shape seen through a window lies outside.</summary>
+        public bool Indoors(Vector2 p)
+        {
+            int i = Cell(p); if (i < 0) return false;
+            if (roofDirty || roofDistance == null)
+            {
+                if (roofDistance == null) roofDistance = new float[Count];
+                Distances(k => roofHits[k] >= c.ceiling_min_hits && OwnOccupancy(k) != 255, roofDistance); roofDirty = false;
+            }
+            return roofDistance[i] <= c.ceiling_radius_m;
+        }
         internal float Cost(int i)
         {
             float strength = Mathf.Clamp01((c.heat_cost_radius_m - fireDistance[i]) / (c.heat_cost_radius_m - c.fire_clearance_m));

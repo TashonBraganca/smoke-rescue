@@ -1,5 +1,5 @@
 """The incident commander agent: stands at the command post outside, hears robot reports over the same lossy radio,
-splits the building into sectors and decides human approvals.
+relays what changes the other robot's plan and decides human approvals. It has no map and assigns no areas.
 
 Approvals: in "human" mode a pending request waits for a person (the web page posts to /approvals/<id>); in
 "simulated" mode a fixed, logged operator rule answers, and every answer says it came from the rule, not a person.
@@ -13,17 +13,14 @@ from pathlib import Path
 
 from brain.agent.llm import request_key
 
-SYSTEM = """You are the incident commander for two search robots in a burning building. You stand outside at the
-command post and hear their radio reports, which may arrive late or not at all. Assign each robot a rectangular
-sector of the building so they do not search the same rooms twice; move a robot when its partner already covered an
-area, when fire blocks a sector, or when a survivor needs a second look. Keep sectors inside the building outline.
-Be brief: call assign_sector or broadcast as needed, then finish with one sentence."""
+SYSTEM = """You are the incident commander for two search robots inside a burning building whose layout nobody knows.
+You stand outside at the command post and hear their radio reports, which may arrive late or not at all. You have
+no map, no floor plan and no building outline: everything you know comes from those reports. Your job is to relay
+what one robot learned that changes the other's plan (a survivor found, fire spreading, a route blocked, an area
+already searched), and to set priorities in words. You never assign coordinates or areas; each robot decides where
+to search from its own map. Be brief: broadcast only when it helps, then finish with one sentence."""
 
-NUM = {"type": "number"}
 TOOLS = [
-    {"type": "function", "function": {"name": "assign_sector", "description": "Give a robot a search sector (building metres).",
-     "parameters": {"type": "object", "properties": {"robot": {"type": "string"}, "x0": NUM, "y0": NUM, "x1": NUM, "y1": NUM,
-                    "reason": {"type": "string"}}, "required": ["robot", "x0", "y0", "x1", "y1", "reason"]}}},
     {"type": "function", "function": {"name": "broadcast", "description": "Radio a short message to all robots.",
      "parameters": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}}},
     {"type": "function", "function": {"name": "finish", "description": "End this step with a one-sentence summary.",
@@ -43,10 +40,9 @@ def simulated_operator(request: dict) -> dict:
 
 
 class Commander:
-    def __init__(self, backend, trace_path: Path, search_area: tuple[float, float, float, float]):
+    def __init__(self, backend, trace_path: Path):
         self.backend = backend
         self.trace_path = Path(trace_path)
-        self.area = search_area
 
     def _trace(self, rec: dict) -> None:
         with self.trace_path.open("a") as f:
@@ -55,9 +51,8 @@ class Commander:
     def step(self, req: dict) -> dict:
         start = time.perf_counter()
         messages = [{"role": "system", "content": SYSTEM},
-                    {"role": "user", "content": "Situation:\n" + json.dumps({"t": req["t"], "building": self.area,
-                     "reports": req.get("reports", []), "robots": req.get("robots", {}),
-                     "survivors": req.get("survivors", []), "sectors": req.get("sectors", {})}, default=str)}]
+                    {"role": "user", "content": "Situation:\n" + json.dumps({"t": req["t"],
+                     "reports": req.get("reports", []), "robots": req.get("robots", {})}, default=str)}]
         step_id = f"commander@{float(req['t']):.3f}"
         orders, refusals, summary = [], [], None
         for rnd in range(1, 5):
@@ -80,17 +75,6 @@ class Commander:
                 if c.name == "finish":
                     summary = a.get("summary", "")
                     result = {"ok": True}
-                elif c.name == "assign_sector":
-                    x0, x1 = sorted((float(a.get("x0", 0)), float(a.get("x1", 0))))
-                    y0, y1 = sorted((float(a.get("y0", 0)), float(a.get("y1", 0))))
-                    X0, Y0, X1, Y1 = self.area
-                    if x1 - x0 < 2 or y1 - y0 < 2 or x0 < X0 - .5 or y0 < Y0 - .5 or x1 > X1 + .5 or y1 > Y1 + .5:
-                        result = {"refused": True, "reason": "sector must be at least 2 x 2 m and inside the building"}
-                        refusals.append({"tool": c.name, "args": a, **result})
-                    else:
-                        orders.append({"type": "assign_sector", "robot": a.get("robot"), "rect": [x0, y0, x1, y1],
-                                       "reason": a.get("reason", ""), "t": req["t"]})
-                        result = {"ok": True}
                 elif c.name == "broadcast":
                     orders.append({"type": "broadcast", "text": str(a.get("text", ""))[:280], "t": req["t"]})
                     result = {"ok": True}
