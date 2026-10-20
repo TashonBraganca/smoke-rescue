@@ -315,7 +315,7 @@ namespace SmokeRescue.Brain
         /// spot that is tighter than the planning clearance; see GridPlanner.Lead.</summary>
         internal bool Passable(int i) => i >= 0 && i < Count && Occupancy(i) == 1 &&
             obstacleDistance[i] > c.robot_radius_m * .8f && fireDistance[i] > CellM;
-        /// <summary>Distance from ceiling evidence, walked through cells that are not walls (4-neighbour steps), out to
+        /// <summary>Distance from ceiling evidence, walked through known free floor (4-neighbour steps), out to
         /// ceiling_radius_m. A straight-line distance reached through exterior walls and counted a strip of yard as
         /// indoors (check run 5: robot B left by its door and searched along the outside of the west wall).</summary>
         void RoofDistances()
@@ -340,7 +340,9 @@ namespace SmokeRescue.Brain
                     int nx = x + (k == 0 ? 1 : k == 1 ? -1 : 0), ny = y + (k == 2 ? 1 : k == 3 ? -1 : 0);
                     if (!Inside(nx, ny)) continue;
                     int n = ny * Size + nx;
-                    if (roofDistance[n] <= next || OwnOccupancy(n) == 255) continue;
+                    // Only across floor known to be free: an unmapped stretch of wall is not a way out (run 7, the
+                    // yard 0.5 m outside the west wall reached through wall cells the robot had not seen yet).
+                    if (roofDistance[n] <= next || OwnOccupancy(n) != 1) continue;
                     roofDistance[n] = next; queue.Enqueue(n);
                 }
             }

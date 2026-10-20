@@ -17,6 +17,7 @@ from pathlib import Path
 
 import numpy as np
 
+from brain.nav_io import load_scenario, read_json_lines, recording_frame, transform_xy
 from brain.oracle import load_survivors, load_trajectory
 
 MATCH_M, SEARCH_RADIUS_M, CELL_M = 1.5, 2.5, 0.5
@@ -33,12 +34,15 @@ def score(rec: Path) -> dict:
     robots = meta["robots"]
     truth_people = [(s["id"], np.array([s["position_house"][0], s["position_house"][2]])) for s in (load_survivors(rec) or [])]
     confirmations, found, false = [], {}, []
+    scenario = load_scenario(meta)
     for r in robots:
+        # Robots report positions in their own frames; place them on the plan with the true start (evaluation only).
+        frame, _ = recording_frame(read_json_lines(rec / r / "brain_state.jsonl"), scenario, r)
         for e in _decisions(rec / r):
             if e["kind"] != "survivor_confirmed":
                 continue
             n = e.get("numbers") or {}
-            p = np.array([n.get("x_m", np.nan), n.get("y_m", np.nan)])
+            p = transform_xy(np.array([n.get("x_m", np.nan), n.get("y_m", np.nan)]), frame)
             d = [(float(np.linalg.norm(p - q)), sid) for sid, q in truth_people]
             best = min(d) if d else (np.inf, None)
             by_agent = "Agent confirmed" in (e.get("reason") or "")
