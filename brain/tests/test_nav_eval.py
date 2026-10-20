@@ -242,3 +242,147 @@ def test_snapshots_do_not_hide_recording_changes(recording):
     assert any(name.endswith('brain_state.jsonl') for name, _, _ in signature)
     watcher.RunWatcher(recording, snap).lines()
     assert watcher.file_signature(recording, snap) == signature
+
+
+@pytest.fixture
+def local_recording(recording):
+    """Two independently rotated starts observing the same analytic square."""
+    from brain.nav_io import rotation, sample_grid
+    original = [json.loads(l) for l in (recording / 'robot_A/brain_state.jsonl').read_text().splitlines()]
+    source = np.flipud(cv2.imread(str(recording / 'robot_A/brain_map/40.png'), 0))
+    source[39:42, 44:56] = 0
+    config = json.loads((Path(__file__).parents[2] / 'config/brain.json').read_text())
+    cell, size = config['cell_m'], config['grid_size_m']
+    n = round(size / cell)
+    yy, xx = np.indices((n, n))
+    own = -size / 2 + (np.stack([xx, yy], axis=-1) + .5) * cell
+    scenario = {'search_area': [0, 0, 6, 6], 'robots': []}
+    for name, x, yaw in [('robot_A', 1.2, .3), ('robot_B', 4.8, -.7)]:
+        rd = recording / name
+        (rd / 'brain_map').mkdir(parents=True, exist_ok=True)
+        start = np.array([x, .7])
+        scenario['robots'].append(dict(id=name, spawn=dict(at=start.tolist(), yaw=float(-np.degrees(yaw)))))
+        world = [dict(s, x=x, yaw_rad=yaw) for s in original]
+        states = []
+        for s in world:
+            xy = (np.array([s['x'], s['y']]) - start) @ rotation(yaw)
+            path = (np.array([[s['x'], s['y']], [x, 5.]]) - start) @ rotation(yaw)
+            states.append(dict(s, x=float(xy[0]), y=float(xy[1]), yaw_rad=0., path=path.tolist(), goal=path[-1].tolist()))
+        (rd / 'brain_state.jsonl').write_text(''.join(json.dumps(s) + '\n' for s in states))
+        forward = np.array([-np.sin(yaw), np.cos(yaw)])
+        poses = [[s['t'], x + .25 * forward[0], -1.6, s['y'] + .25 * forward[1],
+                  0, -np.sin(yaw / 2), 0, np.cos(yaw / 2)] for s in world]
+        np.savetxt(recording / 'oracle' / f'{name}_groundtruth.txt', poses)
+        angles = -np.pi + np.arange(180) * 2 * np.pi / 180
+        lines = [f'# beams 180 angle_min_rad {-np.pi} increment_rad {2*np.pi/180} mount_height_m .6 mount_forward_m .12 min_m .05 max_m 20\n']
+        for s in world:
+            origin = np.array([x, s['y']]) + .12 * forward
+            directions = np.c_[-np.sin(yaw + angles), np.cos(yaw + angles)]
+            with np.errstate(divide='ignore', invalid='ignore'):
+                distances = np.stack([(wall - origin[axis]) / directions[:, axis] for axis in (0, 1) for wall in (0., 6.)])
+            distances[distances <= 0] = np.inf
+            lines.append(str(s['t']) + ' ' + ' '.join(map(str, np.rint(distances.min(axis=0) * 1000).astype(int))) + '\n')
+        (rd / 'lidar.txt').write_text(''.join(lines))
+        world_cells = own @ rotation(yaw).T + start
+        grid = sample_grid(source, world_cells, np.array([-2., -2.]), cell)
+        cv2.imwrite(str(rd / 'brain_map/40.png'), np.flipud(grid))
+        (rd / 'brain_map.txt').write_text(f"40 {states[-1]['x']} {states[-1]['y']} 0 brain_map/40.png\n")
+        # Sender B into receiver A. Explicit formula independent of frame_link_report.
+        dx, dy = 3.6 * np.cos(.3), -3.6 * np.sin(.3)
+        event = dict(t=12., kind='frame_linked', reason='matched robot_B', numbers=dict(dx_m=float(dx), dy_m=float(dy), dyaw_deg=float(np.degrees(-1.))))
+        (rd / 'decisions.jsonl').write_text(json.dumps(event) + '\n' if name == 'robot_A' else '')
+    scenario_path = recording / 'scenario.json'
+    scenario_path.write_text(json.dumps(scenario))
+    (recording / 'meta.json').write_text(json.dumps(dict(robots=['robot_A', 'robot_B'], scenario=str(scenario_path))))
+    return recording
+
+
+def test_local_frames_maps_lidar_and_link(local_recording, tmp_path, capsys):
+    from brain.nav_eval import evaluate, print_table
+    reports = evaluate(local_recording, tmp_path / 'local')
+    for r in reports.values():
+        assert r['frame_check']['recorded_frame'] == 'local'
+        assert r['frame_check']['passed']
+        assert r['localization']['position_m']['max'] < 1e-6
+        assert r['localization']['yaw_deg']['max'] < 1e-6
+        assert r['lidar']['true_pose']['median_m'] < .005
+        assert r['lidar']['brain_pose']['median_m'] < .005
+        assert r['map']['precision'] > .85
+        assert r['map']['doors']['closed'] == ['gap']
+    link = reports['robot_A']['frame_link']
+    assert link['t'] == 12
+    assert link['sender'] == 'robot_B'
+    assert link['position_error_m'] < 1e-10
+    assert link['yaw_error_deg'] < 1e-10
+    assert reports['robot_B']['frame_link']['t'] is None
+    print_table(reports)
+    assert 'linked at 12.00s' in capsys.readouterr().out
+
+
+def test_local_start_sign_and_missing_transform_controls(local_recording, tmp_path, monkeypatch):
+    import brain.nav_eval as nav
+    good = nav.evaluate(local_recording, tmp_path / 'good')
+    scenario_path = local_recording / 'scenario.json'
+    scenario = json.loads(scenario_path.read_text())
+    for robot in scenario['robots']:
+        robot['spawn']['yaw'] *= -1
+    scenario_path.write_text(json.dumps(scenario))
+    wrong = nav.evaluate(local_recording, tmp_path / 'sign')
+    assert wrong['robot_B']['localization']['position_m']['max'] > 1
+    assert wrong['robot_B']['localization']['yaw_deg']['max'] > 70
+    assert wrong['robot_B']['map']['precision'] < good['robot_B']['map']['precision'] - .2
+    assert wrong['robot_A']['frame_link']['position_error_m'] > 1
+    for robot in scenario['robots']:
+        robot['spawn']['yaw'] *= -1
+    scenario_path.write_text(json.dumps(scenario))
+    monkeypatch.setattr(nav, 'placed_states', lambda states, transform: states)
+    missing = nav.evaluate(local_recording, tmp_path / 'missing_transform')
+    assert missing['robot_B']['localization']['position_m']['max'] > 4
+    assert missing['robot_B']['lidar']['brain_pose']['median_m'] > .05
+    assert missing['robot_B']['lidar']['true_pose']['passed']
+
+
+def test_watcher_keeps_link_status_without_truth(local_recording, tmp_path, monkeypatch):
+    watcher = load_watcher()
+    original = Path.open
+    def guarded(path, *args, **kwargs):
+        assert 'oracle' not in path.parts
+        return original(path, *args, **kwargs)
+    monkeypatch.setattr(Path, 'open', guarded)
+    w = watcher.RunWatcher(local_recording, tmp_path / 'snap')
+    for lines in [w.lines(), w.lines()]:
+        assert 'linked at 12.0s' in lines[0] and 'dyaw=-57.30deg' in lines[0]
+        assert 'not linked' in lines[1]
+    config = json.loads((Path(__file__).parents[2] / 'config/brain.json').read_text())
+    side = 3 * round(config['grid_size_m'] / config['cell_m'])
+    assert cv2.imread(str(tmp_path / 'snap/robot_A_latest.png')).shape[:2] == (side, side)
+
+
+def test_shared_frame_detected_from_spawn(recording, tmp_path):
+    from brain.nav_eval import evaluate
+    from brain.nav_io import recording_frame, placed_states
+    states = [json.loads(l) for l in (recording / 'robot_A/brain_state.jsonl').read_text().splitlines()]
+    scenario = dict(robots=[dict(id='robot_A', spawn=dict(at=[1.2, .7], yaw=float(-np.degrees(.3))))])
+    path = recording / 'scenario.json'
+    path.write_text(json.dumps(scenario))
+    (recording / 'meta.json').write_text(json.dumps(dict(robots=['robot_A'], scenario=str(path))))
+    transform, frame = recording_frame(states, scenario, 'robot_A')
+    assert frame == 'shared'
+    np.testing.assert_array_equal(transform, [0, 0, 0])
+    assert placed_states(states, transform) == states
+    report = evaluate(recording, tmp_path / 'shared')['robot_A']
+    assert report['localization']['position_m']['max'] < 1e-6
+    assert report['map']['precision'] > .95
+
+
+def test_link_errors_measure_translation_and_wrapped_yaw(local_recording):
+    from brain.nav_eval import frame_link_report
+    from brain.nav_io import load_scenario
+    meta = json.loads((local_recording / 'meta.json').read_text())
+    event = json.loads((local_recording / 'robot_A/decisions.jsonl').read_text())
+    event['numbers']['dx_m'] += .3
+    event['numbers']['dy_m'] += .4
+    event['numbers']['dyaw_deg'] += 365
+    link = frame_link_report([event], 'robot_A', meta['robots'], load_scenario(meta))
+    assert link['position_error_m'] == pytest.approx(.5)
+    assert link['yaw_error_deg'] == pytest.approx(5)

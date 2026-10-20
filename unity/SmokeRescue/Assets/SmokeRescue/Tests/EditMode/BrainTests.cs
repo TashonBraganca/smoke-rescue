@@ -760,6 +760,27 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(Vector2.Distance(peer.pose.position, new Vector2(.5f, .1f)), Is.LessThan(.15f), "B's last pose converted into A's frame");
         }
 
+        [Test, Explicit("timing probe, run by hand")]
+        public void StepCostProbe()
+        {
+            string Run(System.Action<BrainConfig> tweak)
+            {
+                var c = BrainConfig.Load(); tweak(c);
+                var b = new RobotBrain(Calibration(), c, "A", 0); var sw = System.Diagnostics.Stopwatch.StartNew();
+                for (int tick = 0; tick < 120; tick++)
+                {
+                    double t = tick / 60.0; Motion(b, t, .3f); b.OnAirTemperature(t, 20);
+                    if (tick % 6 == 0) b.OnLidar(SegmentScan(t, new Vector2(0, .3f * (float)t), 0, RoomOne));
+                    if (tick % 4 == 0) b.OnRgbd(Image(t, true, 3000));
+                    b.Step(t, 1f / 60);
+                }
+                return $"{sw.Elapsed.TotalMilliseconds / 120:F1} ms/step";
+            }
+            Assert.Fail("all " + Run(_ => { }) + " | no ceiling rule " + Run(c => c.search_requires_ceiling = false) +
+                " | shared frames " + Run(c => c.frames_shared_at_start = true) + " | 44 m grid " + Run(c => c.grid_size_m = 44) +
+                " | no scan matching " + Run(c => { c.scan_window_m = 0; c.scan_window_deg = 0; }));
+        }
+
         [Test]
         public void OpenGroundAlongOneWallNeverLinks()
         {
@@ -986,6 +1007,11 @@ namespace SmokeRescue.Tests.EditMode
             var g = Map(a);
             Assert.That(g.Indoors(new Vector2(0, 3.6f)), Is.True, "ceiling seen overhead");
             Assert.That(g.Indoors(new Vector2(0, -4f)), Is.False, "behind the robot no ceiling was seen");
+            // A wall between ceiling and floor: the far side is not indoors, however close (run 5, the yard outside a wall).
+            // The 4 m frame's top rows see ceiling up to about 4.6 m ahead; put the wall just past that.
+            Assert.That(g.Indoors(new Vector2(0, 5.6f)), Is.True, "control: 1 m past the last ceiling cell, no wall yet");
+            for (float x = -3; x <= 3; x += .05f) g.ObserveOccupied(g.Cell(new Vector2(x, 5.25f)));
+            Assert.That(g.Indoors(new Vector2(0, 5.6f)), Is.False, "beyond a wall, though within the radius in a straight line");
             var options = a.FrontierOptions(.1, 10);
             Assert.That(options, Is.Not.Empty);
             Assert.That(options.All(f => g.Indoors(f.position)), Is.True);
