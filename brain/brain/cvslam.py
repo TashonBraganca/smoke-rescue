@@ -31,6 +31,7 @@ from brain.io import read_camera
 
 KEY_TRANS_M, KEY_ROT_DEG = 0.25, 12.0
 LOOP_RADIUS_M, LOOP_MIN_GAP, LOOP_MIN_INLIERS = 3.0, 25, 40
+LOOP_MIN_PATH_M = 1.0   # travel between the two keyframes; nearby views fix no drift and invite rotation/translation mix-ups
 
 
 def _assoc(robot_dir: Path) -> list[tuple[float, Path, Path]]:
@@ -48,11 +49,12 @@ def _angle_deg(T: np.ndarray) -> float:
 
 
 class Keyframe:
-    __slots__ = ("idx", "frame", "pose", "kps", "desc", "pts3d")
+    __slots__ = ("idx", "frame", "pose", "kps", "desc", "pts3d", "path_m")
 
     def __init__(self, idx, frame, pose):
         self.idx, self.frame, self.pose = idx, frame, pose
         self.kps = self.desc = self.pts3d = None
+        self.path_m = 0.0
 
 
 def run(robot_dir: Path, out_dir: Path, mode: str = "RGB_DEPTH", loops: bool = True, max_frames: int | None = None,
@@ -106,6 +108,7 @@ def run(robot_dir: Path, out_dir: Path, mode: str = "RGB_DEPTH", loops: bool = T
     keyframes.append(kf)
     rel.append((0, np.eye(4)))
     prev_f, pose = f, np.eye(4)
+    travelled = 0.0
     for i in range(1, len(rows)):
         gray, depth, f = load(i)
         # Frame-to-frame: small baselines converge; frame-to-keyframe under-measured motion by about half.
@@ -117,12 +120,14 @@ def run(robot_dir: Path, out_dir: Path, mode: str = "RGB_DEPTH", loops: bool = T
         else:
             failures += 1
             step = np.eye(4)                     # hold still for one frame rather than guess
+        travelled += float(np.linalg.norm(step[:3, 3]))
         pose = pose @ step
         prev_f = f
         k = len(keyframes) - 1
         T_kf = np.linalg.inv(keyframes[k].pose) @ pose
         if np.linalg.norm(T_kf[:3, 3]) > KEY_TRANS_M or _angle_deg(T_kf) > KEY_ROT_DEG:
             new = Keyframe(i, f, pose.copy())
+            new.path_m = travelled
             features(new, gray, depth)
             odo_edges.append((k, k + 1, T_kf))
             keyframes.append(new)
@@ -145,7 +150,8 @@ def run(robot_dir: Path, out_dir: Path, mode: str = "RGB_DEPTH", loops: bool = T
             "pose_graph": "scipy least_squares (cv2.detail_PoseGraph has no Python methods in 5.0.0.93)" if loop_edges else "none",
             "tracking_s": round(t_track, 1), "ms_per_frame": round(1000 * t_track / max(1, len(rows)), 1),
             "settings": {"key_trans_m": KEY_TRANS_M, "key_rot_deg": KEY_ROT_DEG, "loop_radius_m": LOOP_RADIUS_M,
-                         "loop_min_gap_keyframes": LOOP_MIN_GAP, "loop_min_inliers": LOOP_MIN_INLIERS}}
+                         "loop_min_gap_keyframes": LOOP_MIN_GAP, "loop_min_inliers": LOOP_MIN_INLIERS,
+                         "loop_min_path_m": LOOP_MIN_PATH_M}}
     (out_dir / "cvslam_meta.json").write_text(json.dumps(meta, indent=1))
     return meta
 
@@ -157,7 +163,8 @@ def _close_loops(kfs, loop_edges, matcher, K):
     pos = cur.pose[:3, 3]
     best = None
     for j, old in enumerate(kfs[:-LOOP_MIN_GAP]):
-        if old.desc is None or np.linalg.norm(old.pose[:3, 3] - pos) > LOOP_RADIUS_M:
+        if (old.desc is None or np.linalg.norm(old.pose[:3, 3] - pos) > LOOP_RADIUS_M
+                or cur.path_m - old.path_m < LOOP_MIN_PATH_M):
             continue
         m = matcher.match(old.desc, cur.desc)
         if len(m) < LOOP_MIN_INLIERS:
