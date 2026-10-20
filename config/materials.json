@@ -5,7 +5,8 @@
     "wood_oak_planks": {
       "source": "polyhaven",
       "id": "laminate_floor_02",
-      "tile_m": 2.0
+      "tile_m": 2.0,
+      "smoothness": 0.45
     },
     "stone_tiles_large": {
       "source": "polyhaven",
@@ -15,12 +16,14 @@
     "ceramic_tiles_checker": {
       "source": "ambientcg",
       "id": "Tiles074",
-      "tile_m": 1.2
+      "tile_m": 1.2,
+      "smoothness": 0.55
     },
     "wood_herringbone": {
       "source": "polyhaven",
       "id": "herringbone_parquet",
-      "tile_m": 1.5
+      "tile_m": 1.5,
+      "smoothness": 0.45
     },
     "carpet_beige": {
       "source": "polyhaven",
@@ -31,7 +34,8 @@
     "mosaic_tiles_teal": {
       "source": "ambientcg",
       "id": "Tiles068",
-      "tile_m": 0.6
+      "tile_m": 0.6,
+      "smoothness": 0.5
     },
     "carpet_grey": {
       "source": "ambientcg",
@@ -80,7 +84,8 @@
     "subway_tiles_white_and_paint": {
       "source": "ambientcg",
       "id": "Tiles010",
-      "tile_m": 0.8
+      "tile_m": 0.8,
+      "smoothness": 0.55
     },
     "wainscot_panels_cream": {
       "source": "polyhaven",
@@ -124,7 +129,8 @@
     "ceramic_tiles_large_white": {
       "source": "ambientcg",
       "id": "Tiles107",
-      "tile_m": 1.2
+      "tile_m": 1.2,
+      "smoothness": 0.55
     },
     "paint_white_textured": {
       "source": "ambientcg",
@@ -181,7 +187,8 @@
     "prop_marble_top": {
       "source": "ambientcg",
       "id": "Marble006",
-      "tile_m": 1.5
+      "tile_m": 1.5,
+      "smoothness": 0.55
     },
     "prop_coat_wool": {
       "source": "polyhaven",

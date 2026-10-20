@@ -464,18 +464,6 @@
         "hide_materials": [
           "glass"
         ]
-      },
-      {
-        "polyhaven": "hanging_picture_frame_01",
-        "fit_width": 0.5,
-        "offset": [
-          0.7,
-          1.4,
-          0
-        ],
-        "hide_materials": [
-          "glass"
-        ]
       }
     ],
     "hallway_art_f": [
@@ -494,11 +482,11 @@
     ],
     "hallway_art_g": [
       {
-        "polyhaven": "hanging_picture_frame_01",
-        "fit_width": 0.7,
+        "polyhaven": "vintage_telephone_wall_clock",
+        "fit_width": 0.34,
         "offset": [
           0,
-          1.6,
+          1.25,
           0
         ],
         "hide_materials": [

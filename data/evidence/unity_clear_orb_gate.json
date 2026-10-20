@@ -3,9 +3,9 @@
   "robots": {
     "robot_A": {
       "frames": 1028,
-      "median": 1056.5,
-      "p5": 626.05,
-      "min": 89,
+      "median": 1072.0,
+      "p5": 639.7,
+      "min": 85,
       "low_stretches_s": [
         [
           35.733333,
