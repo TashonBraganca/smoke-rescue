@@ -161,7 +161,10 @@ namespace SmokeRescue.Brain
             }
             if (returning)
             {
-                if (Vector2.Distance(motion.Pose.position, home) <= c.goal_tolerance_m)
+                // The start is usually a doorway, which is narrower than the planning clearance, so the return path ends at
+                // the nearest walkable cell short of it (house reflex check: robot B stopped 0.3 m from its start and replanned
+                // the same 3-point path for 45 s). Within return_arrive_m of the start counts as back.
+                if (Vector2.Distance(motion.Pose.position, home) <= Mathf.Max(c.goal_tolerance_m, c.return_arrive_m))
                 {
                     completed = true; ClearPath();
                     Emit(t, "mission_complete", returnReason + " Returned to the estimated start.", "distance_to_start_m", Vector2.Distance(motion.Pose.position, home));
@@ -298,7 +301,12 @@ namespace SmokeRescue.Brain
                     else
                     {
                         ClearPath(); lastPlan = t; if (double.IsNaN(scanSince))
-                        { scanSince = t; Emit(t, "goal", "No reachable frontier is visible; scan unseen directions before returning."); }
+                        {
+                            scanSince = t; Emit(t, "goal", "No reachable frontier is visible; scan unseen directions before returning.");
+                            // With an agent, the model hears of it during the scan and may order a way on (a door, debris).
+                            Emit(t, "no_frontier", "No reachable unsearched floor in this robot's map; returning after the scan unless ordered on.",
+                                "scan_s", c.no_frontier_scan_s);
+                        }
                         if (t - scanSince >= c.no_frontier_scan_s) BeginReturn(t, "No reachable frontier remains after a full scan.");
                     }
                 }
