@@ -1,0 +1,8 @@
+{
+  "runs": [
+    {
+      "id": "haze_test20",
+      "label": "20-second haze test / local Qwen3"
+    }
+  ]
+}

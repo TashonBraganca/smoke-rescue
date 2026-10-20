@@ -1,0 +1,72 @@
+[
+ {
+  "recording": "unity_haze_auto_test20",
+  "duration_s": 20.0,
+  "survivors_total": 6,
+  "survivors_found": 0,
+  "first_found_s": null,
+  "confirmations": 0,
+  "false_confirmations": 0,
+  "confirmation_details": [],
+  "area_searched_m2": 81.2,
+  "area_searched_by_both_m2": 0.0,
+  "double_coverage_share": 0.0,
+  "heat": {
+   "robot_A": {
+    "max_air_c": 21.6,
+    "s_air_over_60c": 0.0,
+    "max_surface_within_1m_c": 24.5
+   },
+   "robot_B": {
+    "max_air_c": 20.0,
+    "s_air_over_60c": 0.0,
+    "max_surface_within_1m_c": 20.0
+   }
+  },
+  "collision_s": {
+   "robot_A": 10.5,
+   "robot_B": 0.0
+  },
+  "agent": {}
+ },
+ {
+  "recording": "unity_haze_agents_test20",
+  "duration_s": 20.0,
+  "survivors_total": 6,
+  "survivors_found": 0,
+  "first_found_s": null,
+  "confirmations": 0,
+  "false_confirmations": 0,
+  "confirmation_details": [],
+  "area_searched_m2": 92.2,
+  "area_searched_by_both_m2": 0.0,
+  "double_coverage_share": 0.0,
+  "heat": {
+   "robot_A": {
+    "max_air_c": 42.1,
+    "s_air_over_60c": 0.0,
+    "max_surface_within_1m_c": 64.8
+   },
+   "robot_B": {
+    "max_air_c": 20.0,
+    "s_air_over_60c": 0.0,
+    "max_surface_within_1m_c": 20.0
+   }
+  },
+  "collision_s": {
+   "robot_A": 0.0,
+   "robot_B": 0.0
+  },
+  "agent": {
+   "url": "http://localhost:8080",
+   "steps": 5,
+   "orders": 2,
+   "refusals": 0,
+   "errors": 0,
+   "orders_by_type": {
+    "assign_sector": 2,
+    "set_torch": 2
+   }
+  }
+ }
+]

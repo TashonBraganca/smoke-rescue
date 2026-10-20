@@ -3,31 +3,77 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Smoke Rescue</title>
+<meta name="description" content="Smoke Rescue recorded runs, agent decisions, evaluation metrics, and OpenCV 5 image tools.">
+<title>Smoke Rescue | Recorded results</title>
 <link rel="stylesheet" href="style.css">
+<script src="app.js" defer></script>
 </head>
 <body>
-<main>
-  <h1>Smoke Rescue</h1>
-  <p>Autonomous robots search a smoke-filled house. Each robot reasons with an Amazon Bedrock model and calls deterministic OpenCV 5 vision tools. This page talks to the agent service running on AWS Fargate.</p>
-
-  <section>
-    <h2>Agent service</h2>
-    <dl id="health"><dt>Status</dt><dd id="status">checking</dd><dt>Backend</dt><dd id="backend">unknown</dd><dt>Model</dt><dd id="model">unknown</dd></dl>
-  </section>
-
-  <section>
-    <h2>Try a frame</h2>
-    <form id="try">
-      <label>Tool <input id="tool" value="assess_visibility" required pattern="[a-z_]+"></label>
-      <label>Image <input id="file" type="file" accept="image/png,image/jpeg" required></label>
-      <button type="submit">Send</button>
-    </form>
-    <pre id="out" aria-live="polite"></pre>
-  </section>
-
-  <p class="small">Calls go to <code>/api/*</code> on this same address. Request volume is rate limited.</p>
-</main>
-<script src="app.js"></script>
+<a class="skip" href="#main">Skip to results</a>
+<header class="masthead"><a href="#about" class="wordmark">Smoke Rescue</a><span>OpenCV 5 / Recorded results</span><div><span id="health" role="status">API checking</span> <button id="refresh-health" type="button">Check API</button></div></header>
+<nav aria-label="Sections"><a href="#about">System</a><a href="#walkthrough">Walkthrough</a><a href="#trace">Decisions</a><a href="#metrics">Comparison</a><a href="#try-tools">Try OpenCV 5</a></nav>
+<main id="main">
+<section id="about" aria-labelledby="about-title">
+<p class="eyebrow">Two robots. One smoke-filled building.</p>
+<h1 id="about-title">Search through smoke.<br>Inspect every decision.</h1>
+<p class="intro">Smoke Rescue simulates two rescue robots searching a burning building in Unity on a Mac. Each robot uses its own RGB-D, thermal and IMU sensors, a reflex brain, and an LLM agent that calls OpenCV 5 tools before issuing evidence-backed orders. A commander coordinates the search over a lossy radio, while recorded traces and offline evaluation let you inspect what happened.</p>
+<figure class="architecture" tabindex="0" role="group" aria-label="System architecture diagram. Scroll horizontally on small screens.">
+<svg viewBox="0 0 1000 560" role="img" aria-labelledby="arch-title arch-desc">
+<title id="arch-title">Smoke Rescue architecture and AWS deployment design</title>
+<desc id="arch-desc">Unity on the Mac simulates robot A and robot B with RGB-D, thermal and IMU sensors. Each has a reflex brain and an LLM agent using OpenCV 5 tools. The commander coordinates over lossy radio. Recordings feed ORB-SLAM3 on OpenCV 5 and offline evaluation. AWS CloudFront serves S3 results and routes API calls to Fargate ARM64 agents and OpenCV tools. Fargate calls Bedrock. Batch runs SLAM. Budgets and alarms monitor AWS.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z"/></marker></defs>
+<rect class="zone" x="10" y="10" width="590" height="540" rx="8"/><text class="svg-label" x="30" y="42">MAC / UNITY SIMULATION</text>
+<rect x="30" y="64" width="255" height="76"/><text x="45" y="93">Robot A</text><text class="svg-small" x="45" y="119">RGB-D · Thermal · IMU</text>
+<rect x="320" y="64" width="255" height="76"/><text x="335" y="93">Robot B</text><text class="svg-small" x="335" y="119">RGB-D · Thermal · IMU</text>
+<path class="flow" d="M157 140V167M447 140V167"/>
+<rect x="30" y="170" width="255" height="70"/><text x="45" y="198">Reflex brain A</text><text class="svg-small" x="45" y="221">Navigation / safety / map</text>
+<rect x="320" y="170" width="255" height="70"/><text x="335" y="198">Reflex brain B</text><text class="svg-small" x="335" y="221">Navigation / safety / map</text>
+<path class="flow" d="M157 240V267M447 240V267"/>
+<rect class="agent-box" x="30" y="270" width="255" height="70"/><text x="45" y="298">LLM agent A</text><text class="svg-small" x="45" y="321">OpenCV 5 tools → orders</text>
+<rect class="agent-box" x="320" y="270" width="255" height="70"/><text x="335" y="298">LLM agent B</text><text class="svg-small" x="335" y="321">OpenCV 5 tools → orders</text>
+<path class="flow" d="M157 340V370H447V340M302 370V397"/>
+<text class="svg-small" x="203" y="391">Lossy radio / shared context</text>
+<rect x="170" y="400" width="270" height="54"/><text x="190" y="434">Commander / approvals</text>
+<rect x="30" y="478" width="545" height="51"/><text class="svg-small" x="45" y="509">Recordings → ORB-SLAM3 on OpenCV 5 → evaluation</text>
+<rect class="zone" x="620" y="10" width="370" height="540" rx="8"/><text class="svg-label" x="640" y="42">AWS / DEPLOYMENT DESIGN</text>
+<rect x="645" y="64" width="320" height="54"/><text x="665" y="98">CloudFront</text>
+<path class="flow" d="M730 118V157M885 118V237"/><text class="svg-small" x="894" y="188">/api/*</text>
+<rect x="645" y="160" width="185" height="55"/><text class="svg-small" x="660" y="192">S3 / site + runs</text>
+<rect class="agent-box" x="645" y="240" width="320" height="76"/><text x="660" y="270">Fargate ARM64</text><text class="svg-small" x="660" y="295">Agent + OpenCV 5 API</text>
+<path class="flow" d="M805 316V347"/>
+<rect x="645" y="350" width="320" height="50"/><text x="665" y="382">Amazon Bedrock</text>
+<rect x="645" y="420" width="320" height="50"/><text x="665" y="452">AWS Batch / SLAM</text>
+<rect x="645" y="490" width="320" height="39"/><text class="svg-small" x="665" y="515">Budgets + alarms</text>
+<path class="flow remote" d="M575 305H642M575 504H607V445H642"/>
+</svg>
+<figcaption>Recorded simulation, not a live robot feed. The sample uses local Qwen3 through Ollama. AWS deployment is configured in the repository; this diagram does not prove deployment. SLAM and ground-truth scoring run offline.</figcaption>
+</figure>
+</section>
+<section id="walkthrough" aria-labelledby="video-title">
+<div class="section-heading"><div><p class="eyebrow">01 / Recorded evidence</p><h2 id="video-title">Watch the search</h2></div><div class="run-control"><label for="run">Choose a run</label><select id="run" disabled><option>Loading runs</option></select></div></div>
+<p id="run-status" role="status">Loading the run catalog.</p>
+<video id="video" controls playsinline preload="metadata" aria-label="Recorded Smoke Rescue walkthrough" aria-describedby="video-note"></video>
+<p id="video-status" role="status"></p><p id="video-note" class="muted">Walkthroughs show recorded robot views and decisions. Use fullscreen to inspect the camera panels. Simulation timestamps in the trace may differ from video playback time. The trace below provides searchable decision text.</p>
+<p class="downloads"><a id="video-link" hidden>Download video</a><a id="trace-link" hidden>Download trace</a><a id="compare-link" hidden>Download comparison</a></p>
+</section>
+<section id="trace" aria-labelledby="trace-title">
+<p class="eyebrow">02 / Evidence to action</p><h2 id="trace-title">Follow the agent's decisions</h2>
+<p>Each step groups the triggering event, executed tools and resulting orders. A missing verdict means the log did not record one. Model summaries are claims by the model; check the tool errors and evidence IDs.</p>
+<div class="filters"><div><label for="robot">Robot or commander</label><select id="robot"><option value="">All actors</option></select></div><div><label for="tool-filter">Tool</label><select id="tool-filter"><option value="">All tools</option></select></div></div>
+<p id="trace-status" role="status">Choose a run to load decisions.</p><div id="steps"></div><button id="more" type="button" hidden>Show more decisions</button>
+</section>
+<section id="metrics" aria-labelledby="metrics-title">
+<p class="eyebrow">03 / Offline evaluation</p><h2 id="metrics-title">With and without agents</h2>
+<p id="metrics-status" role="status">Choose a run to load metrics.</p><div id="metrics-table" class="table-wrap" role="region" aria-label="Run comparison table" tabindex="0"></div>
+<p class="muted">Values come from brain.compare_runs. Agent counters come from the run summary and can differ from the executed calls in the trace. Search area is a coverage proxy within 2.5 m of the true paths, sampled on a 0.5 m grid. It is not verified visible floor area. A survivor match uses a 1.5 m threshold. Compare duration and scenario before drawing conclusions; a short test does not establish a rescue benefit.</p>
+</section>
+<section id="try-tools" aria-labelledby="tools-title">
+<p class="eyebrow">04 / Live image tools</p><h2 id="tools-title">Try OpenCV 5 yourself</h2>
+<p>Upload an RGB PNG for visibility measurements, or a single-channel 16-bit thermal PNG encoded as kelvin × 10. These image-only endpoints do not run the full depth-based agent tools or issue robot orders.</p>
+<form id="try"><div><label for="tool">OpenCV tool</label><select id="tool"><option value="assess_visibility">assess_visibility / RGB PNG</option><option value="scan_thermal">scan_thermal / 16-bit thermal PNG</option></select></div><div><label for="file">PNG image, up to 10 MiB</label><input id="file" type="file" accept="image/png,.png" required aria-describedby="upload-note"></div><button id="send" type="submit">Analyze image</button></form>
+<p id="upload-note" class="muted">The image is sent to the agent API at this address. A plain Python static server serves the recorded results but has no API. Thermal pixels must encode temperature, not a colourized preview.</p>
+<p id="upload-status" role="status">No image submitted.</p><pre id="out" tabindex="0" aria-label="OpenCV JSON response">The JSON response will appear here.</pre>
+</section>
+</main><footer>Smoke Rescue / Simulation evidence and inspectable agent decisions. <a href="runs/README.txt">Run file format and publishing instructions</a></footer>
 </body>
 </html>
