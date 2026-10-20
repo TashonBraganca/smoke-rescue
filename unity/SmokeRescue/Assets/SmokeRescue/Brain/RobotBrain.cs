@@ -279,7 +279,9 @@ namespace SmokeRescue.Brain
                 if (blocked) Emit(t, nearFire ? "avoid_fire" : "replan", "A mapped obstacle or fire margin blocks the previous path; discard it.");
                 if (goal.HasValue && !blocked)
                 {
-                    SetPath(planner.Plan(motion.Pose.position, goal.Value), true); lastPlan = t;
+                    // Keep what the goal is: an agent go_to refreshed as a frontier sent a claim with radius 0, which the
+                    // partner rejected (slow-fire run, 7 s: the recording stopped on "Invalid peer claim").
+                    SetPath(planner.Plan(motion.Pose.position, goal.Value), frontierGoal); lastPlan = t;
                     Emit(t, "replan", "Periodic refresh through current free space and heat costs.", "path_points", path.Count);
                 }
                 if ((path.Count == 0 || blocked) && AgentGoalActive(t))
@@ -288,7 +290,8 @@ namespace SmokeRescue.Brain
                     var agentPath = planner.Plan(motion.Pose.position, agentGoal.Value); lastPlan = t;
                     if (agentPath.Count > 0)
                     {
-                        SetPath(agentPath); scanSince = double.NaN;
+                        SetPath(agentPath, agentGoalIsFrontier); scanSince = double.NaN;
+                        if (agentGoalIsFrontier) { frontierCentre = agentGoal.Value; frontierRadius = c.peer_claim_radius_m; }
                         Emit(t, "goal", "Agent order: " + agentGoalReason, "x_m", agentGoal.Value.x, "y_m", agentGoal.Value.y, "path_points", path.Count);
                     }
                     else { Emit(t, "replan", "Agent goal has no known free path; back to exploring.", "x_m", agentGoal.Value.x, "y_m", agentGoal.Value.y); agentGoal = null; }

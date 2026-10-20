@@ -61,7 +61,7 @@ namespace SmokeRescue.Brain
             var m = new BrainMessage { Sender = id, BaseSequence = full ? 0 : baseline, GridSize = SharedSize,
                 Origin = grid.Origin, Pose = motion.Pose, Goal = goal,
                 Explored = new byte[bytes], Occupied = new byte[bytes], Survivors = confirmed.ToArray(), Keyframes = KeyframesToSend() };
-            if (frontierGoal && goal.HasValue && !completed && !returning && !retreating && active == null)
+            if (frontierGoal && frontierRadius > 0 && goal.HasValue && !completed && !returning && !retreating && active == null)
                 m.Claim = new BrainClaim { centre = frontierCentre, radiusM = frontierRadius, expiresAt = t + c.peer_claim_s };
             for (int i = 0; i < grid.Count; i++)
             {
@@ -99,7 +99,14 @@ namespace SmokeRescue.Brain
             if (tReceived < lastPeerReceived || (!double.IsNaN(lastStep) && tReceived < lastStep))
                 throw new ArgumentException("Deliver peer packets in receive-time order before Step.");
             // Detach caller-owned buffers. A queued packet must itself remain unchanged until delivered.
-            var bytes = incoming.ToBytes(); var m = BrainMessage.FromBytes(bytes); ValidateMessage(m, tReceived);
+            var bytes = incoming.ToBytes(); var m = BrainMessage.FromBytes(bytes);
+            // A packet that fails validation is dropped and logged; it must never stop this robot.
+            try { ValidateMessage(m, tReceived); }
+            catch (InvalidDataException e)
+            {
+                Emit(tReceived, "peer_message_rejected", $"{m.Sender}: {e.Message}", "sequence", m.Sequence);
+                return;
+            }
             if (!peers.TryGetValue(m.Sender, out var peer))
             { peer = new PeerState { explored = new byte[m.Explored.Length] }; peers.Add(m.Sender, peer); }
             // Observation is monotone. OR also retains prior rooms if a newer delta follows a dropped full snapshot.

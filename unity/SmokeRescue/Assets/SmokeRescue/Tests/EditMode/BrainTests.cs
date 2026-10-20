@@ -729,6 +729,29 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void AnAgentGoToNeverSendsAnEmptyClaimAndABadPacketIsDropped()
+        {
+            // Slow-fire run: an agent go_to was refreshed as a frontier and sent a claim with radius 0; the partner threw
+            // "Invalid peer claim" and the whole recording stopped at 7 s.
+            var a = new RobotBrain(Calibration(), Settings(), "A", 0); Room(a, -4, 4, -4, 4);
+            a.AgentGoTo(new Vector2(0, 3), 0, 30, "closer look");
+            BrainMessage last = null;
+            for (int i = 0; i < 60; i++)
+            {
+                double t = i / 15.0; Motion(a, t); a.OnRgbd(Image(t, true)); a.OnAirTemperature(t, 20); a.Step(t, 1f / 15); a.DrainEvents();
+                var m = a.BuildMessage(t);
+                if (m == null) continue;
+                last = m;
+                Assert.That(m.Claim == null || m.Claim.radiusM > 0, Is.True, $"claim radius at {t:F2} s");
+            }
+            Assert.That(last, Is.Not.Null);
+            var bad = Wire(last); bad.Claim = new BrainClaim { centre = Vector2.zero, radiusM = 0, expiresAt = bad.SentAt + 1 };
+            var b = new RobotBrain(Calibration(), Settings(), "B", 0);
+            Assert.DoesNotThrow(() => b.OnPeerMessage(bad, bad.SentAt + .1));
+            Assert.That(b.DrainEvents().Count(e => e.kind == "peer_message_rejected"), Is.EqualTo(1));
+        }
+
+        [Test]
         public void AReturnEndsWithinHalfAMetreOfADoorwayStart()
         {
             // House reflex check: robot B stopped 0.3 m from its doorway start, where the return path ended, and replanned
