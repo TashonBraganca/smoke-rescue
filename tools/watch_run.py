@@ -176,7 +176,10 @@ def watch(recording, every=120., snap=None, clock=time.monotonic, sleep=time.sle
     now = last_change = clock()
     next_print = now
     while True:
-        if (recording / 'meta.json').exists():
+        # The recorder writes meta.json at every 30 s checkpoint; only complete: true (or an older meta without the
+        # key) means the run has ended.
+        meta_path = recording / 'meta.json'
+        if meta_path.exists() and json.loads(meta_path.read_text() or '{}').get('complete', True):
             for line in watcher.lines():
                 print(line, flush=True)
             print('RUN FINISHED', flush=True)
