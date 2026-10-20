@@ -53,7 +53,10 @@ namespace SmokeRescue.Robots
                     if (obstacles == null) return Refuse("no debris in this scene");
                     var body = obstacles.TryFindMovableAhead(position, heading, ReachAheadM);
                     if (body == null) return Refuse(string.IsNullOrEmpty(obstacles.FailureReason) ? "no movable debris within reach ahead" : obstacles.FailureReason);
-                    var b = body.GetComponent<Collider>().bounds;
+                    var colliders = body.GetComponentsInChildren<Collider>();
+                    if (colliders.Length == 0) return Refuse($"debris {body.Id} has no collider");
+                    var b = colliders[0].bounds;
+                    foreach (var col in colliders) b.Encapsulate(col.bounds);
                     float halfAlong = Mathf.Abs(direction.x) * b.extents.x + Mathf.Abs(direction.y) * b.extents.z;
                     contact = new Vector3(b.center.x, b.center.y, b.center.z) - forward * (halfAlong + 0.03f);
                     TargetId = body.Id; pushed = body.transform;

@@ -32,6 +32,19 @@ namespace SmokeRescue.Editor
         [MenuItem("Tools/Smoke Rescue/Record/Haze autonomous full run")]
         public static void HazeAutoFull() => Run("scenario_haze_2agents.json", "unity_haze_auto_v1");
 
+        // Same runs with the LLM agent layer on (brain/brain/agent/server.py must be serving on port 8080).
+        [MenuItem("Tools/Smoke Rescue/Record/Haze agents 20 s test")]
+        public static void HazeAgentsTest() => WithAgents(() => Run("scenario_haze_2agents.json", "unity_haze_agents_test20", 20f));
+
+        [MenuItem("Tools/Smoke Rescue/Record/Haze agents full run")]
+        public static void HazeAgentsFull() => WithAgents(() => Run("scenario_haze_2agents.json", "unity_haze_agents_v1"));
+
+        static void WithAgents(System.Action run)
+        {
+            RecordingSession.AgentUrl = System.Environment.GetEnvironmentVariable("SMOKE_AGENT_URL") ?? "http://localhost:8080";
+            try { run(); } finally { RecordingSession.AgentUrl = null; }
+        }
+
         static void Run(string scenario, string runId, float maxSeconds = float.PositiveInfinity, bool noise = true)
         {
             SmokeRescue.Robots.Robot.BodyPrefab = UseQuadruped ? FurnitureBuilder.RobotBodyPrefab() : null;

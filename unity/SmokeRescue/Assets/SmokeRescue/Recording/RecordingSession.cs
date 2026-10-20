@@ -26,7 +26,7 @@ namespace SmokeRescue.Recording
     /// wall-clock speed: two runs with the same seed write identical text files.
     /// Output layout: docs/INTERFACES.md section 3. The house-frame conversion happens here, once.
     /// </summary>
-    public static class RecordingSession
+    public static partial class RecordingSession
     {
         public const int ClockHz = 600;
 
@@ -38,7 +38,7 @@ namespace SmokeRescue.Recording
             public int radioLines, truthPoints;
         }
 
-        class RobotRig
+        partial class RobotRig
         {
             public Robot robot;
             public RgbdCamera rgbd;
@@ -143,6 +143,7 @@ namespace SmokeRescue.Recording
             var brainRadio = new StringBuilder("# brain state radio, one line per broadcast and receiver with a message to carry\n" +
                                                "# t_send from to sequence bytes full status t_deliver\n");
             var pending = new Queue<Task>();
+            var world = AgentSetup(plan, scenario, rigs);
             int camEvery = Mathf.RoundToInt(ClockHz / sensorCfg.camera.rate_hz);
             int radioEvery = Mathf.RoundToInt(ClockHz * scenario.radio.broadcast_period_s);
             int brainEvery = Mathf.RoundToInt(ClockHz / 60f), stateEvery = Mathf.RoundToInt(ClockHz / 2f);
@@ -159,6 +160,7 @@ namespace SmokeRescue.Recording
                 if (t > duration + 1e-9) break;
                 if (k > 0)
                     foreach (var rig in rigs) rig.robot.Step(dt);
+                if (k > 0) AgentWorldStep(world, rigs, dt);
                 bool allDone = rigs.All(r => r.robot.Driver.Finished);
                 if (allDone && double.IsNaN(finishedAt)) finishedAt = t;
                 if (allDone && t - finishedAt >= 1.0) break;   // one second of standing still at the end
@@ -202,14 +204,19 @@ namespace SmokeRescue.Recording
                     foreach (var rig in rigs)
                     {
                         if (rig.brain == null) continue;
+                        if (rig.actions != null && rig.actions.IsRunning) continue;   // the arm is working; legs hold
                         rig.command = rig.brain.Step(t, brainEvery / (float)ClockHz);
                         foreach (var e in rig.brain.DrainEvents())
                         {
                             rig.decisions.Append(JsonConvert.SerializeObject(e)).Append('\n');
                             if (e.kind == "mission_complete") rig.missionDone = true;
+                            NoteAgentTrigger(rig, e);
                         }
                         if (k % stateEvery == 0) rig.brainState.Append(BrainStateLine(t, rig.brain.Snapshot())).Append('\n');
                     }
+
+                if (k % brainEvery == 0 && AgentUrl != null) AgentDecisions(world, rigs, t, pending, sensorCfg, scenario, root);
+                if (k % radioEvery == 0) AgentRadio(world, rigs, radio, t);
 
                 if (k % radioEvery == 0)
                     foreach (var from in rigs)
@@ -255,6 +262,7 @@ namespace SmokeRescue.Recording
                     {
                         var th = rig.thermal.CaptureSync(t);
                         rig.brain?.OnThermal(th);
+                        rig.thermalTimes.Add(t);
                         string thRel = $"thermal/{stamp}.png", thPath = Path.Combine(rig.dir, thRel);
                         rig.thermalTxt.Append(stamp).Append(' ').Append(thRel).Append('\n');
                         pending.Enqueue(SensorPng.EncodeDepthAsync(th.DeciKelvin, th.Width, th.Height).ContinueWith(x => File.WriteAllBytes(thPath, x.Result)));
@@ -292,6 +300,7 @@ namespace SmokeRescue.Recording
             }
             string radioText = radioLog.ToString();
             File.WriteAllText(Path.Combine(root, "radio.txt"), radioText);
+            WriteAgentLogs(world, rigs, root);
             if (rigs.Count(r => r.brain != null) > 1) File.WriteAllText(Path.Combine(root, "brain_radio.txt"), brainRadio.ToString());
             result.radioLines = radioText.Split('\n').Count(l => l.Length > 0 && l[0] != '#');
 

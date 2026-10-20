@@ -92,7 +92,14 @@ namespace SmokeRescue.Editor
             var cfg = JObject.Parse(File.ReadAllText(Path.Combine(FloorPlan.ConfigDir, "props.json")));
             int props = LayerMask.NameToLayer(HouseBuilder.PropsLayer);
             var missing = new List<string>();
-            foreach (var lm in scenario.obstacles) PlaceLandmark(root.transform, lm, cfg, props, missing);
+            var physics = ObstacleRuntime.LoadDefinitions();
+            for (int k = 0; k < scenario.obstacles.Count; k++)
+            {
+                var lm = scenario.obstacles[k];
+                var go = PlaceLandmark(root.transform, lm, cfg, props, missing);
+                // Runtime identity so agents' arms can push light debris (mass and movable flag from props.json).
+                if (go != null && physics?[lm.kind] != null) go.AddComponent<ObstacleBody>().Initialize($"{lm.room}_{lm.kind}_{k}", lm.kind, physics);
+            }
             Physics.SyncTransforms();
             if (missing.Count > 0) Debug.LogWarning($"[SmokeRescue] obstacle parts missing:\n{string.Join("\n", missing)}");
             return scenario.obstacles.Count;

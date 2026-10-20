@@ -230,6 +230,8 @@ namespace SmokeRescue.Brain
                 if (active != null) return FollowOrHold(t, dt);
             }
             if (goal.HasValue && Vector2.Distance(goal.Value, motion.Pose.position) <= c.goal_tolerance_m) ClearPath();
+            if (agentGoal.HasValue && Vector2.Distance(agentGoal.Value, motion.Pose.position) <= c.goal_tolerance_m)
+            { Emit(t, "goal", "Reached the agent's goal.", "x_m", agentGoal.Value.x, "y_m", agentGoal.Value.y); agentGoal = null; }
             if (NeedPlan(t))
             {
                 bool blocked = path.Count > 0 && !planner.PathSafe(path, cursor);
@@ -239,9 +241,24 @@ namespace SmokeRescue.Brain
                     SetPath(planner.Plan(motion.Pose.position, goal.Value), true); lastPlan = t;
                     Emit(t, "replan", "Periodic refresh through current free space and heat costs.", "path_points", path.Count);
                 }
+                if ((path.Count == 0 || blocked) && AgentGoalActive(t))
+                {
+                    // An agent order outranks frontier choice until it is reached, expires or proves unreachable.
+                    var agentPath = planner.Plan(motion.Pose.position, agentGoal.Value); lastPlan = t;
+                    if (agentPath.Count > 0)
+                    {
+                        SetPath(agentPath); scanSince = double.NaN;
+                        Emit(t, "goal", "Agent order: " + agentGoalReason, "x_m", agentGoal.Value.x, "y_m", agentGoal.Value.y, "path_points", path.Count);
+                    }
+                    else { Emit(t, "replan", "Agent goal has no known free path; back to exploring.", "x_m", agentGoal.Value.x, "y_m", agentGoal.Value.y); agentGoal = null; }
+                }
                 if (path.Count == 0 || blocked)
                 {
-                    var frontier = planner.Frontier(motion.Pose.position, p => ClaimBlocks(p, t) || GoalBlacklisted(p, t) || !InSearchArea(p)); lastPlan = t;
+                    System.Func<Vector2, bool> excluded = p => ClaimBlocks(p, t) || GoalBlacklisted(p, t) || !InSearchArea(p);
+                    // The commander's sector first; anywhere in the building once the sector has no reachable frontier.
+                    var frontier = sector.HasValue ? planner.Frontier(motion.Pose.position, p => excluded(p) || !sector.Value.Contains(p)) : null;
+                    if (frontier == null) frontier = planner.Frontier(motion.Pose.position, excluded);
+                    lastPlan = t;
                     if (frontier != null)
                     {
                         SetPath(frontier.path, true); frontierCentre = frontier.claimCentre; frontierRadius = frontier.claimRadius;
