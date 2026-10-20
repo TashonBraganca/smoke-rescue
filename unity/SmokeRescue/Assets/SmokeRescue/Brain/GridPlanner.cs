@@ -31,6 +31,10 @@ namespace SmokeRescue.Brain
             if (grid.Walkable(start)) return true;
             var parent = new Dictionary<int, int> { [start] = -1 }; var queue = new Queue<int>(); queue.Enqueue(start);
             int reach = Mathf.CeilToInt(c.lead_max_m / grid.CellM), sx = start % grid.Size, sy = start / grid.Size;
+            // Out of a fire margin the walk is as long as the margin is deep (agent run 9: 1.4 m and more), and every
+            // step already moves away from the fire, so the lead_max_m box does not apply.
+            bool hot = grid.FireDistance(start) <= c.fire_clearance_m;
+            if (hot) reach = grid.Size;
             while (queue.Count > 0)
             {
                 int cell = queue.Dequeue(), x = cell % grid.Size, y = cell / grid.Size;
@@ -44,12 +48,20 @@ namespace SmokeRescue.Brain
                     int nx = x + (k == 0 ? 1 : k == 1 ? -1 : 0), ny = y + (k == 2 ? 1 : k == 3 ? -1 : 0);
                     if (!grid.Inside(nx, ny) || Math.Abs(nx - sx) > reach || Math.Abs(ny - sy) > reach) continue;
                     int n = ny * grid.Size + nx;
-                    if (parent.ContainsKey(n) || !grid.Passable(n)) continue;
+                    // Inside a fire margin, any free step that does not move closer to the fire is allowed: a robot must
+                    // always be able to leave a hot spot, whoever marked it.
+                    bool escaping = hot && grid.FireDistance(n) >= grid.FireDistance(cell) - 1e-4f &&
+                                    grid.Occupancy(n) == 1 && grid.ObstacleDistance(n) > c.robot_radius_m * .8f;
+                    if (parent.ContainsKey(n) || !(grid.Passable(n) || escaping)) continue;
                     parent[n] = cell; queue.Enqueue(n);
                 }
             }
             return false;
         }
+        /// <summary>A step on the way out of a tight or hot spot: passable, or free with room for the body and no closer
+        /// to fire than the step before (leaving a fire margin).</summary>
+        bool LeadStep(int cell, int previous) => grid.Passable(cell) ||
+            (grid.Occupancy(cell) == 1 && grid.ObstacleDistance(cell) > c.robot_radius_m * .8f && grid.FireDistance(cell) >= grid.FireDistance(previous) - 1e-4f);
         List<Vector2> Join(List<int> lead, List<Vector2> path)
         {
             if (lead.Count == 0 || path.Count == 0) return path;
@@ -171,7 +183,7 @@ namespace SmokeRescue.Brain
                 // A path may begin with a lead out of a tight spot (passable cells), then must stay walkable.
                 int cell = grid.Cell(path[i]);
                 if (grid.Walkable(cell)) leading = false;
-                else if (!leading || !grid.Passable(cell)) return false;
+                else if (!leading || !LeadStep(cell, i > from ? grid.Cell(path[i - 1]) : cell)) return false;
                 if (i > from)
                 {
                     int previous = grid.Cell(path[i - 1]);
@@ -185,13 +197,14 @@ namespace SmokeRescue.Brain
         internal bool SegmentSafe(Vector2 a, Vector2 b)
         {
             grid.PrepareNavigation(); int steps = Math.Max(1, Mathf.CeilToInt(Vector2.Distance(a, b) / (grid.CellM * .25f)));
-            bool leading = true;
+            bool leading = true; int previous = grid.Cell(a);
             for (int i = 0; i <= steps; i++)
             {
                 // Same rule as PathSafe: leaving a tight spot is allowed through passable cells, entering one is not.
                 int cell = grid.Cell(Vector2.Lerp(a, b, i / (float)steps));
                 if (grid.Walkable(cell)) leading = false;
-                else if (!leading || !grid.Passable(cell)) return false;
+                else if (!leading || !LeadStep(cell, previous)) return false;
+                previous = cell;
             }
             return true;
         }

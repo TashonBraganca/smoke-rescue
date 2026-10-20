@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 PACKAGE_ROOT = Path(__file__).parents[1] / "brain"
-EXCLUDED_ROBOT_FILES = {"evaluator.py", "viewer.py", "pipeline.py", "slam_compare.py", "compare_runs.py", "nav_eval.py", "warm_eval.py"}  # evaluators score against ground truth
+EXCLUDED_ROBOT_FILES = {"evaluator.py", "viewer.py", "pipeline.py", "slam_compare.py", "compare_runs.py", "nav_eval.py", "warm_eval.py", "rgb_people_eval.py"}  # evaluators score against ground truth
 
 
 def scan_strict_source(source: str, filename: str = "<source>") -> list[str]:

@@ -79,7 +79,17 @@ namespace SmokeRescue.Brain
         /// fire margin and heat cost keep paths away; the heat decays like observed heat.</summary>
         public void AgentAvoidArea(Vector2 centre, float radiusM, double t, double seconds, string evidence)
         {
-            radiusM = Mathf.Clamp(radiusM, 0.3f, 4f);
+            // A keep-out area must never contain the robot itself: it was written as fire, so every plan started inside
+            // fire and the robot froze (agent run 9, robot B, 1.24 m inside a 2 m circle). Shrink it to leave the robot
+            // outside with its fire clearance, or refuse it.
+            float room = Vector2.Distance(centre, motion.Pose.position) - c.fire_clearance_m - c.robot_radius_m;
+            if (room < 0.3f)
+            {
+                Emit(t, "agent_order", "avoid_area refused: the robot is inside or at the edge of it; it backs off on heat by itself.",
+                    "x_m", centre.x, "y_m", centre.y, "radius_m", radiusM);
+                return;
+            }
+            radiusM = Mathf.Clamp(Mathf.Min(radiusM, room), 0.3f, 4f);
             float temperature = c.fire_c + c.heat_decay_c_per_s * (float)Math.Max(1.0, seconds) + 50f;
             int cells = 0;
             for (float dx = -radiusM; dx <= radiusM; dx += grid.CellM)
