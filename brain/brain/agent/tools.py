@@ -91,6 +91,7 @@ class ToolRegistry:
         self.orders: list[dict] = []
         self.refusals: list[dict] = []
         self.finished: str | None = None
+        self._cache: dict = {}
 
     # ----- geometry --------------------------------------------------------------------------------------------
     def world(self, bearing_deg: float, range_m: float) -> tuple[float, float]:
@@ -108,7 +109,11 @@ class ToolRegistry:
             fn = getattr(self, f"_p_{name}", None)
             if fn is None:
                 return {"error": f"unknown tool {name!r}"}
+            key = (name, tuple(sorted((args or {}).items())))
+            if key in self._cache:                   # same frame, same answer: say so instead of recomputing
+                return {**self._cache[key], "note": "already run in this step; use this result"}
             result = fn(**(args or {}))
+            self._cache[key] = result
             if isinstance(result, dict) and result.get("id"):
                 self.evidence[result["id"]] = result
             return result
@@ -196,5 +201,7 @@ class ToolRegistry:
         order = {"type": name, **args, "t": self.ctx.t, "robot": self.ctx.robot}
         if "evidence_id" in args:
             order["evidence_tool"] = self.evidence[args["evidence_id"]]["tool"]
+            if name == "request_human_approval":
+                order["evidence"] = {k: v for k, v in self.evidence[args["evidence_id"]].items() if k not in ("intrinsics", "rgb_to_thermal")}
         self.orders.append(order)
         return {"ok": True, "queued": name}

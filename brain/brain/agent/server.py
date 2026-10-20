@@ -54,13 +54,13 @@ def health():
 async def robot_step(robot: str, request: Request):
     req = await request.json()
     req["robot"] = robot
-    return RobotAgent(backend(), TRACE).step(req)
+    return RobotAgent(backend(), Path(req.get("trace_path") or TRACE)).step(req)
 
 
 @app.post("/commander/step")
 async def commander_step(request: Request):
     req = await request.json()
-    return Commander(backend(), TRACE, AREA).step(req)
+    return Commander(backend(), Path(req.get("trace_path") or TRACE), AREA).step(req)
 
 
 @app.post("/approval")

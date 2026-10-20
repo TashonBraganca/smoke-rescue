@@ -4,6 +4,8 @@
   "seed": 7,
   "duration_s": 300,
   "search_area": [0, 0, 40, 28],
+  "door_states": {"d_apt_bed2_hall": "closed", "d_office_store_corridor": "closed", "d_workshop_tools_corridor": "half"},
+  "door_states_reason": "Closed and half-open interior doors on rooms off the long corridors, so robots must open them with the arm or search elsewhere; every entrance stays open.",
   "sim_rate_hz": 15,
   "yaw_convention": "degrees about Unity +y. 0 faces +z (north), 90 faces +x (east).",
   "smoke": {

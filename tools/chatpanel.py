@@ -36,6 +36,14 @@ DECISION_TEXT = {
     "peer_message_received": None,       # shown as radio traffic instead
     "collision_risk": lambda e: f"Obstacle close: {e.get('reason', '')}",
     "mission_complete": lambda e: "Mission complete, heading out",
+    "agent_decision": lambda e: f"Decided: {e.get('reason', '')}",
+    "agent_order": lambda e: f"Agent: {e.get('reason', '')}",
+    "candidate_rejected": lambda e: "OpenCV check: that warm shape is NOT a person, ignoring it",
+    "sector_assigned": lambda e: f"Commander gave me a sector: {e.get('reason', '')}",
+    "team_message_sent": lambda e: f"-> team: {e.get('reason', '')}",
+    "team_message_received": lambda e: f"<- {e.get('reason', '')}",
+    "approval": lambda e: f"Human approval: {e.get('reason', '')}",
+    "stuck": lambda e: "Stuck: legs not moving, backing off and replanning",
 }
 
 

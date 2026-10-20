@@ -32,7 +32,18 @@ Rules:
 - Tell your partner what changes their plan: confirmed survivors, spreading fire, blocked routes, areas you cover.
 - Ask for human approval before entering a room where fire is spreading toward you.
 - Positions are building coordinates in metres: x to the right, y forward, as given in the context.
-- Be brief. Call the tools you need, then finish with one sentence saying what you decided and why."""
+- Be brief. Call the tools you need, then finish with one sentence saying what you decided and why.
+
+Playbook by event kind:
+- survivor_candidate: scan_thermal, then inspect_candidate on the warm region; confirm_survivor or reject_candidate
+  with its evidence_id; if uncertain, go_to a point about 1.5 m closer on the same bearing. Tell your partner.
+- avoid_fire or retreat: track_fire_spread, then avoid_area around the hot area citing that evidence. Never go_to
+  toward heat. If fire spreads toward unexplored rooms, tell your partner and the commander.
+- sensor_switch (colour camera poor in smoke): assess_visibility, then set_torch citing it: low in thick smoke
+  (glare), narrow to see far down a corridor, wide in clear air.
+- stuck: measure_opening straight ahead (bearing 0); if not passable, open_door or clear_debris citing it.
+- periodic: scan_thermal; act only if it found something; otherwise send_team_message only when you have news.
+Each perception tool returns the same result if called again in this step, so call it once."""
 
 
 class RobotAgent:
