@@ -209,6 +209,10 @@ def map_accuracy(grid: np.ndarray, points: np.ndarray, floorplan: dict, origin=O
     return report, truth
 
 
+STALL_REASONS = ('sweep_started', 'survivor_view_ready', 'survivor_confirmed')
+STALL_EXPLAINED_MAX_S = 20.
+
+
 def detect_stalls(states: list[dict], truth_t: np.ndarray, truth_pose: np.ndarray, events: list[dict]) -> list[dict]:
     """Merge overlapping ten-second windows whose true path stays within 15 cm.
 
@@ -235,9 +239,14 @@ def detect_stalls(states: list[dict], truth_t: np.ndarray, truth_pose: np.ndarra
     result = []
     for start, end in intervals:
         i = int(np.searchsorted(times, start))
+        kinds = Counter(e['kind'] for e in events if start <= e['t'] <= end)
+        # Standing still on purpose: a look-around sweep or a survivor view. Only a short stall can be explained this
+        # way; one that outlasts the deliberate action by more than the 10 s window still counts.
+        deliberate = sorted(k for k in STALL_REASONS if kinds.get(k))
+        explained = bool(deliberate) and end - start <= STALL_EXPLAINED_MAX_S
         result.append(dict(start_t=start, end_t=end, duration_s=end - start,
                            true_xy=true[i, :2].tolist(), brain_xy=brain[i, :2].tolist(),
-                           events=dict(Counter(e['kind'] for e in events if start <= e['t'] <= end))))
+                           events=dict(kinds), explained=explained, reason=deliberate if explained else None))
     return result
 
 
@@ -478,7 +487,7 @@ def print_table(reports: dict) -> None:
         print(f"{robot:<12} {'/'.join(number(p[k]) for k in ['median', 'p95', 'max', 'final']):<29} "
               f"{number(y['median'])}/{number(y['max'])}   "
               f"{number(lidar.get('true_pose', {}).get('median_m'))}/{number(lidar.get('brain_pose', {}).get('median_m'))}   "
-              f"{number(r['map'].get('precision'))}/{number(r['map'].get('recall'))}   {len(r['stalls'])}   {number(r['collision_seconds'])}")
+              f"{number(r['map'].get('precision'))}/{number(r['map'].get('recall'))}   {len(r['stalls'])} ({sum(not s['explained'] for s in r['stalls'])} unexplained)   {number(r['collision_seconds'])}")
         link = r['frame_link']
         print(f"{robot} frame_link: not linked" if link['t'] is None else
               f"{robot} frame_link: linked at {link['t']:.2f}s from {link['sender']} {link['reported_transform']}; error {number(link['position_error_m'])} m / {number(link['yaw_error_deg'])} deg")
