@@ -102,19 +102,26 @@ namespace SmokeRescue.Sensors
             var request = AsyncGPUReadback.Request(tempTarget, 0);
             request.WaitForCompletion();
             if (request.hasError) throw new InvalidOperationException("Thermal GPU readback failed.");
-            var raw = request.GetData<float>();
+            var raw = request.GetData<float>().ToArray();   // a managed copy: the rows below are read from worker threads
             int w = Config.width, h = Config.height;
             var dk = new ushort[w * h];
-            for (int y = 0; y < h; y++)
-            for (int x = 0; x < w; x++)
+            // Rows in parallel, each with a stream seeded from this camera's stream and the row (as RgbdNoise), so a frame
+            // repeats for the same seed (perf.txt: about 5 of 68 wall s per 10 sim s serial).
+            ulong frameSeed = ((ulong)(uint)rng.Next() << 32) | (uint)rng.Next();
+            float netd = Config.netd_k, top = Config.range_max_c; bool noisy = NoiseEnabled;
+            System.Threading.Tasks.Parallel.For(0, h, y =>
             {
-                float c = raw[(h - 1 - y) * w + x];
-                if (float.IsNaN(c)) c = 10f;
-                c = Mathf.Min(c, Config.range_max_c);    // the sensor saturates at the top of its range
-                if (NoiseEnabled) c += (float)(Gauss(rng) * Config.netd_k) + fixedPattern[y * w + x];
-                float k10 = Mathf.Clamp((c + 273.15f) * 10f, 0f, 65535f);
-                dk[y * w + x] = (ushort)Mathf.RoundToInt(k10);
-            }
+                var row = new PixelRandom(frameSeed ^ ((ulong)(y + 1) * 0x9E3779B97F4A7C15UL));
+                for (int x = 0; x < w; x++)
+                {
+                    float c = raw[(h - 1 - y) * w + x];
+                    if (float.IsNaN(c)) c = 10f;
+                    c = Mathf.Min(c, top);    // the sensor saturates at the top of its range
+                    if (noisy) c += row.Gaussian() * netd + fixedPattern[y * w + x];
+                    float k10 = Mathf.Clamp((c + 273.15f) * 10f, 0f, 65535f);
+                    dk[y * w + x] = (ushort)Mathf.RoundToInt(k10);
+                }
+            });
             return new ThermalFrame(simTimestamp, w, h, dk);
         }
 

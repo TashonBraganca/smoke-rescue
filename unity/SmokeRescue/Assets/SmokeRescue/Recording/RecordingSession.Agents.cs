@@ -38,7 +38,7 @@ namespace SmokeRescue.Recording
         static readonly HashSet<string> AgentTriggers = new HashSet<string>
             { "survivor_candidate", "survivor_view_ready", "sensor_switch", "avoid_fire", "retreat", "stuck",
               // The model chooses where to search next: ask it whenever an area is done or a route has failed.
-              "area_searched", "no_progress", "goal_blacklisted", "collision_hold" };
+              "area_searched", "no_progress", "goal_blacklisted", "collision_hold", "no_frontier" };
         const double AgentPeriodS = 20, AgentMinGapS = 4, CommanderPeriodS = 30, OrderHoldS = 15, ExploreHoldS = 60;
         const int FrontierOptions = 6;
 
@@ -71,6 +71,9 @@ namespace SmokeRescue.Recording
             public Vector3 post;
             public double lastCommander = double.NegativeInfinity;
             public readonly List<JObject> postInbox = new List<JObject>();
+            /// <summary>Recorder-side audit of the command post's radio: each link check with a text waiting, and each text
+            /// heard. Written beside agent_trace.jsonl; no robot reads it.</summary>
+            public readonly StringBuilder postLog = new StringBuilder();
             public readonly List<(string to, JObject order)> postOutbox = new List<(string, JObject)>();
             public int steps, orders, refusals, errors;
         }
@@ -242,10 +245,16 @@ namespace SmokeRescue.Recording
                         to.inbox.Add(copy); to.brain.Log(t, "team_message_received", $"{copy["from"]}: {copy["text"]}");
                     }
                 }
-                if (radio.Evaluate(from.robot.transform.position, w.post).delivered)
+                var toPost = radio.Evaluate(from.robot.transform.position, w.post);
+                if (from.outbox.Any(m => !m.heardBy.Contains(CommandPostId)))
+                    w.postLog.Append(new JObject { ["t"] = Math.Round(t, 3), ["from"] = from.robot.RobotId, ["kind"] = "link",
+                        ["distance_m"] = Math.Round(toPost.distance, 2), ["walls"] = toPost.walls, ["reason"] = toPost.reason }.ToString(Formatting.None)).Append('\n');
+                if (toPost.delivered)
                     foreach (var m in from.outbox)
                     {
                         if (!m.heardBy.Add(CommandPostId)) continue;
+                        w.postLog.Append(new JObject { ["t"] = Math.Round(t, 3), ["from"] = from.robot.RobotId, ["kind"] = "heard",
+                            ["text"] = m.message.Value<string>("text") }.ToString(Formatting.None)).Append('\n');
                         // The commander has no map: robot positions (each in its own frame) would mean nothing to it.
                         var copy = (JObject)m.message.DeepClone(); copy.Remove("x"); copy.Remove("y"); w.postInbox.Add(copy);
                     }
@@ -349,6 +358,7 @@ namespace SmokeRescue.Recording
         {
             foreach (var rig in rigs.Where(r => r.agentLog.Length > 0))
                 File.WriteAllText(Path.Combine(rig.dir, "agent_steps.jsonl"), rig.agentLog.ToString());
+            if (w.postLog.Length > 0) File.WriteAllText(Path.Combine(root, "command_post.jsonl"), w.postLog.ToString());
             if (AgentUrl != null)
                 File.WriteAllText(Path.Combine(root, "agent_summary.json"), JsonConvert.SerializeObject(new
                     { url = AgentUrl, w.steps, w.orders, w.refusals, w.errors }, Formatting.Indented));

@@ -684,6 +684,38 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void AReturnEndsWithinHalfAMetreOfADoorwayStart()
+        {
+            // House reflex check: robot B stopped 0.3 m from its doorway start, where the return path ended, and replanned
+            // the same path for 45 s. Standing 0.3 m from the start must complete the mission; control: 0.18 m does not.
+            int Completions(float arrive)
+            {
+                var c = Settings(); c.mission_time_limit_s = 1.2f; c.return_arrive_m = arrive; var b = new RobotBrain(Calibration(), c, "A", 0);
+                int done = 0;
+                for (int i = 0; i < 60; i++)
+                {
+                    double t = i / 15.0; Motion(b, t, t < 1 ? .3f : 0); b.OnRgbd(Image(t, true)); b.OnAirTemperature(t, 20);
+                    b.Step(t, 1f / 15); done += b.DrainEvents().Count(e => e.kind == "mission_complete");
+                }
+                Assert.That(Vector2.Distance(b.Snapshot().pose.position, Vector2.zero), Is.InRange(.25f, .35f), "the robot stands 0.3 m from its start");
+                return done;
+            }
+            Assert.That(Completions(.5f), Is.EqualTo(1));
+            Assert.That(Completions(0f), Is.Zero, "control: the 0.18 m waypoint tolerance alone never completes");
+        }
+
+        [Test]
+        public void NoReachableFrontierIsReportedOncePerScanSoAnAgentCanAct()
+        {
+            var c = Settings(); c.search_requires_ceiling = true;
+            var b = new RobotBrain(Calibration(), c, "A", 0); var all = new List<BrainEvent>();
+            for (int i = 0; i < 30; i++) { double t = i / 15.0; Motion(b, t); b.OnRgbd(Image(t, true)); b.OnAirTemperature(t, 20); b.Step(t, 1f / 15); all.AddRange(b.DrainEvents()); }
+            Assert.That(all.Count(e => e.kind == "no_frontier"), Is.EqualTo(1), "open floor with no walls or ceiling: nothing known to be indoors to search; events: " +
+                string.Join(",", all.Select(e => e.kind).Distinct()));
+            Assert.That(all.Count(e => e.kind == "goal" && e.reason.StartsWith("No reachable frontier is visible")), Is.EqualTo(1), "one scan");
+        }
+
+        [Test]
         public void TimeLimitReturnsAndEmitsMissionCompleteOnlyOnce()
         {
             var c = Settings(); c.mission_time_limit_s = .1f; var b = new RobotBrain(Calibration(), c, "A", 0);

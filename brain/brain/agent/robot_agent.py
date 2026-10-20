@@ -67,6 +67,10 @@ Playbook by event kind:
   After changing the torch, call assess_visibility again; if the colour image is now usable, scan_thermal to look
   for people with both sensors.
 - stuck: measure_opening straight ahead (bearing 0); if not passable, open_door or clear_debris citing it.
+- no_frontier (your map has no reachable unsearched floor; the robot returns after a short scan unless you act):
+  read the LiDAR summary and your camera. If a closed door or light debris blocks the way on, measure_opening
+  toward it and open_door or clear_debris citing that. If fire blocks it, tell your partner and the commander and
+  let the robot return. Never invent a target.
 - Every step: if the context says the torch is off or the event is periodic, call assess_visibility first; if the
   colour image is not usable and the torch is off, set_torch wide citing it.
 - periodic (radio check-in): scan_thermal, act on what it finds, then send_team_message with one line for your

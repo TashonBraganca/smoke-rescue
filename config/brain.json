@@ -151,6 +151,8 @@
   "lookahead_m_reason": "Follow the local path without cutting doorway corners.",
   "goal_tolerance_m": 0.18,
   "goal_tolerance_m_reason": "Allow grid quantization when reaching a waypoint.",
+  "return_arrive_m": 0.5,
+  "return_arrive_m_reason": "A returning robot is back once within this distance of its start. The start is usually an entry doorway, narrower than the planning clearance, so the return path ends up to about half a metre short of it.",
   "open_speed_mps": 0.6,
   "open_speed_mps_reason": "Use the requested exploration speed in open space.",
   "near_speed_mps": 0.3,
