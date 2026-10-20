@@ -136,3 +136,17 @@ def test_no_exploring_during_a_heat_event(tmp_path, monkeypatch):
     req = request(tmp_path) | {"event": {"kind": "retreat"}, "frontiers": [{"id": 0, "x": 7.5, "y": 3.2}]}
     out = RobotAgent(Scripted([[ToolCall("explore_frontier", {"frontier_id": 0, "reason": "go"})]]), tmp_path / "t.jsonl").step(req)
     assert out["orders"] == [] and out["refusals"][0]["tool"] == "explore_frontier"
+
+
+def test_commander_trace_records_the_reports_that_reached_the_post(tmp_path):
+    # Agent run 9: the commander said "no update" at 30 s although a survivor had been confirmed at 13 s. The trace
+    # held no inputs, so "nothing arrived" could not be told from "arrived and ignored".
+    from brain.agent.commander import Commander
+
+    trace = tmp_path / "trace.jsonl"
+    report = {"from": "robot_A", "t": 13.0, "text": "Confirmed survivor in my current area."}
+    Commander(Scripted([]), trace).step({"t": 30.0, "reports": [report], "robots": ["robot_A", "robot_B"]})
+    rows = [json.loads(line) for line in trace.read_text().splitlines()]
+    start = [r for r in rows if r["kind"] == "step_start"]
+    assert len(start) == 1 and start[0]["reports"] == [report]
+    assert start[0]["step"] == "commander@30.000"

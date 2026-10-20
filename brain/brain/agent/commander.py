@@ -54,6 +54,9 @@ class Commander:
                     {"role": "user", "content": "Situation:\n" + json.dumps({"t": req["t"],
                      "reports": req.get("reports", []), "robots": req.get("robots", {})}, default=str)}]
         step_id = f"commander@{float(req['t']):.3f}"
+        # What reached the post, so an audit can tell "nothing arrived" from "arrived and ignored".
+        self._trace({"kind": "step_start", "step": step_id, "t": req["t"], "robot": "commander",
+                     "reports": req.get("reports", [])})
         orders, refusals, summary = [], [], None
         for rnd in range(1, 5):
             key = request_key(messages, TOOLS)
