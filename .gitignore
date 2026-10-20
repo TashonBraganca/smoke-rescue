@@ -54,3 +54,4 @@ brain/*.pt
 # Rendered videos are rebuilt from recordings (tools/make_walkthrough.py, Render Showcase Video)
 data/evidence/*.mp4
 data/evidence/showcase_frames/
+data/models/

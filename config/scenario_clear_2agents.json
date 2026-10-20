@@ -5,7 +5,13 @@
   "seed": 7,
   "smoke": {
     "global_haze": 0.0,
-    "rooms": { "default": 0.0 },
+    "rooms": {
+      "default": 0.0
+    },
     "ramp_per_minute": 0.0
+  },
+  "fire": {
+    "spread": false,
+    "note": "Static fires only, so the clear-air SLAM baseline stays comparable across runs."
   }
 }

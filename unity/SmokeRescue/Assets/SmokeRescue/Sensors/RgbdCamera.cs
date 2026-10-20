@@ -28,7 +28,7 @@ namespace SmokeRescue.Sensors
         public float ExposureEv { get; set; } = 3f;
         /// <summary>Deterministic exposure loop: after each frame, move EV toward a mid-grey mean (damped, clamped).</summary>
         public bool AutoExposure { get; set; } = true;
-        public const float ExposureMinEv = 0f, ExposureMaxEv = 9f, TargetGrey = 105f / 255f;
+        public const float ExposureMinEv = 0f, ExposureMaxEv = 12f, TargetGrey = 105f / 255f;
         public bool IsCapturing { get; private set; }
         public Func<Vector3, float> LocalDensity { get; set; } = _ => 0;
         /// <summary>Caller supplies normalized proximity to fire for configured exposure flicker.</summary>

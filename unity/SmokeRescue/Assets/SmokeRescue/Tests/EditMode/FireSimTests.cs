@@ -173,6 +173,7 @@ namespace SmokeRescue.Tests.EditMode
             foreach (string room in new[] { "living", "foyer", "kitchen", "hallway", "bedroom_1", "closet", "study", "bedroom_2", "laundry" })
                 Assert.IsTrue(Cells(sim).Any(c => c.Room == room && c.BurntFraction > 0), room);
             AssertRoomUnburnt(sim, "bathroom");
+            Assert.AreEqual(-1, sim.GetRoomState("bathroom").FlashoverTime);
         }
 
         [Test]
@@ -195,6 +196,22 @@ namespace SmokeRescue.Tests.EditMode
         {
             string path = Config(j => j[field] = value);
             Assert.Throws<InvalidDataException>(() => FireSim.Load(FloorPlan.Load(), path, 7));
+        }
+
+        [Test]
+        public void ADisplacedDoorCannotExchangeGasThroughAnUnrelatedWall()
+        {
+            var plan = TwoRooms("open");
+            plan.doors[0].at = new float[] { 7, 2 };
+            Assert.Throws<InvalidDataException>(() => FireSim.Load(plan, SmallFire(), 7));
+        }
+
+        [Test]
+        public void MissingFurnitureDefinitionsAreRejected()
+        {
+            var plan = FloorPlan.Load();
+            plan.landmarks[0].kind = "undefined_fuel";
+            Assert.Throws<InvalidDataException>(() => FireSim.Load(plan, firePath, 7));
         }
 
         [Test]

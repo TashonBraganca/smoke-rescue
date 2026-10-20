@@ -11,6 +11,8 @@ namespace SmokeRescue.World
         readonly FloorPlan plan;
         readonly Scenario.Smoke smoke;
         public float Time { get; set; }
+        /// <summary>When set (spreading fire), smoke density comes from the fire simulation instead of the scenario.</summary>
+        public System.Func<Vector3, float, float> Override { get; set; }
 
         public SmokeField(FloorPlan plan, Scenario.Smoke smoke) { this.plan = plan; this.smoke = smoke; }
 
@@ -24,7 +26,9 @@ namespace SmokeRescue.World
         public float Density(Vector3 p)
         {
             var room = RoomAt(p);
-            return room == null || p.y < 0f || p.y > plan.wall_height ? 0f : smoke.Density(room, Time);
+            if (room == null || p.y < 0f || p.y > plan.wall_height) return 0f;
+            float d = smoke.Density(room, Time);
+            return Override == null ? d : Mathf.Max(d, Mathf.Clamp01(Override(p, Time)));
         }
 
         /// <summary>Density to HDRP mean free path (metres of fog before light is attenuated to 1/e).
@@ -60,6 +64,9 @@ namespace SmokeRescue.World
         ThermalField thermal;
         FireVisuals fireVisuals;
         FlameBodies flameBodies;
+        FireSimHeat fireSim;
+        /// <summary>The spreading fire, or null when the scenario uses static fires.</summary>
+        public FireSimHeat FireSpread => fireSim;
 
         public static Atmosphere Build(FloorPlan plan, Scenario scenario)
         {
@@ -153,7 +160,14 @@ namespace SmokeRescue.World
 
             // Fire: one heat source drives what colour cameras see (flames, smoke, light), what thermal cameras see
             // (heat field, flame bodies) and what the air-temperature sensors read.
-            a.thermal = new ThermalField(plan, new StaticFireHeat(plan));
+            if (scenario.fire != null && scenario.fire.spread)
+            {
+                var spread = new FireSimHeat(plan, scenario.seed, scenario.fire.head_start_s);
+                a.fireSim = spread;
+                a.thermal = new ThermalField(plan, spread);
+                a.field.Override = spread.SmokeDensity;
+            }
+            else a.thermal = new ThermalField(plan, new StaticFireHeat(plan));
             a.fireVisuals = new FireVisuals(go.transform, plan.wall_height, scenario.seed);
             a.flameBodies = new FlameBodies(go.transform);
             foreach (var f in plan.fires)
@@ -177,6 +191,23 @@ namespace SmokeRescue.World
                 string room = isLayer ? key.Substring(0, key.Length - 6) : key;
                 float d = scenario.smoke.Density(room, t);
                 if (isLayer) d = Mathf.Clamp01(d * 2.5f + (d > 0f ? 0.1f : 0f));
+                if (fireSim != null)
+                {
+                    // Smoke from the fire simulation: a dense hot layer from the ceiling down to the layer height,
+                    // thinner smoke below it. Layer volumes resize as the layer sinks.
+                    var rs = fireSim.Room(room, t);
+                    if (isLayer)
+                    {
+                        float depth = Mathf.Max(0.3f, plan.wall_height - rs.LayerHeight);
+                        var lp = volume.transform.position;
+                        volume.transform.position = new Vector3(lp.x, plan.wall_height - depth / 2f, lp.z);
+                        var size = volume.parameters.size;
+                        volume.parameters.size = new Vector3(size.x, depth, size.z);
+                        volume.parameters.albedo = new Color(0.2f, 0.19f, 0.18f);
+                        d = Mathf.Max(d, Mathf.Clamp01(rs.SmokeDensity * 1.2f));
+                    }
+                    else d = Mathf.Max(d, Mathf.Clamp01(fireSim.SmokeDensity(new Vector3(volume.transform.position.x, 0.5f, volume.transform.position.z), t)));
+                }
                 volume.gameObject.SetActive(d > 1e-3f);
                 volume.parameters.meanFreePath = SmokeField.MeanFreePath(d);
                 volume.parameters.textureOffset = new Vector3(0.011f * t, -0.017f * t, 0.007f * t);   // slow rising drift
@@ -196,8 +227,10 @@ namespace SmokeRescue.World
         public float NearFire(Vector3 p)
         {
             float best = 0f;
-            foreach (var f in plan.fires)
-                best = Mathf.Max(best, f.intensity * Mathf.Clamp01(1f - Vector2.Distance(new Vector2(p.x, p.z), new Vector2(f.at[0], f.at[1])) / 4f));
+            var xz = new Vector2(p.x, p.z);
+            foreach (var (c, radius, height, _) in thermal.Source.Flames(field.Time))
+                if (radius > 0f)
+                    best = Mathf.Max(best, Mathf.Clamp01(height / 1.5f) * Mathf.Clamp01(1f - (Vector2.Distance(xz, new Vector2(c.x, c.z)) - radius) / 4f));
             return best;
         }
 
