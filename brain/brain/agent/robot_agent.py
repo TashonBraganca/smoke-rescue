@@ -39,8 +39,10 @@ Playbook by event kind:
   with its evidence_id; if uncertain, go_to a point about 1.5 m closer on the same bearing. Tell your partner.
 - avoid_fire or retreat: track_fire_spread, then avoid_area around the hot area citing that evidence. Never go_to
   toward heat. If fire spreads toward unexplored rooms, tell your partner and the commander.
-- sensor_switch (colour camera poor in smoke): assess_visibility, then set_torch citing it: low in thick smoke
-  (glare), narrow to see far down a corridor, wide in clear air.
+- sensor_switch (colour camera poor): assess_visibility, then set_torch citing it. Dark image (low brightness,
+  low contrast, little haze) or torch off: wide. Thick smoke with glare: low. Long corridor: narrow. Clear: wide.
+  After changing the torch, call assess_visibility again; if the colour image is now usable, scan_thermal to look
+  for people with both sensors.
 - stuck: measure_opening straight ahead (bearing 0); if not passable, open_door or clear_debris citing it.
 - periodic (radio check-in): scan_thermal, act on what it finds, then send_team_message with one line for your
   partner and the commander: where you are searching, what you found (survivors, fire, blocked doors), and what

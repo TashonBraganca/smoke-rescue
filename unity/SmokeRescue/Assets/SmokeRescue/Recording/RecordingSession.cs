@@ -113,6 +113,7 @@ namespace SmokeRescue.Recording
                 rig.odom = new OdometrySensor(sensorCfg, scenario.seed * 1000 + i * 10 + 3) { NoiseEnabled = noise };
                 rig.imu.Reset(rig.robot.Body.position, rig.robot.Body.rotation);
                 rig.odom.Reset(rig.robot.transform.position, rig.robot.transform.rotation);
+                if (!string.IsNullOrEmpty(spec.torch) && spec.torch != "wide") rig.robot.SetTorch(spec.torch, 0f, 0f);
                 rig.dir = Path.Combine(root, spec.id);
                 if (spec.control == "autonomous")
                 {

@@ -20,7 +20,8 @@ namespace SmokeRescue.World
         public int seed;
         public float duration_s;
         public float sim_rate_hz = 15f;
-        public float[] search_area;   // operator knowledge: building outline x_min, z_min, x_max, z_max, seen from outside
+        public float[] search_area;
+        public List<string> dark_rooms = new List<string>();   // rooms whose emergency and room lights are out   // operator knowledge: building outline x_min, z_min, x_max, z_max, seen from outside
         public Smoke smoke = new Smoke();
         public List<Robot> robots = new List<Robot>();
         public LookAround look_around = new LookAround();
@@ -65,6 +66,7 @@ namespace SmokeRescue.World
             public Spawn spawn;
             public string control;
             public float cruise_speed = 0.5f;
+            public string torch = "wide";                      // starting torch mode: wide, narrow, low, off
             public float doorway_speed = 0.3f;
             public List<float[]> route = new List<float[]>();
             public List<float[]> look_around_at = new List<float[]>();

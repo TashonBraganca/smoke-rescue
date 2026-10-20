@@ -143,8 +143,11 @@ namespace SmokeRescue.World
                 a.roomFogs.Add((layer, r.id + "#layer"));
             }
 
+            bool Dark(float x, float z) => scenario.dark_rooms != null && plan.rooms.Exists(r => scenario.dark_rooms.Contains(r.id)
+                && x >= r.rect[0] && x <= r.rect[2] && z >= r.rect[1] && z <= r.rect[3]);
             foreach (var e in plan.emergency_lights)
             {
+                if (Dark(e.at[0], e.at[1])) continue;     // power and battery lighting failed in this room
                 var l = AddPointLight(go, "EmergencyLight", new Vector3(e.at[0], plan.wall_height - 0.25f, e.at[1]),
                     new Color(1f, 0.92f, 0.82f), 350f, 9f);
                 l.shadows = LightShadows.Soft;
@@ -154,6 +157,7 @@ namespace SmokeRescue.World
             // world-fixed texture. Without it the house was black outside the headlight and SLAM lost tracking.
             foreach (var r in plan.rooms)
             {
+                if (scenario.dark_rooms != null && scenario.dark_rooms.Contains(r.id)) continue;
                 var c = new Vector3((r.rect[0] + r.rect[2]) / 2f, plan.wall_height - 0.2f, (r.rect[1] + r.rect[3]) / 2f);
                 var l = AddPointLight(go, $"RoomLight_{r.id}", c, new Color(1f, 0.86f, 0.7f), 300f, 9f);
                 l.shadows = LightShadows.None;
