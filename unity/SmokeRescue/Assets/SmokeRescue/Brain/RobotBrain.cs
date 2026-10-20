@@ -107,7 +107,7 @@ namespace SmokeRescue.Brain
             if (!completed && !returning && t >= c.mission_time_limit_s) BeginReturn(t, "Exploration time limit reached.");
             if (!retreating && (airC > c.heat_retreat_c || budget < c.heat_retreat_fraction))
             {
-                ResetStuckRecovery(); retreating = true; active = null; dwell = 0; ClearPath();
+                ResetStuckRecovery(); retreating = true; sweeping = false; active = null; dwell = 0; ClearPath();
                 Emit(t, "retreat", "Air temperature or remaining heat budget requires a cool reachable goal.", "air_c", airC, "heat_budget", budget);
             }
             else if (retreating && airC < c.heat_recover_below_c && t - lastAir <= c.frame_max_age_s && budget >= c.heat_resume_fraction)
@@ -229,7 +229,14 @@ namespace SmokeRescue.Brain
                 }
                 if (active != null) return FollowOrHold(t, dt);
             }
-            if (goal.HasValue && Vector2.Distance(goal.Value, motion.Pose.position) <= c.goal_tolerance_m) ClearPath();
+            if (goal.HasValue && Vector2.Distance(goal.Value, motion.Pose.position) <= c.goal_tolerance_m)
+            {
+                bool wasFrontier = frontierGoal; var reached = goal.Value;
+                ClearPath();
+                if (wasFrontier) OnFrontierReached(reached, t);
+            }
+            if (sweeping && !returning) return SweepStep(t, dt);
+            CheckProgress(t);
             if (agentGoal.HasValue && Vector2.Distance(agentGoal.Value, motion.Pose.position) <= c.goal_tolerance_m)
             { Emit(t, "goal", "Reached the agent's goal.", "x_m", agentGoal.Value.x, "y_m", agentGoal.Value.y); agentGoal = null; }
             if (NeedPlan(t))
@@ -254,7 +261,7 @@ namespace SmokeRescue.Brain
                 }
                 if (path.Count == 0 || blocked)
                 {
-                    System.Func<Vector2, bool> excluded = p => ClaimBlocks(p, t) || GoalBlacklisted(p, t) || !InSearchArea(p);
+                    System.Func<Vector2, bool> excluded = p => ClaimBlocks(p, t) || GoalBlacklisted(p, t) || VisitedGoal(p, t) || !InSearchArea(p);
                     // The commander's sector first; anywhere in the building once the sector has no reachable frontier.
                     var frontier = sector.HasValue ? planner.Frontier(motion.Pose.position, p => excluded(p) || !sector.Value.Contains(p)) : null;
                     if (frontier == null) frontier = planner.Frontier(motion.Pose.position, excluded);

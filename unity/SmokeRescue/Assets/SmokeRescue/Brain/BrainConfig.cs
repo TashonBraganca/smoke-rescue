@@ -87,6 +87,12 @@ namespace SmokeRescue.Brain
         public float replan_s = 1.0f;
         public float frontier_min_distance_m = 0.5f;
         public float frontier_gain_weight = 0.04f;
+        public int frontier_gain_cap_cells = 150, frontier_min_information_cells = 10;
+        public float visited_radius_m = 0.8f, visited_hold_s = 90f;
+        public float sweep_spacing_m = 3.0f, sweep_repeat_s = 120f, sweep_hold_s = 0.6f, sweep_yaw_dps = 45f, sweep_tolerance_deg = 6f;
+        public float area_report_radius_m = 4.0f;
+        public int progress_min_cells = 40;
+        public float progress_window_s = 15f, progress_skip_radius_m = 2.5f;
         public int frontier_information_radius_cells = 3;
         public float lookahead_m = 0.45f;
         public float goal_tolerance_m = 0.18f;

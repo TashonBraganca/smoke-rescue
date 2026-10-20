@@ -32,7 +32,7 @@ namespace SmokeRescue.Recording
         static readonly HttpClient Http = new HttpClient { Timeout = TimeSpan.FromSeconds(300) };
         static readonly HashSet<string> AgentTriggers = new HashSet<string>
             { "survivor_candidate", "sensor_switch", "avoid_fire", "retreat", "stuck" };   // collisions stay with the reflex layer
-        const double AgentPeriodS = 20, AgentMinGapS = 4, CommanderPeriodS = 30, OrderHoldS = 40;
+        const double AgentPeriodS = 20, AgentMinGapS = 4, CommanderPeriodS = 30, OrderHoldS = 15;
 
         partial class RobotRig
         {
@@ -231,6 +231,9 @@ namespace SmokeRescue.Recording
             File.WriteAllText(Path.Combine(rig.dir, "thermal.txt"), rig.thermalTxt.ToString());
             File.WriteAllText(Path.Combine(rig.dir, "camera.yaml"), CameraYaml(cfg));
             if (cfg.thermal != null) File.WriteAllText(Path.Combine(rig.dir, "thermal.yaml"), ThermalYaml(cfg));
+            // Decision and brain-state logs too, so a run that dies keeps them and progress can be watched live.
+            File.WriteAllText(Path.Combine(rig.dir, "decisions.jsonl"), rig.decisions.ToString());
+            File.WriteAllText(Path.Combine(rig.dir, "brain_state.jsonl"), rig.brainState.ToString());
         }
 
         static JObject Post(string path, JObject body)

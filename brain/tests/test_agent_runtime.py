@@ -106,3 +106,13 @@ def test_no_go_to_during_a_heat_event(tmp_path, monkeypatch):
     agent = RobotAgent(Scripted([[ToolCall("go_to", {"x": 6, "y": 6, "reason": "toward"})]]), tmp_path / "t.jsonl")
     out = agent.step(req)
     assert out["orders"] == [] and out["refusals"][0]["tool"] == "go_to"
+
+
+def test_third_close_look_at_one_spot_is_refused(tmp_path, monkeypatch):
+    fake_vision(monkeypatch, "uncertain")
+    T.ToolRegistry._looks.clear()
+    for k in range(3):
+        req = request(tmp_path) | {"t": 10.0 + k}
+        out = RobotAgent(Scripted([[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": 5})],
+                                   [ToolCall("approach_candidate", {"evidence_id": "ev1"})]]), tmp_path / "t.jsonl").step(req)
+    assert out["orders"] == [] and "already looked" in out["refusals"][0]["reason"]
