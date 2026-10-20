@@ -98,6 +98,7 @@ namespace SmokeRescue.Robots
             light.shadows = LightShadows.Soft;
             robot.Headlight = light;
 
+            robot.StoreMountRest();
             robot.ApplyPose();
             return robot;
         }
@@ -128,6 +129,22 @@ namespace SmokeRescue.Robots
             // Trot: diagonal pairs (FL+RR, FR+RL) swing in opposite phase; knees lag hips by a quarter cycle.
             foreach (var (t, rest, phase, amp) in legJoints)
                 t.localRotation = rest * Quaternion.Euler(amp * moving * Mathf.Sin(Driver.GaitPhase + phase), 0f, 0f);
+            // Stabilised sensor head (gimbal): the camera keeps its height and pitch while the body bobs and sways under
+            // it. On a 1.6 m mast the 1.2 degree trot sway moved the view about 3 cm every step, which showed as jitter.
+            if (mountSet)
+                CameraMount.SetPositionAndRotation(transform.TransformPoint(mountLocal), transform.rotation * mountPitch);
+        }
+
+        Vector3 mountLocal;
+        Quaternion mountPitch;
+        bool mountSet;
+
+        /// <summary>Records the camera mount's rest pose relative to the robot (no bob, no sway) for the gimbal.</summary>
+        void StoreMountRest()
+        {
+            mountLocal = transform.InverseTransformPoint(CameraMount.position);
+            mountPitch = Quaternion.Inverse(transform.rotation) * CameraMount.rotation;
+            mountSet = true;
         }
 
         /// <summary>Instantiates the rigged quadruped, scales it to BodyLength, puts its feet on the floor, adds a colour band.</summary>

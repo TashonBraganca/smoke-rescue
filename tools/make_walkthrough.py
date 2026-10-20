@@ -112,6 +112,7 @@ def main() -> None:
     ap.add_argument("--out", type=Path)
     ap.add_argument("--fps", type=float, default=15.0)
     ap.add_argument("--run", type=Path, help="run folder with <robot>/narration.jsonl to caption the video")
+    ap.add_argument("--map", action="store_true", help="add the 2D house map panel (needs --run with SLAM and merge outputs)")
     a = ap.parse_args()
     meta = json.loads((a.recording / "meta.json").read_text())
     robots = meta["robots"]
@@ -121,11 +122,15 @@ def main() -> None:
     colours = [(60, 120, 255), (255, 170, 40), (90, 220, 90)]   # BGR: orange-red A, blue B, green C
     clock = sorted({round(t, 4) for fr in tracks.values() for t, _, _ in fr})
     ff = subprocess.Popen(["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "bgr24",
-                           "-s", f"{W * len(robots)}x{H + 160}", "-r", str(a.fps), "-i", "-",
+                           "-s", f"{W * len(robots) + (640 if a.map else 0)}x{H + 160}", "-r", str(a.fps), "-i", "-",
                            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "20", str(out)], stdin=subprocess.PIPE)
     orbs = {r: orb_from_yaml(a.recording / r / "camera.yaml") for r in robots}
     thermals = {r: thermal_frames(a.recording / r) for r in robots}
     captions = {r: narration(a.run, r) for r in robots}
+    minimap = None
+    if a.map:
+        from minimap import MiniMap
+        minimap = MiniMap(a.recording, a.run)
     PW, PH = W // 3, 160   # three bottom panels (even height for the encoder)
     idx = {r: 0 for r in robots}
     cache: dict[str, tuple] = {}
@@ -171,6 +176,8 @@ def main() -> None:
             bottom[:, PW:2 * PW] = th
             bottom[:, 2 * PW:3 * PW] = orb
             cols.append(np.vstack([top, bottom]))
+        if minimap is not None:
+            cols.append(minimap.render(t))
         ff.stdin.write(np.hstack(cols).tobytes())
     ff.stdin.close()
     ff.wait()
