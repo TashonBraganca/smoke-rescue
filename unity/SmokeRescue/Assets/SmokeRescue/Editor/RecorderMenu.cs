@@ -65,6 +65,13 @@ namespace SmokeRescue.Editor
 
         static void Run(string scenario, string runId, float maxSeconds = float.PositiveInfinity, bool noise = true)
         {
+            // The live colour person detector runs in the vision service; without it robots rely on thermal alone.
+            string vision = System.Environment.GetEnvironmentVariable("SMOKE_AGENT_URL") ?? "http://localhost:8080";
+            bool up = false;
+            try { using (var http = new System.Net.Http.HttpClient { Timeout = System.TimeSpan.FromSeconds(5) }) up = http.GetAsync(vision.TrimEnd('/') + "/health").Result.IsSuccessStatusCode; }
+            catch (System.Exception) { up = false; }
+            RecordingSession.PeopleUrl = up ? vision : null;
+            Debug.Log(up ? $"[SmokeRescue] colour person detector at {vision}" : $"[SmokeRescue] WARNING: vision service {vision} not reachable; colour person detection is off");
             SmokeRescue.Robots.Robot.BodyPrefab = UseQuadruped ? FurnitureBuilder.RobotBodyPrefab() : null;
             var sc = Scenario.Load(scenario);
             FurnitureBuilder.PlaceScenarioObstacles(sc);

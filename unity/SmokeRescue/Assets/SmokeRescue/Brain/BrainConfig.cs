@@ -105,6 +105,9 @@ namespace SmokeRescue.Brain
         public float keyframe_min_return_share = 0.6f, link_unique_shift_m = 0.3f, link_unique_ratio = 0.85f;
         public float link_coarse_min_fit = 0.35f;
         public bool link_diagnostics = false;
+        public float person_rgb_min_confidence = 0.5f, person_rgb_max_range_m = 6f, person_rgb_window_s = 3f, person_rgb_fresh_s = 1.5f, person_rgb_scan_period_s = 1f;
+        public int person_rgb_sightings = 2;
+        public float person_floor_clearance_m = 0.12f, person_top_max_m = 2.0f;
         public int scan_beam_stride = 3, scan_min_beams = 40;
         public float scan_match_range_m = 8f, scan_sigma_m = 0.05f, scan_window_m = 0.1f, scan_step_m = 0.025f;
         public float scan_window_deg = 1.5f, scan_step_deg = 0.5f, scan_min_fit = 0.3f, scan_softness = 0.004f;
@@ -179,7 +182,10 @@ namespace SmokeRescue.Brain
                 keyframe_spacing_m <= 0 || keyframe_turn_deg <= 0 || keyframe_beams < 36 || keyframe_max < 2 || keyframes_per_message < 1 || keyframes_per_message > 16 ||
                 link_shortlist < 1 || link_max_candidates < 2 || link_turn_candidates < 1 || link_verifications_per_step < 1 || link_max_descriptor_distance <= 0 || link_window_m < 0 || link_step_m <= 0 ||
                 link_window_deg < 0 || link_step_deg <= 0 || link_min_fit <= 0 || link_min_fit > 1 || link_agree_m <= 0 || link_agree_deg <= 0 || link_min_separation_m < 0 ||
-                keyframe_min_return_share < 0 || keyframe_min_return_share > 1 || link_unique_shift_m <= 0 || link_unique_ratio <= 0 || link_unique_ratio >= 1 || link_coarse_min_fit <= 0 || link_coarse_min_fit > link_min_fit || scan_beam_stride < 1 || scan_min_beams < 3 || scan_match_range_m <= 0 ||
+                keyframe_min_return_share < 0 || keyframe_min_return_share > 1 || link_unique_shift_m <= 0 || link_unique_ratio <= 0 || link_unique_ratio >= 1 || link_coarse_min_fit <= 0 || link_coarse_min_fit > link_min_fit ||
+                person_rgb_min_confidence <= 0 || person_rgb_min_confidence >= 1 || person_rgb_max_range_m <= 0 || person_rgb_window_s <= 0 ||
+                person_rgb_fresh_s <= 0 || person_rgb_scan_period_s <= 0 || person_rgb_sightings < 1 ||
+                person_floor_clearance_m < 0 || person_top_max_m <= person_floor_clearance_m || scan_beam_stride < 1 || scan_min_beams < 3 || scan_match_range_m <= 0 ||
                 scan_sigma_m <= 0 || scan_window_m < 0 || scan_step_m <= 0 || scan_window_deg < 0 || scan_step_deg <= 0 ||
                 scan_min_fit < 0 || scan_min_fit > 1 || scan_softness <= 0 || localization_report_s <= 0 || collision_escape_s <= 0)
                 throw new ArgumentException("Invalid LiDAR localization or collision margin configuration.");

@@ -132,6 +132,18 @@ async def vision_tool(tool: str, request: Request):
     return out
 
 
+@app.post("/perceive/people")
+async def perceive_people(request: Request):
+    """The robots' live person detector: OpenCV 5 dnn running YOLO11m on the robot's own colour frame at t, with
+    range from its own depth. Called by the recorder once per sim second per robot, with or without the LLM agents."""
+    from brain.agent import vision
+    req = await request.json()
+    t0 = time.perf_counter()
+    frame = vision.load_frame(req["robot_dir"], float(req["t"]))
+    people = vision.detect_people_rgb(frame, min_conf=float(req.get("min_conf", 0.25)))
+    return {"t": float((frame.get("stamps") or {}).get("rgb", req["t"])), "people": people, "opencv": cv2.__version__, "ms": round((time.perf_counter() - t0) * 1000, 1)}
+
+
 @app.get("/trace")
 def trace(n: int = 200):
     if not TRACE.exists():

@@ -14,7 +14,7 @@ namespace SmokeRescue.Brain
             public Vector2 position;
             public double lastSeen, retryAfter;
             public readonly Queue<double> observations = new Queue<double>();
-            public bool candidate, confirmed;
+            public bool candidate, confirmed, rgb;
         }
         readonly struct AirSample
         { public readonly double t; public readonly float c; public AirSample(double time, float value) { t = time; c = value; } }
@@ -185,7 +185,7 @@ namespace SmokeRescue.Brain
                 float best = float.PositiveInfinity;
                 foreach (var track in tracks)
                 {
-                    if (!track.candidate || track.confirmed || track.retryAfter > t || GoalBlacklisted(track.position, t) || t - track.lastSeen > c.survivor_fresh_s) continue;
+                    if (!track.candidate || track.confirmed || track.retryAfter > t || GoalBlacklisted(track.position, t) || t - track.lastSeen > FreshS(track)) continue;
                     // A warm shape outside the ceilinged floor is beyond a window or door: not a person inside.
                     if (!InSearchArea(track.position)) continue;
                     float range = Vector2.Distance(track.position, motion.Pose.position);
@@ -211,7 +211,7 @@ namespace SmokeRescue.Brain
                         Emit(t, "goal", "At survivor viewing distance; stop and face the person for confirmation.", "range_m", range);
                     }
                     bool steady = Mathf.Abs(error) <= c.survivor_face_tolerance_deg && motion.Speed <= c.survivor_stop_speed_mps &&
-                        Mathf.Abs(motion.YawRate) * Mathf.Rad2Deg <= c.survivor_stop_yaw_dps && t - active.lastSeen <= c.survivor_fresh_s;
+                        Mathf.Abs(motion.YawRate) * Mathf.Rad2Deg <= c.survivor_stop_yaw_dps && t - active.lastSeen <= FreshS(active);
                     dwell = steady ? dwell + elapsed : 0;
                     if (dwell + 1e-6f >= c.survivor_dwell_s && AgentConfirms)
                     {
@@ -400,6 +400,41 @@ namespace SmokeRescue.Brain
                 }
             }
         }
+        /// <summary>Colour sightings arrive once per scan period, thermal blobs every frame, so freshness depends on the source.</summary>
+        double FreshS(Track track) => track.rgb ? c.person_rgb_fresh_s : c.survivor_fresh_s;
+
+        /// <summary>A person seen by the colour camera's OpenCV 5 dnn detector (YOLO11m, run by the recorder's vision
+        /// service on this robot's own frame at t): bearing in degrees, positive to the right; range is the median depth
+        /// of the box. Thermal saturates inside a fire room's hot gas layer and found no person in 161 visible views
+        /// (warm_eval); the colour camera still sees them. Repeated sightings make a candidate like thermal blobs do.</summary>
+        public void OnPersonSighting(double t, float bearingDegRight, float rangeM, float confidence)
+        {
+            BrainMath.Time(t);
+            if (!BrainMath.Finite(bearingDegRight) || !BrainMath.Finite(rangeM) || !BrainMath.Finite(confidence)) throw new ArgumentException("Nonfinite person sighting.");
+            if (confidence < c.person_rgb_min_confidence || !(rangeM > 0) || rangeM > c.person_rgb_max_range_m) return;
+            var pose = motion.Covers(t) ? motion.At(t) : motion.Pose;
+            Vector2 camera = pose.Transform(0, sensors.camera.mount.forward_offset_m);
+            float heading = pose.yawRad - bearingDegRight * Mathf.Deg2Rad;
+            var position = camera + new Vector2(-Mathf.Sin(heading), Mathf.Cos(heading)) * rangeM;
+            foreach (var person in survivors) if (Vector2.Distance(person, position) <= c.survivor_merge_m) return;
+            Track nearest = null; float best = c.survivor_merge_m;
+            foreach (var track in tracks)
+            {
+                float d = Vector2.Distance(track.position, position);
+                if (!track.confirmed && d <= best) { best = d; nearest = track; }
+            }
+            if (nearest == null) { nearest = new Track { position = position, lastSeen = double.NegativeInfinity }; tracks.Add(nearest); }
+            if (t <= nearest.lastSeen) return;
+            nearest.rgb = true; nearest.position = position; nearest.lastSeen = t; nearest.observations.Enqueue(t);
+            while (nearest.observations.Count > 0 && t - nearest.observations.Peek() > c.person_rgb_window_s) nearest.observations.Dequeue();
+            if (!nearest.candidate && nearest.observations.Count >= c.person_rgb_sightings)
+            {
+                nearest.candidate = true;
+                Emit(t, "survivor_candidate", "OpenCV dnn person detector (YOLO11m) saw a person in the colour image in repeated scans.",
+                    "x_m", position.x, "y_m", position.y, "confidence", confidence, "range_m", rangeM, "frames", nearest.observations.Count, "rgb", 1);
+            }
+        }
+
         void UpdateHeatBudget(double from, double t)
         {
             while (airQueue.Count > 0 && airQueue[0].t <= t)

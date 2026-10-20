@@ -100,6 +100,8 @@ namespace SmokeRescue.Brain
             while (old < history.Count && history[old].end < t - retention) old++;
             if (old > 0) history.RemoveRange(0, old);
         }
+        /// <summary>False when t is older than the retained history (At would return a zero pose).</summary>
+        public bool Covers(double t) => t >= now - 1e-9 || (history.Count > 0 && t >= history[0].start);
         public BrainPose At(double t)
         {
             int lo = 0, hi = history.Count - 1;

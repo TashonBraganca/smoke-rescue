@@ -28,11 +28,11 @@ namespace SmokeRescue.Brain
                 if (temperature >= c.person_min_c && temperature <= c.person_max_c && Match(x, y, rgb, s, out _, out _, out float z))
                     depth[y * thermal.Width + x] = z;
             }
-            var result = new List<PersonDetection>();
+            var result = new List<PersonDetection>(); var heights = new List<float>();
             for (int start = 0; start < count; start++)
             {
                 if (seen[start] || depth[start] == 0) continue;
-                seen[start] = true; queue.Enqueue(start); int pixels = 0; float area = 0; Vector2 sum = Vector2.zero;
+                seen[start] = true; queue.Enqueue(start); int pixels = 0; float area = 0; Vector2 sum = Vector2.zero; heights.Clear();
                 while (queue.Count > 0)
                 {
                     int index = queue.Dequeue(), x = index % thermal.Width, y = index / thermal.Width;
@@ -40,7 +40,7 @@ namespace SmokeRescue.Brain
                     var p = OccupancyGrid.BackProject(u, v, z, s);
                     // Pixel area on a plane normal to the optical axis, not a world-floor area.
                     float pixelArea = z * z / (s.thermal.fx * s.thermal.fy);
-                    sum += pose.Transform(p.x, p.y) * pixelArea; area += pixelArea; pixels++;
+                    sum += pose.Transform(p.x, p.y) * pixelArea; area += pixelArea; pixels++; heights.Add(p.z);
                     for (int direction = 0; direction < 4; direction++)
                     {
                         int nx = x + (direction == 0 ? -1 : direction == 1 ? 1 : 0);
@@ -51,10 +51,20 @@ namespace SmokeRescue.Brain
                         { seen[next] = true; queue.Enqueue(next); }
                     }
                 }
-                if (pixels >= c.person_min_pixels && area >= c.person_min_area_m2 && area <= c.person_max_area_m2)
+                // A body is off the floor and no taller than a standing person: heated floor near a fire and tall wall
+                // patches were most of the false warm shapes (warm_eval: 361 false blobs, 0 real people in fire rooms).
+                if (pixels >= c.person_min_pixels && area >= c.person_min_area_m2 && area <= c.person_max_area_m2 &&
+                    Percentile(heights, .5f) >= c.person_floor_clearance_m && Percentile(heights, .95f) <= c.person_top_max_m)
                     result.Add(new PersonDetection(sum / area, area));
             }
             return result;
+        }
+        /// <summary>Linear-interpolated percentile of unweighted values (sorts the list in place).</summary>
+        static float Percentile(List<float> values, float q)
+        {
+            if (values.Count == 0) return float.NaN;
+            values.Sort(); float index = (values.Count - 1) * q; int lo = Mathf.FloorToInt(index), hi = Mathf.Min(values.Count - 1, lo + 1);
+            return Mathf.Lerp(values[lo], values[hi], index - lo);
         }
         internal static void ProjectHeat(ThermalFrame thermal, RgbdFrame rgb, SensorConfig s, BrainConfig c, BrainPose pose, OccupancyGrid grid)
         {
