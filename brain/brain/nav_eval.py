@@ -17,7 +17,7 @@ from brain.nav_io import (CELL_M, ORIGIN, interpolate_poses,
                           is_complete, latest_map, poses_from_states, read_json_lines)
 from brain.nav_io import (load_scenario, start_pose, recording_frame, placed_states,
                           transform_xy, rotation, map_geometry, sample_grid, frame_peer)
-from brain.oracle import load_collisions, load_floorplan, load_house_points, load_trajectory
+from brain.oracle import load_collisions, load_floorplan, load_house_points, load_survivors, load_trajectory
 
 
 def body_trajectory(recording: Path, robot: str) -> tuple[np.ndarray, np.ndarray]:
@@ -189,9 +189,24 @@ def door_status(grid: np.ndarray, door: dict, origin=ORIGIN, cell=CELL_M) -> str
     return 'closed'
 
 
-def map_accuracy(grid: np.ndarray, points: np.ndarray, floorplan: dict, origin=ORIGIN, cell=CELL_M) -> tuple[dict, np.ndarray]:
+SURVIVOR_BODY_M = .6
+
+
+def map_accuracy(grid: np.ndarray, points: np.ndarray, floorplan: dict, origin=ORIGIN, cell=CELL_M,
+                 people_xy=()) -> tuple[dict, np.ndarray]:
+    """people_xy: true survivor positions. A person is a real obstacle the robots map, but the truth point set holds
+    only the house and furniture, so occupied cells within SURVIVOR_BODY_M of a person are left out of precision and
+    phantoms and counted separately (slow-fire run: 94 'phantom' cells on survivor s3)."""
     truth = truth_occupancy(points, grid.shape, origin, cell)
     occupied, observed = grid == 0, grid != 128
+    body = np.zeros(grid.shape, bool)
+    if len(people_xy):
+        yy, xx = np.indices(grid.shape)
+        centres = origin + (np.stack([xx, yy], axis=-1) + .5) * cell
+        for p in people_xy:
+            body |= np.linalg.norm(centres - np.asarray(p), axis=-1) <= SURVIVOR_BODY_M
+    on_people = occupied & body
+    occupied = occupied & ~body
     truth_distance = distance_to_cells(truth, cell)
     brain_distance = distance_to_cells(occupied, cell)
     inside_observed = distance_to_cells(observed, cell) <= .3 + 1e-8
@@ -205,6 +220,7 @@ def map_accuracy(grid: np.ndarray, points: np.ndarray, floorplan: dict, origin=O
                   recall=float(np.mean(brain_distance[eligible] <= .15)) if eligible.any() else None,
                   occupied_cells=int(occupied.sum()), truth_cells=int(truth.sum()),
                   observed_truth_cells=int(eligible.sum()), phantom_cells=int(phantom.sum()),
+                  occupied_cells_on_people=int(on_people.sum()),
                   phantom_clusters=phantom_clusters(phantom, origin, cell), doors=doors)
     return report, truth
 
@@ -444,7 +460,8 @@ def evaluate(recording: Path | str, out: Path | str | None = None) -> dict:
                 own = (xy - transform[:2]) @ rotation(transform[2])
                 grid = sample_grid(grid, own, source_origin, source_cell)
             shape = grid.shape
-            map_report, _ = map_accuracy(grid, points, floorplan, origin, cell)
+            people = [(s['position_house'][0], s['position_house'][2]) for s in (load_survivors(recording) or [])]
+            map_report, _ = map_accuracy(grid, points, floorplan, origin, cell, people)
             map_report.update(status='measured', t=map_t, cell_m=cell, origin_xy=origin.tolist(), shape=list(shape))
             searched = searched_for(robot_dir, map_t)
             if searched is not None:

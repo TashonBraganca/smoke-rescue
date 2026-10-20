@@ -426,3 +426,17 @@ def test_a_stall_is_explained_only_by_a_short_deliberate_stop():
     assert len(short) == 1 and short[0]['explained'] and short[0]['reason'] == ['sweep_started']
     unexplained = detect_stalls(states[:15], times[:15], still[:15], [dict(t=2., kind='replan')])
     assert len(unexplained) == 1 and not unexplained[0]['explained']
+
+
+def test_cells_on_a_survivor_are_not_phantoms():
+    import numpy as np
+    from brain.nav_eval import map_accuracy
+
+    grid = np.full((60, 60), 255, np.uint8)
+    grid[10, 5:55] = 0                                  # a wall the truth has
+    grid[40:43, 30:33] = 0                              # a person lying on the floor
+    points = np.array([[(x + .5) * .1, -1.0, (10 + .5) * .1] for x in range(5, 55)])   # 1 m up (y is negative up)
+    plain, _ = map_accuracy(grid, points, {}, origin=np.zeros(2), cell=.1)
+    people, _ = map_accuracy(grid, points, {}, origin=np.zeros(2), cell=.1, people_xy=[(3.15, 4.15)])
+    assert plain['phantom_cells'] == 9 and plain['precision'] < 1
+    assert people['phantom_cells'] == 0 and people['precision'] == 1 and people['occupied_cells_on_people'] == 9
