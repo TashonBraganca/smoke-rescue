@@ -1,0 +1,59 @@
+General configuration for OpenCV 5.0.0 =====================================
+
+	linux-vdso.so.1 (0x0000ffffa3dd7000)
+	libORB_SLAM3.so => /opt/ORB_SLAM3/lib/libORB_SLAM3.so (0x0000ffffa39f0000)
+	libopencv_imgcodecs.so.500 => /usr/local/lib/libopencv_imgcodecs.so.500 (0x0000ffffa3970000)
+	libopencv_imgproc.so.500 => /usr/local/lib/libopencv_imgproc.so.500 (0x0000ffffa31c0000)
+	libopencv_core.so.500 => /usr/local/lib/libopencv_core.so.500 (0x0000ffffa2d50000)
+	libpango_display.so => /usr/local/lib/libpango_display.so (0x0000ffffa2ca0000)
+	libpango_opengl.so => /usr/local/lib/libpango_opengl.so (0x0000ffffa2c50000)
+	libGLEW.so.2.2 => /lib/aarch64-linux-gnu/libGLEW.so.2.2 (0x0000ffffa2b70000)
+	libOpenGL.so.0 => /lib/aarch64-linux-gnu/libOpenGL.so.0 (0x0000ffffa2b00000)
+	libstdc++.so.6 => /lib/aarch64-linux-gnu/libstdc++.so.6 (0x0000ffffa28d0000)
+	libgcc_s.so.1 => /lib/aarch64-linux-gnu/libgcc_s.so.1 (0x0000ffffa28a0000)
+	libc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffffa26f0000)
+	/lib/ld-linux-aarch64.so.1 (0x0000ffffa3d90000)
+	libopencv_stereo.so.500 => /usr/local/lib/libopencv_stereo.so.500 (0x0000ffffa26b0000)
+	libopencv_highgui.so.500 => /usr/local/lib/libopencv_highgui.so.500 (0x0000ffffa2670000)
+	libDBoW2.so => /opt/ORB_SLAM3/Thirdparty/DBoW2/lib/libDBoW2.so (0x0000ffffa2650000)
+	libg2o.so => /opt/ORB_SLAM3/Thirdparty/g2o/lib/libg2o.so (0x0000ffffa25b0000)
+	libboost_serialization.so.1.74.0 => /lib/aarch64-linux-gnu/libboost_serialization.so.1.74.0 (0x0000ffffa2560000)
+	libcrypto.so.3 => /lib/aarch64-linux-gnu/libcrypto.so.3 (0x0000ffffa2150000)
+	libopencv_features.so.500 => /usr/local/lib/libopencv_features.so.500 (0x0000ffffa20b0000)
+	libopencv_geometry.so.500 => /usr/local/lib/libopencv_geometry.so.500 (0x0000ffffa1f10000)
+	libpango_vars.so => /usr/local/lib/libpango_vars.so (0x0000ffffa1ee0000)
+	libpango_core.so => /usr/local/lib/libpango_core.so (0x0000ffffa1e80000)
+	libm.so.6 => /lib/aarch64-linux-gnu/libm.so.6 (0x0000ffffa1de0000)
+	libjpeg.so.8 => /lib/aarch64-linux-gnu/libjpeg.so.8 (0x0000ffffa1d80000)
+	libpng16.so.16 => /lib/aarch64-linux-gnu/libpng16.so.16 (0x0000ffffa1d30000)
+	libz.so.1 => /lib/aarch64-linux-gnu/libz.so.1 (0x0000ffffa1d00000)
+	libpango_windowing.so => /usr/local/lib/libpango_windowing.so (0x0000ffffa1cb0000)
+	libpango_image.so => /usr/local/lib/libpango_image.so (0x0000ffffa1c80000)
+	libGLX.so.0 => /lib/aarch64-linux-gnu/libGLX.so.0 (0x0000ffffa1c30000)
+	libGL.so.1 => /lib/aarch64-linux-gnu/libGL.so.1 (0x0000ffffa1b30000)
+	libGLdispatch.so.0 => /lib/aarch64-linux-gnu/libGLdispatch.so.0 (0x0000ffffa19a0000)
+	libopencv_flann.so.500 => /usr/local/lib/libopencv_flann.so.500 (0x0000ffffa1910000)
+	libX11.so.6 => /lib/aarch64-linux-gnu/libX11.so.6 (0x0000ffffa17c0000)
+	libwayland-client.so.0 => /lib/aarch64-linux-gnu/libwayland-client.so.0 (0x0000ffffa17a0000)
+	libwayland-egl.so.1 => /lib/aarch64-linux-gnu/libwayland-egl.so.1 (0x0000ffffa1780000)
+	libwayland-cursor.so.0 => /lib/aarch64-linux-gnu/libwayland-cursor.so.0 (0x0000ffffa1760000)
+	libxkbcommon.so.0 => /lib/aarch64-linux-gnu/libxkbcommon.so.0 (0x0000ffffa1700000)
+	libEGL.so.1 => /lib/aarch64-linux-gnu/libEGL.so.1 (0x0000ffffa16d0000)
+	libxcb.so.1 => /lib/aarch64-linux-gnu/libxcb.so.1 (0x0000ffffa1690000)
+	libffi.so.8 => /lib/aarch64-linux-gnu/libffi.so.8 (0x0000ffffa1670000)
+	libXau.so.6 => /lib/aarch64-linux-gnu/libXau.so.6 (0x0000ffffa1650000)
+	libXdmcp.so.6 => /lib/aarch64-linux-gnu/libXdmcp.so.6 (0x0000ffffa1630000)
+	libbsd.so.0 => /lib/aarch64-linux-gnu/libbsd.so.0 (0x0000ffffa1600000)
+	libmd.so.0 => /lib/aarch64-linux-gnu/libmd.so.0 (0x0000ffffa15e0000)
+/usr/local/lib/libopencv_calib.so.5.0.0
+/usr/local/lib/libopencv_core.so.5.0.0
+/usr/local/lib/libopencv_features.so.5.0.0
+/usr/local/lib/libopencv_flann.so.5.0.0
+/usr/local/lib/libopencv_geometry.so.5.0.0
+/usr/local/lib/libopencv_highgui.so.5.0.0
+/usr/local/lib/libopencv_imgcodecs.so.5.0.0
+/usr/local/lib/libopencv_imgproc.so.5.0.0
+/usr/local/lib/libopencv_objdetect.so.5.0.0
+/usr/local/lib/libopencv_stereo.so.5.0.0
+
+Baseline unchanged sha256:eed19cb2ad2ef104f7c827d20bf30bb992179bf833708f4382ff9aa2ab09214b

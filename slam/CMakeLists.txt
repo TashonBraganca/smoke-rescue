@@ -5,7 +5,10 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-find_package(OpenCV 4.4 REQUIRED)
+find_package(OpenCV REQUIRED)
+if(OpenCV_VERSION VERSION_LESS 4.4)
+    message(FATAL_ERROR "OpenCV 4.4 or newer is required")
+endif()
 find_package(Eigen3 3.1 REQUIRED)
 find_package(Pangolin REQUIRED)
 

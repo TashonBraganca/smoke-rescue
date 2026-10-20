@@ -1,0 +1,98 @@
+# OpenCV 5.0.0 annotated tag 9e2ede9628a55ec2742a1b180d3e69b0322281b9
+# resolves to the source commit below. The OpenCV 4 baseline is independent.
+FROM --platform=linux/arm64 ubuntu:22.04 AS build
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+ARG DEBIAN_FRONTEND=noninteractive
+ARG OPENCV_COMMIT=40738fb16ceddb5fb3fea747585f7ce6abb0605b
+ARG PANGOLIN_COMMIT=aff6883c83f3fd7e8268a9715e84266c42e2efe3
+ARG ORB_SLAM3_COMMIT=4452a3c4ab75b1cde34e5505a36ec3f9edcdc4c4
+ARG BUILD_JOBS=4
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential ca-certificates cmake curl patch pkg-config \
+    libboost-serialization-dev libeigen3-dev libssl-dev \
+    libegl1-mesa-dev libepoxy-dev libgl1-mesa-dev libglew-dev \
+    libwayland-dev libxkbcommon-dev wayland-protocols \
+    libjpeg-dev libpng-dev zlib1g-dev
+
+RUN mkdir -p /opt/opencv && curl -fL \
+    "https://codeload.github.com/opencv/opencv/tar.gz/${OPENCV_COMMIT}" \
+    | tar -xz --strip-components=1 -C /opt/opencv
+# calib requires objdetect. No other extra OpenCV modules are enabled.
+RUN cmake -S /opt/opencv -B /opt/opencv/build \
+    -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=17 \
+    -DCMAKE_INSTALL_PREFIX=/usr/local -DBUILD_SHARED_LIBS=ON \
+    -DBUILD_LIST=core,imgproc,imgcodecs,features,flann,calib,geometry,stereo,highgui,objdetect \
+    -DBUILD_TESTS=OFF -DBUILD_PERF_TESTS=OFF -DBUILD_EXAMPLES=OFF \
+    -DBUILD_opencv_apps=OFF -DBUILD_DOCS=OFF -DBUILD_JAVA=OFF \
+    -DBUILD_opencv_python2=OFF -DBUILD_opencv_python3=OFF \
+    -DBUILD_opencv_js=OFF -DBUILD_opencv_objc=OFF \
+    -DWITH_CUDA=OFF -DWITH_OPENCL=OFF -DWITH_IPP=OFF \
+    -DWITH_FFMPEG=OFF -DWITH_GSTREAMER=OFF -DWITH_V4L=OFF \
+    -DWITH_GTK=OFF -DWITH_QT=OFF -DWITH_WAYLAND=OFF \
+    -DWITH_OPENEXR=OFF -DWITH_TIFF=OFF -DWITH_WEBP=OFF \
+    -DWITH_OPENJPEG=OFF -DWITH_JASPER=OFF -DWITH_AVIF=OFF \
+    -DWITH_JPEGXL=OFF -DWITH_ITT=OFF -DWITH_PROTOBUF=OFF \
+    -DWITH_LAPACK=OFF -DWITH_EIGEN=ON \
+    && cmake --build /opt/opencv/build --parallel "${BUILD_JOBS}" \
+    && cmake --install /opt/opencv/build --strip && ldconfig
+
+RUN mkdir -p /opt/Pangolin && curl -fL \
+    "https://codeload.github.com/stevenlovegrove/Pangolin/tar.gz/${PANGOLIN_COMMIT}" \
+    | tar -xz --strip-components=1 -C /opt/Pangolin
+RUN cmake -S /opt/Pangolin -B /opt/Pangolin/build \
+    -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=17 \
+    -DBUILD_EXAMPLES=OFF -DBUILD_PANGOLIN_PYTHON=OFF \
+    -DBUILD_TESTS=OFF -DBUILD_TOOLS=OFF \
+    && cmake --build /opt/Pangolin/build --parallel "${BUILD_JOBS}" \
+    && cmake --install /opt/Pangolin/build --strip && ldconfig
+
+# Exclude large example image sets; CMake still needs the example source files.
+RUN mkdir -p /opt/ORB_SLAM3 && curl -fL \
+    "https://codeload.github.com/UZ-SLAMLab/ORB_SLAM3/tar.gz/${ORB_SLAM3_COMMIT}" \
+    | tar -xz --strip-components=1 -C /opt/ORB_SLAM3 \
+        --exclude='*.png' --exclude='*.jpg' --exclude='*.pdf' --exclude='*/evaluation/*'
+COPY slam/orbslam3_opencv5.patch slam/orbslam3_shutdown.patch /opt/patches/
+ARG ORB_BUILD_JOBS=2
+RUN patch -d /opt/ORB_SLAM3 -p1 < /opt/patches/orbslam3_opencv5.patch \
+    && patch -d /opt/ORB_SLAM3 -p1 < /opt/patches/orbslam3_shutdown.patch \
+    && cmake -S /opt/ORB_SLAM3/Thirdparty/DBoW2 -B /opt/ORB_SLAM3/Thirdparty/DBoW2/build \
+        -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=17 \
+        -DOpenCV_DIR=/usr/local/lib/cmake/opencv5 \
+    && cmake --build /opt/ORB_SLAM3/Thirdparty/DBoW2/build --parallel "${BUILD_JOBS}" \
+    && tar -xzf /opt/ORB_SLAM3/Vocabulary/ORBvoc.txt.tar.gz -C /opt/ORB_SLAM3/Vocabulary \
+    && cmake -S /opt/ORB_SLAM3 -B /opt/ORB_SLAM3/build \
+        -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=17 \
+        -DOpenCV_DIR=/usr/local/lib/cmake/opencv5 \
+    && cmake --build /opt/ORB_SLAM3/build --target g2o --parallel "${ORB_BUILD_JOBS}" \
+    && cmake --build /opt/ORB_SLAM3/build --target ORB_SLAM3 --parallel "${ORB_BUILD_JOBS}"
+
+COPY slam/CMakeLists.txt slam/rgbd_runner.cc slam/imu_feed.h /opt/smoke-rescue-runner/
+RUN cmake -S /opt/smoke-rescue-runner -B /opt/smoke-rescue-runner/build \
+        -DCMAKE_BUILD_TYPE=Release -DOpenCV_DIR=/usr/local/lib/cmake/opencv5 \
+    && cmake --build /opt/smoke-rescue-runner/build --parallel "${BUILD_JOBS}" \
+    && cmake --install /opt/smoke-rescue-runner/build --strip
+
+FROM --platform=linux/arm64 ubuntu:22.04
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libboost-serialization1.74.0 libssl3 libegl1 libepoxy0 libglew2.2 \
+    libgl1 libopengl0 libwayland-client0 libwayland-cursor0 libwayland-egl1 \
+    libxkbcommon0 libjpeg-turbo8 libpng16-16 zlib1g libstdc++6
+COPY --from=build /usr/local/lib/ /usr/local/lib/
+COPY --from=build /usr/local/bin/smoke_rescue_rgbd /usr/local/bin/
+COPY --from=build /opt/ORB_SLAM3/lib/libORB_SLAM3.so /opt/ORB_SLAM3/lib/
+COPY --from=build /opt/ORB_SLAM3/Thirdparty/DBoW2/lib/libDBoW2.so /opt/ORB_SLAM3/Thirdparty/DBoW2/lib/
+COPY --from=build /opt/ORB_SLAM3/Thirdparty/g2o/lib/libg2o.so /opt/ORB_SLAM3/Thirdparty/g2o/lib/
+COPY --from=build /opt/ORB_SLAM3/Vocabulary/ORBvoc.txt /opt/ORB_SLAM3/Vocabulary/
+COPY --from=build /opt/ORB_SLAM3/LICENSE /opt/ORB_SLAM3/LICENSE
+COPY --from=build /opt/opencv/LICENSE /usr/local/share/licenses/opencv/LICENSE
+COPY --from=build /opt/Pangolin/LICENCE /usr/local/share/licenses/Pangolin/LICENCE
+COPY --from=build /opt/patches/ /opt/patches/
+RUN ldconfig
+ENV LD_LIBRARY_PATH=/opt/ORB_SLAM3/lib:/opt/ORB_SLAM3/Thirdparty/DBoW2/lib:/opt/ORB_SLAM3/Thirdparty/g2o/lib
+LABEL org.smoke-rescue.opencv.commit=40738fb16ceddb5fb3fea747585f7ce6abb0605b \
+      org.smoke-rescue.orbslam3.commit=4452a3c4ab75b1cde34e5505a36ec3f9edcdc4c4 \
+      org.smoke-rescue.pangolin.commit=aff6883c83f3fd7e8268a9715e84266c42e2efe3
+ENTRYPOINT ["/usr/local/bin/smoke_rescue_rgbd"]
+CMD ["/recording", "/output"]
