@@ -29,6 +29,7 @@ namespace SmokeRescue.Editor
             var plan = FloorPlan.Load();
             var scenario = Scenario.Load(scenarioFile);
             var cfg = SensorConfig.Load();
+            FurnitureBuilder.PlaceScenarioObstacles(scenario);
             var atm = Atmosphere.Build(plan, scenario);
             ThermalPreview.TagSurvivors();
             string dir = Path.Combine(EvidenceCapture.EvidenceDir, folder);
@@ -108,7 +109,9 @@ namespace SmokeRescue.Editor
         static void DebugState(string scenarioFile)
         {
             var plan = FloorPlan.Load();
-            var atm = Atmosphere.Build(plan, Scenario.Load(scenarioFile));
+            var sc = Scenario.Load(scenarioFile);
+            FurnitureBuilder.PlaceScenarioObstacles(sc);
+            var atm = Atmosphere.Build(plan, sc);
             foreach (float t in new[] { 0f, 45f, 90f })
             {
                 Settle(atm, t);

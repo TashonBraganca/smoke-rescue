@@ -1,0 +1,125 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Smoke Rescue cost guard and observability. Monthly budget with email alerts, CloudWatch alarms and a dashboard.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: smoke-rescue
+  AlertEmail:
+    Type: String
+    AllowedPattern: "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+  MonthlyBudgetUsd:
+    Type: Number
+    Default: 50
+    MinValue: 1
+  AlbFullName:
+    Type: String
+    Description: Agent stack output AlbFullName (app/name/id).
+  TargetGroupFullName:
+    Type: String
+  ClusterName:
+    Type: String
+  ServiceName:
+    Type: String
+  Alb5xxThreshold:
+    Type: Number
+    Default: 5
+
+Resources:
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "${ProjectName}-alarms"
+      Subscription:
+        - { Protocol: email, Endpoint: !Ref AlertEmail }
+
+  Budget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: !Sub "${ProjectName}-monthly"
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit: { Amount: !Ref MonthlyBudgetUsd, Unit: USD }
+      NotificationsWithSubscribers:
+        - Notification: { NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: 50, ThresholdType: PERCENTAGE }
+          Subscribers: [{ SubscriptionType: EMAIL, Address: !Ref AlertEmail }]
+        - Notification: { NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: 80, ThresholdType: PERCENTAGE }
+          Subscribers: [{ SubscriptionType: EMAIL, Address: !Ref AlertEmail }]
+        - Notification: { NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: 100, ThresholdType: PERCENTAGE }
+          Subscribers: [{ SubscriptionType: EMAIL, Address: !Ref AlertEmail }]
+        - Notification: { NotificationType: FORECASTED, ComparisonOperator: GREATER_THAN, Threshold: 100, ThresholdType: PERCENTAGE }
+          Subscribers: [{ SubscriptionType: EMAIL, Address: !Ref AlertEmail }]
+
+  Alb5xxAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${ProjectName}-alb-5xx"
+      AlarmDescription: ALB or agent returned 5xx responses
+      Metrics:
+        - Id: total
+          Expression: FILL(elb, 0) + FILL(target, 0)
+          Label: 5xx responses
+          ReturnData: true
+        - Id: elb
+          ReturnData: false
+          MetricStat:
+            Stat: Sum
+            Period: 300
+            Metric:
+              Namespace: AWS/ApplicationELB
+              MetricName: HTTPCode_ELB_5XX_Count
+              Dimensions: [{ Name: LoadBalancer, Value: !Ref AlbFullName }]
+        - Id: target
+          ReturnData: false
+          MetricStat:
+            Stat: Sum
+            Period: 300
+            Metric:
+              Namespace: AWS/ApplicationELB
+              MetricName: HTTPCode_Target_5XX_Count
+              Dimensions:
+                - { Name: LoadBalancer, Value: !Ref AlbFullName }
+                - { Name: TargetGroup, Value: !Ref TargetGroupFullName }
+      ComparisonOperator: GreaterThanThreshold
+      Threshold: !Ref Alb5xxThreshold
+      EvaluationPeriods: 1
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+      OKActions: [!Ref AlarmTopic]
+
+  NoTasksAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${ProjectName}-agent-no-running-tasks"
+      AlarmDescription: The agent service has no running tasks (Container Insights RunningTaskCount)
+      Namespace: ECS/ContainerInsights
+      MetricName: RunningTaskCount
+      Dimensions:
+        - { Name: ClusterName, Value: !Ref ClusterName }
+        - { Name: ServiceName, Value: !Ref ServiceName }
+      Statistic: Minimum
+      Period: 60
+      EvaluationPeriods: 3
+      ComparisonOperator: LessThanThreshold
+      Threshold: 1
+      TreatMissingData: breaching
+      AlarmActions: [!Ref AlarmTopic]
+      OKActions: [!Ref AlarmTopic]
+
+  Dashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub "${ProjectName}"
+      DashboardBody: !Sub |
+        {"widgets":[
+          {"type":"metric","x":0,"y":0,"width":12,"height":6,"properties":{"title":"ALB requests and 5xx","region":"${AWS::Region}","stat":"Sum","period":60,"metrics":[["AWS/ApplicationELB","RequestCount","LoadBalancer","${AlbFullName}"],[".","HTTPCode_Target_5XX_Count",".","."],[".","HTTPCode_ELB_5XX_Count",".","."]]}},
+          {"type":"metric","x":12,"y":0,"width":12,"height":6,"properties":{"title":"Agent latency (p95, seconds)","region":"${AWS::Region}","stat":"p95","period":60,"metrics":[["AWS/ApplicationELB","TargetResponseTime","LoadBalancer","${AlbFullName}"]]}},
+          {"type":"metric","x":0,"y":6,"width":12,"height":6,"properties":{"title":"Running tasks","region":"${AWS::Region}","stat":"Minimum","period":60,"metrics":[["ECS/ContainerInsights","RunningTaskCount","ClusterName","${ClusterName}","ServiceName","${ServiceName}"]]}},
+          {"type":"metric","x":12,"y":6,"width":12,"height":6,"properties":{"title":"Agent CPU and memory (%)","region":"${AWS::Region}","stat":"Average","period":60,"metrics":[["AWS/ECS","CPUUtilization","ClusterName","${ClusterName}","ServiceName","${ServiceName}"],[".","MemoryUtilization",".",".",".","."]]}},
+          {"type":"log","x":0,"y":12,"width":24,"height":6,"properties":{"title":"Agent errors","region":"${AWS::Region}","query":"SOURCE '/ecs/${ProjectName}-agent' | fields @timestamp, @message | filter @message like /ERROR|Traceback/ | sort @timestamp desc | limit 50","view":"table"}}
+        ]}
+
+Outputs:
+  AlarmTopicArn: { Value: !Ref AlarmTopic }
+  DashboardName: { Value: !Ref Dashboard }

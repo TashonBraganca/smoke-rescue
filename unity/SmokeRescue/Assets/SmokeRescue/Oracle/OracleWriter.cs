@@ -45,12 +45,18 @@ namespace SmokeRescue.Oracle
             sb.Append(string.Format(CultureInfo.InvariantCulture, "{0:F6} {1:F2} {2:F2}\n", t, airC, hottestSurfaceC));
         }
 
+        readonly Dictionary<string, double> collisions = new Dictionary<string, double>();
+        /// <summary>Seconds a robot's body spent stopped against walls or furniture (scoring only).</summary>
+        public void Collisions(string robotId, double seconds) => collisions[robotId] = seconds;
+
         /// <summary>Fire timeline from the fire simulation: collapses and room flashover times.</summary>
         public void FireEvents(object events) =>
             File.WriteAllText(Path.Combine(dir, "fire_events.json"), JsonConvert.SerializeObject(events, Formatting.Indented));
 
         public void Finish(Scenario scenario, string floorplanPath)
         {
+            if (collisions.Count > 0)
+                File.WriteAllText(Path.Combine(dir, "collisions.json"), JsonConvert.SerializeObject(collisions, Formatting.Indented));
             foreach (var kv in heat)
                 File.WriteAllText(Path.Combine(dir, $"{kv.Key}_heat.txt"), kv.Value.ToString());
             foreach (var kv in trajectories)

@@ -1,0 +1,240 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Smoke Rescue batch compute. AWS Batch on Fargate with job definitions for ORB-SLAM3 (OpenCV 5, arm64) and the evaluation pipeline.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: smoke-rescue
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+  RunsBucketName:
+    Type: String
+  SlamImageTag:
+    Type: String
+    Default: unset
+  PipelineImageTag:
+    Type: String
+    Default: unset
+  ComputeType:
+    Type: String
+    Default: FARGATE
+    AllowedValues: [FARGATE, FARGATE_SPOT]
+  MaxVcpus:
+    Type: Number
+    Default: 16
+  SlamVcpu:
+    Type: String
+    Default: "4"
+    AllowedValues: ["2", "4", "8"]
+  SlamMemoryMiB:
+    Type: String
+    Default: "16384"
+    Description: Must be valid for the vCPU count (4 vCPU allows 8192 to 30720).
+  PipelineArchitecture:
+    Type: String
+    Default: X86_64
+    AllowedValues: [X86_64, ARM64]
+    Description: X86_64 because open3d 0.19.0 has no linux-aarch64 wheel in brain/uv.lock.
+  JobTimeoutSeconds:
+    Type: Number
+    Default: 7200
+
+Resources:
+  SlamRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${ProjectName}/slam"
+      ImageTagMutability: IMMUTABLE
+      EmptyOnDelete: true
+      ImageScanningConfiguration: { ScanOnPush: true }
+      EncryptionConfiguration: { EncryptionType: AES256 }
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {"rules":[{"rulePriority":1,"description":"keep the last 5 images","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":5},"action":{"type":"expire"}}]}
+
+  PipelineRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${ProjectName}/pipeline"
+      ImageTagMutability: IMMUTABLE
+      EmptyOnDelete: true
+      ImageScanningConfiguration: { ScanOnPush: true }
+      EncryptionConfiguration: { EncryptionType: AES256 }
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {"rules":[{"rulePriority":1,"description":"keep the last 5 images","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":5},"action":{"type":"expire"}}]}
+
+  BatchLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/batch/${ProjectName}"
+      RetentionInDays: 14
+
+  JobSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Batch jobs, no ingress, HTTPS egress only
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: S3, ECR, CloudWatch Logs
+
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ecs-tasks.amazonaws.com }
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals: { "aws:SourceAccount": !Ref "AWS::AccountId" }
+      Policies:
+        - PolicyName: pull-images-and-log
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: "*"
+              - Effect: Allow
+                Action: [ecr:BatchGetImage, ecr:GetDownloadUrlForLayer]
+                Resource: [!GetAtt SlamRepository.Arn, !GetAtt PipelineRepository.Arn]
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !Sub "${BatchLogGroup.Arn}:*"
+
+  # Jobs may read recordings/ and write runs/. They cannot touch agent/.
+  JobRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ecs-tasks.amazonaws.com }
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals: { "aws:SourceAccount": !Ref "AWS::AccountId" }
+      Policies:
+        - PolicyName: recordings-in-runs-out
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:s3:::${RunsBucketName}/recordings/*"
+                  - !Sub "arn:${AWS::Partition}:s3:::${RunsBucketName}/runs/*"
+              - Effect: Allow
+                Action: s3:PutObject
+                Resource: !Sub "arn:${AWS::Partition}:s3:::${RunsBucketName}/runs/*"
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource: !Sub "arn:${AWS::Partition}:s3:::${RunsBucketName}"
+                Condition:
+                  StringLike: { "s3:prefix": ["recordings/*", "runs/*"] }
+
+  ComputeEnvironment:
+    Type: AWS::Batch::ComputeEnvironment
+    Properties:
+      ComputeEnvironmentName: !Sub "${ProjectName}-fargate"
+      Type: MANAGED
+      State: ENABLED
+      ComputeResources:
+        Type: !Ref ComputeType
+        MaxvCpus: !Ref MaxVcpus
+        Subnets: !Ref SubnetIds
+        SecurityGroupIds: [!Ref JobSecurityGroup]
+
+  JobQueue:
+    Type: AWS::Batch::JobQueue
+    Properties:
+      JobQueueName: !Sub "${ProjectName}-queue"
+      State: ENABLED
+      Priority: 1
+      ComputeEnvironmentOrder:
+        - Order: 1
+          ComputeEnvironment: !Ref ComputeEnvironment
+
+  SlamJobDefinition:
+    Type: AWS::Batch::JobDefinition
+    Properties:
+      JobDefinitionName: !Sub "${ProjectName}-orbslam3-cv5"
+      Type: container
+      PlatformCapabilities: [FARGATE]
+      Timeout: { AttemptDurationSeconds: !Ref JobTimeoutSeconds }
+      RetryStrategy: { Attempts: 2 }
+      Parameters:
+        input_s3_uri: ""
+        output_s3_uri: ""
+      ContainerProperties:
+        Image: !Sub "${SlamRepository.RepositoryUri}:${SlamImageTag}"
+        Command: ["Ref::input_s3_uri", "Ref::output_s3_uri"]
+        Environment:
+          - { Name: RUNS_BUCKET, Value: !Ref RunsBucketName }
+        ResourceRequirements:
+          - { Type: VCPU, Value: !Ref SlamVcpu }
+          - { Type: MEMORY, Value: !Ref SlamMemoryMiB }
+        ExecutionRoleArn: !GetAtt ExecutionRole.Arn
+        JobRoleArn: !GetAtt JobRole.Arn
+        EphemeralStorage: { SizeInGiB: 50 }
+        FargatePlatformConfiguration: { PlatformVersion: LATEST }
+        NetworkConfiguration: { AssignPublicIp: ENABLED }
+        RuntimePlatform:
+          CpuArchitecture: ARM64
+          OperatingSystemFamily: LINUX
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-group: !Ref BatchLogGroup
+            awslogs-region: !Ref "AWS::Region"
+            awslogs-stream-prefix: slam
+
+  PipelineJobDefinition:
+    Type: AWS::Batch::JobDefinition
+    Properties:
+      JobDefinitionName: !Sub "${ProjectName}-pipeline-eval"
+      Type: container
+      PlatformCapabilities: [FARGATE]
+      Timeout: { AttemptDurationSeconds: !Ref JobTimeoutSeconds }
+      RetryStrategy: { Attempts: 1 }
+      Parameters:
+        recording_s3_uri: ""
+        run_s3_uri: ""
+      ContainerProperties:
+        Image: !Sub "${PipelineRepository.RepositoryUri}:${PipelineImageTag}"
+        Command: ["Ref::recording_s3_uri", "Ref::run_s3_uri"]
+        Environment:
+          - { Name: RUNS_BUCKET, Value: !Ref RunsBucketName }
+        ResourceRequirements:
+          - { Type: VCPU, Value: "2" }
+          - { Type: MEMORY, Value: "8192" }
+        ExecutionRoleArn: !GetAtt ExecutionRole.Arn
+        JobRoleArn: !GetAtt JobRole.Arn
+        EphemeralStorage: { SizeInGiB: 50 }
+        FargatePlatformConfiguration: { PlatformVersion: LATEST }
+        NetworkConfiguration: { AssignPublicIp: ENABLED }
+        RuntimePlatform:
+          CpuArchitecture: !Ref PipelineArchitecture
+          OperatingSystemFamily: LINUX
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-group: !Ref BatchLogGroup
+            awslogs-region: !Ref "AWS::Region"
+            awslogs-stream-prefix: pipeline
+
+Outputs:
+  SlamRepositoryUri: { Value: !GetAtt SlamRepository.RepositoryUri }
+  PipelineRepositoryUri: { Value: !GetAtt PipelineRepository.RepositoryUri }
+  JobQueueName: { Value: !Ref JobQueue }
+  SlamJobDefinition: { Value: !Ref SlamJobDefinition }
+  PipelineJobDefinition: { Value: !Ref PipelineJobDefinition }
+  BatchLogGroup: { Value: !Ref BatchLogGroup }

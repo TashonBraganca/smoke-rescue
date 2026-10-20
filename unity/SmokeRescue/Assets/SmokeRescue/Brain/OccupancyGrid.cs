@@ -1,0 +1,279 @@
+using System;
+using System.Collections.Generic;
+using SmokeRescue.Sensors;
+using UnityEngine;
+
+namespace SmokeRescue.Brain
+{
+    /// <summary>Sensor-only log-odds map and maximum observed surface temperature layer.</summary>
+    public sealed class OccupancyGrid
+    {
+        readonly BrainConfig c;
+        readonly float[] odds, heat, rise;
+        readonly double[] heatTime;
+        readonly bool[] hits, frees, observed;
+        readonly double[] localTime, ownHeatTime;
+        readonly float[] ownHeat;
+        readonly SortedDictionary<string, byte[]> peerLayers = new SortedDictionary<string, byte[]>(StringComparer.Ordinal);
+        readonly byte[] peer;
+        double localObservationTime;
+        float[] obstacleDistance, fireDistance;
+        bool dirty = true;
+        double time;
+        public int Size { get; }
+        public int Count => Size * Size;
+        public float CellM => c.cell_m;
+        public Vector2 Origin { get; }
+        public OccupancyGrid(BrainConfig config)
+        {
+            c = config; Size = Mathf.CeilToInt(c.grid_size_m / c.cell_m);
+            Origin = c.fixed_grid_origin ? new Vector2(c.grid_origin_x_m, c.grid_origin_z_m) :
+                new Vector2(-Size * c.cell_m / 2, -Size * c.cell_m / 2);
+            odds = new float[Count]; heat = new float[Count]; rise = new float[Count]; heatTime = new double[Count];
+            hits = new bool[Count]; frees = new bool[Count]; observed = new bool[Count];
+            localTime = new double[Count]; peer = new byte[Count];
+            ownHeat = new float[Count]; ownHeatTime = new double[Count];
+            for (int i = 0; i < Count; i++) { heat[i] = c.ambient_c; heatTime[i] = double.NegativeInfinity; ownHeat[i] = c.ambient_c; ownHeatTime[i] = double.NegativeInfinity; }
+        }
+        public int Cell(Vector2 p)
+        {
+            int x = Mathf.FloorToInt((p.x - Origin.x) / CellM), y = Mathf.FloorToInt((p.y - Origin.y) / CellM);
+            return Inside(x, y) ? y * Size + x : -1;
+        }
+        public Vector2 Centre(int index) => Origin + new Vector2(index % Size + .5f, index / Size + .5f) * CellM;
+        public bool Inside(int x, int y) => x >= 0 && y >= 0 && x < Size && y < Size;
+        public byte OwnOccupancy(int index) => index < 0 || index >= Count ? (byte)0 :
+            odds[index] >= c.occupied_threshold ? (byte)255 : odds[index] <= c.free_threshold ? (byte)1 : (byte)0;
+        public bool OwnObserved(int i) => i >= 0 && i < Count && observed[i];
+        public bool PeerExplored(int i) => i >= 0 && i < Count && peer[i] != 0;
+        public byte Occupancy(int i)
+        {
+            if (i < 0 || i >= Count) return 0;
+            byte own = OwnOccupancy(i);
+            if (own == 255) return own;
+            if (own == 1 && (peer[i] != 255 || time - localTime[i] <= c.peer_local_priority_s)) return own;
+            return peer[i] != 0 ? peer[i] : own;
+        }
+        public byte OccupancyAt(Vector2 p) => Occupancy(Cell(p));
+        public float Heat(int i) => heat[i];
+        public void ObserveFree(int x, int y) { if (Inside(x, y)) ObserveFree(y * Size + x); }
+        public void ObserveFree(int i)
+        {
+            if (i < 0 || i >= Count) return;
+            odds[i] = Mathf.Max(-c.log_odds_cap, odds[i] + c.free_log_odds);
+            observed[i] = true; localTime[i] = localObservationTime; dirty = true;
+        }
+        public void ObserveOccupied(int i)
+        {
+            if (i < 0 || i >= Count) return;
+            odds[i] = Mathf.Min(c.log_odds_cap, Mathf.Max(0, odds[i]) + c.occupied_log_odds);
+            observed[i] = true; localTime[i] = localObservationTime; dirty = true;
+        }
+        // Keep the inferred contact beyond the current inflated footprint, so replanning can start.
+        internal int MarkStuckStrip(BrainPose pose)
+        {
+            float start = c.robot_radius_m + 2 * CellM, end = start + c.stuck_strip_depth_m;
+            int centre = Cell(pose.position); if (centre < 0) return 0;
+            int radius = Mathf.CeilToInt((end + c.robot_radius_m) / CellM), marked = 0;
+            for (int dy = -radius; dy <= radius; dy++) for (int dx = -radius; dx <= radius; dx++)
+            {
+                int x = centre % Size + dx, y = centre / Size + dy; if (!Inside(x, y)) continue;
+                int i = y * Size + x; var delta = Centre(i) - pose.position;
+                float forward = Vector2.Dot(delta, pose.Forward);
+                float side = pose.Forward.x * delta.y - pose.Forward.y * delta.x;
+                if (forward < start || forward > end || Mathf.Abs(side) > c.robot_radius_m) continue;
+                odds[i] = Mathf.Max(odds[i], c.stuck_log_odds);
+                observed[i] = true; localTime[i] = time; marked++;
+            }
+            dirty = true; return marked;
+        }
+        internal void ReplacePeerLayer(string sender, BrainMessage m, byte[] explored)
+        {
+            var layer = new byte[Count];
+            for (int i = 0; i < Count; i++)
+            {
+                int cell = m.Cell(Centre(i)); if (cell < 0) continue;
+                if (BrainMessage.Bit(m.Occupied, cell)) layer[i] = 255;
+                else if (BrainMessage.Bit(explored, cell)) layer[i] = 1;
+            }
+            peerLayers[sender] = layer;
+            Array.Clear(peer, 0, peer.Length);
+            foreach (var pair in peerLayers)
+                for (int i = 0; i < Count; i++) if (pair.Value[i] > peer[i]) peer[i] = pair.Value[i];
+            dirty = true;
+        }
+        internal bool OwnOverlap(string sender)
+        {
+            if (!peerLayers.TryGetValue(sender, out var layer)) return false;
+            for (int i = 0; i < Count; i++) if (observed[i] && layer[i] != 0) return true;
+            return false;
+        }
+        public byte[] CopyPeerExplored()
+        {
+            var copy = new byte[Count]; for (int i = 0; i < Count; i++) if (peer[i] != 0) copy[i] = 1;
+            return copy;
+        }
+        internal float LocalHeat(int i) => ownHeat[i];
+        internal double LocalHeatTime(int i) => ownHeatTime[i];
+        internal void ObservePeerHeat(int i, float temperatureC, double observedAt, double receivedAt)
+        {
+            if (i < 0 || i >= Count || observedAt < heatTime[i]) return;
+            float decayed = Mathf.Max(c.ambient_c, temperatureC - c.heat_decay_c_per_s * (float)(receivedAt - observedAt));
+            bool before = Dangerous(i);
+            heat[i] = Mathf.Max(heat[i], decayed); heatTime[i] = observedAt;
+            // A packet contains one historical sample, so it cannot establish a local temperature slope.
+            rise[i] = 0; dirty |= before != Dangerous(i);
+        }
+        public void ObserveHeat(int i, float temperatureC, double t)
+        {
+            if (i < 0 || i >= Count || !BrainMath.Finite(temperatureC) || t < heatTime[i]) return;
+            float ownDecayed = double.IsNegativeInfinity(ownHeatTime[i]) ? c.ambient_c :
+                Mathf.Max(c.ambient_c, ownHeat[i] - c.heat_decay_c_per_s * (float)(t - ownHeatTime[i]));
+            if (t >= ownHeatTime[i] && temperatureC >= ownDecayed) { ownHeat[i] = temperatureC; ownHeatTime[i] = t; }
+            bool wasDangerous = Dangerous(i);
+            if (t > heatTime[i] && t - heatTime[i] <= c.heat_rise_memory_s)
+                rise[i] = Mathf.Max(0, (temperatureC - heat[i]) / (float)(t - heatTime[i]));
+            else if (t > heatTime[i]) rise[i] = 0;
+            heat[i] = Mathf.Max(heat[i], temperatureC); heatTime[i] = t; dirty |= wasDangerous != Dangerous(i);
+        }
+        public void DecayTo(double t)
+        {
+            float dt = (float)Math.Max(0, t - time); bool changed = false;
+            for (int i = 0; i < Count; i++)
+            {
+                bool before = Dangerous(i);
+                if (heat[i] > c.ambient_c) { heat[i] = Mathf.Max(c.ambient_c, heat[i] - c.heat_decay_c_per_s * dt); }
+                if (t - heatTime[i] > c.heat_rise_memory_s) rise[i] = 0;
+                if (before != Dangerous(i)) changed = true;
+            }
+            // Local free evidence can lose priority over a peer obstacle as it ages.
+            if (t > time) for (int i = 0; i < Count; i++)
+                if (peer[i] == 255 && time - localTime[i] <= c.peer_local_priority_s && t - localTime[i] > c.peer_local_priority_s) { changed = true; break; }
+            time = t; localObservationTime = t; dirty |= changed;
+        }
+        public bool Dangerous(int i) => heat[i] >= c.fire_c ||
+            (time - heatTime[i] <= c.heat_rise_memory_s && heat[i] + rise[i] * c.heat_prediction_s >= c.fire_c);
+        public void MarkFootprint(Vector2 position)
+        {
+            int cell = Cell(position); if (cell < 0) return;
+            int radius = Mathf.CeilToInt(c.robot_radius_m / CellM);
+            for (int y = -radius; y <= radius; y++) for (int x = -radius; x <= radius; x++)
+            {
+                int col = cell % Size + x, row = cell / Size + y;
+                if (Inside(col, row) && Vector2.Distance(Centre(row * Size + col), position) <= c.robot_radius_m)
+                    ObserveFree(row * Size + col);
+            }
+        }
+        public void IntegrateDepth(RgbdFrame frame, SensorConfig s, BrainPose pose)
+        {
+            localObservationTime = frame.Timestamp;
+            Array.Clear(hits, 0, Count); Array.Clear(frees, 0, Count);
+            Vector2 camera = pose.Transform(0, s.camera.mount.forward_offset_m);
+            int start = Cell(camera); if (start < 0) { localObservationTime = time; return; }
+            for (int v = 0; v < frame.Height; v += c.depth_stride) for (int u = 0; u < frame.Width; u += c.depth_stride)
+            {
+                float z = frame.Depth[v * frame.Width + u] * .001f;
+                if (z < s.depth.min_m || z > s.depth.max_m) continue;
+                var p = BackProject(u, v, z, s);
+                if (p.z > c.obstacle_max_height_m) continue;
+                Vector2 end = pose.Transform(p.x, p.y);
+                bool obstacle = p.z >= c.obstacle_min_height_m;
+                Ray(start, end, obstacle);
+            }
+            // Aggregate a frame before updating odds. A floor ray cannot erase a wall hit in this frame.
+            for (int i = 0; i < Count; i++)
+                if (hits[i]) ObserveOccupied(i); else if (frees[i] && frame.Timestamp >= localTime[i]) ObserveFree(i);
+            localObservationTime = time;
+        }
+        /// <summary>Returns body x right, y forward, z height above floor. Depth is optical z.</summary>
+        public static Vector3 BackProject(float u, float v, float z, SensorConfig s)
+        {
+            var k = s.camera; float pitch = k.mount.pitch_down_deg * Mathf.Deg2Rad;
+            float down = (v - k.cy) / k.fy * z;
+            return new Vector3((u - k.cx) / k.fx * z,
+                k.mount.forward_offset_m + z * Mathf.Cos(pitch) - down * Mathf.Sin(pitch),
+                k.mount.height_m - z * Mathf.Sin(pitch) - down * Mathf.Cos(pitch));
+        }
+        void Ray(int start, Vector2 end, bool obstacle)
+        {
+            int x = start % Size, y = start / Size;
+            int ex = Mathf.FloorToInt((end.x - Origin.x) / CellM), ey = Mathf.FloorToInt((end.y - Origin.y) / CellM);
+            int dx = Math.Abs(ex - x), dy = Math.Abs(ey - y), sx = x < ex ? 1 : -1, sy = y < ey ? 1 : -1, error = dx - dy;
+            // Bounded even if a projected ray ends outside the map.
+            for (int n = 0; n <= Size * 2 && Inside(x, y); n++)
+            {
+                if (x == ex && y == ey) { if (obstacle) hits[y * Size + x] = true; else frees[y * Size + x] = true; break; }
+                frees[y * Size + x] = true;
+                int twice = 2 * error;
+                if (twice > -dy) { error -= dy; x += sx; }
+                if (twice < dx) { error += dx; y += sy; }
+            }
+        }
+        internal void PrepareNavigation()
+        {
+            if (!dirty) return;
+            obstacleDistance = Distances(i => Occupancy(i) == 255);
+            fireDistance = Distances(Dangerous); dirty = false;
+        }
+        internal bool Walkable(int i)
+        {
+            if (i < 0 || i >= Count || Occupancy(i) != 1) return false;
+            // Include half a cell diagonal so clearance applies to the whole hot/occupied cell.
+            float padding = CellM * .707107f;
+            return obstacleDistance[i] > c.robot_radius_m + padding && fireDistance[i] > c.fire_clearance_m + padding;
+        }
+        internal float Cost(int i)
+        {
+            float strength = Mathf.Clamp01((c.heat_cost_radius_m - fireDistance[i]) / (c.heat_cost_radius_m - c.fire_clearance_m));
+            float warm = Mathf.Clamp01((heat[i] - c.heat_project_min_c) / (c.fire_c - c.heat_project_min_c));
+            float clearance = obstacleDistance[i] - c.robot_radius_m - CellM * .707107f;
+            float edge = Mathf.Clamp01(1 - clearance / c.obstacle_cost_margin_m);
+            return 1 + c.heat_cost_weight * (strength * strength + warm * warm) + c.obstacle_cost_weight * edge * edge;
+        }
+        internal float FireDistance(int i) => i < 0 ? 0 : fireDistance[i];
+        public byte[] CopyOccupancy() { var result = new byte[Count]; for (int i = 0; i < Count; i++) result[i] = Occupancy(i); return result; }
+        public float[] CopyHeat() => (float[])heat.Clone();
+        public Vector2[] FireHotspots()
+        {
+            var list = new List<Vector2>(); for (int i = 0; i < Count; i++) if (Dangerous(i)) list.Add(Centre(i)); return list.ToArray();
+        }
+        // Exact squared Euclidean distance transform, two one-dimensional passes, O(grid cells).
+        float[] Distances(Func<int, bool> source)
+        {
+            var temp = new float[Count]; var output = new float[Count];
+            var f = new float[Size]; var d = new float[Size]; var sites = new int[Size]; var cuts = new float[Size + 1];
+            for (int y = 0; y < Size; y++)
+            {
+                for (int x = 0; x < Size; x++) f[x] = source(y * Size + x) ? 0 : 1e10f;
+                DistanceLine(f, d, sites, cuts);
+                for (int x = 0; x < Size; x++) temp[y * Size + x] = d[x];
+            }
+            for (int x = 0; x < Size; x++)
+            {
+                for (int y = 0; y < Size; y++) f[y] = temp[y * Size + x];
+                DistanceLine(f, d, sites, cuts);
+                for (int y = 0; y < Size; y++) output[y * Size + x] = Mathf.Sqrt(d[y]) * CellM;
+            }
+            return output;
+        }
+        static void DistanceLine(float[] f, float[] d, int[] sites, float[] cuts)
+        {
+            int k = 0; sites[0] = 0; cuts[0] = float.NegativeInfinity; cuts[1] = float.PositiveInfinity;
+            for (int q = 1; q < f.Length; q++)
+            {
+                float intersection;
+                while (true)
+                {
+                    int site = sites[k];
+                    intersection = (float)(((double)f[q] + q * q - ((double)f[site] + site * site)) / (2 * (q - site)));
+                    if (intersection > cuts[k] || k == 0) break;
+                    k--;
+                }
+                sites[++k] = q; cuts[k] = intersection; cuts[k + 1] = float.PositiveInfinity;
+            }
+            k = 0;
+            for (int q = 0; q < f.Length; q++)
+            { while (cuts[k + 1] < q) k++; float delta = q - sites[k]; d[q] = delta * delta + f[sites[k]]; }
+        }
+    }
+}

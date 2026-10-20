@@ -1,0 +1,563 @@
+using System;
+using System.Collections.Generic;
+using SmokeRescue.Sensors;
+using UnityEngine;
+
+namespace SmokeRescue.Brain
+{
+    /// <summary>One robot's deterministic sensor-to-command state machine. Call from one simulation thread.
+    /// Deliver all due motion samples before Step. Image readbacks may be delayed up to frame_max_age_s.</summary>
+    public sealed partial class RobotBrain
+    {
+        sealed class Track
+        {
+            public Vector2 position;
+            public double lastSeen, retryAfter;
+            public readonly Queue<double> observations = new Queue<double>();
+            public bool candidate, confirmed;
+        }
+        readonly struct AirSample
+        { public readonly double t; public readonly float c; public AirSample(double time, float value) { t = time; c = value; } }
+        readonly SensorConfig sensors;
+        readonly BrainConfig c;
+        readonly string id;
+        readonly int scanSign;
+        readonly DeadReckoning motion;
+        readonly OccupancyGrid grid;
+        readonly GridPlanner planner;
+        readonly CameraHealth health;
+        readonly List<RgbdFrame> rgbQueue = new List<RgbdFrame>(), rgbHistory = new List<RgbdFrame>();
+        readonly List<ThermalFrame> thermalQueue = new List<ThermalFrame>();
+        readonly List<AirSample> airQueue = new List<AirSample>();
+        readonly List<BrainEvent> events = new List<BrainEvent>();
+        readonly List<Track> tracks = new List<Track>();
+        readonly List<Vector2> survivors = new List<Vector2>();
+        List<Vector2> path = new List<Vector2>();
+        Track active;
+        Vector2? goal;
+        int cursor;
+        double lastStep = double.NaN, lastRgb = double.NegativeInfinity, lastThermal = double.NegativeInfinity;
+        double lastAir = double.NegativeInfinity, lastPlan = double.NegativeInfinity, scanSince = double.NaN;
+        double nextSurvivorSearch;
+        float airC, budget = 1, dwell, commandedSpeed;
+        bool retreating, returning, completed, collision, nearFire, waitingSensors, inspecting;
+        string returnReason, motionPolicy;
+        string State => completed ? "complete" : retreating ? "retreat" : returning ? "return" : recoveryPhase != 0 ? "recover" : active != null ? "survivor" : "explore";
+
+        public RobotBrain(SensorConfig cfg, BrainConfig brainCfg, string robotId, int seed, EntryPose? entryPose = null)
+        {
+            sensors = cfg ?? throw new ArgumentNullException(nameof(cfg)); c = brainCfg ?? throw new ArgumentNullException(nameof(brainCfg));
+            c.Validate(); ValidateCalibration(cfg);
+            if (string.IsNullOrWhiteSpace(robotId)) throw new ArgumentException("Robot ID is required.", nameof(robotId));
+            id = robotId; scanSign = (seed & 1) == 0 ? 1 : -1;
+            var entry = entryPose.HasValue ? entryPose.Value.pose : new BrainPose();
+            home = entry.position;
+            airC = c.ambient_c; motion = new DeadReckoning(c.motion_stale_s, c.frame_max_age_s + c.frame_pair_tolerance_s, entry); grid = new OccupancyGrid(c);
+            if (grid.Cell(home) < 0) throw new ArgumentException("Entry door is outside the configured building grid.");
+            planner = new GridPlanner(grid, c) { Home = home }; health = new CameraHealth(c);
+            grid.MarkFootprint(home);
+            observedSequence = new long[SharedSize * SharedSize];
+        }
+        public void OnOdometry(OdometrySample sample) => motion.Add(sample);
+        public void OnImu(ImuSample sample) => motion.Add(sample);
+        public void OnRgbd(RgbdFrame frame)
+        {
+            if (frame == null) throw new ArgumentNullException(nameof(frame)); BrainMath.Time(frame.Timestamp);
+            if (frame.Width != sensors.camera.width || frame.Height != sensors.camera.height || frame.Rgb == null || frame.Depth == null ||
+                frame.Rgb.Length != frame.Width * frame.Height * 3 || frame.Depth.Length != frame.Width * frame.Height)
+                throw new ArgumentException("RGB-D dimensions or buffers do not match calibration.");
+            if (frame.Timestamp <= lastRgb) return;
+            if (rgbQueue.Exists(f => f.Timestamp == frame.Timestamp)) return;
+            rgbQueue.Add(frame); rgbQueue.Sort((a, b) => a.Timestamp.CompareTo(b.Timestamp));
+        }
+        public void OnThermal(ThermalFrame frame)
+        {
+            if (frame == null) throw new ArgumentNullException(nameof(frame)); BrainMath.Time(frame.Timestamp);
+            if (frame.Width != sensors.thermal.width || frame.Height != sensors.thermal.height || frame.DeciKelvin == null || frame.DeciKelvin.Length != frame.Width * frame.Height)
+                throw new ArgumentException("Thermal dimensions or buffer do not match calibration.");
+            if (frame.Timestamp <= lastThermal) return;
+            if (thermalQueue.Exists(f => f.Timestamp == frame.Timestamp)) return;
+            thermalQueue.Add(frame); thermalQueue.Sort((a, b) => a.Timestamp.CompareTo(b.Timestamp));
+        }
+        public void OnAirTemperature(double t, float temperatureC)
+        {
+            BrainMath.Time(t); if (!BrainMath.Finite(temperatureC)) throw new ArgumentException("Nonfinite air temperature.");
+            if (t <= lastAir || airQueue.Exists(a => a.t == t)) return;
+            airQueue.Add(new AirSample(t, temperatureC)); airQueue.Sort((a, b) => a.t.CompareTo(b.t));
+        }
+        public BrainCommand Step(double t, float dt)
+        {
+            BrainMath.Time(t);
+            if (t < lastPeerReceived || !BrainMath.Finite(dt) || dt <= 0 || (!double.IsNaN(lastStep) && t <= lastStep))
+                throw new ArgumentException("Step requires increasing simulation timestamps and positive dt.");
+            float elapsed = double.IsNaN(lastStep) ? 0 : (float)(t - lastStep);
+            if (!double.IsNaN(lastStep) && Math.Abs(elapsed - dt) > Math.Max(1e-5, dt * .001))
+                throw new ArgumentException("dt must equal elapsed simulation time.");
+            double previous = double.IsNaN(lastStep) ? t : lastStep; lastStep = t;
+            motion.Advance(t); grid.DecayTo(t); ConsumeImages(t); UpdateHeatBudget(previous, t);
+            InvalidatePeerGoal(t); CheckMapOverlap(t);
+            grid.PrepareNavigation();
+            int cell = grid.Cell(motion.Pose.position);
+            bool fireNow = grid.FireDistance(cell) < c.heat_cost_radius_m;
+            if (fireNow && !nearFire)
+                Emit(t, "avoid_fire", "Observed or rising heat imposes a forbidden margin and a graded path cost.",
+                    "fire_distance_m", grid.FireDistance(cell), "clearance_m", c.fire_clearance_m);
+            nearFire = fireNow;
+
+            if (!completed && !returning && t >= c.mission_time_limit_s) BeginReturn(t, "Exploration time limit reached.");
+            if (!retreating && (airC > c.heat_retreat_c || budget < c.heat_retreat_fraction))
+            {
+                ResetStuckRecovery(); retreating = true; active = null; dwell = 0; ClearPath();
+                Emit(t, "retreat", "Air temperature or remaining heat budget requires a cool reachable goal.", "air_c", airC, "heat_budget", budget);
+            }
+            else if (retreating && airC < c.heat_recover_below_c && t - lastAir <= c.frame_max_age_s && budget >= c.heat_resume_fraction)
+            {
+                ResetStuckRecovery(); retreating = false; ClearPath();
+                Emit(t, "goal", "Cool air and a recovered heat budget permit travel again.", "air_c", airC, "heat_budget", budget);
+            }
+            if (completed && !retreating) return Command(0, 0, dt, true);
+            bool sensorsHealthy = t - lastRgb <= c.frame_max_age_s && motion.Healthy(t) &&
+                t - lastAir <= c.frame_max_age_s && (!health.Thermal || t - lastThermal <= c.frame_max_age_s);
+            if (!sensorsHealthy)
+            {
+                if (!waitingSensors)
+                    Emit(t, "replan", "Hold until geometry, motion, air temperature and the active camera are recent.", "rgb_age_s", Age(t, lastRgb));
+                waitingSensors = true; dwell = 0; ResetStuckRecovery(); return Command(0, 0, dt, true);
+            }
+            if (waitingSensors) { waitingSensors = false; ClearPath(); Emit(t, "replan", "Sensor streams recovered; rebuild the local path."); }
+
+            if (recoveryPhase != 0) return RecoverStuck(t, dt);
+            if (DetectStuck(t, previous, elapsed)) return Command(0, 0, dt, true);
+
+            float nearest = ObstacleAhead(c.collision_cone_deg, out float obstacleSide);
+            float stopping = c.collision_stop_m + commandedSpeed * commandedSpeed / (2 * c.limits.max_accel_mps2);
+            if (nearest < stopping)
+            {
+                if (!collision) Emit(t, "collision_risk", "An occupied cell is inside the heading cone and stopping distance.", "distance_m", nearest, "stop_distance_m", stopping);
+                collision = true; dwell = 0; ClearPath();
+                return Command(0, obstacleSide >= 0 ? -c.scan_yaw_dps : c.scan_yaw_dps, dt, true);
+            }
+            collision = false;
+            if (retreating)
+            {
+                if (NeedPlan(t))
+                {
+                    bool blocked = path.Count > 0 && !planner.PathSafe(path, cursor);
+                    var escape = goal.HasValue && !blocked ? planner.Plan(motion.Pose.position, goal.Value) : planner.CoolestPath(motion.Pose.position);
+                    SetPath(escape); lastPlan = t;
+                    Emit(t, "replan", escape.Count > 0 ? "Retreat along the coolest reachable known route." : "No safe cool route is known; hold position.", "path_points", path.Count);
+                    if (goal.HasValue) EmitGoal(t, "Coolest reachable known cell, with a preference for the start.");
+                }
+                return FollowOrHold(t, dt);
+            }
+            if (returning)
+            {
+                if (Vector2.Distance(motion.Pose.position, home) <= c.goal_tolerance_m)
+                {
+                    completed = true; ClearPath();
+                    Emit(t, "mission_complete", returnReason + " Returned to the estimated start.", "distance_to_start_m", Vector2.Distance(motion.Pose.position, home));
+                    return Command(0, 0, dt, true);
+                }
+                if (NeedPlan(t))
+                {
+                    SetPath(planner.Plan(motion.Pose.position, home)); lastPlan = t;
+                    Emit(t, "replan", path.Count > 0 ? "Return to the start through observed free space." : "The known return route is blocked; hold and keep sensing.", "path_points", path.Count);
+                }
+                return FollowOrHold(t, dt);
+            }
+
+            if (active != null && (active.confirmed || t - active.lastSeen > c.survivor_lost_s))
+            {
+                Emit(t, "goal", "Survivor inspection ended or recent evidence was lost; resume exploration.");
+                active = null; dwell = 0; ClearPath();
+            }
+            if (active == null && t >= nextSurvivorSearch)
+            {
+                float best = float.PositiveInfinity;
+                foreach (var track in tracks)
+                {
+                    if (!track.candidate || track.confirmed || track.retryAfter > t || GoalBlacklisted(track.position, t) || t - track.lastSeen > c.survivor_fresh_s) continue;
+                    // Blobs on the exterior wall plane are windows: warm air behind a broken pane, not a person inside.
+                    if (!InSearchArea(track.position, ExteriorWallInsetM)) continue;
+                    float range = Vector2.Distance(track.position, motion.Pose.position);
+                    if (range < best) { best = range; active = track; }
+                }
+                if (active != null)
+                {
+                    // The no-frontier scan must be a continuous look around; an inspection interrupts it.
+                    ClearPath(); dwell = 0; inspecting = false; scanSince = double.NaN;
+                    Emit(t, "goal", "Inspect the nearest recent survivor candidate at a safe standoff.",
+                        "person_x_m", active.position.x, "person_y_m", active.position.y, "standoff_m", c.survivor_standoff_m);
+                }
+            }
+            if (active != null)
+            {
+                float range = Vector2.Distance(active.position, motion.Pose.position);
+                float error = BrainMath.Angle(motion.Pose.yawRad, BrainMath.Heading(active.position - motion.Pose.position));
+                if (range >= c.survivor_stop_min_m && range <= c.survivor_stop_max_m)
+                {
+                    if (!inspecting)
+                    {
+                        inspecting = true; SetPath(new List<Vector2>());
+                        Emit(t, "goal", "At survivor viewing distance; stop and face the person for confirmation.", "range_m", range);
+                    }
+                    bool steady = Mathf.Abs(error) <= c.survivor_face_tolerance_deg && motion.Speed <= c.survivor_stop_speed_mps &&
+                        Mathf.Abs(motion.YawRate) * Mathf.Rad2Deg <= c.survivor_stop_yaw_dps && t - active.lastSeen <= c.survivor_fresh_s;
+                    dwell = steady ? dwell + elapsed : 0;
+                    if (dwell + 1e-6f >= c.survivor_dwell_s)
+                    {
+                        active.confirmed = true; survivors.Add(active.position);
+                        confirmed.Add(new BrainSurvivor { position = active.position, confirmedAt = t, sourceRobot = id });
+                        Emit(t, "survivor_confirmed", "Stopped facing a recently observed person for the required dwell.",
+                            "x_m", active.position.x, "y_m", active.position.y, "range_m", range, "dwell_s", dwell);
+                        active = null; dwell = 0; ClearPath(); nextSurvivorSearch = t + c.replan_s;
+                    }
+                    // A deadband permits a measured stationary dwell rather than continuous tiny turns.
+                    return Command(0, Mathf.Abs(error) <= c.survivor_face_tolerance_deg ? 0 : error * c.heading_gain, dt, true);
+                }
+                dwell = 0; inspecting = false;
+                if (NeedPlan(t))
+                {
+                    SetPath(planner.ApproachPath(motion.Pose.position, active.position)); lastPlan = t;
+                    Emit(t, "replan", "Find a known free approach at the survivor standoff distance.", "path_points", path.Count, "standoff_m", c.survivor_standoff_m);
+                    if (goal.HasValue) EmitGoal(t, "Approach a repeated warm person-sized blob, then stop and face it.");
+                    else
+                    {
+                        active.retryAfter = t + c.survivor_lost_s; active = null; nextSurvivorSearch = t + c.replan_s;
+                        Emit(t, "goal", "No safe known survivor approach exists yet; explore for another approach.");
+                    }
+                }
+                if (active != null) return FollowOrHold(t, dt);
+            }
+            if (goal.HasValue && Vector2.Distance(goal.Value, motion.Pose.position) <= c.goal_tolerance_m) ClearPath();
+            if (NeedPlan(t))
+            {
+                bool blocked = path.Count > 0 && !planner.PathSafe(path, cursor);
+                if (blocked) Emit(t, nearFire ? "avoid_fire" : "replan", "A mapped obstacle or fire margin blocks the previous path; discard it.");
+                if (goal.HasValue && !blocked)
+                {
+                    SetPath(planner.Plan(motion.Pose.position, goal.Value), true); lastPlan = t;
+                    Emit(t, "replan", "Periodic refresh through current free space and heat costs.", "path_points", path.Count);
+                }
+                if (path.Count == 0 || blocked)
+                {
+                    var frontier = planner.Frontier(motion.Pose.position, p => ClaimBlocks(p, t) || GoalBlacklisted(p, t) || !InSearchArea(p)); lastPlan = t;
+                    if (frontier != null)
+                    {
+                        SetPath(frontier.path, true); frontierCentre = frontier.claimCentre; frontierRadius = frontier.claimRadius;
+                        scanSince = double.NaN;
+                        Emit(t, "goal", "Reachable frontier minimizes travel and heat cost minus nearby unknown-cell gain.",
+                            "x_m", frontier.position.x, "y_m", frontier.position.y, "path_cost", frontier.cost, "information_cells", frontier.information, "score", frontier.score);
+                        Emit(t, "replan", "Build a path to the selected frontier.", "path_points", path.Count);
+                    }
+                    else
+                    {
+                        ClearPath(); lastPlan = t; if (double.IsNaN(scanSince))
+                        { scanSince = t; Emit(t, "goal", "No reachable frontier is visible; scan unseen directions before returning."); }
+                        if (t - scanSince >= c.no_frontier_scan_s) BeginReturn(t, "No reachable frontier remains after a full scan.");
+                    }
+                }
+            }
+            if (!goal.HasValue && !returning) return Command(0, scanSign * c.scan_yaw_dps, dt, true);
+            return FollowOrHold(t, dt);
+        }
+
+        void ConsumeImages(double t)
+        {
+            while (rgbQueue.Count > 0 && rgbQueue[0].Timestamp <= t)
+            {
+                var f = rgbQueue[0]; rgbQueue.RemoveAt(0);
+                if (f.Timestamp <= lastRgb || t - f.Timestamp > c.frame_max_age_s) continue;
+                var pose = motion.At(f.Timestamp); grid.IntegrateDepth(f, sensors, pose);
+                if (health.Observe(f, sensors))
+                    Emit(f.Timestamp, "sensor_switch", health.Thermal ? "Sustained poor colour health; use thermal perception and reduce speed." : "Sustained colour recovery; use RGB mode again.",
+                        "score", health.Score, "corners", health.Corners, "contrast_std", health.Contrast, "valid_depth_fraction", health.ValidDepth, "threshold", c.health_threshold,
+                        "required_duration_s", health.Thermal ? c.switch_to_thermal_s : c.switch_to_rgb_s);
+                lastRgb = f.Timestamp; rgbHistory.Add(f);
+            }
+            while (thermalQueue.Count > 0 && thermalQueue[0].Timestamp <= t)
+            {
+                var thermal = thermalQueue[0]; RgbdFrame match = null; double difference = double.PositiveInfinity;
+                foreach (var rgb in rgbHistory)
+                {
+                    double delta = Math.Abs(rgb.Timestamp - thermal.Timestamp);
+                    if (delta < difference) { match = rgb; difference = delta; }
+                }
+                if (match == null || difference > c.frame_pair_tolerance_s)
+                {
+                    if (t - thermal.Timestamp <= c.frame_max_age_s) break;
+                    thermalQueue.RemoveAt(0); continue;
+                }
+                thermalQueue.RemoveAt(0);
+                if (thermal.Timestamp <= lastThermal || t - thermal.Timestamp > c.frame_max_age_s) continue;
+                var pose = motion.At(match.Timestamp);
+                ThermalPerception.ProjectHeat(thermal, match, sensors, c, pose, grid);
+                ObservePeople(thermal.Timestamp, ThermalPerception.Detect(thermal, match, sensors, c, pose));
+                lastThermal = thermal.Timestamp;
+            }
+            rgbHistory.RemoveAll(f => t - f.Timestamp > c.frame_max_age_s + c.frame_pair_tolerance_s);
+        }
+        void ObservePeople(double t, List<PersonDetection> detections)
+        {
+            foreach (var detection in detections)
+            {
+                bool known = false; foreach (var person in survivors) if (Vector2.Distance(person, detection.position) <= c.survivor_merge_m) { known = true; break; }
+                if (known) continue;
+                Track nearest = null; float best = c.survivor_merge_m;
+                foreach (var track in tracks)
+                {
+                    float d = Vector2.Distance(track.position, detection.position);
+                    if (!track.confirmed && d <= best) { best = d; nearest = track; }
+                }
+                if (nearest == null) { nearest = new Track { position = detection.position, lastSeen = double.NegativeInfinity }; tracks.Add(nearest); }
+                if (t <= nearest.lastSeen) continue; // At most one vote per thermal frame.
+                nearest.position = detection.position; nearest.lastSeen = t;
+                nearest.observations.Enqueue(t);
+                while (nearest.observations.Count > 0 && t - nearest.observations.Peek() > c.candidate_window_s) nearest.observations.Dequeue();
+                if (!nearest.candidate && nearest.observations.Count >= c.candidate_frames)
+                {
+                    nearest.candidate = true;
+                    Emit(t, "survivor_candidate", "A human-temperature, person-sized depth blob persisted across independent frames.",
+                        "x_m", nearest.position.x, "y_m", nearest.position.y, "area_m2", detection.areaM2, "frames", nearest.observations.Count);
+                }
+            }
+        }
+        void UpdateHeatBudget(double from, double t)
+        {
+            while (airQueue.Count > 0 && airQueue[0].t <= t)
+            {
+                var sample = airQueue[0]; airQueue.RemoveAt(0);
+                if (sample.t < from) { if (sample.t > lastAir) { airC = sample.c; lastAir = sample.t; } continue; }
+                IntegrateBudget((float)(sample.t - from), from); from = sample.t;
+                airC = sample.c; lastAir = sample.t;
+            }
+            IntegrateBudget((float)(t - from), from);
+        }
+        void IntegrateBudget(float duration, double t)
+        {
+            if (airC > c.heat_drain_start_c) budget -= (airC - c.heat_drain_start_c) * c.heat_drain_per_degree_s * duration;
+            else if (airC < c.heat_recover_below_c && t - lastAir <= c.frame_max_age_s) budget += c.heat_recover_per_s * duration;
+            budget = Mathf.Clamp01(budget);
+        }
+        bool NeedPlan(double t) => t - lastPlan >= c.replan_s || (path.Count > 0 && !planner.PathSafe(path, cursor));
+        sealed class StuckPlace
+        { public Vector2 position; public int repeats; public double lastAt; }
+        sealed class BlockedGoal
+        { public Vector2 position; public double until; }
+        readonly List<StuckPlace> stuckPlaces = new List<StuckPlace>();
+        readonly List<BlockedGoal> blockedGoals = new List<BlockedGoal>();
+        double stalledFor, recoverySince;
+        int recoveryPhase, recoveryTurnSign;
+        BrainPose contactPose;
+        float recoveryYaw;
+        Vector2? recoveryGoal;
+        bool recoveryFrontier;
+
+        void ResetStuckRecovery()
+        { stalledFor = 0; recoveryPhase = 0; recoveryGoal = null; }
+        bool GoalBlacklisted(Vector2 point, double t)
+        {
+            blockedGoals.RemoveAll(g => t >= g.until);
+            return blockedGoals.Exists(g => Vector2.Distance(point, g.position) <= c.stuck_repeat_radius_m);
+        }
+        void BlacklistGoal(Vector2 point, double t, int repeats)
+        {
+            blockedGoals.Add(new BlockedGoal { position = point, until = t + c.stuck_blacklist_s });
+            Emit(t, "goal_blacklisted", "Repeated stalls near one location exclude this goal area until the retry time.",
+                "x_m", point.x, "y_m", point.y, "repeats", repeats, "until_s", t + c.stuck_blacklist_s);
+        }
+        bool DetectStuck(double t, double previous, float elapsed)
+        {
+            // commandedSpeed is the command held over the interval just integrated, after limits.
+            if (commandedSpeed <= c.stuck_command_mps ||
+                !motion.ForwardStayedNearZero(previous, t, c.stuck_measured_mps))
+            { stalledFor = 0; return false; }
+            stalledFor += elapsed;
+            if (stalledFor + 1e-6 < c.stuck_window_s) return false;
+            contactPose = motion.Pose; recoveryGoal = goal; recoveryFrontier = frontierGoal;
+            ObstacleAhead(c.near_cone_deg, out float side);
+            recoveryTurnSign = Mathf.Abs(side) < 1e-5f ? scanSign : side > 0 ? -1 : 1;
+            stuckPlaces.RemoveAll(p => t - p.lastAt >= c.stuck_blacklist_s);
+            var place = stuckPlaces.Find(p => Vector2.Distance(p.position, contactPose.position) <= c.stuck_repeat_radius_m);
+            if (place == null) { place = new StuckPlace { position = contactPose.position }; stuckPlaces.Add(place); }
+            place.repeats++; place.lastAt = t;
+            int marked = grid.MarkStuckStrip(contactPose);
+            Emit(t, "stuck", "Forward commands produced negligible forward odometry for the detection window.",
+                "commanded_speed_mps", commandedSpeed, "measured_speed_mps", motion.ForwardSpeed,
+                "duration_s", stalledFor, "marked_cells", marked, "repeats", place.repeats,
+                "x_m", contactPose.position.x, "y_m", contactPose.position.y);
+            if (place.repeats >= c.stuck_repeat_count && !returning && !retreating)
+            {
+                if (recoveryGoal.HasValue) BlacklistGoal(recoveryGoal.Value, t, place.repeats);
+                if (active != null)
+                {
+                    active.retryAfter = t + c.stuck_blacklist_s;
+                    BlacklistGoal(active.position, t, place.repeats); active = null;
+                }
+                recoveryGoal = null;
+            }
+            ClearPath(); dwell = 0; inspecting = false; scanSince = double.NaN;
+            stalledFor = 0; recoveryPhase = 1; recoverySince = t;
+            return true;
+        }
+        BrainCommand RecoverStuck(double t, float dt)
+        {
+            if (recoveryPhase == 1)
+            {
+                float backed = Mathf.Max(0, Vector2.Dot(contactPose.position - motion.Pose.position, contactPose.Forward));
+                float remaining = c.stuck_reverse_m - backed;
+                float speed = Mathf.Min(c.stuck_reverse_mps, c.limits.max_reverse_mps, Mathf.Max(0, remaining) / dt);
+                // A rear camera is not assumed. Reverse only through the mapped free footprint.
+                float nextSpeed = Mathf.MoveTowards(commandedSpeed, -speed, c.limits.max_accel_mps2 * dt);
+                if (remaining > grid.CellM * .05f && speed > 0 && -nextSpeed * dt <= remaining &&
+                    t - recoverySince < c.stuck_reverse_timeout_s &&
+                    planner.ReverseSafe(motion.Pose.position, motion.Pose.position - motion.Pose.Forward * remaining))
+                    return Command(-speed, 0, dt, false);
+                recoveryPhase = 2; recoverySince = t; recoveryYaw = motion.Pose.yawRad;
+                return Command(0, 0, dt, true);
+            }
+            float turned = recoveryTurnSign * Mathf.DeltaAngle(recoveryYaw * Mathf.Rad2Deg, motion.Pose.yawRad * Mathf.Rad2Deg);
+            if (turned < c.stuck_turn_deg && t - recoverySince < c.stuck_turn_timeout_s)
+            {
+                float yaw = Mathf.Min(c.scan_yaw_dps, (c.stuck_turn_deg - turned) / dt);
+                return Command(0, recoveryTurnSign * yaw, dt, true);
+            }
+            var target = recoveryGoal; bool frontier = recoveryFrontier;
+            ResetStuckRecovery(); ClearPath();
+            if (target.HasValue && (returning || retreating || !GoalBlacklisted(target.Value, t)))
+            {
+                SetPath(planner.Plan(motion.Pose.position, target.Value), frontier); lastPlan = t;
+                // A failed route must allow frontier selection on the next step.
+                if (path.Count == 0) lastPlan = double.NegativeInfinity;
+            }
+            Emit(t, "replan", "Stuck recovery ended; rebuild the route around the inferred contact or select another frontier.",
+                "path_points", path.Count);
+            return Command(0, 0, dt, true);
+        }
+        void SetPath(List<Vector2> value, bool isFrontier = false) { frontierGoal = isFrontier && value.Count > 0; path = value; cursor = 0; goal = path.Count > 0 ? path[path.Count - 1] : (Vector2?)null; }
+        void ClearPath() { frontierGoal = false; path.Clear(); cursor = 0; goal = null; lastPlan = double.NegativeInfinity; }
+        void BeginReturn(double t, string reason)
+        {
+            ResetStuckRecovery(); returning = true; active = null; dwell = 0; returnReason = reason; ClearPath();
+            Emit(t, "goal", reason + " Return to the estimated start.", "x_m", home.x, "y_m", home.y);
+        }
+        BrainCommand FollowOrHold(double t, float dt)
+        {
+            if (path.Count == 0 || !goal.HasValue) return Command(0, 0, dt, true);
+            Vector2 position = motion.Pose.position;
+            while (cursor + 1 < path.Count && Vector2.Distance(position, path[cursor]) < c.goal_tolerance_m) cursor++;
+            if (Vector2.Distance(position, goal.Value) < c.goal_tolerance_m) return Command(0, 0, dt, true);
+            Vector2 target = path[cursor], previous = position; float remain = c.lookahead_m;
+            for (int i = cursor; i < path.Count; i++)
+            {
+                float distance = Vector2.Distance(previous, path[i]);
+                if (distance >= remain) { target = Vector2.MoveTowards(previous, path[i], remain); break; }
+                target = path[i]; remain -= distance; previous = path[i];
+            }
+            if (!planner.SegmentSafe(position, target)) target = path[cursor];
+            if (!planner.SegmentSafe(position, target))
+            {
+                Emit(t, "replan", "Pursuit chord crosses an inflated obstacle or heat margin; stop and refresh.");
+                ClearPath(); return Command(0, 0, dt, true);
+            }
+            float error = BrainMath.Angle(motion.Pose.yawRad, BrainMath.Heading(target - position));
+            float near = ObstacleAhead(c.near_cone_deg, out _);
+            float speed = near < c.near_obstacle_m ? c.near_speed_mps : c.open_speed_mps;
+            string policy = near < c.near_obstacle_m ? "near" : "open";
+            if (health.Thermal) { speed = Mathf.Min(speed, c.thermal_speed_mps); policy = "thermal"; }
+            speed *= Mathf.Clamp01(Vector2.Distance(position, goal.Value) / c.goal_slow_distance_m);
+            float yaw = 2 * speed * Mathf.Sin(error * Mathf.Deg2Rad) / Mathf.Max(grid.CellM, Vector2.Distance(position, target)) * Mathf.Rad2Deg;
+            if (Mathf.Abs(error) > c.turn_in_place_deg)
+            {
+                speed = 0; policy = "turn";
+                // Brake before rotating, so the acceleration ramp cannot make a turn drift into a wall.
+                yaw = commandedSpeed > c.survivor_stop_speed_mps ? 0 : error * c.heading_gain;
+            }
+            float nextSpeed = Mathf.MoveTowards(commandedSpeed, speed, c.limits.max_accel_mps2 * dt);
+            float nextYaw = Mathf.Clamp(yaw, -c.limits.max_yaw_rate_dps, c.limits.max_yaw_rate_dps);
+            var midPose = motion.Pose; midPose.yawRad += nextYaw * Mathf.Deg2Rad * dt / 2;
+            // Check the speed after acceleration limiting, including motion while braking.
+            if (nextSpeed > 0 && !planner.SegmentSafe(position, position + midPose.Forward * nextSpeed * dt))
+            {
+                Emit(t, "collision_risk", "The next commanded translation leaves known safe free space.");
+                return Command(0, yaw, dt, true);
+            }
+            if (policy != motionPolicy)
+            {
+                motionPolicy = policy;
+                Emit(t, "replan", "Local pursuit selects the " + policy + " motion policy from image health, clearance and heading.",
+                    "speed_target_mps", speed, "yaw_target_dps", Mathf.Clamp(yaw, -c.limits.max_yaw_rate_dps, c.limits.max_yaw_rate_dps),
+                    "occupied_ahead_m", float.IsPositiveInfinity(near) ? -1 : near, "heading_error_deg", error);
+            }
+            return Command(speed, yaw, dt, false);
+        }
+        float ObstacleAhead(float halfAngle, out float side)
+        {
+            float best = float.PositiveInfinity; side = 0; Vector2 position = motion.Pose.position, forward = motion.Pose.Forward;
+            // Only local cells can affect the speed or stop decision.
+            float radius = Mathf.Max(c.near_obstacle_m, c.collision_stop_m + c.limits.max_forward_mps * c.limits.max_forward_mps / (2 * c.limits.max_accel_mps2));
+            int cell = grid.Cell(position); if (cell < 0) return 0;
+            int r = Mathf.CeilToInt(radius / grid.CellM), col = cell % grid.Size, row = cell / grid.Size;
+            for (int dy = -r; dy <= r; dy++) for (int dx = -r; dx <= r; dx++)
+            {
+                if (!grid.Inside(col + dx, row + dy)) continue;
+                int i = (row + dy) * grid.Size + col + dx; if (grid.Occupancy(i) != 255) continue;
+                Vector2 delta = grid.Centre(i) - position; float distance = delta.magnitude;
+                if (distance >= best || distance > radius || Vector2.Angle(forward, delta) > halfAngle) continue;
+                best = distance; side = forward.x * delta.y - forward.y * delta.x;
+            }
+            return best;
+        }
+        BrainCommand Command(float speed, float yaw, float dt, bool stop)
+        {
+            float allowed = Mathf.Min(c.limits.max_forward_mps, health.Thermal ? c.thermal_speed_mps : c.open_speed_mps);
+            float limited = Mathf.Clamp(speed, -c.limits.max_reverse_mps, allowed);
+            // A safety stop bypasses the nominal acceleration ramp. The simulator must honour emergency zero.
+            commandedSpeed = stop ? 0 : Mathf.MoveTowards(commandedSpeed, limited, c.limits.max_accel_mps2 * dt);
+            commandedSpeed = Mathf.Clamp(commandedSpeed, -c.limits.max_reverse_mps, allowed);
+            return new BrainCommand(commandedSpeed, Mathf.Clamp(yaw, -c.limits.max_yaw_rate_dps, c.limits.max_yaw_rate_dps));
+        }
+        void EmitGoal(double t, string reason)
+        { if (goal.HasValue) Emit(t, "goal", reason, "x_m", goal.Value.x, "y_m", goal.Value.y); }
+        void Emit(double t, string kind, string reason, params object[] values)
+        {
+            var numbers = new SortedDictionary<string, double>(StringComparer.Ordinal);
+            for (int i = 0; i < values.Length; i += 2) numbers.Add((string)values[i], Convert.ToDouble(values[i + 1], System.Globalization.CultureInfo.InvariantCulture));
+            events.Add(new BrainEvent { t = t, robot = id, kind = kind, reason = reason, numbers = numbers });
+        }
+        static double Age(double t, double observed) => double.IsNegativeInfinity(observed) ? -1 : Math.Max(0, t - observed);
+        public IReadOnlyList<BrainEvent> DrainEvents()
+        {
+            // Stable by timestamp, then insertion order, including delayed camera decisions.
+            var indexed = new List<(int index, BrainEvent value)>();
+            for (int i = 0; i < events.Count; i++) indexed.Add((i, events[i]));
+            indexed.Sort((a, b) => { int order = a.value.t.CompareTo(b.value.t); return order == 0 ? a.index.CompareTo(b.index) : order; });
+            var result = new List<BrainEvent>(); foreach (var item in indexed) result.Add(item.value); events.Clear();
+            return result.AsReadOnly();
+        }
+        /// <summary>Operator-supplied building outline in building coordinates (x_min, y_min, x_max, y_max), like the entry
+        /// pose: an incident commander sees the outline from outside. Frontiers outside it are never goals, so a robot
+        /// standing at its door explores the building rather than the yard. Null searches everywhere.</summary>
+        public Rect? SearchArea { get; set; }
+        public bool InSearchArea(Vector2 p, float insetM = 0f) => !SearchArea.HasValue ||
+            Rect.MinMaxRect(SearchArea.Value.xMin + insetM, SearchArea.Value.yMin + insetM,
+                            SearchArea.Value.xMax - insetM, SearchArea.Value.yMax - insetM).Contains(p);
+        const float ExteriorWallInsetM = 0.3f;   // exterior walls are 0.25 m thick
+
+        public BrainSnapshot Snapshot() => new BrainSnapshot
+        {
+            pose = motion.Pose, gridSize = grid.Size, cellM = grid.CellM, gridOrigin = grid.Origin,
+            occupancy = grid.CopyOccupancy(), heat = grid.CopyHeat(), path = path.ToArray(), goal = goal,
+            mode = health.Thermal ? "thermal" : "rgb", state = State, heatBudget = budget,
+            confirmedSurvivors = survivors.ToArray(), fireHotspots = grid.FireHotspots(),
+            peerExplored = grid.CopyPeerExplored(), peers = CopyPeers(), survivors = CopySurvivors()
+        };
+        static void ValidateCalibration(SensorConfig s)
+        {
+            if (s.camera?.mount == null || s.depth == null || s.thermal == null || s.camera.width < 3 || s.camera.height < 3 ||
+                s.thermal.width < 3 || s.thermal.height < 3 || !(s.camera.fx > 0) || !(s.camera.fy > 0) || !(s.thermal.fx > 0) || !(s.thermal.fy > 0) ||
+                !(s.depth.min_m > 0) || !(s.depth.max_m > s.depth.min_m) || !BrainMath.Finite(s.camera.mount.height_m + s.camera.mount.forward_offset_m + s.camera.mount.pitch_down_deg))
+                throw new ArgumentException("Brain requires calibrated RGB-D, thermal intrinsics and a camera mount.");
+        }
+    }
+}

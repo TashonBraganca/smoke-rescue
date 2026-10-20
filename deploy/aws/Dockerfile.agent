@@ -1,0 +1,47 @@
+# Smoke Rescue agent server for AWS Fargate (Graviton / linux/arm64).
+# Build from the repo root:
+#   docker buildx build --platform linux/arm64 -f deploy/aws/Dockerfile.agent -t smoke-rescue-agent .
+#
+# Dependencies come from brain/uv.lock, frozen. `uv sync` cannot drop the transitive
+# dependencies of torch/ultralytics/open3d/mlx-vlm without a pyproject change, so the
+# builder runs `uv export --frozen --no-dev --prune ...` and installs the exact locked,
+# hash-checked set. See the final report for the optional pyproject extras that would
+# let a plain `uv sync --frozen --no-dev` do the same.
+
+ARG PYTHON_IMAGE=python:3.11-slim-bookworm@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89
+ARG UV_IMAGE=ghcr.io/astral-sh/uv:0.11.2@sha256:c4f5de312ee66d46810635ffc5df34a1973ba753e7241ce3a08ef979ddd7bea5
+
+FROM --platform=linux/arm64 ${UV_IMAGE} AS uv
+
+FROM --platform=linux/arm64 ${PYTHON_IMAGE} AS build
+COPY --from=uv /uv /uvx /bin/
+ENV UV_PYTHON_DOWNLOADS=never UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
+WORKDIR /src
+COPY brain/pyproject.toml brain/uv.lock brain/README.md ./
+# Packages the agent does not import (vision.py needs cv2, numpy, yaml; evaluation and replay live elsewhere).
+RUN uv export --frozen --no-dev --no-emit-project \
+        --prune torch --prune torchvision --prune ultralytics --prune open3d --prune mlx-vlm \
+        --prune evo --prune rerun-sdk --prune pyzmq \
+        -o /tmp/requirements.txt \
+    && uv venv /opt/venv \
+    && uv pip install --python /opt/venv/bin/python --require-hashes --no-deps -r /tmp/requirements.txt
+
+FROM --platform=linux/arm64 ${PYTHON_IMAGE} AS runtime
+# opencv-python (non-headless wheel in the lock) links libGL and glib.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin app
+COPY --from=build /opt/venv /opt/venv
+COPY brain/brain /app/brain
+ENV PATH=/opt/venv/bin:$PATH PYTHONPATH=/app PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 \
+    HOME=/tmp AGENT_BACKEND=bedrock PORT=8080
+WORKDIR /app
+# Build gate: fails the build if the lean dependency set cannot import the server.
+RUN python -c "import brain.agent.server"
+USER 10001:10001
+EXPOSE 8080
+HEALTHCHECK --interval=15s --timeout=3s --start-period=20s --retries=3 \
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2)"]
+CMD ["uvicorn", "brain.agent.server:app", "--host", "0.0.0.0", "--port", "8080", \
+     "--proxy-headers", "--no-server-header", "--timeout-keep-alive", "75"]

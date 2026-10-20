@@ -74,7 +74,9 @@ namespace SmokeRescue.Editor
         public static void SensorViews()
         {
             var plan = FloorPlan.Load();
-            var atm = Atmosphere.Build(plan, Scenario.Load("scenario_haze_2agents.json"));
+            var sc = Scenario.Load("scenario_haze_2agents.json");
+            FurnitureBuilder.PlaceScenarioObstacles(sc);
+            var atm = Atmosphere.Build(plan, sc);
             var views = JArray.Parse(File.ReadAllText(Path.Combine(EvidenceCapture.EvidenceDir, "custom_views.json")));
             var dir = Path.Combine(EvidenceCapture.EvidenceDir, "sensor");
             Directory.CreateDirectory(dir);
@@ -108,11 +110,14 @@ namespace SmokeRescue.Editor
         /// <summary>Survivors from the haze scenario, laid on their side on the floor (the downloaded figures are standing;
         /// proper lying, slumped and curled poses need rig posing and are logged as a known issue).</summary>
         [MenuItem("Tools/Smoke Rescue/Place Survivors")]
-        public static void PlaceSurvivors()
+        public static void PlaceSurvivors() => PlaceSurvivors(Scenario.Load("scenario_haze_2agents.json"));
+
+        /// <summary>Places this scenario's survivors (fixed or seeded random spots) and gives them body heat for the
+        /// thermal cameras. Called before every recording, because random placement differs per seed.</summary>
+        public static void PlaceSurvivors(Scenario scenario)
         {
             var old = GameObject.Find(SurvivorsRoot);
             if (old != null) Object.DestroyImmediate(old);
-            var scenario = Scenario.Load("scenario_haze_2agents.json");
             var cfg = JObject.Parse(File.ReadAllText(Path.Combine(FloorPlan.ConfigDir, "props.json")));
             var models = (cfg["survivor_candidates"] as JArray)?.Cast<JObject>().ToList();
             var root = new GameObject(SurvivorsRoot);

@@ -29,6 +29,7 @@ namespace SmokeRescue.Editor
             var plan = FloorPlan.Load();
             var scenario = Scenario.Load(scenarioFile);
             var cfg = SensorConfig.Load();
+            FurnitureBuilder.PlaceScenarioObstacles(scenario);
             var atm = Atmosphere.Build(plan, scenario);
             string outDir = Path.Combine(EvidenceCapture.EvidenceDir, "showcase_frames");
             if (Directory.Exists(outDir)) Directory.Delete(outDir, true);

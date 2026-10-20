@@ -1,8 +1,9 @@
 {
   "id": "haze_2agents",
-  "description": "Tomorrow's demo. Two robots enter from the front and back doors in light haze, map separately, and overlap in the foyer, hallway and study so their maps can merge.",
+  "description": "Two autonomous robots enter the south and east sides of a connected 40 by 28 m house, apartment, office and workshop. Six survivors use seeded random placement. Routes remain as simulator test fallbacks; autonomous control ignores them when commands are attached.",
   "seed": 7,
-  "duration_s": 150,
+  "duration_s": 300,
+  "search_area": [0, 0, 40, 28],
   "sim_rate_hz": 15,
   "yaw_convention": "degrees about Unity +y. 0 faces +z (north), 90 faces +x (east).",
   "smoke": {
@@ -26,7 +27,7 @@
         ],
         "yaw": 0
       },
-      "control": "scripted",
+      "control": "autonomous",
       "cruise_speed": 0.5,
       "doorway_speed": 0.3,
       "route": [
@@ -115,15 +116,51 @@
       "color": "#2FA3E6",
       "spawn": {
         "at": [
-          18.0,
-          15.2
+          41.2,
+          7.5
         ],
-        "yaw": 180
+        "yaw": 270
       },
-      "control": "scripted",
+      "control": "autonomous",
       "cruise_speed": 0.5,
       "doorway_speed": 0.3,
       "route": [
+        [
+          38,
+          7.5
+        ],
+        [
+          38,
+          7
+        ],
+        [
+          22,
+          7
+        ],
+        [
+          22,
+          11
+        ],
+        [
+          22,
+          16.2
+        ],
+        [
+          27,
+          16.2
+        ],
+        [
+          27,
+          20.5
+        ],
+        [
+          18,
+          20.5
+        ],
+        [
+          18,
+          16.5
+        ],
         [
           18.0,
           12.5
@@ -237,6 +274,26 @@
       ],
       "yaw": 0,
       "pose": "curled_on_bed"
+    },
+    {
+      "id": "s5",
+      "room": "apt_bed_1",
+      "at": [
+        28.3,
+        10.8
+      ],
+      "yaw": 180,
+      "pose": "lying_on_side"
+    },
+    {
+      "id": "s6",
+      "room": "workshop_tools",
+      "at": [
+        24.0,
+        24.8
+      ],
+      "yaw": 90,
+      "pose": "slumped_against_wall"
     }
   ],
   "radio": {
@@ -249,5 +306,71 @@
     "spread": true,
     "head_start_s": 60.0,
     "note": "Whole-house fire from config/fire.json; the robots enter 60 s after ignition."
-  }
+  },
+  "obstacles": [
+    {
+      "room": "hallway",
+      "kind": "obstacle_wood_pile",
+      "at": [
+        6.3,
+        7.4
+      ],
+      "yaw": 15
+    },
+    {
+      "room": "hallway",
+      "kind": "obstacle_rubble",
+      "at": [
+        12.6,
+        7.45
+      ],
+      "yaw": 0
+    },
+    {
+      "room": "foyer",
+      "kind": "obstacle_burnt_crate",
+      "at": [
+        10.9,
+        4.4
+      ],
+      "yaw": 30
+    },
+    {
+      "room": "living",
+      "kind": "obstacle_waste_pile",
+      "at": [
+        5.3,
+        4.7
+      ],
+      "yaw": 60
+    },
+    {
+      "room": "apt_hall",
+      "kind": "obstacle_waste_pile",
+      "at": [
+        28.5,
+        8.2
+      ],
+      "yaw": 0
+    },
+    {
+      "room": "office_corridor",
+      "kind": "obstacle_burnt_crate",
+      "at": [
+        8,
+        21.4
+      ],
+      "yaw": 0
+    },
+    {
+      "room": "workshop_corridor",
+      "kind": "obstacle_rubble",
+      "at": [
+        34,
+        21.2
+      ],
+      "yaw": 0
+    }
+  ],
+  "survivor_placement": "random"
 }

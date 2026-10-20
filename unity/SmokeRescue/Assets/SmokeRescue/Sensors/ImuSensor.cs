@@ -16,7 +16,7 @@ namespace SmokeRescue.Sensors
         readonly SensorConfig.ImuConfig config;
         readonly SensorRandom random;
         Vector3 position, velocity, accelBias, gyroBias;
-        Quaternion rotation;
+        Quaternion sampleStart;
         bool primed, velocityKnown;
         double elapsed;
         public bool NoiseEnabled { get; set; } = true;
@@ -25,18 +25,17 @@ namespace SmokeRescue.Sensors
         /// <summary>Prime with known initial velocity to get a sample on the first step. Otherwise two steps warm up derivatives.</summary>
         public void Reset(Vector3 truePosition, Quaternion trueRotation, Vector3 trueVelocity = default)
         {
-            position = truePosition; rotation = trueRotation; velocity = trueVelocity;
+            position = truePosition; sampleStart = trueRotation; velocity = trueVelocity;
             primed = velocityKnown = true; elapsed = 0; accelBias = gyroBias = Vector3.zero;
         }
         public ImuSample? Step(double timestamp, Vector3 truePosition, Quaternion trueRotation, float dt)
         {
             SensorMotion.CheckStep(dt, RateHz);
-            if (!primed) { position = truePosition; rotation = trueRotation; primed = true; return null; }
+            if (!primed) { position = truePosition; sampleStart = trueRotation; primed = true; return null; }
             var nextVelocity = (truePosition - position) / dt;
             var acceleration = (nextVelocity - velocity) / dt;
-            var angular = FrameConvert.Angular(SensorMotion.BodyAngularRate(rotation, trueRotation, dt));
-            position = truePosition; rotation = trueRotation; velocity = nextVelocity;
-            if (!velocityKnown) { velocityKnown = true; return null; }
+            position = truePosition; velocity = nextVelocity;
+            if (!velocityKnown) { velocityKnown = true; sampleStart = trueRotation; return null; }
             elapsed += dt;
             if (NoiseEnabled)
             {
@@ -45,6 +44,9 @@ namespace SmokeRescue.Sensors
             }
             if (elapsed + 1e-7 < 1.0 / RateHz) return null;
             float sampleDt = (float)elapsed; elapsed = 0;
+            // A gyro reports the mean rate over its sample period, not the last simulation tick.
+            var angular = FrameConvert.Angular(SensorMotion.BodyAngularRate(sampleStart, trueRotation, sampleDt));
+            sampleStart = trueRotation;
             var force = FrameConvert.Point(Quaternion.Inverse(trueRotation) * (acceleration - new Vector3(0, -9.81f, 0)));
             if (NoiseEnabled)
             {

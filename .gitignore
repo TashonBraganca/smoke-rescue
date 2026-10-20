@@ -55,3 +55,4 @@ brain/*.pt
 data/evidence/*.mp4
 data/evidence/showcase_frames/
 data/models/
+data/codex_jobs/

@@ -5,6 +5,7 @@
     "SmokeRescue.World",
     "SmokeRescue.Robots",
     "SmokeRescue.Sensors",
+    "SmokeRescue.Brain",
     "SmokeRescue.Radio",
     "SmokeRescue.Oracle",
     "Unity.RenderPipelines.HighDefinition.Runtime",

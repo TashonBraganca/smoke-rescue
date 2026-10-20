@@ -260,6 +260,24 @@
       "light": "#C9B77E",
       "gamma": 0.7,
       "tile_m": 1.0
+    },
+    "apartment_plaster_cream": {
+      "source": "polyhaven",
+      "id": "concrete_wall_003",
+      "tint": "#DDD0AD",
+      "tile_m": 2.0
+    },
+    "office_plaster_blue": {
+      "source": "ambientcg",
+      "id": "Plaster003",
+      "tint": "#7894AA",
+      "tile_m": 2.0
+    },
+    "workshop_concrete_ochre": {
+      "source": "polyhaven",
+      "id": "concrete_floor_02",
+      "tint": "#A0784C",
+      "tile_m": 3.0
     }
   }
 }

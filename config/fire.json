@@ -13,6 +13,16 @@
       ],
       "time_s": 0,
       "radius_m": 0.3
+    },
+    {
+      "room": "hallway",
+      "at": [
+        6.3,
+        7.4
+      ],
+      "time_s": 75,
+      "radius_m": 0.35,
+      "note": "burning wood pile in the hallway (scenario obstacle), lit by embers; robots enter at 60 s"
     }
   ],
   "materials": {
@@ -94,7 +104,10 @@
     "wallpaper_yellow_stripes": "paper_finish",
     "concrete_sealed": "inert",
     "brick_painted_white": "inert",
-    "concrete_rough": "inert"
+    "concrete_rough": "inert",
+    "apartment_plaster_cream": "paint_finish",
+    "office_plaster_blue": "paint_finish",
+    "workshop_concrete_ochre": "inert"
   },
   "furniture": {
     "red_velvet_sofa": {
@@ -368,6 +381,142 @@
         0.25
       ],
       "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood."
+    },
+    "obstacle_wood_pile": {
+      "material": "wood",
+      "size_m": [
+        1.3,
+        0.9
+      ],
+      "justification": "Loose dry planks and boards: wood fuel over the pile's footprint."
+    },
+    "obstacle_waste_pile": {
+      "material": "inert",
+      "size_m": [
+        1.1,
+        1.0
+      ],
+      "justification": "Plaster, brick and tile rubble does not burn."
+    },
+    "obstacle_burnt_crate": {
+      "material": "furniture_wood",
+      "size_m": [
+        0.7,
+        0.7
+      ],
+      "justification": "Wooden crate, already partly burnt."
+    },
+    "obstacle_rubble": {
+      "material": "inert",
+      "size_m": [
+        1.1,
+        1.1
+      ],
+      "justification": "Fallen ceiling plaster and roof tiles do not burn."
+    },
+    "apartment_modern_sofa": {
+      "material": "upholstery",
+      "size_m": [
+        2.3,
+        1.1
+      ],
+      "justification": "Estimated upholstered sofa footprint at 2.2 m fitted width; foam, fabric and frame supply the fuel."
+    },
+    "apartment_counter": {
+      "material": "furniture_wood",
+      "size_m": [
+        1.6,
+        1.0
+      ],
+      "justification": "Estimated timber kitchenette cabinet footprint at 1.5 m fitted width; metal fittings excluded."
+    },
+    "apartment_fridge": {
+      "material": "appliance_contents",
+      "size_m": [
+        0.9,
+        0.8
+      ],
+      "justification": "Estimated refrigerator footprint at 0.8 m fitted width; only wiring and plastic contents burn."
+    },
+    "apartment_bed": {
+      "material": "upholstery",
+      "size_m": [
+        1.7,
+        2.2
+      ],
+      "justification": "Estimated bed footprint after fitting its 2.04 m length to 2.1 m; mattress and frame are fuel."
+    },
+    "office_workstation": {
+      "material": "furniture_wood",
+      "size_m": [
+        1.8,
+        0.9
+      ],
+      "justification": "Estimated 1.8 by 0.9 m desk and lamp envelope; timber desktop supplies fuel and the steel frame is excluded."
+    },
+    "office_task_chair": {
+      "material": "upholstery",
+      "size_m": [
+        0.75,
+        0.75
+      ],
+      "justification": "Estimated chair footprint at 0.65 m fitted width; seat padding and plastic are approximated as upholstery."
+    },
+    "steel_storage_shelf": {
+      "material": "furniture_wood",
+      "size_m": [
+        1.2,
+        0.65
+      ],
+      "justification": "Estimated shelf footprint at 1.1 m fitted width and about 2.15 m height; timber shelf inserts supply fuel."
+    },
+    "workshop_bench": {
+      "material": "furniture_wood",
+      "size_m": [
+        2.1,
+        1.1
+      ],
+      "justification": "Estimated timber-topped steel workbench footprint at 2 m fitted width; metal frame is excluded from fuel."
+    },
+    "workshop_drawers": {
+      "material": "furniture_wood",
+      "size_m": [
+        1.7,
+        1.1
+      ],
+      "justification": "Estimated timber drawer cabinet footprint at 1.6 m fitted width; drawers hold hand tools."
+    },
+    "utility_washer": {
+      "material": "appliance_contents",
+      "size_m": [
+        0.8,
+        0.75
+      ],
+      "justification": "Estimated washer footprint at 0.7 m fitted width; wiring and plastic supply a small fuel load."
+    },
+    "hall_plant": {
+      "material": "wood",
+      "size_m": [
+        0.75,
+        0.75
+      ],
+      "justification": "Estimated potted plant footprint; dry organic matter is approximated as wood and the ceramic pot is excluded."
+    },
+    "supply_boxes": {
+      "material": "furniture_wood",
+      "size_m": [
+        1.4,
+        0.7
+      ],
+      "justification": "Estimated cardboard boxes and stored timber contents over 1.4 by 0.7 m; equivalent wood fuel is a scenario estimate."
+    },
+    "office_meeting_table": {
+      "material": "furniture_wood",
+      "size_m": [
+        1.9,
+        1.9
+      ],
+      "justification": "Estimated 1.9 m square envelope of a 1.8 m fitted timber meeting table and four 0.5 m chairs; timber supplies fuel."
     }
   },
   "spread": {
