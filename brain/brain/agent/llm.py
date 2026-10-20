@@ -94,6 +94,72 @@ class BedrockBackend:
         return Reply(text, calls, time.perf_counter() - start, self.model, {"usage": out.get("usage")})
 
 
+def _load_env_file(path: Path) -> dict:
+    out = {}
+    if path.exists():
+        for line in path.read_text().splitlines():
+            if "=" in line and not line.lstrip().startswith("#"):
+                k, v = line.split("=", 1)
+                out[k.strip()] = v.strip()
+    return out
+
+
+class AzureOpenAIBackend:
+    """Azure OpenAI chat completions with tools. Credentials come from the environment or from
+    ~/.config/smoke-rescue/azure.env (outside the repo, mode 600); they are never logged or written to traces."""
+
+    def __init__(self, deployment: str | None = None, reasoning_effort: str | None = None, timeout: float = 180.0):
+        env = {**_load_env_file(Path.home() / ".config" / "smoke-rescue" / "azure.env"), **os.environ}
+        self.endpoint = env["AZURE_OPENAI_ENDPOINT"].rstrip("/")
+        self.key = env["AZURE_OPENAI_API_KEY"]
+        self.version = env.get("AZURE_OPENAI_API_VERSION", "2025-01-01-preview")
+        self.model = deployment or env.get("AZURE_OPENAI_DEPLOYMENT", "gpt-5.6-terra")
+        self.effort = reasoning_effort or env.get("AZURE_REASONING_EFFORT", "high")
+        self.client = httpx.Client(timeout=timeout)
+
+    def chat(self, messages: list[dict], tools: list[dict]) -> Reply:
+        body = {"messages": _openai_messages(messages), "tools": tools, "tool_choice": "auto",
+                "max_completion_tokens": 2000, "reasoning_effort": self.effort}
+        url = f"{self.endpoint}/openai/deployments/{self.model}/chat/completions?api-version={self.version}"
+        start = time.perf_counter()
+        for attempt in range(4):
+            r = self.client.post(url, headers={"api-key": self.key}, json=body)
+            if r.status_code == 400 and "reasoning_effort" in r.text and "reasoning_effort" in body:
+                body.pop("reasoning_effort")            # deployment does not take the parameter
+                continue
+            if r.status_code in (429, 500, 502, 503) and attempt < 3:
+                time.sleep(float(r.headers.get("retry-after", 2 ** attempt)))
+                continue
+            break
+        r.raise_for_status()
+        data = r.json()
+        msg = data["choices"][0]["message"]
+        calls = [ToolCall(c["function"]["name"], _loads_or_empty(c["function"].get("arguments") or "{}"))
+                 for c in msg.get("tool_calls") or []]
+        return Reply(msg.get("content") or "", calls, time.perf_counter() - start, self.model,
+                     {"usage": data.get("usage")})
+
+
+def _openai_messages(messages: list[dict]) -> list[dict]:
+    """Our neutral messages to OpenAI's format: assistant tool calls get ids, tool results answer them in order."""
+    out, pending = [], []
+    for i, m in enumerate(messages):
+        if m["role"] == "assistant":
+            calls = m.get("tool_calls") or []
+            ids = [f"call_{i}_{j}" for j in range(len(calls))]
+            pending = list(ids)
+            entry = {"role": "assistant", "content": m.get("content") or None}
+            if calls:
+                entry["tool_calls"] = [{"id": cid, "type": "function", "function": {"name": c["name"], "arguments": json.dumps(c["arguments"])}}
+                                       for cid, c in zip(ids, calls)]
+            out.append(entry)
+        elif m["role"] == "tool":
+            out.append({"role": "tool", "tool_call_id": pending.pop(0) if pending else "call_x", "content": m.get("content", "")})
+        else:
+            out.append({"role": m["role"], "content": m.get("content", "")})
+    return out
+
+
 class ReplayBackend:
     """Replays model replies from a trace written by an earlier run, keyed by the exact request."""
 
@@ -116,6 +182,8 @@ def make_backend(kind: str | None = None, model: str | None = None, trace: str |
     kind = kind or os.environ.get("AGENT_BACKEND", "ollama")
     if kind == "ollama":
         return OllamaBackend(model or os.environ.get("AGENT_MODEL", "qwen3-vl:8b"))
+    if kind == "azure":
+        return AzureOpenAIBackend(model)
     if kind == "bedrock":
         return BedrockBackend(model or os.environ["AGENT_MODEL"])
     if kind == "replay":
