@@ -19,6 +19,7 @@ namespace SmokeRescue.Brain
         readonly bool[] hits, frees, observed;
         readonly byte[] roofHits;
         float[] roofDistance; bool roofDirty = true;
+        int[] enclosureGeneration; bool[] enclosureValue; int generation;
         readonly double[] localTime, ownHeatTime;
         readonly float[] ownHeat;
         readonly SortedDictionary<string, byte[]> peerLayers = new SortedDictionary<string, byte[]>(StringComparer.Ordinal);
@@ -355,16 +356,53 @@ namespace SmokeRescue.Brain
         /// ceiling_radius_m of that across known free floor, 0 elsewhere.</summary>
         public byte[] CopyIndoors()
         {
-            if (roofDirty || roofDistance == null) { RoofDistances(); roofDirty = false; }
+            if (roofDirty || roofDistance == null) { RoofDistances(); roofDirty = false; generation++; }
             var copy = new byte[Count];
-            for (int i = 0; i < Count; i++) copy[i] = roofDistance[i] == 0 ? (byte)2 : roofDistance[i] <= c.ceiling_radius_m ? (byte)1 : (byte)0;
+            for (int i = 0; i < Count; i++)
+                copy[i] = roofDistance[i] == 0 ? (byte)2 : roofDistance[i] <= c.ceiling_radius_m ? (byte)1 : OwnOccupancy(i) == 1 && Enclosed(i) ? (byte)3 : (byte)0;
             return copy;
         }
-        public bool Indoors(Vector2 p)
+        public bool Indoors(Vector2 p) => UnderCeiling(p) || (OwnOccupancy(Cell(p)) == 1 && Enclosed(Cell(p)));
+        /// <summary>The ceiling half of Indoors: within ceiling_radius_m of wall-clear ceiling evidence, walked across known
+        /// free floor.</summary>
+        public bool UnderCeiling(Vector2 p)
         {
             int i = Cell(p); if (i < 0) return false;
-            if (roofDirty || roofDistance == null) { RoofDistances(); roofDirty = false; }
+            if (roofDirty || roofDistance == null) { RoofDistances(); roofDirty = false; generation++; }
             return roofDistance[i] <= c.ceiling_radius_m;
+        }
+
+        /// <summary>
+        /// Free floor walled in on this robot's own map: of enclosure_rays rays cast from the cell, at least
+        /// enclosure_min_closed_share reach a mapped wall within enclosure_range_m and at most enclosure_max_open_share run
+        /// that far over floor mapped free (rays into unmapped space count as neither). A room is walled in even when
+        /// its ceiling was never seen; the yard is not, since the LiDAR maps open ground there. The ceiling rule alone
+        /// left rooms outside the search area: the camera's top edge is about 12 degrees above horizontal, so ceiling
+        /// points are seen only 4.5 m and more away, beyond the far wall of most rooms (house reflex check: robot B
+        /// gave up at 27 s with 27 percent searched; agent run 9, robot A offered one 0.5 m2 frontier at 20 s).
+        /// </summary>
+        bool Enclosed(int i)
+        {
+            if (enclosureGeneration == null) { enclosureGeneration = new int[Count]; enclosureValue = new bool[Count]; for (int k = 0; k < Count; k++) enclosureGeneration[k] = -1; }
+            if (enclosureGeneration[i] == generation) return enclosureValue[i];
+            Vector2 p = Centre(i); float step = CellM * .5f; int steps = Mathf.CeilToInt(c.enclosure_range_m / step), closed = 0, open = 0;
+            for (int r = 0; r < c.enclosure_rays; r++)
+            {
+                float a = r * 2 * Mathf.PI / c.enclosure_rays; var dir = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
+                bool ended = false;
+                for (int s = 1; s <= steps && !ended; s++)
+                {
+                    int cell = Cell(p + dir * (s * step));
+                    byte occupancy = cell < 0 ? (byte)1 : OwnOccupancy(cell);
+                    if (cell < 0) { open++; ended = true; }
+                    else if (occupancy == 255) { closed++; ended = true; }
+                    else if (occupancy == 0) ended = true;
+                }
+                if (!ended) open++;
+            }
+            bool result = closed >= c.enclosure_min_closed_share * c.enclosure_rays && open <= c.enclosure_max_open_share * c.enclosure_rays;
+            enclosureGeneration[i] = generation; enclosureValue[i] = result;
+            return result;
         }
         internal float Cost(int i)
         {

@@ -38,17 +38,28 @@ namespace SmokeRescue.World
 
         /// <summary>FireSim only moves forward. Going back in time (previews, re-renders) restarts it from the seed and
         /// replays to t, which gives the identical state because the simulation is deterministic.</summary>
+        readonly object advanceGate = new object();
+        /// <summary>Times the simulation was reloaded and replayed from t = 0 to serve an earlier time; each costs a
+        /// replay of the whole fire so far. Read by the recorder's perf log; it should stay 0 during a recording.</summary>
+        public static int Rewinds;
         void Advance(float t)
         {
+            // Depth noise samples smoke from parallel image rows: the first caller at a new time advances the fire
+            // under the lock, and the rest see the new time only once that is finished.
             double ft = FireTime(t);
-            if (ft == lastFireTime) return;
-            if (ft < lastFireTime)    // FireSim rejects any request earlier than the previous one
+            if (ft == System.Threading.Volatile.Read(ref lastFireTime)) return;
+            lock (advanceGate)
             {
-                Sim = FireSim.Load(plan, Path.Combine(FloorPlan.ConfigDir, "fire.json"), seed);
-                flamesT = float.NaN;
+                if (ft == lastFireTime) return;
+                if (ft < lastFireTime)    // FireSim rejects any request earlier than the previous one
+                {
+                    Rewinds++;
+                    Sim = FireSim.Load(plan, Path.Combine(FloorPlan.ConfigDir, "fire.json"), seed);
+                    flamesT = float.NaN;
+                }
+                Sim.AdvanceTo(ft);
+                System.Threading.Volatile.Write(ref lastFireTime, ft);
             }
-            Sim.AdvanceTo(ft);
-            lastFireTime = ft;
         }
 
         public Vector4 Sample(Vector2 xz, float t)

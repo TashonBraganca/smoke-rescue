@@ -174,13 +174,29 @@ namespace SmokeRescue.Recording
             var result = new Result { dir = root };
 
             Physics.SyncTransforms();
+            var perf = new StagePerf();
+            int rewindsBefore = FireSimHeat.Rewinds;
+            perf.Counter("fire_rewinds", () => FireSimHeat.Rewinds - rewindsBefore);
             for (long k = 0; ; k++)
             {
                 double t = k / (double)ClockHz;
                 if (t > duration + 1e-9) break;
-                if (k > 0)
-                    foreach (var rig in rigs) rig.robot.Step(dt);
-                if (k > 0) AgentWorldStep(world, rigs, dt);
+                // Every reader of the smoke field sees this tick's time. It was set only at camera frames, so the LiDAR
+                // asked the fire simulation for a time older than the thermocouple had, and each such request reloaded
+                // the fire and replayed it from t = 0 (perf.txt: LiDAR smoke lookups 15 to 32 s per 10 sim s, growing).
+                atmosphere.Field.Time = (float)t;
+                if (k > 0 && k % (ClockHz * 10) == 0)
+                {
+                    perf.Line(t, ("rgbd_noise", RgbdNoise.ProcessTime), ("lidar_sync", LidarSensor.SyncTime),
+                        ("lidar_rays", LidarSensor.RayTime), ("lidar_smoke", LidarSensor.SmokeTime));
+                    File.WriteAllText(Path.Combine(root, "perf.txt"), perf.ToString());
+                }
+                using (perf.Time("physics"))
+                {
+                    if (k > 0)
+                        foreach (var rig in rigs) rig.robot.Step(dt);
+                    if (k > 0) AgentWorldStep(world, rigs, dt);
+                }
                 bool allDone = rigs.All(r => r.robot.Driver.Finished);
                 if (allDone && double.IsNaN(finishedAt)) finishedAt = t;
                 if (allDone && t - finishedAt >= 1.0) break;   // one second of standing still at the end
@@ -197,7 +213,8 @@ namespace SmokeRescue.Recording
                         if (o.HasValue) rig.brain?.OnOdometry(o.Value);
                         if (o.HasValue)
                             rig.odomTxt.Append(ts).Append(' ').Append(F(o.Value.Vx)).Append(' ').Append(F(o.Value.Vy)).Append(' ').Append(F(o.Value.Wz)).Append('\n');
-                        var scan = rig.lidar?.Step(t, rig.robot.transform.position, rig.robot.transform.rotation);
+                        LidarScan scan;
+                        using (perf.Time("lidar")) scan = rig.lidar?.Step(t, rig.robot.transform.position, rig.robot.transform.rotation);
                         if (scan != null)
                         {
                             rig.lastScan = scan; rig.brain?.OnLidar(scan);
@@ -233,7 +250,7 @@ namespace SmokeRescue.Recording
                     {
                         if (rig.brain == null) continue;
                         if (rig.actions != null && rig.actions.IsRunning) continue;   // the arm is working; legs hold
-                        rig.command = rig.brain.Step(t, brainEvery / (float)ClockHz);
+                        using (perf.Time("brain_step")) rig.command = rig.brain.Step(t, brainEvery / (float)ClockHz);
                         foreach (var e in rig.brain.DrainEvents())
                         {
                             rig.decisions.Append(JsonConvert.SerializeObject(e)).Append('\n');
@@ -241,10 +258,10 @@ namespace SmokeRescue.Recording
                             NoteAgentTrigger(rig, e);
                         }
                         if (k % stateEvery == 0) rig.brainState.Append(BrainStateLine(t, rig.brain.Snapshot())).Append('\n');
-                        if (k % (ClockHz * MapEveryS) == 0) WriteBrainMap(rig, t, pending);
+                        if (k % (ClockHz * MapEveryS) == 0) using (perf.Time("brain_map")) WriteBrainMap(rig, t, pending);
                     }
 
-                if (k % brainEvery == 0 && AgentUrl != null) AgentDecisions(world, rigs, t, pending, sensorCfg, scenario, root);
+                if (k % brainEvery == 0 && AgentUrl != null) using (perf.Time("agents")) AgentDecisions(world, rigs, t, pending, sensorCfg, scenario, root);
                 if (k % radioEvery == 0) AgentRadio(world, rigs, radio, t);
 
                 if (k % radioEvery == 0)
@@ -276,8 +293,9 @@ namespace SmokeRescue.Recording
                 {
                     rig.rgbd.NearFire = atmosphere.NearFire(rig.robot.transform.position);
                     var cam = rig.rgbd.transform;
-                    var frame = rig.rgbd.CaptureSync(t);
-                    rig.brain?.OnRgbd(frame);
+                    RgbdFrame frame;
+                    using (perf.Time("rgbd_capture")) frame = rig.rgbd.CaptureSync(t);
+                    using (perf.Time("brain_rgbd")) rig.brain?.OnRgbd(frame);
                     if (rig.frames == 0) WriteOrientationProbe(root, rig.robot.RobotId, rig.rgbd, sensorCfg);
                     oracle.CameraPose(rig.robot.RobotId, t, cam.position, cam.rotation);
                     string rgbRel = $"rgb/{stamp}.png", depthRel = $"depth/{stamp}.png";
@@ -289,8 +307,9 @@ namespace SmokeRescue.Recording
                     pending.Enqueue(SensorPng.EncodeDepthAsync(frame.Depth, frame.Width, frame.Height).ContinueWith(x => File.WriteAllBytes(depthPath, x.Result)));
                     if (rig.thermal != null)
                     {
-                        var th = rig.thermal.CaptureSync(t);
-                        rig.brain?.OnThermal(th);
+                        ThermalFrame th;
+                        using (perf.Time("thermal_capture")) th = rig.thermal.CaptureSync(t);
+                        using (perf.Time("brain_thermal")) rig.brain?.OnThermal(th);
                         rig.thermalTimes.Add(t);
                         string thRel = $"thermal/{stamp}.png", thPath = Path.Combine(rig.dir, thRel);
                         rig.thermalTxt.Append(stamp).Append(' ').Append(thRel).Append('\n');
@@ -298,8 +317,8 @@ namespace SmokeRescue.Recording
                     }
                     rig.frames++;
                 }
-                PeopleScan(rigs, t, pending, sensorCfg);
-                while (pending.Count > 48) pending.Dequeue().Wait();
+                using (perf.Time("people")) PeopleScan(rigs, t, pending, sensorCfg);
+                using (perf.Time("pending_io")) while (pending.Count > 48) pending.Dequeue().Wait();
                 if (rigs[0].frames % 150 == 0)
                     progress?.Invoke($"t={t:0.0}s frames={rigs[0].frames} wall={wall.Elapsed.TotalSeconds:0}s");
             }
@@ -414,7 +433,8 @@ namespace SmokeRescue.Recording
             for (int i = 0; i < searched.Length; i++) searched[i] = s.searched[i] != 0 ? (byte)255 : (byte)0;
             string searchedPath = Path.Combine(rig.dir, $"brain_map/{Fmt(t)}.searched.png");
             var indoor = rig.brain.IndoorMask();
-            for (int i = 0; i < indoor.Length; i++) indoor[i] = indoor[i] == 2 ? (byte)255 : indoor[i] == 1 ? (byte)128 : (byte)0;
+            // 255 ceiling seen, 128 near a ceiling, 64 walled in on the robot's own map (OccupancyGrid.Enclosed), 0 not known indoors.
+            for (int i = 0; i < indoor.Length; i++) indoor[i] = indoor[i] == 2 ? (byte)255 : indoor[i] == 1 ? (byte)128 : indoor[i] == 3 ? (byte)64 : (byte)0;
             string indoorPath = Path.Combine(rig.dir, $"brain_map/{Fmt(t)}.indoor.png");
             pending.Enqueue(Task.Run(() => File.WriteAllBytes(indoorPath, ImageConversion.EncodeArrayToPNG(indoor,
                 UnityEngine.Experimental.Rendering.GraphicsFormat.R8_UNorm, (uint)size, (uint)size))));

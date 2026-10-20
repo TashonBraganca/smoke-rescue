@@ -44,6 +44,10 @@ namespace SmokeRescue.Sensors
         public Transform Self { get; set; }
         public SensorConfig.LidarConfig Config => cfg;
 
+        /// <summary>Wall time in each part of a sweep across all LiDARs, read by the recorder's perf log.</summary>
+        public static readonly System.Diagnostics.Stopwatch SyncTime = new System.Diagnostics.Stopwatch(),
+            RayTime = new System.Diagnostics.Stopwatch(), SmokeTime = new System.Diagnostics.Stopwatch();
+
         public LidarSensor(SensorConfig.LidarConfig config, int seed)
         {
             cfg = config ?? throw new ArgumentNullException(nameof(config));
@@ -59,7 +63,7 @@ namespace SmokeRescue.Sensors
             if (t + 1e-9 < next) return null;
             next = (double.IsNegativeInfinity(next) ? t : next) + 1.0 / cfg.rate_hz;
             // Doors swing and robots move by transform; make the colliders agree with this instant.
-            Physics.SyncTransforms();
+            SyncTime.Start(); Physics.SyncTransforms(); SyncTime.Stop();
             float yaw = rootRotation.eulerAngles.y * Mathf.Deg2Rad;
             var forward = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw));
             var right = new Vector3(forward.z, 0f, -forward.x);
@@ -69,12 +73,14 @@ namespace SmokeRescue.Sensors
             {
                 float a = AngleMinRad + i * AngleIncrementRad;
                 var dir = forward * Mathf.Cos(a) - right * Mathf.Sin(a);   // positive angle turns left
-                float r = Nearest(origin, dir);
+                RayTime.Start(); float r = Nearest(origin, dir); RayTime.Stop();
                 if (r < cfg.min_m || r > cfg.max_m) { ranges[i] = 0f; continue; }
                 if (NoiseEnabled)
                 {
+                    SmokeTime.Start();
                     float density = (LocalDensity(origin + dir * (r * .25f)) + LocalDensity(origin + dir * (r * .5f)) +
                                      LocalDensity(origin + dir * (r * .75f))) / 3f;
+                    SmokeTime.Stop();
                     float lost = Mathf.Min(cfg.smoke_dropout.max, cfg.smoke_dropout.per_unit_density * Mathf.Max(0f, density));
                     if (random.Uniform() < lost) { ranges[i] = 0f; continue; }
                     r += random.Gaussian() * (cfg.range_sigma_m + cfg.range_sigma_per_m * r);

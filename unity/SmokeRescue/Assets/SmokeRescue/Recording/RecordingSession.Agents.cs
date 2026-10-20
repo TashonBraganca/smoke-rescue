@@ -118,6 +118,7 @@ namespace SmokeRescue.Recording
                                    Scenario scenario, string root)
         {
             LastT = t;
+            var calls = new List<(RobotRig rig, JObject req)>();
             foreach (var rig in rigs)
             {
                 if (rig.brain == null || rig.missionDone || (rig.actions != null && rig.actions.IsRunning)) continue;
@@ -149,7 +150,14 @@ namespace SmokeRescue.Recording
                         ["position"] = p.linked ? new JArray(Math.Round(p.pose.position.x, 2), Math.Round(p.pose.position.y, 2)) : null })),
                 };
                 rig.inbox.Clear();
-                var reply = Post($"/robot/{rig.robot.RobotId}/step", req);
+                calls.Add((rig, req));
+            }
+            // Every due robot's step goes out at once, so the sim waits for the slowest model call, not their sum.
+            // Replies are applied in robot order, so the outcome does not depend on which call returns first.
+            var replies = PostAll(calls.Select(d => ($"/robot/{d.rig.robot.RobotId}/step", d.req)).ToList());
+            for (int i = 0; i < calls.Count; i++)
+            {
+                var rig = calls[i].rig; var reply = replies[i];
                 w.steps++;
                 if (reply == null) { w.errors++; continue; }
                 rig.agentLog.Append(reply.ToString(Formatting.None)).Append('\n');
@@ -311,6 +319,13 @@ namespace SmokeRescue.Recording
                     rig.brain.OnPersonSighting(Math.Min(seen, t), p.Value<float>("bearing_deg"), p.Value<float>("range_m"), p.Value<float>("confidence"));
                 }
             }
+        }
+
+        static List<JObject> PostAll(List<(string path, JObject body)> calls, string baseUrl = null)
+        {
+            var tasks = calls.Select(c => Task.Run(() => Post(c.path, c.body, baseUrl))).ToArray();
+            Task.WaitAll(tasks);
+            return tasks.Select(task => task.Result).ToList();
         }
 
         static JObject Post(string path, JObject body, string baseUrl = null)
