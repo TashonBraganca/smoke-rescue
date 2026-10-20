@@ -10,6 +10,7 @@
     "Unity.RenderPipelines.Core.Runtime",
     "SmokeRescue.Robots",
     "SmokeRescue.Sensors",
+    "SmokeRescue.Brain",
     "SmokeRescue.Radio"
   ],
   "includePlatforms": [

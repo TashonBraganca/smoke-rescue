@@ -23,6 +23,14 @@ namespace SmokeRescue.Robots
         public Transform Body { get; private set; }
         public Transform CameraMount { get; private set; }
         public Light Headlight { get; private set; }
+        public RobotArm Arm { get; private set; }
+
+        /// <summary>Torch state. Pitch is positive up, yaw positive right, both relative to the camera.</summary>
+        public string TorchMode { get; private set; } = "wide";
+        public float TorchPitchDeg { get; private set; }
+        public float TorchYawDeg { get; private set; }
+        public const float TorchPitchMinDeg = -30f, TorchPitchMaxDeg = 15f, TorchYawLimitDeg = 45f, LowBeamDownDeg = 15f;
+        float wideAngle, wideInner, wideRange, wideIntensity;
 
         /// <summary>Gait bob amplitude in metres (peak), and sway in degrees. Spec: 1 to 2 cm, 1 to 2 degrees.</summary>
         public const float BobAmplitude = 0.007f;
@@ -97,7 +105,14 @@ namespace SmokeRescue.Robots
             light.intensity = head.Value<float>("intensity_lumen");
             light.shadows = LightShadows.Soft;
             robot.Headlight = light;
+            (robot.wideAngle, robot.wideInner, robot.wideRange, robot.wideIntensity) = (light.spotAngle, light.innerSpotAngle, light.range, light.intensity);
 
+            // Arm on the back, left of the sensor mast, so a forward reach does not pass through it.
+            robot.Arm = RobotArm.Build(robot.Body, new Vector3(-0.09f, bodyTop, -0.05f), spec.Colour);
+
+            // Physical body: a capsule against walls and furniture. Used only when a brain drives the robot.
+            int solid = (1 << LayerMask.NameToLayer("Walls")) | (1 << LayerMask.NameToLayer("Props"));
+            robot.Driver.Blocked = xz => Physics.CheckCapsule(new Vector3(xz.x, 0.25f, xz.y), new Vector3(xz.x, 0.55f, xz.y), 0.22f, solid, QueryTriggerInteraction.Ignore);
             robot.StoreMountRest();
             robot.ApplyPose();
             return robot;
@@ -114,6 +129,36 @@ namespace SmokeRescue.Robots
         {
             Driver.Step(dt);
             ApplyPose();
+        }
+
+        /// <summary>
+        /// Torch modes: "wide" flood (the default), "narrow" tight beam with twice the throw, "low" dimmed and angled at
+        /// least 15 degrees down to cut back-scatter glare in thick smoke, "off". Aim is clamped to pitch -30..+15 and
+        /// yaw -45..+45 degrees.
+        /// </summary>
+        public void SetTorch(string mode, float pitchDeg, float yawDeg)
+        {
+            if (!float.IsFinite(pitchDeg) || !float.IsFinite(yawDeg))
+                throw new System.ArgumentOutOfRangeException(nameof(pitchDeg), "Torch aim must be finite.");
+            float pitch = Mathf.Clamp(pitchDeg, TorchPitchMinDeg, TorchPitchMaxDeg);
+            float yaw = Mathf.Clamp(yawDeg, -TorchYawLimitDeg, TorchYawLimitDeg);
+            switch (mode)
+            {
+                case "wide": Beam(wideAngle, wideInner, wideRange, wideIntensity); break;
+                case "narrow": Beam(30f, 12f, wideRange * 2f, wideIntensity); break;          // same lumens, focused
+                case "low": Beam(wideAngle, wideInner, wideRange * 0.6f, wideIntensity * 0.35f); pitch = Mathf.Min(pitch, -LowBeamDownDeg); break;
+                case "off": Headlight.enabled = false; break;
+                default: throw new System.ArgumentException($"Unknown torch mode '{mode}'.", nameof(mode));
+            }
+            TorchMode = mode; TorchPitchDeg = pitch; TorchYawDeg = yaw;
+            Headlight.transform.localRotation = Quaternion.Euler(-pitch, yaw, 0f);
+        }
+
+        void Beam(float angle, float inner, float range, float intensity)
+        {
+            Headlight.enabled = true;
+            Headlight.spotAngle = angle; Headlight.innerSpotAngle = Mathf.Min(inner, angle);
+            Headlight.range = range; Headlight.intensity = intensity;
         }
 
         public void ApplyPose()

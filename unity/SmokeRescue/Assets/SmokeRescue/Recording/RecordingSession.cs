@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+using SmokeRescue.Brain;
 using SmokeRescue.Oracle;
 using SmokeRescue.Radio;
 using SmokeRescue.Robots;
@@ -43,6 +44,11 @@ namespace SmokeRescue.Recording
             public RgbdCamera rgbd;
             public ThermalCamera thermal;
             public AirTemperatureSensor air;
+            public RobotBrain brain;
+            public BrainCommand command;
+            public bool missionDone;
+            public StringBuilder decisions = new StringBuilder();
+            public StringBuilder brainState = new StringBuilder();
             public StringBuilder thermalTxt = Header("thermal images, 16-bit PNG, kelvin x 10, 0 = invalid");
             public StringBuilder airTxt = new StringBuilder("# body air temperature, thermocouple with lag and noise\n# t temperature_c\n");
             public ImuSensor imu;
@@ -108,6 +114,19 @@ namespace SmokeRescue.Recording
                 rig.imu.Reset(rig.robot.Body.position, rig.robot.Body.rotation);
                 rig.odom.Reset(rig.robot.transform.position, rig.robot.transform.rotation);
                 rig.dir = Path.Combine(root, spec.id);
+                if (spec.control == "autonomous")
+                {
+                    // The robot drives itself: its brain sees only this robot's sensors (fed below at their own rates)
+                    // and returns forward speed and yaw rate. Brain yaw is left-positive; Unity yaw is right-positive.
+                    // The incident commander logs which door each robot entered, in building coordinates. That is
+                    // operator knowledge, not ground truth during the run, and it puts every brain in one frame.
+                    var entry = new EntryPose(spec.spawn.at[0], spec.spawn.at[1], spec.spawn.yaw);
+                    rig.brain = new RobotBrain(sensorCfg, BrainConfig.Load(), spec.id, scenario.seed * 1000 + i * 10 + 6, entry);
+                    if (scenario.search_area != null)
+                        rig.brain.SearchArea = Rect.MinMaxRect(scenario.search_area[0], scenario.search_area[1], scenario.search_area[2], scenario.search_area[3]);
+                    var r0 = rig;
+                    rig.robot.Driver.Command = () => (r0.command.forwardMps, -r0.command.yawRateDeg, r0.missionDone);
+                }
                 Directory.CreateDirectory(Path.Combine(rig.dir, "rgb"));
                 Directory.CreateDirectory(Path.Combine(rig.dir, "depth"));
                 if (rig.thermal != null) Directory.CreateDirectory(Path.Combine(rig.dir, "thermal"));
@@ -117,9 +136,16 @@ namespace SmokeRescue.Recording
             var oracle = new OracleWriter(root);
             var radio = new RadioModel(scenario.radio.range_m, scenario.radio.max_walls);
             var radioLog = new RadioLog();
+            // Live shared context between brains. The recorder alone decides delivery with the RadioModel. While a
+            // link is down only the newest state waits: it carries everything since the receiver's last ACK.
+            var waiting = new Dictionary<(RobotRig from, RobotRig to), (byte[] bytes, BrainMessage m)>();
+            var inFlight = new List<(double at, RobotRig to, byte[] bytes)>();
+            var brainRadio = new StringBuilder("# brain state radio, one line per broadcast and receiver with a message to carry\n" +
+                                               "# t_send from to sequence bytes full status t_deliver\n");
             var pending = new Queue<Task>();
             int camEvery = Mathf.RoundToInt(ClockHz / sensorCfg.camera.rate_hz);
             int radioEvery = Mathf.RoundToInt(ClockHz * scenario.radio.broadcast_period_s);
+            int brainEvery = Mathf.RoundToInt(ClockHz / 60f), stateEvery = Mathf.RoundToInt(ClockHz / 2f);
             int airEvery = Mathf.RoundToInt(ClockHz / (sensorCfg.air_temperature?.rate_hz ?? 10f));
             const float dt = 1f / ClockHz;
             float duration = Mathf.Min(scenario.duration_s, maxSeconds);
@@ -142,9 +168,11 @@ namespace SmokeRescue.Recording
                     {
                         string ts = Fmt(t);
                         var s = rig.imu.Step(t, rig.robot.Body.position, rig.robot.Body.rotation, dt);
+                        if (s.HasValue) rig.brain?.OnImu(s.Value);
                         if (s.HasValue)
                             rig.imuTxt.Append(ts).Append(' ').Append(V(s.Value.SpecificForce)).Append(' ').Append(V(s.Value.AngularRate)).Append('\n');
                         var o = rig.odom.Step(t, rig.robot.transform.position, rig.robot.transform.rotation, dt);
+                        if (o.HasValue) rig.brain?.OnOdometry(o.Value);
                         if (o.HasValue)
                             rig.odomTxt.Append(ts).Append(' ').Append(F(o.Value.Vx)).Append(' ').Append(F(o.Value.Vy)).Append(' ').Append(F(o.Value.Wz)).Append('\n');
                     }
@@ -157,13 +185,53 @@ namespace SmokeRescue.Recording
                         float hottest = HottestSurfaceNear(atmosphere, body, (float)t);
                         oracle.Heat(rig.robot.RobotId, t, trueAir, hottest);
                         var reading = rig.air?.Step(t, trueAir);
+                        if (reading.HasValue) rig.brain?.OnAirTemperature(t, reading.Value);
                         if (reading.HasValue) rig.airTxt.Append(Fmt(t)).Append(' ').Append(reading.Value.ToString("F2", CultureInfo.InvariantCulture)).Append('\n');
+                    }
+
+                if (k % brainEvery == 0 && inFlight.Count > 0)
+                {
+                    // Packets whose radio delay has elapsed reach their receiver before its next Step, oldest first.
+                    // The receiver hears it at this tick (the brain contract), decoded from the frozen wire bytes.
+                    foreach (var p in inFlight.Where(p => p.at <= t).OrderBy(p => p.at).ToList())
+                        p.to.brain.OnPeerMessage(BrainMessage.FromBytes(p.bytes), t);
+                    inFlight.RemoveAll(p => p.at <= t);
+                }
+
+                if (k % brainEvery == 0)
+                    foreach (var rig in rigs)
+                    {
+                        if (rig.brain == null) continue;
+                        rig.command = rig.brain.Step(t, brainEvery / (float)ClockHz);
+                        foreach (var e in rig.brain.DrainEvents())
+                        {
+                            rig.decisions.Append(JsonConvert.SerializeObject(e)).Append('\n');
+                            if (e.kind == "mission_complete") rig.missionDone = true;
+                        }
+                        if (k % stateEvery == 0) rig.brainState.Append(BrainStateLine(t, rig.brain.Snapshot())).Append('\n');
                     }
 
                 if (k % radioEvery == 0)
                     foreach (var from in rigs)
-                        radioLog.Tick(t, from.robot.RobotId, rigs.Where(r => r != from).Select(r =>
-                            (r.robot.RobotId, radio.Evaluate(from.robot.transform.position, r.robot.transform.position))));
+                    {
+                        var links = rigs.Where(r => r != from).Select(r =>
+                            (to: r, link: radio.Evaluate(from.robot.transform.position, r.robot.transform.position))).ToList();
+                        radioLog.Tick(t, from.robot.RobotId, links.Select(x => (x.to.robot.RobotId, x.link)));
+                        var message = from.brain?.BuildMessage(t);   // after this tick's Step; null when nothing is new
+                        var frozen = message?.ToBytes();              // the sender may not change a packet once sent
+                        foreach (var (to, link) in links)
+                        {
+                            if (to.brain == null) continue;
+                            if (message != null) waiting[(from, to)] = (frozen, message);
+                            if (!waiting.TryGetValue((from, to), out var w)) continue;
+                            var m = w.m;
+                            string status = link.delivered ? "sent" : "queued_" + link.reason;
+                            if (link.delivered) { inFlight.Add((t + link.delay, to, w.bytes)); waiting.Remove((from, to)); }
+                            brainRadio.Append(Fmt(t)).Append(' ').Append(from.robot.RobotId).Append(' ').Append(to.robot.RobotId)
+                                .Append(' ').Append(m.Sequence).Append(' ').Append(w.bytes.Length).Append(' ').Append(m.FullSnapshot ? 1 : 0)
+                                .Append(' ').Append(status).Append(' ').Append(link.delivered ? Fmt(t + link.delay) : "-1").Append('\n');
+                        }
+                    }
 
                 if (k % camEvery != 0) continue;
                 atmosphere.Apply((float)t);
@@ -173,6 +241,7 @@ namespace SmokeRescue.Recording
                     rig.rgbd.NearFire = atmosphere.NearFire(rig.robot.transform.position);
                     var cam = rig.rgbd.transform;
                     var frame = rig.rgbd.CaptureSync(t);
+                    rig.brain?.OnRgbd(frame);
                     if (rig.frames == 0) WriteOrientationProbe(root, rig.robot.RobotId, rig.rgbd, sensorCfg);
                     oracle.CameraPose(rig.robot.RobotId, t, cam.position, cam.rotation);
                     string rgbRel = $"rgb/{stamp}.png", depthRel = $"depth/{stamp}.png";
@@ -185,6 +254,7 @@ namespace SmokeRescue.Recording
                     if (rig.thermal != null)
                     {
                         var th = rig.thermal.CaptureSync(t);
+                        rig.brain?.OnThermal(th);
                         string thRel = $"thermal/{stamp}.png", thPath = Path.Combine(rig.dir, thRel);
                         rig.thermalTxt.Append(stamp).Append(' ').Append(thRel).Append('\n');
                         pending.Enqueue(SensorPng.EncodeDepthAsync(th.DeciKelvin, th.Width, th.Height).ContinueWith(x => File.WriteAllBytes(thPath, x.Result)));
@@ -212,10 +282,17 @@ namespace SmokeRescue.Recording
                     File.WriteAllText(Path.Combine(rig.dir, "thermal.yaml"), ThermalYaml(sensorCfg));
                 }
                 if (rig.air != null) File.WriteAllText(Path.Combine(rig.dir, "air_temp.txt"), rig.airTxt.ToString());
+                if (rig.brain != null)
+                {
+                    File.WriteAllText(Path.Combine(rig.dir, "decisions.jsonl"), rig.decisions.ToString());
+                    File.WriteAllText(Path.Combine(rig.dir, "brain_state.jsonl"), rig.brainState.ToString());
+                    oracle.Collisions(rig.robot.RobotId, rig.robot.Driver.CollisionSteps / (double)ClockHz);
+                }
                 result.frames[rig.robot.RobotId] = rig.frames;
             }
             string radioText = radioLog.ToString();
             File.WriteAllText(Path.Combine(root, "radio.txt"), radioText);
+            if (rigs.Count(r => r.brain != null) > 1) File.WriteAllText(Path.Combine(root, "brain_radio.txt"), brainRadio.ToString());
             result.radioLines = radioText.Split('\n').Count(l => l.Length > 0 && l[0] != '#');
 
             if (atmosphere.FireSpread != null)
@@ -298,6 +375,18 @@ namespace SmokeRescue.Recording
                 "Viewer.ViewpointZ: -1.8", "Viewer.ViewpointF: 500.0", "",
             });
         }
+
+        /// <summary>The brain's own view, twice a second, for the map and replay: pose, goal, path, mode, state, heat
+        /// budget, survivors and fire hotspots, all in the brain's own frame.</summary>
+        static string BrainStateLine(double t, BrainSnapshot s) => JsonConvert.SerializeObject(new
+        {
+            t, x = s.pose.position.x, y = s.pose.position.y, yaw_rad = s.pose.yawRad,
+            goal = s.goal.HasValue ? new[] { s.goal.Value.x, s.goal.Value.y } : null,
+            path = s.path?.Select(p => new[] { (float)System.Math.Round(p.x, 2), (float)System.Math.Round(p.y, 2) }).ToArray(),
+            s.mode, s.state, heat_budget = s.heatBudget,
+            survivors = s.confirmedSurvivors?.Select(p => new[] { p.x, p.y }).ToArray(),
+            fires = s.fireHotspots?.Select(p => new[] { p.x, p.y }).ToArray(),
+        });
 
         /// <summary>Hottest floor surface within 1 m of a point (for scoring how close a robot came to fire).</summary>
         static float HottestSurfaceNear(Atmosphere atm, Vector3 p, float t)

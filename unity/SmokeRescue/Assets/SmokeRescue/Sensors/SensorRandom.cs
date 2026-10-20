@@ -17,8 +17,12 @@ namespace SmokeRescue.Sensors
         {
             var delta = Quaternion.Inverse(previous) * current;
             if (delta.w < 0) delta = new Quaternion(-delta.x, -delta.y, -delta.z, -delta.w);
-            delta.ToAngleAxis(out float angle, out Vector3 axis);
-            return angle < 0.00001f ? Vector3.zero : axis * (Mathf.DeltaAngle(0, angle) * Mathf.Deg2Rad / dt);
+            // Angle from the vector part with atan2. ToAngleAxis uses acos(w), and for one 600 Hz tick at 30 deg/s
+            // w is within two float steps of 1, which put 20 to 35 degree heading errors into the recorded gyro.
+            var v = new Vector3(delta.x, delta.y, delta.z);
+            float s = v.magnitude;
+            if (s < 1e-12f) return Vector3.zero;
+            return v / s * (2f * Mathf.Atan2(s, delta.w) / dt);
         }
         public static void CheckStep(float dt, float rate)
         {

@@ -1,0 +1,14 @@
+{
+  "name": "SmokeRescue.Brain",
+  "rootNamespace": "SmokeRescue.Brain",
+  "references": ["SmokeRescue.Sensors"],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": true,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

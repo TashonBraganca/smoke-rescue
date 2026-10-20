@@ -1,0 +1,17 @@
+# Batch wrapper around the OpenCV 5 ORB-SLAM3 image (slam/Dockerfile.cv5, linux/arm64).
+# Adds the AWS CLI and an entrypoint that pulls the recording from S3 and pushes results back.
+#   docker buildx build --platform linux/arm64 -f deploy/aws/batch/Dockerfile.slam \
+#       --build-arg BASE_IMAGE=smoke-rescue-orbslam3-cv5 deploy/aws/batch
+ARG BASE_IMAGE=smoke-rescue-orbslam3-cv5
+ARG AWSCLI_IMAGE=amazon/aws-cli:2.37.0@sha256:337494c2047176fe9abcf45a5d1eaf1c2c62cae40953284fb1143b5c6170f065
+FROM --platform=linux/arm64 ${AWSCLI_IMAGE} AS awscli
+FROM --platform=linux/arm64 ${BASE_IMAGE}
+COPY --from=awscli /usr/local/aws-cli /usr/local/aws-cli
+RUN ln -s /usr/local/aws-cli/v2/current/bin/aws /usr/local/bin/aws \
+    && useradd --uid 10001 --create-home --shell /usr/sbin/nologin app \
+    && mkdir /work && chown app /work
+COPY slam_entrypoint.sh /usr/local/bin/slam_entrypoint.sh
+RUN chmod 0755 /usr/local/bin/slam_entrypoint.sh
+USER 10001:10001
+WORKDIR /work
+ENTRYPOINT ["/usr/local/bin/slam_entrypoint.sh"]

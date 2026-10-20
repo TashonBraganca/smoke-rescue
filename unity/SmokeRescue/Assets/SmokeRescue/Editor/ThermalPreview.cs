@@ -18,7 +18,9 @@ namespace SmokeRescue.Editor
             var plan = FloorPlan.Load();
             var cfg = SensorConfig.Load();
             float t = 120f;
-            var atm = Atmosphere.Build(plan, Scenario.Load("scenario_haze_2agents.json"));
+            var sc = Scenario.Load("scenario_haze_2agents.json");
+            FurnitureBuilder.PlaceScenarioObstacles(sc);
+            var atm = Atmosphere.Build(plan, sc);
             atm.Apply(t);
             var holder = new GameObject("ThermalPreview");
             TagSurvivors();

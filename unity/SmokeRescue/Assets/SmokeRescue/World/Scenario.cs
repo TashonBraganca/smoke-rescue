@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
@@ -14,15 +15,23 @@ namespace SmokeRescue.World
     {
         public string id;
         public string description;
+        /// <summary>World-side hinge overrides applied by DoorRuntime after the house is built.</summary>
+        public Dictionary<string, string> door_states = new Dictionary<string, string>();
         public int seed;
         public float duration_s;
         public float sim_rate_hz = 15f;
+        public float[] search_area;   // operator knowledge: building outline x_min, z_min, x_max, z_max, seen from outside
         public Smoke smoke = new Smoke();
         public List<Robot> robots = new List<Robot>();
         public LookAround look_around = new LookAround();
         public List<Survivor> survivors = new List<Survivor>();
         public Radio radio = new Radio();
         public FireSpread fire = new FireSpread();
+        /// <summary>Obstacles for this run only (burning wood, debris, rubble), placed like landmarks.</summary>
+        public List<FloorPlan.Landmark> obstacles = new List<FloorPlan.Landmark>();
+        /// <summary>"fixed" (positions as listed) or "random": each survivor keeps its id and pose but is put at a
+        /// seeded random spot on free floor in any room, so robots cannot be tuned to known positions.</summary>
+        public string survivor_placement = "fixed";
 
         /// <summary>Whole-house spreading fire (FireSim, config/fire.json). Off: the static fires in floorplan.json.</summary>
         [Serializable]
@@ -102,7 +111,39 @@ namespace SmokeRescue.World
             var merged = LoadMerged(path);
             var scenario = merged.ToObject<Scenario>();
             if (scenario.robots.Count == 0) throw new InvalidDataException($"scenario has no robots: {path}");
+            if (scenario.survivor_placement == "random") scenario.PlaceSurvivorsRandomly(FloorPlan.Load());
             return scenario;
+        }
+
+        /// <summary>Seeded random survivor spots: any room, at least 0.6 m from its walls, 0.9 m from landmarks and
+        /// obstacles, 1.2 m from doors and spawn points, and 3 m from each other.</summary>
+        void PlaceSurvivorsRandomly(FloorPlan plan)
+        {
+            var rng = new System.Random(seed * 7919 + 101);
+            var taken = new List<Vector2>();
+            var avoid = new List<(Vector2 p, float r)>();
+            foreach (var l in plan.landmarks) avoid.Add((new Vector2(l.at[0], l.at[1]), 0.9f));
+            foreach (var o in obstacles) avoid.Add((new Vector2(o.at[0], o.at[1]), 0.9f));
+            foreach (var d in plan.doors) avoid.Add((new Vector2(d.at[0], d.at[1]), 1.2f));
+            foreach (var r in robots) avoid.Add((new Vector2(r.spawn.at[0], r.spawn.at[1]), 1.2f));
+            var rooms = plan.rooms.Where(r => r.id != "hallway").ToList();
+            foreach (var s in survivors)
+            {
+                for (int attempt = 0; attempt < 2000; attempt++)
+                {
+                    var room = rooms[rng.Next(rooms.Count)];
+                    var rect = room.Rect;
+                    if (rect.width < 1.4f || rect.height < 1.4f) continue;
+                    var p = new Vector2(rect.xMin + 0.6f + (float)rng.NextDouble() * (rect.width - 1.2f),
+                                        rect.yMin + 0.6f + (float)rng.NextDouble() * (rect.height - 1.2f));
+                    if (avoid.Any(a => Vector2.Distance(a.p, p) < a.r) || taken.Any(q => Vector2.Distance(q, p) < 3f)) continue;
+                    s.at = new[] { p.x, p.y };
+                    s.room = room.id;
+                    s.yaw = (float)(rng.NextDouble() * 360.0);
+                    taken.Add(p);
+                    break;
+                }
+            }
         }
 
         static JObject LoadMerged(string path)

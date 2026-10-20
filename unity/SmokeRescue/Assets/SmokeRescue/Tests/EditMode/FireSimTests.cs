@@ -153,7 +153,12 @@ namespace SmokeRescue.Tests.EditMode
         {
             var plan = FloorPlan.Load();
             foreach (var d in plan.doors.Where(d => d.between.Contains("living"))) d.state = "closed";
-            var sim = FireSim.Load(plan, firePath, 7); sim.AdvanceTo(360);
+            // Only the living-room ignition: the scenario's burning hallway wood pile is a separate fire by design.
+            var cfg = Newtonsoft.Json.Linq.JObject.Parse(File.ReadAllText(firePath));
+            cfg["ignitions"] = new Newtonsoft.Json.Linq.JArray(cfg["ignitions"].Where(i => (string)i["room"] == "living"));
+            string livingOnly = Path.Combine(Path.GetTempPath(), "fire_living_only.json");
+            File.WriteAllText(livingOnly, cfg.ToString());
+            var sim = FireSim.Load(plan, livingOnly, 7); sim.AdvanceTo(360);
             AssertRoomUnburnt(sim, "hallway");
             var open = House(); open.AdvanceTo(360);
             Assert.IsTrue(Cells(open).Any(c => c.Room == "hallway" && c.BurntFraction > 0));
@@ -284,7 +289,7 @@ namespace SmokeRescue.Tests.EditMode
             var j = JObject.Parse(dump);
             Assert.AreEqual(1, (int)j["version"]);
             Assert.AreEqual(sim.Width * sim.Height, j["cells"].Count());
-            Assert.AreEqual(10, j["rooms"].Count());
+            Assert.AreEqual(plan.rooms.Count, j["rooms"].Count());
             Assert.IsNotEmpty(j["walls"]);
         }
 

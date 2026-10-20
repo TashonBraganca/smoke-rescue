@@ -1,6 +1,6 @@
 {
   "id": "clear_2agents",
-  "description": "Same routes as haze_2agents with no smoke at all. Used first, to prove SLAM and merging before smoke makes it harder.",
+  "description": "Clear-air baseline inside the original south-west house. Original route waypoints and four fixed survivors are preserved. Robot B approaches its original route through the west entrance because the old north spawn is now indoors.",
   "inherits": "scenario_haze_2agents.json",
   "seed": 7,
   "smoke": {
@@ -13,5 +13,237 @@
   "fire": {
     "spread": false,
     "note": "Static fires only, so the clear-air SLAM baseline stays comparable across runs."
-  }
+  },
+  "obstacles": [],
+  "survivor_placement": "fixed",
+  "duration_s": 160,
+  "search_area": [0, 0, 40, 28],
+  "robots": [
+    {
+      "id": "robot_A",
+      "color": "#F2A900",
+      "spawn": {
+        "at": [
+          10.0,
+          -1.2
+        ],
+        "yaw": 0
+      },
+      "control": "scripted",
+      "cruise_speed": 0.5,
+      "doorway_speed": 0.3,
+      "route": [
+        [
+          10.0,
+          1.5
+        ],
+        [
+          10.0,
+          3.5
+        ],
+        [
+          6.5,
+          3.5
+        ],
+        [
+          4.0,
+          3.5
+        ],
+        [
+          4.0,
+          5.0
+        ],
+        [
+          4.0,
+          7.0
+        ],
+        [
+          2.5,
+          7.0
+        ],
+        [
+          2.5,
+          9.5
+        ],
+        [
+          3.6,
+          10.6
+        ],
+        [
+          2.5,
+          9.5
+        ],
+        [
+          2.5,
+          7.0
+        ],
+        [
+          10.0,
+          7.0
+        ],
+        [
+          10.0,
+          9.5
+        ],
+        [
+          10.0,
+          11.2
+        ],
+        [
+          11.0,
+          10.2
+        ],
+        [
+          9.6,
+          9.6
+        ]
+      ],
+      "look_around_at": [
+        [
+          6.5,
+          3.5
+        ],
+        [
+          3.6,
+          10.6
+        ],
+        [
+          10.0,
+          11.2
+        ]
+      ]
+    },
+    {
+      "id": "robot_B",
+      "color": "#2FA3E6",
+      "spawn": {
+        "at": [
+          -1.2,
+          7.0
+        ],
+        "yaw": 90
+      },
+      "control": "scripted",
+      "cruise_speed": 0.5,
+      "doorway_speed": 0.3,
+      "route": [
+        [
+          1.5,
+          7
+        ],
+        [
+          18,
+          7
+        ],
+        [
+          18.0,
+          12.5
+        ],
+        [
+          18.0,
+          9.5
+        ],
+        [
+          18.0,
+          7.0
+        ],
+        [
+          16.0,
+          7.0
+        ],
+        [
+          16.0,
+          5.0
+        ],
+        [
+          14.5,
+          4.6
+        ],
+        [
+          13.0,
+          3.5
+        ],
+        [
+          11.0,
+          3.5
+        ],
+        [
+          10.0,
+          4.6
+        ],
+        [
+          10.0,
+          7.0
+        ],
+        [
+          10.0,
+          9.5
+        ],
+        [
+          10.6,
+          11.0
+        ],
+        [
+          9.4,
+          10.4
+        ]
+      ],
+      "look_around_at": [
+        [
+          18.0,
+          11.0
+        ],
+        [
+          14.5,
+          4.6
+        ],
+        [
+          10.6,
+          11.0
+        ]
+      ]
+    }
+  ],
+  "survivors": [
+    {
+      "id": "s1",
+      "room": "living",
+      "at": [
+        5.6,
+        2.0
+      ],
+      "yaw": 30,
+      "pose": "lying_on_side"
+    },
+    {
+      "id": "s2",
+      "room": "bathroom",
+      "at": [
+        5.6,
+        9.0
+      ],
+      "yaw": 90,
+      "pose": "slumped_against_wall"
+    },
+    {
+      "id": "s3",
+      "room": "study",
+      "at": [
+        11.0,
+        12.2
+      ],
+      "yaw": 90,
+      "pose": "collapsed_at_desk"
+    },
+    {
+      "id": "s4",
+      "room": "bedroom_2",
+      "at": [
+        13.2,
+        12.4
+      ],
+      "yaw": 0,
+      "pose": "curled_on_bed"
+    }
+  ]
 }

@@ -34,35 +34,7 @@ namespace SmokeRescue.Editor
             var missing = new List<string>();
 
             foreach (var lm in plan.landmarks)
-            {
-                var parts = cfg["landmarks"]?[lm.kind] as JArray;
-                if (parts == null) { missing.Add($"{lm.kind}: not in props.json"); continue; }
-                var group = new GameObject($"{lm.room}_{lm.kind}");
-                group.transform.SetParent(root.transform, false);
-                group.transform.SetPositionAndRotation(new Vector3(lm.at[0], 0f, lm.at[1]), Quaternion.Euler(0f, lm.yaw, 0f));
-                float lastTop = 0f;
-                int k = 0;
-                foreach (JObject part in parts)
-                {
-                    var prefab = LoadModel(part, out string label);
-                    if (prefab == null) { missing.Add($"{lm.kind}: {label}"); continue; }
-                    var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
-                    go.name = $"{k++}_{label}";
-                    go.transform.SetParent(group.transform, false);
-                    var off = part["offset"] as JArray;
-                    float ox = off != null ? off[0].Value<float>() : 0f;
-                    float oy = off == null ? 0f : off[1].Type == JTokenType.String ? lastTop : off[1].Value<float>();
-                    float oz = off != null ? off[2].Value<float>() : 0f;
-                    go.transform.localPosition = new Vector3(ox, oy, oz);
-                    go.transform.localRotation = Quaternion.Euler(0f, part.Value<float?>("yaw") ?? 0f, 0f);
-                    if (part["hide_materials"] is JArray hide) DropSubmeshes(go, hide.Values<string>().ToArray());
-                    if (part["fit_width"] != null) FitWidth(go, part.Value<float>("fit_width"));
-                    var b = RenderBounds(go);
-                    lastTop = b.max.y;
-                    foreach (var t in go.GetComponentsInChildren<Transform>()) t.gameObject.layer = props;
-                    if (!Walkable.Contains(lm.kind)) AddBoxCollider(go, b);
-                }
-            }
+                PlaceLandmark(root.transform, lm, cfg, props, missing);
             PlaceFiller(plan, cfg, root, props, missing);
             foreach (var t in root.GetComponentsInChildren<Transform>())
                 GameObjectUtility.SetStaticEditorFlags(t.gameObject, StaticEditorFlags.ContributeGI | StaticEditorFlags.OccluderStatic | StaticEditorFlags.OccludeeStatic | StaticEditorFlags.BatchingStatic);
@@ -70,6 +42,60 @@ namespace SmokeRescue.Editor
                       (missing.Count > 0 ? $"\nMissing:\n{string.Join("\n", missing)}" : ""));
             if (missing.Count > 0) Debug.LogWarning($"[SmokeRescue] {missing.Count} furniture parts missing");
             return root;
+        }
+
+        /// <summary>Places one landmark's parts from props.json under `parent`, with box colliders on the Props layer.</summary>
+        public static GameObject PlaceLandmark(Transform parent, FloorPlan.Landmark lm, JObject cfg, int props, List<string> missing)
+        {
+            var parts = cfg["landmarks"]?[lm.kind] as JArray;
+            if (parts == null) { missing.Add($"{lm.kind}: not in props.json"); return null; }
+            var group = new GameObject($"{lm.room}_{lm.kind}");
+            group.transform.SetParent(parent, false);
+            group.transform.SetPositionAndRotation(new Vector3(lm.at[0], 0f, lm.at[1]), Quaternion.Euler(0f, lm.yaw, 0f));
+            float lastTop = 0f;
+            int k = 0;
+            foreach (JObject part in parts)
+            {
+                var prefab = LoadModel(part, out string label);
+                if (prefab == null) { missing.Add($"{lm.kind}: {label}"); continue; }
+                var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+                go.name = $"{k++}_{label}";
+                go.transform.SetParent(group.transform, false);
+                var off = part["offset"] as JArray;
+                float ox = off != null ? off[0].Value<float>() : 0f;
+                float oy = off == null ? 0f : off[1].Type == JTokenType.String ? lastTop : off[1].Value<float>();
+                float oz = off != null ? off[2].Value<float>() : 0f;
+                go.transform.localPosition = new Vector3(ox, oy, oz);
+                go.transform.localRotation = Quaternion.Euler(0f, part.Value<float?>("yaw") ?? 0f, 0f);
+                if (part["hide_materials"] is JArray hide) DropSubmeshes(go, hide.Values<string>().ToArray());
+                if (part["fit_width"] != null) FitWidth(go, part.Value<float>("fit_width"));
+                var b = RenderBounds(go);
+                if (part.Value<bool?>("on_floor") == true) { go.transform.position += Vector3.up * -b.min.y; b = RenderBounds(go); }
+                lastTop = b.max.y;
+                foreach (var t in go.GetComponentsInChildren<Transform>()) t.gameObject.layer = props;
+                if (!Walkable.Contains(lm.kind)) AddBoxCollider(go, b);
+            }
+            return group;
+        }
+
+        /// <summary>Scenario obstacles (debris, burning wood, rubble) placed for one run under Furniture/Obstacles.
+        /// They are not saved with the house: only scenarios that list them get them.</summary>
+        public static int PlaceScenarioObstacles(Scenario scenario)
+        {
+            var furniture = GameObject.Find(RootName);
+            if (furniture == null) throw new System.InvalidOperationException("Place Furniture first.");
+            var old = furniture.transform.Find("Obstacles");
+            if (old != null) Object.DestroyImmediate(old.gameObject);
+            if (scenario.obstacles == null || scenario.obstacles.Count == 0) return 0;
+            var root = new GameObject("Obstacles");
+            root.transform.SetParent(furniture.transform, false);
+            var cfg = JObject.Parse(File.ReadAllText(Path.Combine(FloorPlan.ConfigDir, "props.json")));
+            int props = LayerMask.NameToLayer(HouseBuilder.PropsLayer);
+            var missing = new List<string>();
+            foreach (var lm in scenario.obstacles) PlaceLandmark(root.transform, lm, cfg, props, missing);
+            Physics.SyncTransforms();
+            if (missing.Count > 0) Debug.LogWarning($"[SmokeRescue] obstacle parts missing:\n{string.Join("\n", missing)}");
+            return scenario.obstacles.Count;
         }
 
         /// <summary>The quadruped body model named by props.json "robot_body", imported like furniture. Null if absent.</summary>

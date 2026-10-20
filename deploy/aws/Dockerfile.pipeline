@@ -1,0 +1,38 @@
+# Evaluation / map pipeline for AWS Batch. Runs linux/amd64 because open3d 0.19.0 has no
+# linux-aarch64 wheel in brain/uv.lock. torch, ultralytics and mlx-vlm are pruned, so
+# brain.place (torch) and brain.detect are not available in this image.
+#   docker buildx build --platform linux/amd64 -f deploy/aws/Dockerfile.pipeline -t smoke-rescue-pipeline .
+ARG PYTHON_IMAGE=python:3.11-slim-bookworm@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89
+ARG UV_IMAGE=ghcr.io/astral-sh/uv:0.11.2@sha256:c4f5de312ee66d46810635ffc5df34a1973ba753e7241ce3a08ef979ddd7bea5
+ARG AWSCLI_IMAGE=amazon/aws-cli:2.37.0@sha256:337494c2047176fe9abcf45a5d1eaf1c2c62cae40953284fb1143b5c6170f065
+
+FROM --platform=linux/amd64 ${UV_IMAGE} AS uv
+FROM --platform=linux/amd64 ${AWSCLI_IMAGE} AS awscli
+
+FROM --platform=linux/amd64 ${PYTHON_IMAGE} AS build
+COPY --from=uv /uv /uvx /bin/
+ENV UV_PYTHON_DOWNLOADS=never UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
+WORKDIR /src
+COPY brain/pyproject.toml brain/uv.lock brain/README.md ./
+RUN uv export --frozen --no-dev --no-emit-project \
+        --prune torch --prune torchvision --prune ultralytics --prune mlx-vlm \
+        -o /tmp/requirements.txt \
+    && uv venv /opt/venv \
+    && uv pip install --python /opt/venv/bin/python --require-hashes --no-deps -r /tmp/requirements.txt
+
+FROM --platform=linux/amd64 ${PYTHON_IMAGE} AS runtime
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 libgomp1 \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --uid 10001 --create-home --shell /usr/sbin/nologin app
+COPY --from=awscli /usr/local/aws-cli /usr/local/aws-cli
+RUN ln -s /usr/local/aws-cli/v2/current/bin/aws /usr/local/bin/aws
+COPY --from=build /opt/venv /opt/venv
+COPY brain/brain /app/brain
+COPY deploy/aws/batch/pipeline_entrypoint.sh /usr/local/bin/pipeline_entrypoint.sh
+ENV PATH=/opt/venv/bin:$PATH PYTHONPATH=/app PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 HOME=/home/app
+RUN chmod 0755 /usr/local/bin/pipeline_entrypoint.sh && mkdir /work && chown app /work \
+    && python -c "import brain.evaluator"
+USER 10001:10001
+WORKDIR /work
+ENTRYPOINT ["/usr/local/bin/pipeline_entrypoint.sh"]
