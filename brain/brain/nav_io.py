@@ -58,9 +58,10 @@ def latest_map(robot_dir: Path) -> tuple[float, np.ndarray] | None:
     return None
 
 
-def searched_for(robot_dir: Path, map_t: float) -> np.ndarray | None:
-    """Searched-floor mask written beside the snapshot at map_t (255 searched), south row first; None if absent."""
-    path = robot_dir / 'brain_map' / f'{map_t:.6f}.searched.png'
+def searched_for(robot_dir: Path, map_t: float, layer: str = 'searched') -> np.ndarray | None:
+    """A mask written beside the snapshot at map_t, south row first; None if absent. Layers: 'searched' (255 searched
+    by a camera), 'indoor' (255 ceiling seen, 128 within the indoor radius of one, 0 not known to be indoors)."""
+    path = robot_dir / 'brain_map' / f'{map_t:.6f}.{layer}.png'
     if not path.exists():
         return None
     image = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
@@ -167,11 +168,11 @@ def map_geometry(shape, frame: str):
     return origin, cell
 
 
-def sample_grid(grid, xy, origin, cell):
-    """Sample a south-first grid at arbitrary points, with unknown outside it."""
+def sample_grid(grid, xy, origin, cell, fill=128):
+    """Sample a south-first grid at arbitrary points, with fill (occupancy: 128 unknown) outside it."""
     cells = np.floor((np.asarray(xy) - origin) / cell + 1e-8).astype(int)
     valid = (cells[..., 0] >= 0) & (cells[..., 0] < grid.shape[1]) & (cells[..., 1] >= 0) & (cells[..., 1] < grid.shape[0])
-    result = np.full(valid.shape, 128, np.uint8)
+    result = np.full(valid.shape, fill, np.uint8)
     result[valid] = grid[cells[..., 1][valid], cells[..., 0][valid]]
     return result
 

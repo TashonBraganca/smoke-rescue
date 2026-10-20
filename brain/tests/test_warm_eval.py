@@ -20,7 +20,10 @@ def scene(kind='person'):
     depth = np.full((h, w), 3.8, np.float32)
     temp = np.full((h, w), 24., np.float32)
     yy, xx = np.indices((h, w))
-    top = 30 if kind == 'high' else 80
+    # 'high': rows 5 to 26 at 3 m are 2.0 to 2.5 m above the floor, over person_top_max_m (2.0, a standing adult plus
+    # margin). Rows 30 to 52 were 1.4 to 1.9 m, a standing person, and passed once the limit stopped being fitted to
+    # this scenario's lying and slumped poses (1.25 m).
+    top = 5 if kind == 'high' else 80
     mask = (yy >= top) & (yy < top+22) & (xx >= 60) & (xx < 100)
     # A curved object stands in front of the background.
     depth[mask] = 3.0-.22*np.sin((xx[mask]-60)/39*np.pi)*np.sin((yy[mask]-top)/21*np.pi)
