@@ -11,7 +11,7 @@ import json
 import time
 from pathlib import Path
 
-from brain.agent.llm import request_key
+from brain.agent.llm import append_jsonl, request_key
 
 SYSTEM = """You are the incident commander for two search robots inside a burning building whose layout nobody knows.
 You stand outside at the command post and hear their radio reports, which may arrive late or not at all. You have
@@ -45,8 +45,7 @@ class Commander:
         self.trace_path = Path(trace_path)
 
     def _trace(self, rec: dict) -> None:
-        with self.trace_path.open("a") as f:
-            f.write(json.dumps(rec, default=str) + "\n")
+        append_jsonl(self.trace_path, rec)
 
     def step(self, req: dict) -> dict:
         start = time.perf_counter()
