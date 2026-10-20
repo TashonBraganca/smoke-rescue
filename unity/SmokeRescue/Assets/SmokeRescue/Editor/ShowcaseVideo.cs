@@ -60,7 +60,7 @@ namespace SmokeRescue.Editor
             hd.backgroundColorHDR = new Color(0.01f, 0.01f, 0.015f);
             cam.fieldOfView = 45f;
             cam.farClipPlane = 200f;
-            cam.cullingMask = ~(1 << LayerMask.NameToLayer(HouseBuilder.CeilingLayer));
+            cam.cullingMask = ~(1 << LayerMask.NameToLayer(HouseBuilder.CeilingLayer)) & ~(1 << LayerMask.NameToLayer("ThermalOnly"));
             cam.aperture = 1.4f; cam.iso = 100; cam.shutterSpeed = 1.96f / Mathf.Pow(2f, 1.8f);
             var rt = new RenderTexture(W, H, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
             cam.targetTexture = rt;

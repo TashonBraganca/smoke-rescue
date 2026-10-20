@@ -28,7 +28,8 @@ namespace SmokeRescue.Editor
                 cam.nearClipPlane = 0.05f;
                 cam.orthographic = orthographic;
                 cam.orthographicSize = orthoSize;
-                if (hideCeiling) cam.cullingMask = ~(1 << LayerMask.NameToLayer(HouseBuilder.CeilingLayer));
+                cam.cullingMask = ~(1 << LayerMask.NameToLayer("ThermalOnly"));
+                if (hideCeiling) cam.cullingMask &= ~(1 << LayerMask.NameToLayer(HouseBuilder.CeilingLayer));
                 var hd = go.AddComponent<HDAdditionalCameraData>();
                 hd.clearColorMode = HDAdditionalCameraData.ClearColorMode.Color;
                 hd.backgroundColorHDR = Color.black;
