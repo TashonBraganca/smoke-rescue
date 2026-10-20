@@ -29,6 +29,10 @@ namespace SmokeRescue.Recording
     {
         /// <summary>Agent server URL, for example http://localhost:8080. Null records without agents.</summary>
         public static string AgentUrl;
+        /// <summary>Vision service for the live colour person detector (OpenCV 5 dnn, YOLO11m). It is perception, not
+        /// the language model, so it runs with or without agents. Null skips it (logged at the start of a run).</summary>
+        public static string PeopleUrl;
+        public static float PeoplePeriodS = 1f;
         // The agent server bounds a step at about 75 s plus one 45 s call; past 120 s the reflex layer carries on alone.
         static readonly HttpClient Http = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
         static readonly HashSet<string> AgentTriggers = new HashSet<string>
@@ -47,6 +51,7 @@ namespace SmokeRescue.Recording
             public readonly List<JObject> outbox = new List<JObject>();    // texts waiting for a radio link
             public readonly List<double> thermalTimes = new List<double>();
             public readonly StringBuilder agentLog = new StringBuilder();
+            public double lastPeople = double.NegativeInfinity;
         }
 
         sealed class AgentWorld
@@ -275,12 +280,33 @@ namespace SmokeRescue.Recording
             File.WriteAllText(Path.Combine(rig.dir, "brain_state.jsonl"), rig.brainState.ToString());
         }
 
-        static JObject Post(string path, JObject body)
+        /// <summary>Once per PeoplePeriodS per robot: run the colour person detector on the robot's latest frame and hand
+        /// each sighting (bearing, range, confidence) to its brain.</summary>
+        static void PeopleScan(List<RobotRig> rigs, double t, Queue<Task> pending, SensorConfig cfg)
+        {
+            if (PeopleUrl == null) return;
+            foreach (var rig in rigs)
+            {
+                if (rig.brain == null || rig.missionDone || t - rig.lastPeople < PeoplePeriodS - 1e-9) continue;
+                rig.lastPeople = t;
+                FlushForAgent(rig, pending, cfg);
+                var reply = Post("/perceive/people", new JObject { ["robot_dir"] = Path.GetFullPath(rig.dir), ["t"] = t, ["min_conf"] = 0.25 }, PeopleUrl);
+                if (reply == null) continue;
+                double seen = reply.Value<double?>("t") ?? t;
+                foreach (JObject p in (reply["people"] as JArray) ?? new JArray())
+                {
+                    if (p["range_m"] == null || p["range_m"].Type == JTokenType.Null) continue;
+                    rig.brain.OnPersonSighting(Math.Min(seen, t), p.Value<float>("bearing_deg"), p.Value<float>("range_m"), p.Value<float>("confidence"));
+                }
+            }
+        }
+
+        static JObject Post(string path, JObject body, string baseUrl = null)
         {
             try
             {
                 var content = new StringContent(body.ToString(Formatting.None), Encoding.UTF8, "application/json");
-                var resp = Http.PostAsync(AgentUrl.TrimEnd('/') + path, content).Result;
+                var resp = Http.PostAsync((baseUrl ?? AgentUrl).TrimEnd('/') + path, content).Result;
                 string text = resp.Content.ReadAsStringAsync().Result;
                 if (!resp.IsSuccessStatusCode) { Debug.LogWarning($"[SmokeRescue] agent {path}: HTTP {(int)resp.StatusCode} {text}"); return null; }
                 return JObject.Parse(text);

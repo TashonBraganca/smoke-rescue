@@ -71,6 +71,7 @@ namespace SmokeRescue.Recording
             var plan = FloorPlan.Load();
             var scenario = Scenario.Load(scenarioFile);
             var sensorCfg = SensorConfig.Load();
+            PeoplePeriodS = BrainConfig.Load().person_rgb_scan_period_s;
             string root = Path.GetFullPath(Path.Combine(FloorPlan.ConfigDir, "..", "data", "recordings", runId));
             if (Directory.Exists(root))
             {
@@ -297,6 +298,7 @@ namespace SmokeRescue.Recording
                     }
                     rig.frames++;
                 }
+                PeopleScan(rigs, t, pending, sensorCfg);
                 while (pending.Count > 48) pending.Dequeue().Wait();
                 if (rigs[0].frames % 150 == 0)
                     progress?.Invoke($"t={t:0.0}s frames={rigs[0].frames} wall={wall.Elapsed.TotalSeconds:0}s");

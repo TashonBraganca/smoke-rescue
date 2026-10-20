@@ -318,5 +318,21 @@
   "link_diagnostics": true,
   "link_diagnostics_reason": "Log every rejected fingerprint comparison (place_rejected) during the overnight verification runs; turn off for the final demo runs.",
   "ceiling_wall_margin_m": 0.4,
-  "ceiling_wall_margin_m_reason": "Ceiling evidence counts only on cells at least this far from a mapped wall: wall faces reach the ceiling height band, and their noisy points outside an exterior wall made the yard look roofed (run 6). 0.4 m is under half the narrowest hallway."
+  "ceiling_wall_margin_m_reason": "Ceiling evidence counts only on cells at least this far from a mapped wall: wall faces reach the ceiling height band, and their noisy points outside an exterior wall made the yard look roofed (run 6). 0.4 m is under half the narrowest hallway.",
+  "person_rgb_min_confidence": 0.5,
+  "person_rgb_min_confidence_reason": "YOLO11m (OpenCV 5 dnn) confidence needed for a colour person sighting; the agent's inspect_candidate uses the same 0.5. Provisional until rgb_people_eval reports precision per threshold.",
+  "person_rgb_max_range_m": 6.0,
+  "person_rgb_max_range_m_reason": "Sightings farther than this are ignored: the box depth gets unreliable and the person is too small to confirm.",
+  "person_rgb_sightings": 2,
+  "person_rgb_sightings_reason": "Two colour sightings of one place within person_rgb_window_s make a survivor candidate.",
+  "person_rgb_window_s": 3.0,
+  "person_rgb_window_s_reason": "Window for repeated colour sightings (scans run once per second).",
+  "person_rgb_fresh_s": 1.5,
+  "person_rgb_fresh_s_reason": "A colour track counts as currently seen for this long after a sighting (thermal tracks use survivor_fresh_s at 15 Hz).",
+  "person_rgb_scan_period_s": 1.0,
+  "person_rgb_scan_period_s_reason": "The recorder runs the colour person detector on each robot's latest frame this often (661 ms per frame on the M5 CPU).",
+  "person_floor_clearance_m": 0.12,
+  "person_floor_clearance_m_reason": "A thermal blob's median height must be at least this far above the floor: heated floor near a fire was a main source of false warm shapes (warm_eval).",
+  "person_top_max_m": 2.0,
+  "person_top_max_m_reason": "A thermal blob's 95th-percentile height must be under a standing adult's height plus margin; taller warm patches are walls. Not tuned to this scenario's poses (lying, slumped), so a standing person still passes."
 }

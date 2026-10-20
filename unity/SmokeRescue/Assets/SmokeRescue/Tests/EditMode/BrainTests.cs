@@ -443,6 +443,34 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void ColourPersonSightingsBecomeACandidateWhereThePersonIs()
+        {
+            // Thermal saturates in fire rooms (warm_eval: 0 of 161 visible survivors); the colour dnn detector still sees
+            // them. A person 2.4 m ahead and 10 degrees to the right, seen twice, must become one candidate there.
+            float Spot(float confidence, out int candidates)
+            {
+                var b = new RobotBrain(Calibration(), Settings(), "A", 0);
+                var all = new List<BrainEvent>();
+                for (int tick = 0; tick <= 40; tick++)
+                {
+                    double t = tick / 20.0; Motion(b, t); b.OnAirTemperature(t, 20);
+                    if (tick % 20 == 0) b.OnPersonSighting(t, 10f, 2.4f, confidence);
+                    b.Step(t, .05f); all.AddRange(b.DrainEvents());
+                }
+                var events = all.Where(e => e.kind == "survivor_candidate").ToList(); candidates = events.Count;
+                if (candidates == 0) return float.NaN;
+                // Camera 0.25 m ahead of the body; bearing 10 degrees right.
+                var expected = new Vector2(0, .25f) + new Vector2(Mathf.Sin(10 * Mathf.Deg2Rad), Mathf.Cos(10 * Mathf.Deg2Rad)) * 2.4f;
+                return Vector2.Distance(new Vector2((float)events[0].numbers["x_m"], (float)events[0].numbers["y_m"]), expected);
+            }
+            float error = Spot(.8f, out int confident);
+            Assert.That(confident, Is.EqualTo(1));
+            Assert.That(error, Is.LessThan(.05f), "candidate where the person is");
+            Spot(.3f, out int weak);
+            Assert.That(weak, Is.Zero, "control: sightings under person_rgb_min_confidence are ignored");
+        }
+
+        [Test]
         public void WithAnAgentTheReflexOnlyBringsTheCamerasCloseAndNeverConfirms()
         {
             var s = Calibration(); var b = new RobotBrain(s, Settings(), "A", 4) { AgentConfirms = true };
