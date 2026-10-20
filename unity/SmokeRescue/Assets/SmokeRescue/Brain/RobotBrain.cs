@@ -165,15 +165,17 @@ namespace SmokeRescue.Brain
                 // The start is usually a doorway, which is narrower than the planning clearance, so the return path ends at
                 // the nearest walkable cell short of it (house reflex check: robot B stopped 0.3 m from its start and replanned
                 // the same 3-point path for 45 s). Within return_arrive_m of the start counts as back.
-                if (Vector2.Distance(motion.Pose.position, home) <= Mathf.Max(c.goal_tolerance_m, c.return_arrive_m))
+                float toExit = float.PositiveInfinity; foreach (var e in Exits()) toExit = Mathf.Min(toExit, Vector2.Distance(motion.Pose.position, e));
+                if (toExit <= Mathf.Max(c.goal_tolerance_m, c.return_arrive_m))
                 {
                     completed = true; ClearPath();
-                    Emit(t, "mission_complete", returnReason + " Returned to the estimated start.", "distance_to_start_m", Vector2.Distance(motion.Pose.position, home));
+                    Emit(t, "mission_complete", returnReason + " Reached a known way out.", "distance_to_start_m", Vector2.Distance(motion.Pose.position, home),
+                        "distance_to_exit_m", toExit);
                     return Command(0, 0, dt, true);
                 }
                 if (NeedPlan(t))
                 {
-                    SetPath(planner.Plan(motion.Pose.position, home)); lastPlan = t;
+                    SetPath(PlanOut()); lastPlan = t;
                     if (path.Count == 0 && returnReason == WayOutClosing)
                     {
                         // Fire cut the way home while the robot was on it (agent run 12: robot A held still for the rest
@@ -585,7 +587,7 @@ namespace SmokeRescue.Brain
         {
             if (completed || returning || retreating || t < nextWayOutCheck) return;
             nextWayOutCheck = t + c.escape_check_s;
-            var route = planner.Plan(motion.Pose.position, home);
+            var route = PlanOut();
             if (route.Count == 0)
             {
                 if (hadWayOut) LoseWayOut(t);
@@ -602,6 +604,26 @@ namespace SmokeRescue.Brain
             }
         }
         const string WayOutClosing = "The way out was closing.";
+        /// <summary>Known ways out: this robot's own entry and, once a partner's map is linked, the partner's entry (the
+        /// origin of its frame), which it reported by radio. Slow-fire run: robot B's way home was cut by fire 5.5 m from
+        /// the door robot A had entered and left by, and it held still for 50 s.</summary>
+        IEnumerable<Vector2> Exits()
+        {
+            yield return home;
+            foreach (var partner in peers.Keys)
+                if (PartnerToOwn(partner, Vector2.zero, out var entry)) yield return entry;
+        }
+        /// <summary>The shortest known route to any way out (fewest waypoints), or an empty path.</summary>
+        List<Vector2> PlanOut()
+        {
+            List<Vector2> best = new List<Vector2>();
+            foreach (var exit in Exits())
+            {
+                var route = planner.Plan(motion.Pose.position, exit);
+                if (route.Count > 0 && (best.Count == 0 || route.Count < best.Count)) best = route;
+            }
+            return best;
+        }
         void LoseWayOut(double t)
         {
             hadWayOut = false; returning = false; ResetStuckRecovery(); retreating = true; sweeping = false; active = null; dwell = 0; ClearPath();

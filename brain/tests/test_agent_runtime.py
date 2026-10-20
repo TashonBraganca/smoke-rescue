@@ -166,3 +166,19 @@ def test_commander_trace_records_the_reports_that_reached_the_post(tmp_path):
     start = [r for r in rows if r["kind"] == "step_start"]
     assert len(start) == 1 and start[0]["reports"] == [report]
     assert start[0]["step"] == "commander@30.000"
+
+
+def test_a_survivor_is_confirmed_only_from_a_close_inspection(tmp_path, monkeypatch):
+    # Slow-fire run: a confirmation from 6.55 m at the image edge landed 1.55 m from the person (a duplicate scored
+    # as false). Beyond person_confirm_max_range_m the agent must approach first; within it, confirming works.
+    fake_vision(monkeypatch, "person")
+    monkeypatch.setattr(T.vision, "inspect_candidate", lambda f, b, r, output_dir: {
+        "id": f"ev{r:g}", "tool": "inspect_candidate", "verdict": "person", "params": {"bearing_deg": b, "range_m": r},
+        "candidate": {"bearing_deg": b, "range_m": r}})
+    far, _ = run(tmp_path, [[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": 6.5})],
+                            [ToolCall("confirm_survivor", {"x": 5, "y": 11.5, "evidence_id": "ev6.5"})]])
+    assert far["orders"] == [] and far["refusals"][0]["tool"] == "confirm_survivor"
+    assert "approach_candidate" in far["refusals"][0]["reason"]
+    near, _ = run(tmp_path, [[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": 3})],
+                             [ToolCall("confirm_survivor", {"x": 5, "y": 8, "evidence_id": "ev3"})]])
+    assert [o["type"] for o in near["orders"]] == ["confirm_survivor"], "control: 3 m"

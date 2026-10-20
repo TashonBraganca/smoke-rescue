@@ -119,6 +119,8 @@
   "candidate_frames_reason": "Require repeated person observations.",
   "candidate_window_s": 1.0,
   "candidate_window_s_reason": "Require the repeated observations within one second.",
+  "person_confirm_max_range_m": 4.0,
+  "person_confirm_max_range_m_reason": "An agent may confirm a survivor only from an inspection within this range; farther, it must approach and look again. rgb_people_eval: per-frame precision 0.93 and range error about 0.24 m up to 4 m, worse beyond; slow-fire run: a confirmation from 6.55 m at the image edge landed 1.55 m from the person, a duplicate scored as false.",
   "survivor_merge_m": 1.0,
   "survivor_merge_m_reason": "Report a person only once within the requested merge radius.",
   "survivor_standoff_m": 1.2,
