@@ -17,7 +17,8 @@ from pathlib import Path
 from brain.agent.llm import Reply, request_key
 from brain.agent.tools import ALL_TOOLS, AgentContext, ToolRegistry
 
-MAX_ROUNDS = 6
+MAX_ROUNDS = 4
+REPEAT_WINDOW_S = 12.0     # the reflex brain re-raises the same candidate every few seconds; one decision covers it
 
 SYSTEM = """You are the decision layer of a quadruped search-and-rescue robot inside a burning building.
 A reflex controller already drives, maps, avoids obstacles and backs away from heat. You decide what matters:
@@ -66,8 +67,28 @@ class RobotAgent:
         with self.trace_path.open("a") as f:
             f.write(json.dumps(rec, default=str) + "\n")
 
+    _recent: dict = {}
+
+    def _repeat(self, req: dict) -> bool:
+        ev = req.get("event") or {}
+        n = ev.get("numbers") or {}
+        key = (req["robot"], ev.get("kind"))
+        here = (n.get("x_m"), n.get("y_m"))
+        last = self._recent.get(key)
+        self._recent[key] = (float(req["t"]), here)
+        if ev.get("kind") in ("periodic", None) or last is None:
+            return False
+        lt, lpos = last
+        near = None not in here and None not in lpos and ((here[0] - lpos[0]) ** 2 + (here[1] - lpos[1]) ** 2) ** 0.5 < 1.5
+        return float(req["t"]) - lt < REPEAT_WINDOW_S and (near or ev.get("kind") != "survivor_candidate")
+
     def step(self, req: dict) -> dict:
         start = time.perf_counter()
+        if self._repeat(req):
+            out = {"step": f"{req['robot']}@{float(req['t']):.3f}", "orders": [], "refusals": [], "rounds": 0,
+                   "summary": None, "evidence_ids": [], "latency_s": 0.0, "repeat_of_recent_event": True}
+            self._trace({"kind": "step_skipped", **out, "event": req.get("event")})
+            return out
         pose = req["pose"]
         ctx = AgentContext(robot=req["robot"], t=float(req["t"]), x=float(pose["x"]), y=float(pose["y"]),
                            heading_deg=float(pose["heading_deg"]),
