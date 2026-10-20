@@ -443,6 +443,44 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void ARobotInsideAFireMarginCanAlwaysPlanItsWayOut()
+        {
+            // Agent run 9: robot B ended up inside a keep-out area its own agent marked as fire and froze, since every
+            // plan started inside fire. Leaving must always be possible, by steps that never go nearer the fire.
+            var c = Settings(); c.grid_size_m = 12; c.robot_radius_m = .25f; var g = OpenGrid(c);
+            for (float x = -.6f; x <= .6f; x += .1f) for (float y = -.2f; y <= 1.2f; y += .1f) g.ObserveHeat(g.Cell(new Vector2(x, y)), 500, 0);
+            var planner = new GridPlanner(g, c); var from = new Vector2(.05f, -.05f);
+            float ToFire(Vector2 q) => new Vector2(Mathf.Max(0, Mathf.Abs(q.x) - .6f), Mathf.Max(0, Mathf.Max(-.2f - q.y, q.y - 1.2f))).magnitude;
+            Assert.That(ToFire(from), Is.Zero, "the robot stands in the hot area");
+            foreach (var goal in new[] { new Vector2(.05f, -4f), new Vector2(.05f, 4.5f) })
+            {
+                var path = planner.Plan(from, goal);
+                Assert.That(path, Is.Not.Empty, $"a way out towards {goal}");
+                Assert.That(planner.PathSafe(path), Is.True, "and the path survives the safety check on the next step");
+                // Once a distance from the fire is reached (up to the clearance), the route never comes back nearer.
+                float reached = 0;
+                foreach (var q in path)
+                {
+                    Assert.That(ToFire(q), Is.GreaterThanOrEqualTo(Mathf.Min(reached, c.fire_clearance_m) - .1f), $"{q} goes back towards the fire");
+                    reached = Mathf.Max(reached, ToFire(q));
+                }
+            }
+        }
+
+        [Test]
+        public void AnAgentKeepOutAreaNeverContainsTheRobot()
+        {
+            var b = new RobotBrain(Calibration(), Settings(), "A", 0); Room(b, -3, 3, -3, 3);
+            Motion(b, 0); b.OnAirTemperature(0, 20); b.Step(0, .05f); b.DrainEvents();
+            b.AgentAvoidArea(new Vector2(0, 1.2f), 2f, 0, 30, "ev");
+            var e = b.DrainEvents().Single(x => x.kind == "agent_order");
+            Assert.That(e.reason, Does.Contain("refused"), "robot 1.2 m from the centre of a 2 m circle");
+            b.AgentAvoidArea(new Vector2(0, 4f), 3f, 0, 30, "ev");
+            var shrunk = b.DrainEvents().Single(x => x.kind == "agent_order");
+            Assert.That(shrunk.numbers["radius_m"], Is.LessThan(4f - Settings().fire_clearance_m - Settings().robot_radius_m + 1e-3), "shrunk to leave the robot outside");
+        }
+
+        [Test]
         public void ColourPersonSightingsBecomeACandidateWhereThePersonIs()
         {
             // Thermal saturates in fire rooms (warm_eval: 0 of 161 visible survivors); the colour dnn detector still sees
