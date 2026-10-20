@@ -42,6 +42,10 @@ PERCEPTION = [
 ]
 
 ACTIONS = [
+    _fn("explore_frontier", "Search one of the frontiers listed in the context next (unsearched floor the robot can reach). "
+        "The robot's planner drives there, keeping clear of walls, and sweeps the area on arrival. Pick by: your sector "
+        "first, then more unsearched area, shorter path, and away from where your partner is searching.",
+        {"frontier_id": {"type": "integer"}, "reason": STR}, ["frontier_id", "reason"]),
     _fn("go_to", "Drive to a building position (x, y in metres) by the robot's own planner.",
         {"x": NUM, "y": NUM, "reason": STR}, ["x", "y", "reason"]),
     _fn("approach_candidate", "Walk to a viewpoint 1.5 m short of an inspected warm region, on the line from the robot, "
@@ -85,6 +89,7 @@ class AgentContext:
     event_kind: str = ""
     torch: str = "wide"
     frame_times: list[float] = field(default_factory=list)   # recent thermal stamps, oldest first
+    frontiers: list[dict] = field(default_factory=list)      # search targets offered by the robot's own map
 
 
 class ToolRegistry:
@@ -196,6 +201,15 @@ class ToolRegistry:
         elif name in ("open_door", "clear_debris"):
             refusal = self._need(args, ("measure_opening",), lambda ev: ev.get("passable") is False,
                                  "the cited measurement says the way is passable; just drive")
+        elif name == "explore_frontier":
+            match = [f for f in self.ctx.frontiers if f.get("id") == args.get("frontier_id")]
+            if not match:
+                refusal = {"refused": True, "reason": "frontier_id is not one of the frontiers in this step's context; "
+                           "choose an id from the list (coordinates are never invented)"}
+            elif self.ctx.event_kind in ("avoid_fire", "retreat"):
+                refusal = {"refused": True, "reason": "no exploring during a heat event: let the reflex layer back away"}
+            else:
+                args = {**args, "x": float(match[0]["x"]), "y": float(match[0]["y"])}
         elif name == "go_to":
             if not self._in_area(float(args["x"]), float(args["y"])):
                 refusal = {"refused": True, "reason": "target is outside the building search area"}

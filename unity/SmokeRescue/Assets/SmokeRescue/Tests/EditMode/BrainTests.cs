@@ -438,6 +438,27 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void WithAnAgentTheReflexOnlyBringsTheCamerasCloseAndNeverConfirms()
+        {
+            var s = Calibration(); var b = new RobotBrain(s, Settings(), "A", 4) { AgentConfirms = true };
+            var position = Vector2.zero; float yaw = 0, v = 0, w = 0; var all = new List<BrainEvent>();
+            for (int tick = 0; tick < 900; tick++)
+            {
+                double t = tick / 60.0;
+                position += new Vector2(-Mathf.Sin(yaw), Mathf.Cos(yaw)) * v / 60; yaw += w * Mathf.Deg2Rad / 60;
+                Motion(b, t, v, w * Mathf.Deg2Rad);
+                if (tick % 6 == 0) b.OnAirTemperature(t, 20);
+                if (tick % 4 == 0) { var pair = SceneImages(t, position, yaw, s); b.OnRgbd(pair.Item1); b.OnThermal(pair.Item2); }
+                var command = b.Step(t, 1f / 60); v = command.forwardMps; w = command.yawRateDeg;
+                all.AddRange(b.DrainEvents());
+            }
+            var ready = all.Where(e => e.kind == "survivor_view_ready").ToList();
+            Assert.That(ready.Count, Is.EqualTo(1), "one hand-off per warm shape until the agent decides or the retry time passes");
+            Assert.That(ready[0].numbers["range_m"], Is.InRange(1.0, 1.5));
+            Assert.That(all.Any(e => e.kind == "survivor_confirmed"), Is.False, "control for the test below: only the agent confirms");
+        }
+
+        [Test]
         public void SurvivorApproachStopsFacesAndConfirmsOnlyOnce()
         {
             var s = Calibration(); var c = Settings(); var b = new RobotBrain(s, c, "A", 4);
@@ -605,14 +626,160 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(b.Snapshot().state, Is.EqualTo("complete"));
         }
 
+        /// <summary>A 360 degree sweep of an empty square room centred on the origin, seen from p with heading yaw.</summary>
+        static LidarScan RoomScan(double t, Vector2 p, float yaw, float half = 2f, int beams = 360)
+        {
+            var ranges = new float[beams]; float inc = 2 * Mathf.PI / beams, min = -Mathf.PI;
+            for (int i = 0; i < beams; i++)
+            {
+                float a = yaw + min + i * inc; var d = new Vector2(-Mathf.Sin(a), Mathf.Cos(a)); float r = float.PositiveInfinity;
+                if (d.x > 1e-6f) r = Mathf.Min(r, (half - p.x) / d.x); if (d.x < -1e-6f) r = Mathf.Min(r, (-half - p.x) / d.x);
+                if (d.y > 1e-6f) r = Mathf.Min(r, (half - p.y) / d.y); if (d.y < -1e-6f) r = Mathf.Min(r, (-half - p.y) / d.y);
+                ranges[i] = r;
+            }
+            return new LidarScan(t, min, inc, .15f, 12f, 0f, .45f, ranges);
+        }
+        static float SafeForward(RobotBrain b, float requested) => (float)typeof(RobotBrain)
+            .GetMethod("SafeForward", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).Invoke(b, new object[] { requested });
+
         [Test]
-        public void CloseDepthObstacleTriggersCollisionStop()
+        public void LidarMapsWallsAndFloorButDoesNotCountAsSearched()
         {
             var b = new RobotBrain(Calibration(), Settings(), "A", 0);
-            Motion(b, 0); b.OnAirTemperature(0, 20); b.OnRgbd(Image(0, true, 200));
-            var command = b.Step(0, 1f / 60);
-            Assert.That(command.forwardMps, Is.Zero);
-            Assert.That(b.DrainEvents().Any(e => e.kind == "collision_risk" && e.numbers["distance_m"] < .5), Is.True);
+            Motion(b, 0); b.OnAirTemperature(0, 20); b.OnLidar(RoomScan(0, Vector2.zero, 0)); b.Step(0, 1f / 60);
+            var g = Map(b); int wall = 0, inside = 0;
+            for (int i = 0; i < g.Count; i++)
+            {
+                if (g.LidarOccupancy(i) != 255) continue;
+                var p = g.Centre(i); float edge = Mathf.Max(Mathf.Abs(p.x), Mathf.Abs(p.y));
+                if (Mathf.Abs(edge - 2f) <= .1f) wall++; else inside++;
+            }
+            Assert.That(wall, Is.GreaterThan(100)); Assert.That(inside, Is.Zero);
+            int floor = g.Cell(new Vector2(1.05f, -.95f));
+            Assert.That(g.Occupancy(floor), Is.EqualTo(1));
+            Assert.That(g.OwnObserved(floor), Is.False, "Only a camera search makes floor searched.");
+            Assert.That(g.Unsearched(floor), Is.True);
+            Assert.That(new GridPlanner(g, Settings()).SelectFrontier(Vector2.zero).HasValue, Is.True);
+            Room(b, -2, 2, -2, 2);
+            Assert.That(new GridPlanner(g, Settings()).SelectFrontier(Vector2.zero).HasValue, Is.False);
+        }
+
+        [Test]
+        public void LongUnsearchedEdgeOffersSeveralFrontiersAndClaimsStayLocal()
+        {
+            // LiDAR maps an 8 m room; cameras have searched only its west half. The 8 m edge between them must be
+            // offered as several targets, and a partner's claim on one must leave the others available.
+            var b = new RobotBrain(Calibration(), Settings(), "B", 0, new EntryPose(-3, 0, 90));
+            Motion(b, 0); b.OnAirTemperature(0, 20); b.OnLidar(RoomScan(0, new Vector2(-3, 0), 0, 4f, 720)); b.Step(0, 1f / 60);
+            Room(b, -4, 0, -4, 4);
+            var options = b.FrontierOptions(0, 10);
+            Assert.That(options.Count, Is.GreaterThanOrEqualTo(3), "an 8 m edge is more than one target");
+            var a = new RobotBrain(Calibration(), Settings(), "A", 0); Room(a, -4, 0, -4, 4);
+            var m = a.BuildMessage(0); var near = options[0].position;
+            m.Claim = new BrainClaim { centre = near, radiusM = 2.5f, expiresAt = 15 };
+            b.OnPeerMessage(Wire(m), .1);
+            var after = b.FrontierOptions(.1, 10);
+            Assert.That(after.Any(f => Vector2.Distance(f.position, near) > 2.5f), Is.True, "frontiers outside the claim stay available");
+            Assert.That(after.All(f => Vector2.Distance(f.position, near) > 2.5f), Is.True, "frontiers inside the claim are skipped");
+        }
+
+        [Test]
+        public void ScanMatchingStopsOdometryDriftFromGrowing()
+        {
+            // Odometry reads 20 % fast while the robot drives 0.3 m/s north for 6 s in a 4 m room. Without matching the
+            // error grows with distance (0.06 m per second). With matching it stays bounded by the map's quantisation:
+            // a wall is stored in the 10 cm cell its surface falls in, so the pose can sit up to half a cell off truth
+            // in each axis, but it does not grow. Control: a zero search window, so no correction is possible.
+            var log = new System.Text.StringBuilder();
+            (float mid, float end) Error(BrainConfig c)
+            {
+                c.localization_report_s = 1f; float mid = 0;
+                var b = new RobotBrain(Calibration(), c, "A", 0, new EntryPose(0, -1, 0)); Vector2 truth = Vector2.zero;
+                for (int tick = 0; tick <= 120; tick++)
+                {
+                    double t = tick / 20.0; truth = new Vector2(0, -1 + .3f * (float)t);
+                    Motion(b, t, .36f); b.OnAirTemperature(t, 20);
+                    if (tick % 2 == 0) b.OnLidar(RoomScan(t, truth, 0));
+                    b.Step(t, .05f);
+                    if (tick == 60) mid = Vector2.Distance(b.Snapshot().pose.position, truth);
+                    foreach (var e in b.DrainEvents().Where(e => e.kind == "localization"))
+                        log.Append($"[t {e.t:F0} matched {e.numbers["matched"]} fit {e.numbers["mean_fit"]:F2} dy {e.numbers["dy_m"]:F3}] ");
+                }
+                log.Append("|| ");
+                return (mid, Vector2.Distance(b.Snapshot().pose.position, truth));
+            }
+            var matching = Settings(); var control = Settings(); control.scan_window_m = 0; control.scan_window_deg = 0;
+            var with = Error(matching); var without = Error(control);
+            string report = $"error at 3 s / 6 s: matched {with.mid:F3} / {with.end:F3} m, control {without.mid:F3} / {without.end:F3} m. {log}";
+            TestContext.WriteLine(report);
+            Assert.That(without.end, Is.GreaterThan(.3f), report);
+            Assert.That(with.end, Is.LessThan(.08f), report);
+            Assert.That(with.end - with.mid, Is.LessThan(.02f), "Matched error must not keep growing. " + report);
+        }
+
+        [Test]
+        public void PlanningStartsFromASpotTighterThanThePlanningClearance()
+        {
+            var c = Settings(); c.grid_size_m = 12; c.robot_radius_m = .25f; var g = OpenGrid(c);
+            for (float x = -3; x <= 3; x += .05f) g.ObserveOccupied(g.Cell(new Vector2(x, .32f)));   // a wall 0.27 m ahead
+            var planner = new GridPlanner(g, c); var from = new Vector2(.05f, .05f);
+            var path = planner.Plan(from, new Vector2(.05f, -2.5f));
+            Assert.That(path, Is.Not.Empty, "A robot closer to a wall than the planning clearance must still be able to leave.");
+            Assert.That(Vector2.Distance(path[0], from), Is.LessThan(.15f));
+            Assert.That(planner.PathSafe(path), Is.True);
+            Assert.That(planner.Plan(new Vector2(.05f, .35f), new Vector2(.05f, -2.5f)), Is.Empty, "Control: no lead out of a wall cell.");
+        }
+
+        [Test]
+        public void SweptPathLimitsForwardSpeedOnlyForObstaclesAhead()
+        {
+            var c = Settings(); c.robot_radius_m = .25f;
+            var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -3, 3, -3, 3);
+            Motion(b, 0); b.OnAirTemperature(0, 20); b.Step(0, 1f / 60); var g = Map(b);
+            for (float y = -2; y <= 2; y += .05f) { g.ObserveOccupied(g.Cell(new Vector2(.36f, y))); g.ObserveOccupied(g.Cell(new Vector2(-.36f, y))); }
+            for (float x = -1; x <= 1; x += .05f) g.ObserveOccupied(g.Cell(new Vector2(x, -.3f)));
+            Assert.That(SafeForward(b, .6f), Is.EqualTo(.6f), "Door jambs beside the body and a wall behind it do not limit forward speed.");
+            for (float x = -.3f; x <= .3f; x += .05f) g.ObserveOccupied(g.Cell(new Vector2(x, .55f)));
+            float limited = SafeForward(b, .6f);
+            Assert.That(limited, Is.GreaterThan(0f).And.LessThan(.6f), "A wall 0.55 m ahead allows only a speed that can stop in time.");
+            for (float x = -.3f; x <= .3f; x += .05f) g.ObserveOccupied(g.Cell(new Vector2(x, .25f)));
+            Assert.That(SafeForward(b, .6f), Is.Zero);
+            Assert.That(b.DrainEvents().Count(e => e.kind == "collision_risk"), Is.EqualTo(1), "One event per blocked episode.");
+        }
+
+        [Test]
+        public void HeldCollisionLimitBecomesOneRecoveryWithoutPhantomWalls()
+        {
+            var c = Settings(); c.robot_radius_m = .25f;
+            var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -3, 3, -3, 3);
+            var all = new List<BrainEvent>(); int tick = 0;
+            DriveTick(b, tick++); var g = Map(b);
+            for (float x = -.3f; x <= .3f; x += .05f) g.ObserveOccupied(g.Cell(new Vector2(x, .35f)));
+            int occupiedBefore = Enumerable.Range(0, g.Count).Count(i => g.OwnOccupancy(i) == 255);
+            for (; tick < 100; tick++)
+            {
+                // The follower asks for forward speed on every step it is not recovering.
+                DriveTick(b, tick); if (b.Snapshot().state != "recover") SafeForward(b, .6f); all.AddRange(b.DrainEvents());
+            }
+            Assert.That(all.Count(e => e.kind == "collision_risk"), Is.EqualTo(1));
+            var hold = all.Where(e => e.kind == "collision_hold").ToList();
+            Assert.That(hold.Count, Is.EqualTo(1));
+            Assert.That(hold[0].numbers["marked_cells"], Is.Zero, "A mapped obstacle must not add a contact strip.");
+            Assert.That(Enumerable.Range(0, g.Count).Count(i => g.OwnOccupancy(i) == 255), Is.EqualTo(occupiedBefore));
+        }
+
+        [Test]
+        public void PeerWallsNeverOverrideCellsThisRobotHasSeenFree()
+        {
+            var a = new RobotBrain(Calibration(), Settings(), "A", 0);
+            var b = new RobotBrain(Calibration(), Settings(), "B", 0);
+            Room(a, -3, 3, -3, 3);
+            var seen = new Vector2(.05f, 2.05f); var unseen = new Vector2(2.55f, 2.55f);
+            Map(a).ObserveOccupied(Map(a).Cell(seen)); Map(a).ObserveOccupied(Map(a).Cell(unseen));
+            var g = Map(b); g.ObserveFree(g.Cell(seen));
+            b.OnPeerMessage(Wire(a.BuildMessage(0)), .1); g.DecayTo(30);
+            Assert.That(g.OccupancyAt(seen), Is.EqualTo(1), "Own free evidence wins, however old.");
+            Assert.That(g.OccupancyAt(unseen), Is.EqualTo(255), "Control: the peer's wall fills a cell this robot never saw.");
         }
 
         [Test]

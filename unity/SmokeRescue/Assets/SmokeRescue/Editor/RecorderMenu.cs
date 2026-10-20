@@ -51,6 +51,9 @@ namespace SmokeRescue.Editor
         [MenuItem("Tools/Smoke Rescue/Record/House agents run")]
         public static void HouseAgents() => WithAgents(() => Run("scenario_house_agents.json", "unity_house_agents_v1"));
 
+        [MenuItem("Tools/Smoke Rescue/Record/House reflex 90 s check (no agents)")]
+        public static void HouseReflexCheck() => Run("scenario_house_agents.json", "unity_house_reflex_check", 90f);
+
         [MenuItem("Tools/Smoke Rescue/Record/House reflex run (no agents)")]
         public static void HouseReflex() => Run("scenario_house_agents.json", "unity_house_reflex_v1");
 

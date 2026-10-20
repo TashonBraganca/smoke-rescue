@@ -25,6 +25,7 @@ namespace SmokeRescue.Brain
         readonly DeadReckoning motion;
         readonly OccupancyGrid grid;
         readonly GridPlanner planner;
+        readonly ScanMatcher matcher;
         readonly CameraHealth health;
         readonly List<RgbdFrame> rgbQueue = new List<RgbdFrame>(), rgbHistory = new List<RgbdFrame>();
         readonly List<ThermalFrame> thermalQueue = new List<ThermalFrame>();
@@ -40,7 +41,7 @@ namespace SmokeRescue.Brain
         double lastAir = double.NegativeInfinity, lastPlan = double.NegativeInfinity, scanSince = double.NaN;
         double nextSurvivorSearch;
         float airC, budget = 1, dwell, commandedSpeed;
-        bool retreating, returning, completed, collision, nearFire, waitingSensors, inspecting;
+        bool retreating, returning, completed, nearFire, waitingSensors, inspecting, holdPending;
         string returnReason, motionPolicy;
         string State => completed ? "complete" : retreating ? "retreat" : returning ? "return" : recoveryPhase != 0 ? "recover" : active != null ? "survivor" : "explore";
 
@@ -54,7 +55,7 @@ namespace SmokeRescue.Brain
             home = entry.position;
             airC = c.ambient_c; motion = new DeadReckoning(c.motion_stale_s, c.frame_max_age_s + c.frame_pair_tolerance_s, entry); grid = new OccupancyGrid(c);
             if (grid.Cell(home) < 0) throw new ArgumentException("Entry door is outside the configured building grid.");
-            planner = new GridPlanner(grid, c) { Home = home }; health = new CameraHealth(c);
+            planner = new GridPlanner(grid, c) { Home = home }; health = new CameraHealth(c); matcher = new ScanMatcher(grid, c);
             grid.MarkFootprint(home);
             observedSequence = new long[SharedSize * SharedSize];
         }
@@ -79,6 +80,14 @@ namespace SmokeRescue.Brain
             if (thermalQueue.Exists(f => f.Timestamp == frame.Timestamp)) return;
             thermalQueue.Add(frame); thermalQueue.Sort((a, b) => a.Timestamp.CompareTo(b.Timestamp));
         }
+        public void OnLidar(LidarScan scan)
+        {
+            if (scan == null) throw new ArgumentNullException(nameof(scan)); BrainMath.Time(scan.Timestamp);
+            if (scan.RangesM == null || scan.RangesM.Length < 8 || !(scan.AngleIncrementRad > 0) || !(scan.MaxM > scan.MinM))
+                throw new ArgumentException("LiDAR sweep is malformed.");
+            if (scan.Timestamp <= lastLidar || lidarQueue.Exists(s => s.Timestamp == scan.Timestamp)) return;
+            lidarQueue.Add(scan); lidarQueue.Sort((a, b) => a.Timestamp.CompareTo(b.Timestamp));
+        }
         public void OnAirTemperature(double t, float temperatureC)
         {
             BrainMath.Time(t); if (!BrainMath.Finite(temperatureC)) throw new ArgumentException("Nonfinite air temperature.");
@@ -94,7 +103,8 @@ namespace SmokeRescue.Brain
             if (!double.IsNaN(lastStep) && Math.Abs(elapsed - dt) > Math.Max(1e-5, dt * .001))
                 throw new ArgumentException("dt must equal elapsed simulation time.");
             double previous = double.IsNaN(lastStep) ? t : lastStep; lastStep = t;
-            motion.Advance(t); grid.DecayTo(t); ConsumeImages(t); UpdateHeatBudget(previous, t);
+            motion.Advance(t); grid.DecayTo(t); ConsumeLidar(t); ConsumeImages(t); UpdateHeatBudget(previous, t);
+            grid.ClearBody(motion.Pose.position, c.robot_radius_m - grid.CellM * .5f);
             InvalidatePeerGoal(t); CheckMapOverlap(t);
             grid.PrepareNavigation();
             int cell = grid.Cell(motion.Pose.position);
@@ -129,15 +139,14 @@ namespace SmokeRescue.Brain
             if (recoveryPhase != 0) return RecoverStuck(t, dt);
             if (DetectStuck(t, previous, elapsed)) return Command(0, 0, dt, true);
 
-            float nearest = ObstacleAhead(c.collision_cone_deg, out float obstacleSide);
-            float stopping = c.collision_stop_m + commandedSpeed * commandedSpeed / (2 * c.limits.max_accel_mps2);
-            if (nearest < stopping)
+            if (holdPending)
             {
-                if (!collision) Emit(t, "collision_risk", "An occupied cell is inside the heading cone and stopping distance.", "distance_m", nearest, "stop_distance_m", stopping);
-                collision = true; dwell = 0; ClearPath();
-                return Command(0, obstacleSide >= 0 ? -c.scan_yaw_dps : c.scan_yaw_dps, dt, true);
+                // The swept-path limit has held a forward command at zero for collision_escape_s: back up, turn and
+                // re-route. No contact strip is marked, because the obstacle is already in the map.
+                holdPending = false; sweeping = false;
+                BeginRecovery(t, "collision_hold", "Forward motion blocked by a mapped obstacle in the body's path; back up and choose another route.", goal, false);
+                return Command(0, 0, dt, true);
             }
-            collision = false;
             if (retreating)
             {
                 if (NeedPlan(t))
@@ -204,6 +213,16 @@ namespace SmokeRescue.Brain
                     bool steady = Mathf.Abs(error) <= c.survivor_face_tolerance_deg && motion.Speed <= c.survivor_stop_speed_mps &&
                         Mathf.Abs(motion.YawRate) * Mathf.Rad2Deg <= c.survivor_stop_yaw_dps && t - active.lastSeen <= c.survivor_fresh_s;
                     dwell = steady ? dwell + elapsed : 0;
+                    if (dwell + 1e-6f >= c.survivor_dwell_s && AgentConfirms)
+                    {
+                        // The agent decides who is a person, from OpenCV evidence; the reflex layer only brings the
+                        // cameras to a steady close view, then moves on until the agent confirms or rejects.
+                        Emit(t, "survivor_view_ready", "Stopped facing a warm person-sized shape; the agent decides whether it is a person.",
+                            "x_m", active.position.x, "y_m", active.position.y, "range_m", range);
+                        active.retryAfter = t + c.stuck_blacklist_s; active = null; dwell = 0; inspecting = false; ClearPath();
+                        nextSurvivorSearch = t + c.replan_s;
+                        return Command(0, 0, dt, true);
+                    }
                     if (dwell + 1e-6f >= c.survivor_dwell_s)
                     {
                         active.confirmed = true; survivors.Add(active.position);
@@ -238,7 +257,11 @@ namespace SmokeRescue.Brain
             if (sweeping && !returning) return SweepStep(t, dt);
             CheckProgress(t);
             if (agentGoal.HasValue && Vector2.Distance(agentGoal.Value, motion.Pose.position) <= c.goal_tolerance_m)
-            { Emit(t, "goal", "Reached the agent's goal.", "x_m", agentGoal.Value.x, "y_m", agentGoal.Value.y); agentGoal = null; }
+            {
+                Emit(t, "goal", "Reached the agent's goal.", "x_m", agentGoal.Value.x, "y_m", agentGoal.Value.y);
+                var reached = agentGoal.Value; bool frontier = agentGoalIsFrontier; agentGoal = null; agentGoalIsFrontier = false;
+                if (frontier) { ClearPath(); OnFrontierReached(reached, t); if (sweeping) return SweepStep(t, dt); }
+            }
             if (NeedPlan(t))
             {
                 bool blocked = path.Count > 0 && !planner.PathSafe(path, cursor);
@@ -286,6 +309,35 @@ namespace SmokeRescue.Brain
             return FollowOrHold(t, dt);
         }
 
+        readonly List<LidarScan> lidarQueue = new List<LidarScan>();
+        double lastLidar = double.NegativeInfinity, nextLocalizationReport;
+        int matched, unmatched; float fitSum; Vector3 correctionSum;
+        /// <summary>LiDAR first, so the pose it corrects is the one the camera frames are then projected from.</summary>
+        void ConsumeLidar(double t)
+        {
+            while (lidarQueue.Count > 0 && lidarQueue[0].Timestamp <= t)
+            {
+                var scan = lidarQueue[0]; lidarQueue.RemoveAt(0);
+                if (scan.Timestamp <= lastLidar || t - scan.Timestamp > c.frame_max_age_s) continue;
+                var prior = motion.At(scan.Timestamp);
+                var match = matcher.Match(scan, prior);
+                if (match.applied)
+                {
+                    motion.ApplyCorrection(ScanMatcher.Delta(prior, match.pose));
+                    matched++; fitSum += match.fit; correctionSum += new Vector3(match.dx, match.dy, match.dyawRad * Mathf.Rad2Deg);
+                }
+                else unmatched++;
+                grid.IntegrateLidar(scan, motion.At(scan.Timestamp));
+                lastLidar = scan.Timestamp;
+            }
+            if (t >= nextLocalizationReport && matched + unmatched > 0)
+            {
+                Emit(t, "localization", "LiDAR sweeps matched against the robot's own map; odometry corrected by the summed shift.",
+                    "matched", matched, "skipped", unmatched, "mean_fit", matched > 0 ? fitSum / matched : 0,
+                    "dx_m", correctionSum.x, "dy_m", correctionSum.y, "dyaw_deg", correctionSum.z);
+                matched = unmatched = 0; fitSum = 0; correctionSum = Vector3.zero; nextLocalizationReport = t + c.localization_report_s;
+            }
+        }
         void ConsumeImages(double t)
         {
             while (rgbQueue.Count > 0 && rgbQueue[0].Timestamp <= t)
@@ -398,15 +450,23 @@ namespace SmokeRescue.Brain
             { stalledFor = 0; return false; }
             stalledFor += elapsed;
             if (stalledFor + 1e-6 < c.stuck_window_s) return false;
-            contactPose = motion.Pose; recoveryGoal = goal; recoveryFrontier = frontierGoal;
+            BeginRecovery(t, "stuck", "Forward commands produced negligible forward odometry for the detection window.", goal, true);
+            return true;
+        }
+        /// <summary>markContact: the body stalled against something the map does not show (low debris under the LiDAR
+        /// plane, a leaf in the camera's blind zone), so mark a contact strip ahead. A stop for a mapped obstacle must
+        /// not: repeated strips used to ring the robot in phantom walls until no route existed.</summary>
+        void BeginRecovery(double t, string kind, string reason, Vector2? target, bool markContact)
+        {
+            contactPose = motion.Pose; recoveryGoal = target; recoveryFrontier = frontierGoal;
             ObstacleAhead(c.near_cone_deg, out float side);
             recoveryTurnSign = Mathf.Abs(side) < 1e-5f ? scanSign : side > 0 ? -1 : 1;
             stuckPlaces.RemoveAll(p => t - p.lastAt >= c.stuck_blacklist_s);
             var place = stuckPlaces.Find(p => Vector2.Distance(p.position, contactPose.position) <= c.stuck_repeat_radius_m);
             if (place == null) { place = new StuckPlace { position = contactPose.position }; stuckPlaces.Add(place); }
             place.repeats++; place.lastAt = t;
-            int marked = grid.MarkStuckStrip(contactPose);
-            Emit(t, "stuck", "Forward commands produced negligible forward odometry for the detection window.",
+            int marked = markContact ? grid.MarkStuckStrip(contactPose) : 0;
+            Emit(t, kind, reason,
                 "commanded_speed_mps", commandedSpeed, "measured_speed_mps", motion.ForwardSpeed,
                 "duration_s", stalledFor, "marked_cells", marked, "repeats", place.repeats,
                 "x_m", contactPose.position.x, "y_m", contactPose.position.y);
@@ -422,7 +482,6 @@ namespace SmokeRescue.Brain
             }
             ClearPath(); dwell = 0; inspecting = false; scanSince = double.NaN;
             stalledFor = 0; recoveryPhase = 1; recoverySince = t;
-            return true;
         }
         BrainCommand RecoverStuck(double t, float dt)
         {
@@ -515,6 +574,49 @@ namespace SmokeRescue.Brain
             }
             return Command(speed, yaw, dt, false);
         }
+        double blockedSince = double.NaN, lastBlocked = double.NegativeInfinity;
+
+        /// <summary>Distance the body can drive straight ahead before its circle (robot radius plus half a cell, since
+        /// a mapped cell's surface can sit half a cell from its centre) touches an occupied cell. Cells beside or
+        /// behind the body never limit forward motion, so door jambs and a wall at the robot's side do not stop it.</summary>
+        float SweptClearance()
+        {
+            float best = float.PositiveInfinity, r = c.robot_radius_m + grid.CellM * .5f;
+            Vector2 position = motion.Pose.position, forward = motion.Pose.Forward;
+            float reach = r + c.collision_margin_m + c.limits.max_forward_mps * c.limits.max_forward_mps / (2 * c.limits.max_accel_mps2) + grid.CellM;
+            int cell = grid.Cell(position); if (cell < 0) return 0;
+            int n = Mathf.CeilToInt(reach / grid.CellM), col = cell % grid.Size, row = cell / grid.Size;
+            for (int dy = -n; dy <= n; dy++) for (int dx = -n; dx <= n; dx++)
+            {
+                if (!grid.Inside(col + dx, row + dy)) continue;
+                int i = (row + dy) * grid.Size + col + dx; if (grid.Occupancy(i) != 255) continue;
+                Vector2 delta = grid.Centre(i) - position;
+                float along = Vector2.Dot(delta, forward), lateral = forward.x * delta.y - forward.y * delta.x;
+                if (along <= 0 || Mathf.Abs(lateral) >= r) continue;
+                best = Mathf.Min(best, along - Mathf.Sqrt(r * r - lateral * lateral));
+            }
+            return best;
+        }
+
+        /// <summary>Highest forward speed that can still stop collision_margin_m short of the swept clearance at the
+        /// acceleration limit. Turning is never limited: the body is round, so turning in place cannot hit anything.</summary>
+        float SafeForward(float requested)
+        {
+            double t = lastStep;
+            float room = SweptClearance() - c.collision_margin_m;
+            float safe = room <= 0 ? 0 : Mathf.Sqrt(2 * c.limits.max_accel_mps2 * room);
+            if (requested <= safe + 1e-4f) { if (t - lastBlocked > 1.0) blockedSince = double.NaN; return requested; }
+            if (double.IsNaN(blockedSince))
+            {
+                blockedSince = t;
+                Emit(t, "collision_risk", "A mapped obstacle in the body's path limits forward speed to what can stop in time.",
+                    "clearance_m", float.IsPositiveInfinity(room) ? -1 : room + c.collision_margin_m, "requested_mps", requested, "allowed_mps", safe);
+            }
+            lastBlocked = t;
+            if (safe < c.stuck_command_mps && t - blockedSince >= c.collision_escape_s && recoveryPhase == 0) { holdPending = true; blockedSince = double.NaN; }
+            return safe;
+        }
+
         float ObstacleAhead(float halfAngle, out float side)
         {
             float best = float.PositiveInfinity; side = 0; Vector2 position = motion.Pose.position, forward = motion.Pose.Forward;
@@ -536,6 +638,7 @@ namespace SmokeRescue.Brain
         {
             float allowed = Mathf.Min(c.limits.max_forward_mps, health.Thermal ? c.thermal_speed_mps : c.open_speed_mps);
             float limited = Mathf.Clamp(speed, -c.limits.max_reverse_mps, allowed);
+            if (!stop && limited > 0) limited = SafeForward(limited);
             // A safety stop bypasses the nominal acceleration ramp. The simulator must honour emergency zero.
             commandedSpeed = stop ? 0 : Mathf.MoveTowards(commandedSpeed, limited, c.limits.max_accel_mps2 * dt);
             commandedSpeed = Mathf.Clamp(commandedSpeed, -c.limits.max_reverse_mps, allowed);
@@ -563,6 +666,9 @@ namespace SmokeRescue.Brain
         /// pose: an incident commander sees the outline from outside. Frontiers outside it are never goals, so a robot
         /// standing at its door explores the building rather than the yard. Null searches everywhere.</summary>
         public Rect? SearchArea { get; set; }
+        /// <summary>Set when an agent layer is running: survivors are then confirmed only by the agent's OpenCV-backed
+        /// decision, never by the reflex dwell alone.</summary>
+        public bool AgentConfirms { get; set; }
         public bool InSearchArea(Vector2 p, float insetM = 0f) => !SearchArea.HasValue ||
             Rect.MinMaxRect(SearchArea.Value.xMin + insetM, SearchArea.Value.yMin + insetM,
                             SearchArea.Value.xMax - insetM, SearchArea.Value.yMax - insetM).Contains(p);

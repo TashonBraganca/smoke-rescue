@@ -41,13 +41,31 @@ namespace SmokeRescue.Brain
             sweeps.RemoveAll(s => t - s.t > c.sweep_repeat_s);
             if (sweeps.Exists(s => Vector2.Distance(s.position, motion.Pose.position) < c.sweep_spacing_m)) return;
             sweeps.Add((motion.Pose.position, t));
-            sweeping = true; sweepIndex = 0; sweepBase = motion.Pose.yawRad; sweepHoldUntil = double.NaN;
+            sweeping = true; sweepIndex = 0; sweepBase = motion.Pose.yawRad; sweepHoldUntil = double.NaN; sweepStarted = t;
             Emit(t, "sweep_started", "New area: look left, right and ahead before choosing where to go next.",
                 "x_m", motion.Pose.position.x, "y_m", motion.Pose.position.y);
         }
 
+        double sweepStarted;
+
+        void SkipSweepLook(double t, string why)
+        {
+            sweepHoldUntil = double.NaN;
+            if (++sweepIndex >= SweepOffsetsDeg.Length) EndSweep(t, why);
+        }
+
+        void EndSweep(double t, string note)
+        {
+            sweeping = false;
+            float coverage = AreaCoverage(motion.Pose.position, c.area_report_radius_m);
+            Emit(t, "area_searched", $"Swept this area ({note}); {coverage * 100f:0}% of the floor within {c.area_report_radius_m:0.#} m has been seen.",
+                "x_m", motion.Pose.position.x, "y_m", motion.Pose.position.y, "coverage", coverage);
+            lastPlan = double.NegativeInfinity;
+        }
+
         BrainCommand SweepStep(double t, float dt)
         {
+            if (t - sweepStarted > c.sweep_max_s) { EndSweep(t, "time limit"); return Command(0, 0, dt, true); }
             float target = sweepBase + SweepOffsetsDeg[sweepIndex] * Mathf.Deg2Rad;
             float error = BrainMath.Angle(motion.Pose.yawRad, target);
             if (Mathf.Abs(error) > c.sweep_tolerance_deg)
@@ -56,11 +74,7 @@ namespace SmokeRescue.Brain
             if (t < sweepHoldUntil) return Command(0, 0, dt, true);
             sweepHoldUntil = double.NaN;
             if (++sweepIndex < SweepOffsetsDeg.Length) return Command(0, 0, dt, true);
-            sweeping = false;
-            float coverage = AreaCoverage(motion.Pose.position, c.area_report_radius_m);
-            Emit(t, "area_searched", $"Swept this area; {coverage * 100f:0}% of the floor within {c.area_report_radius_m:0.#} m has been seen.",
-                "x_m", motion.Pose.position.x, "y_m", motion.Pose.position.y, "coverage", coverage);
-            lastPlan = double.NegativeInfinity;
+            EndSweep(t, "all looks done");
             return Command(0, 0, dt, true);
         }
 

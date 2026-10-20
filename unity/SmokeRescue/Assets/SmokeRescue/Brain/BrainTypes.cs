@@ -45,6 +45,14 @@ namespace SmokeRescue.Brain
         public string mode, state;
         public float heatBudget;
     }
+    /// <summary>A search target offered to the agent (RobotBrain.FrontierOptions).</summary>
+    public struct BrainFrontier
+    {
+        public int id;
+        public Vector2 position;
+        public float pathM, unsearchedM2;
+        public bool inSector;
+    }
     public readonly struct PersonDetection
     {
         public readonly Vector2 position;

@@ -18,12 +18,14 @@ from brain.agent.llm import Reply, request_key
 from brain.agent.tools import ALL_TOOLS, AgentContext, ToolRegistry
 
 MAX_ROUNDS = 4
+STEP_DEADLINE_S = 75.0     # past this the step ends with what it has; the reflex layer keeps the robot safe meanwhile
 REPEAT_WINDOW_S = 12.0     # the reflex brain re-raises the same candidate every few seconds; one decision covers it
 
 SYSTEM = """You are the decision layer of a quadruped search-and-rescue robot inside a burning building.
-A reflex controller already drives, maps, avoids obstacles and backs away from heat. You decide what matters:
-which warm shape is a person, where fire is spreading, how to light the scene, what to tell your partner, and
-when to use the arm.
+You decide where the robot searches and what it does there. A reflex controller executes your choice: it plans
+the path on the robot's own LiDAR and camera map, keeps clear of walls, brakes for obstacles and backs away from
+heat. You decide which area to search next, which warm shape is a person, where fire is spreading, how to light
+the scene, what to tell your partner, and when to use the arm.
 
 Rules:
 - Look before you act. Use the OpenCV perception tools; never claim a survivor, reject a candidate, avoid an area,
@@ -35,7 +37,20 @@ Rules:
 - Positions are building coordinates in metres: x to the right, y forward, as given in the context.
 - Be brief. Call the tools you need, then finish with one sentence saying what you decided and why.
 
+Choosing where to search (you, not the reflex layer, pick every search target):
+- The context lists frontiers: unsearched floor the robot can reach, each with id, x, y, path_m, unsearched_m2 and
+  in_my_sector. After area_searched, no_progress, goal_blacklisted, collision_hold, and at every periodic check-in
+  when nothing more urgent is happening, call explore_frontier with one id and a one-line reason.
+- Prefer frontiers in your sector, then more unsearched area per metre of path; skip areas your partner said they
+  cover; do not pick a frontier next to a spot that just failed (goal_blacklisted, collision_hold).
+- The lidar entry gives the nearest obstacle in eight directions; under 0.4 m means the robot is in a tight spot,
+  so prefer a frontier on the open side.
+- If the list is empty, say so to your partner and the commander: your reachable area is searched.
+
 Playbook by event kind:
+- survivor_view_ready: the robot has stopped facing the warm shape at close range. This is your moment to decide:
+  it is straight ahead, so inspect_candidate at bearing 0 and the event's range_m, then confirm_survivor or
+  reject_candidate citing that result. The robot never confirms a person by itself.
 - survivor_candidate: scan_thermal, then inspect_candidate on the warm region; confirm_survivor or reject_candidate
   with its evidence_id; if uncertain, approach_candidate citing that inspection (never compute coordinates
   yourself). If the colour image is dark, set the torch first so the second look can use both sensors. Tell your
@@ -95,15 +110,19 @@ class RobotAgent:
                            search_area=tuple(req["search_area"]) if req.get("search_area") else None,
                            frame_times=[float(s) for s in req.get("frame_times", [])],
                            event_kind=(req.get("event") or {}).get("kind", ""), torch=req.get("torch", "wide"))
+        ctx.frontiers = list(req.get("frontiers") or [])
         tools = ToolRegistry(Path(req["robot_dir"]), ctx, Path(req.get("debug_dir") or Path(self.trace_path).parent / "agent_debug"))
         context = {k: req[k] for k in ("robot", "t", "pose", "torch", "mode", "state", "goal", "heat_budget", "air_c", "event",
-                                       "inbox", "orders", "survivors", "search_area") if k in req}
+                                       "inbox", "orders", "survivors", "search_area", "frontiers", "lidar") if k in req}
         messages = [{"role": "system", "content": SYSTEM},
                     {"role": "user", "content": "Decision needed. Context:\n" + json.dumps(context, default=str)}]
         step_id = f"{req['robot']}@{float(req['t']):.3f}"
         self._trace({"kind": "step_start", "step": step_id, "t": req["t"], "robot": req["robot"], "event": req.get("event")})
         rounds = 0
         while rounds < self.max_rounds and tools.finished is None:
+            if time.perf_counter() - start > STEP_DEADLINE_S:
+                self._trace({"kind": "step_deadline", "step": step_id, "after_rounds": rounds})
+                break
             rounds += 1
             key = request_key(messages, ALL_TOOLS)
             try:

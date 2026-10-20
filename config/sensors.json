@@ -79,5 +79,23 @@
     "time_constant_s": 2.0,
     "height_m": 0.6,
     "note": "Body-mounted thermocouple: first-order lag, reads the air at the robot body."
+  },
+  "lidar": {
+    "rate_hz": 10,
+    "beams": 720,
+    "fov_deg": 360.0,
+    "min_m": 0.15,
+    "max_m": 12.0,
+    "range_sigma_m": 0.01,
+    "range_sigma_per_m": 0.001,
+    "mount": {
+      "height_m": 0.45,
+      "forward_offset_m": 0.0
+    },
+    "smoke_dropout": {
+      "per_unit_density": 0.3,
+      "max": 0.5
+    },
+    "note": "Planar 360 degree time-of-flight scanner on the robot's back, in the body's collision band (0.25 to 0.55 m), modelled on a 2D scanner such as the RPLIDAR S2 (10 Hz, 0.5 degree steps here, about 1 cm noise). Added 2026-10-20 at Tashon's request: the camera on its 1.6 m mast cannot see the floor within about 2 m, so the brain had no near-field geometry. Ray casts physics colliders, so furniture reads as its collider box."
   }
 }

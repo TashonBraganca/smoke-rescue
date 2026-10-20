@@ -45,3 +45,35 @@ def load_survivors(recording: Path | str) -> object | None:
 
 def load_floorplan(recording: Path | str) -> object | None:
     return load_optional_json(recording, "floorplan_used.json")
+
+
+def load_collisions(recording: Path | str) -> dict | None:
+    """Aggregate seconds stopped against geometry, not individual contacts."""
+    return load_optional_json(recording, "collisions.json")
+
+
+def load_house_points(recording: Path | str) -> np.ndarray:
+    """Read the writer's XYZ PLY without loading a rendering library."""
+    path = truth_folder(recording) / "house_truth.ply"
+    with path.open("rb") as stream:
+        header = []
+        while True:
+            line = stream.readline()
+            if not line:
+                raise ValueError(f"unterminated PLY header: {path}")
+            header.append(line.decode("ascii").strip())
+            if header[-1] == "end_header":
+                break
+        count = int(next(s.split()[-1] for s in header if s.startswith("element vertex ")))
+        properties = [s for s in header if s.startswith("property ")]
+        if properties != ["property float x", "property float y", "property float z"]:
+            raise ValueError("expected XYZ float PLY from OracleWriter")
+        if "format binary_little_endian 1.0" in header:
+            points = np.frombuffer(stream.read(count * 12), dtype="<f4").reshape(-1, 3)
+        elif "format ascii 1.0" in header:
+            points = np.loadtxt(stream, max_rows=count, ndmin=2)
+        else:
+            raise ValueError("unsupported PLY encoding")
+    if points.shape != (count, 3) or not np.isfinite(points).all():
+        raise ValueError(f"invalid PLY points: {path}")
+    return points.astype(np.float64)

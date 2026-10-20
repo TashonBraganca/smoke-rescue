@@ -16,6 +16,7 @@ namespace SmokeRescue.Sensors
         public OdometryConfig odometry;
         public ThermalConfig thermal;
         public AirTemperatureConfig air_temperature;
+        public LidarConfig lidar;
         [Serializable] public sealed class CameraConfig
         {
             public int width, height;
@@ -43,6 +44,14 @@ namespace SmokeRescue.Sensors
             public float vertical_fov_deg, fx, fy, cx, cy, rate_hz, mount_right_offset_m, netd_k, fixed_pattern_k, range_max_c;
         }
         [Serializable] public sealed class AirTemperatureConfig { public float rate_hz, noise_c, time_constant_s, height_m; }
+        [Serializable] public sealed class LidarConfig
+        {
+            public float rate_hz, fov_deg, min_m, max_m, range_sigma_m, range_sigma_per_m;
+            public int beams;
+            public LidarMount mount;
+            public SmokeDropout smoke_dropout;
+        }
+        [Serializable] public sealed class LidarMount { public float height_m, forward_offset_m; }
 
         public static string ConfigDir => Path.GetFullPath(Path.Combine(Application.dataPath, "..", "..", "..", "config"));
         public static SensorConfig Load(string path = null)
@@ -71,6 +80,11 @@ namespace SmokeRescue.Sensors
                 throw new InvalidDataException("Invalid thermal camera parameters.");
             if (air_temperature != null && (!(air_temperature.rate_hz > 0) || air_temperature.noise_c < 0 || air_temperature.time_constant_s < 0))
                 throw new InvalidDataException("Invalid air temperature sensor parameters.");
+            if (lidar != null && (lidar.mount == null || lidar.smoke_dropout == null || !(lidar.rate_hz > 0) || lidar.beams < 8 ||
+                !(lidar.fov_deg > 0 && lidar.fov_deg <= 360) || !(lidar.min_m > 0) || !(lidar.max_m > lidar.min_m) ||
+                lidar.range_sigma_m < 0 || lidar.range_sigma_per_m < 0 || !(lidar.mount.height_m > 0) ||
+                lidar.smoke_dropout.max < 0 || lidar.smoke_dropout.max > 1 || lidar.smoke_dropout.per_unit_density < 0))
+                throw new InvalidDataException("Invalid LiDAR parameters.");
         }
     }
 }

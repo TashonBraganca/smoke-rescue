@@ -116,3 +116,23 @@ def test_third_close_look_at_one_spot_is_refused(tmp_path, monkeypatch):
         out = RobotAgent(Scripted([[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": 5})],
                                    [ToolCall("approach_candidate", {"evidence_id": "ev1"})]]), tmp_path / "t.jsonl").step(req)
     assert out["orders"] == [] and "already looked" in out["refusals"][0]["reason"]
+
+
+def test_explore_frontier_uses_the_offered_coordinates_and_refuses_invented_ids(tmp_path, monkeypatch):
+    fake_vision(monkeypatch)
+    frontiers = [{"id": 0, "x": 7.5, "y": 3.2, "path_m": 4.0, "unsearched_m2": 6.0, "in_my_sector": True},
+                 {"id": 1, "x": 12.0, "y": 9.1, "path_m": 9.5, "unsearched_m2": 14.0, "in_my_sector": False}]
+    req = request(tmp_path) | {"event": {"kind": "area_searched"}, "frontiers": frontiers}
+    turns = [[ToolCall("explore_frontier", {"frontier_id": 7, "reason": "invented"}),
+              ToolCall("explore_frontier", {"frontier_id": 1, "reason": "most unsearched floor", "x": 99, "y": 99})]]
+    out = RobotAgent(Scripted(turns), tmp_path / "t.jsonl").step(req)
+    assert [o["type"] for o in out["orders"]] == ["explore_frontier"]
+    assert (out["orders"][0]["x"], out["orders"][0]["y"]) == (12.0, 9.1)      # from the brain's list, not the model
+    assert out["refusals"][0]["tool"] == "explore_frontier" and "not one of the frontiers" in out["refusals"][0]["reason"]
+
+
+def test_no_exploring_during_a_heat_event(tmp_path, monkeypatch):
+    fake_vision(monkeypatch)
+    req = request(tmp_path) | {"event": {"kind": "retreat"}, "frontiers": [{"id": 0, "x": 7.5, "y": 3.2}]}
+    out = RobotAgent(Scripted([[ToolCall("explore_frontier", {"frontier_id": 0, "reason": "go"})]]), tmp_path / "t.jsonl").step(req)
+    assert out["orders"] == [] and out["refusals"][0]["tool"] == "explore_frontier"

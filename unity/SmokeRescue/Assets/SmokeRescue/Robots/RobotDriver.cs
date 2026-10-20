@@ -55,6 +55,8 @@ namespace SmokeRescue.Robots
         public System.Func<(float v, float wDeg, bool done)> Command { get; set; }
         /// <summary>World-side collision test for a body position (x, z); set by Robot.</summary>
         public System.Func<Vector2, bool> Blocked { get; set; }
+        /// <summary>World-side: unit direction (x, z) pointing out of whatever the body at this position overlaps.</summary>
+        public System.Func<Vector2, Vector2> ContactNormal { get; set; }
         /// <summary>Steps on which the body was stopped by a collision (scored, never shown to the brain).</summary>
         public int CollisionSteps { get; private set; }
         bool commandDone;
@@ -128,7 +130,10 @@ namespace SmokeRescue.Robots
             YawRateDeg = Mathf.Clamp(wCmd, -limits.maxYawRateDeg, limits.maxYawRateDeg);
             YawDeg = Mathf.Repeat(YawDeg + YawRateDeg * dt, 360f);
             var next = Position + Forward * (Speed * dt);
-            if (Blocked != null && Mathf.Abs(Speed) > 1e-4f && Blocked(next))
+            // A body already touching something (a door leaf that swung against it) may move only away from the
+            // contact. Refusing every step pinned it for good; allowing every step let it push on through the wall.
+            if (Blocked != null && Mathf.Abs(Speed) > 1e-4f && Blocked(next) &&
+                (!Blocked(Position) || ContactNormal == null || Vector2.Dot(next - Position, ContactNormal(Position)) <= 0f))
             {
                 Speed = 0f;              // the body hits the obstacle and stops; turning in place stays possible
                 CollisionSteps++;

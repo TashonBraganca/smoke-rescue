@@ -1,0 +1,410 @@
+"""Evaluate navigation recordings against hidden truth, entirely offline."""
+from __future__ import annotations
+
+import argparse
+from collections import Counter
+import json
+from pathlib import Path
+
+import cv2
+import numpy as np
+from scipy import ndimage
+from scipy.spatial import cKDTree
+from scipy.spatial.transform import Rotation
+
+from brain.nav_io import (CELL_M, ORIGIN, cell_centres, grid_cells, interpolate_poses,
+                          is_complete, latest_map, poses_from_states, read_json_lines)
+from brain.oracle import load_collisions, load_floorplan, load_house_points, load_trajectory
+
+
+def body_trajectory(recording: Path, robot: str) -> tuple[np.ndarray, np.ndarray]:
+    trajectory = load_trajectory(recording, robot)
+    forward = Rotation.from_quat(trajectory.quaternions_xyzw).apply([0., 0., 1.])[:, [0, 2]]
+    lengths = np.linalg.norm(forward, axis=1)
+    if np.any(lengths < .9):
+        raise ValueError('camera forward direction is not approximately horizontal')
+    forward /= lengths[:, None]
+    xy = trajectory.positions[:, [0, 2]] - .25 * forward
+    return trajectory.timestamps, np.c_[xy, np.unwrap(np.arctan2(-forward[:, 0], forward[:, 1]))]
+
+
+def pose_convention_check(times: np.ndarray, poses: np.ndarray, robot: str, scenario: dict) -> dict:
+    spawn = next((r['spawn'] for r in scenario.get('robots', []) if r['id'] == robot), None)
+    result = dict(t=float(times[0]), body_xy=poses[0, :2].tolist(), yaw_deg=float(np.degrees(poses[0, 2])))
+    if spawn is not None:
+        error = float(np.linalg.norm(poses[0, :2] - spawn['at']))
+        yaw_error = abs(float(np.degrees(wrap_angle(poses[0, 2] + np.radians(spawn['yaw'])))))
+        result.update(spawn_xy=spawn['at'], spawn_yaw_deg=-spawn['yaw'], position_error_m=error,
+                      yaw_error_deg=yaw_error, passed=bool(times[0] <= .1 and error < .05 and yaw_error < 2))
+    return result
+
+
+def wrap_angle(value):
+    return (value + np.pi) % (2 * np.pi) - np.pi
+
+
+def error_summary(values: np.ndarray) -> dict:
+    if not len(values):
+        return dict(median=None, p95=None, max=None, final=None)
+    return dict(median=float(np.median(values)), p95=float(np.percentile(values, 95)),
+                max=float(np.max(values)), final=float(values[-1]))
+
+
+def localization_errors(states: list[dict], truth_t: np.ndarray, truth_pose: np.ndarray):
+    times, poses = poses_from_states(states)
+    keep = (times >= truth_t[0]) & (times <= truth_t[-1])
+    times, poses = times[keep], poses[keep]
+    truth = interpolate_poses(truth_t, truth_pose, times)
+    position = np.linalg.norm(poses[:, :2] - truth[:, :2], axis=1)
+    yaw = np.abs(np.degrees(wrap_angle(poses[:, 2] - truth[:, 2])))
+    exceeded = times[position > .2]
+    report = dict(position_m=error_summary(position), yaw_deg=error_summary(yaw),
+                  first_over_0_2_m_t=float(exceeded[0]) if len(exceeded) else None,
+                  samples=len(times), excluded_samples=int((~keep).sum()))
+    return report, times, position, yaw
+
+
+def read_lidar(path: Path):
+    header, times, scans = None, [], []
+    if not path.exists():
+        return None
+    with path.open() as stream:
+        for line in stream:
+            line = line.strip()
+            if line.startswith('# beams '):
+                line = line[2:]
+            if not line or line.startswith('#'):
+                continue
+            parts = line.split()
+            if parts[0] == 'beams':
+                header = {parts[i]: float(parts[i + 1]) for i in range(0, len(parts), 2)}
+                continue
+            if header is None:
+                raise ValueError(f'LiDAR data precedes beam header in {path}')
+            values = np.array([float(p) for p in parts])
+            if len(values) != int(header['beams']) + 1 or not np.isfinite(values).all() or np.any(values[1:] < 0):
+                raise ValueError(f'invalid LiDAR scan in {path}')
+            times.append(values[0])
+            scans.append(values[1:] * .001)
+    if header is None or not scans:
+        return None
+    return header, np.array(times), np.array(scans)
+
+
+def lidar_endpoints(poses: np.ndarray, ranges: np.ndarray, header: dict) -> np.ndarray:
+    angles = header['angle_min_rad'] + np.arange(ranges.shape[1]) * header['increment_rad']
+    yaw = poses[:, 2]
+    origins = poses[:, :2] + header['mount_forward_m'] * np.c_[-np.sin(yaw), np.cos(yaw)]
+    angle = yaw[:, None] + angles
+    return origins[:, None, :] + ranges[:, :, None] * np.stack([-np.sin(angle), np.cos(angle)], axis=-1)
+
+
+def endpoint_distances(poses: np.ndarray, ranges: np.ndarray, header: dict, tree: cKDTree) -> dict:
+    valid = ranges > 0
+    points = lidar_endpoints(poses, ranges, header)[valid]
+    if not len(points):
+        return dict(status='no_returns', passed=False, median_m=None, p90_m=None, within_5cm_share=None, endpoints=0)
+    distances = tree.query(points)[0]
+    median = float(np.median(distances))
+    return dict(status='measured', passed=median <= .05, median_m=median,
+                p90_m=float(np.percentile(distances, 90)), within_5cm_share=float(np.mean(distances <= .05)), endpoints=len(points))
+
+
+def lidar_accuracy(robot_dir: Path, truth_t: np.ndarray, truth_pose: np.ndarray,
+                   states: list[dict], points: np.ndarray) -> dict:
+    data = read_lidar(robot_dir / 'lidar.txt')
+    if data is None:
+        return dict(status='missing_lidar', true_pose=dict(passed=False))
+    header, times, ranges = data
+    plane = points[np.abs(-points[:, 1] - header['mount_height_m']) <= .15][:, [0, 2]]
+    if not len(plane):
+        return dict(status='no_truth_points_at_sensor_height', true_pose=dict(passed=False))
+    tree = cKDTree(plane)
+    sample_t, sample_r = times[::10], ranges[::10]
+    brain_t, brain_pose = poses_from_states(states)
+    report = dict(status='measured', scans=len(times), no_return_share=float(np.mean(ranges == 0)),
+                  truth_slice_points=len(plane), header=header)
+    for name, t, pose in [('true_pose', truth_t, truth_pose), ('brain_pose', brain_t, brain_pose)]:
+        keep = (sample_t >= t[0]) & (sample_t <= t[-1])
+        if not np.any(keep):
+            report[name] = dict(status='no_pose_overlap', passed=False)
+            continue
+        selected_pose = interpolate_poses(t, pose, sample_t[keep])
+        report[name] = endpoint_distances(selected_pose, sample_r[keep], header, tree)
+        report[name].update(scans=int(keep.sum()), excluded_scans=int((~keep).sum()))
+    return report
+
+
+def truth_occupancy(points: np.ndarray, shape: tuple) -> np.ndarray:
+    height = -points[:, 1]
+    cells = grid_cells(points[(height >= .15) & (height <= 1.9)][:, [0, 2]])
+    cells = cells[(cells[:, 0] >= 0) & (cells[:, 0] < shape[1]) & (cells[:, 1] >= 0) & (cells[:, 1] < shape[0])]
+    result = np.zeros(shape, bool)
+    result[cells[:, 1], cells[:, 0]] = True
+    return result
+
+
+def distance_to_cells(mask: np.ndarray) -> np.ndarray:
+    if not mask.any():
+        return np.full(mask.shape, np.inf)
+    return ndimage.distance_transform_edt(~mask) * CELL_M
+
+
+def phantom_clusters(mask: np.ndarray) -> list[dict]:
+    labels, count = ndimage.label(mask)
+    if not count:
+        return []
+    sizes = np.bincount(labels.ravel())
+    order = sorted(range(1, count + 1), key=lambda n: sizes[n], reverse=True)[:20]
+    centres = ndimage.center_of_mass(mask, labels, order)
+    return [dict(cells=int(sizes[n]), centre_xy=cell_centres(np.array([c[1], c[0]])).tolist())
+            for n, c in zip(order, centres)]
+
+
+def door_status(grid: np.ndarray, door: dict) -> str:
+    """Restrict 4-connected traversal to the gap, so routes around walls cannot pass."""
+    yy, xx = np.indices(grid.shape)
+    x, y = ORIGIN[0] + (xx + .5) * CELL_M, ORIGIN[1] + (yy + .5) * CELL_M
+    cx, cy = door['at']
+    normal, tangent = (y - cy, x - cx) if door['wall'] == 'z' else (x - cx, y - cy)
+    corridor = (np.abs(tangent) <= door['width'] / 2) & (np.abs(normal) <= .4 + CELL_M + 1e-8)
+    start = corridor & (normal <= -.4 + 1e-8)
+    end = corridor & (normal >= .4 - 1e-8)
+    if not start.any() or not end.any():
+        return 'not_observed'
+    free = corridor & (grid == 255)
+    labels, _ = ndimage.label(free)
+    starts = set(labels[start]) - {0}
+    if starts.intersection(set(labels[end]) - {0}):
+        return 'open'
+    # If unknown cells could still supply the crossing, the evidence is incomplete.
+    possible, _ = ndimage.label(corridor & (grid != 0))
+    if (set(possible[start]) - {0}).intersection(set(possible[end]) - {0}):
+        return 'not_observed'
+    if np.all(grid[corridor] == 128):
+        return 'not_observed'
+    return 'closed'
+
+
+def map_accuracy(grid: np.ndarray, points: np.ndarray, floorplan: dict) -> tuple[dict, np.ndarray]:
+    truth = truth_occupancy(points, grid.shape)
+    occupied, observed = grid == 0, grid != 128
+    truth_distance = distance_to_cells(truth)
+    brain_distance = distance_to_cells(occupied)
+    inside_observed = distance_to_cells(observed) <= .3 + 1e-8
+    eligible = truth & inside_observed
+    phantom = occupied & (truth_distance > .3 + 1e-8)
+    doors = dict(open=[], closed=[], not_observed=[])
+    for door in floorplan.get('doors', []):
+        if door.get('state') in {'open', 'half', 'removed'}:
+            doors[door_status(grid, door)].append(door['id'])
+    report = dict(precision=float(np.mean(truth_distance[occupied] <= .15)) if occupied.any() else None,
+                  recall=float(np.mean(brain_distance[eligible] <= .15)) if eligible.any() else None,
+                  occupied_cells=int(occupied.sum()), truth_cells=int(truth.sum()),
+                  observed_truth_cells=int(eligible.sum()), phantom_cells=int(phantom.sum()),
+                  phantom_clusters=phantom_clusters(phantom), doors=doors)
+    return report, truth
+
+
+def detect_stalls(states: list[dict], truth_t: np.ndarray, truth_pose: np.ndarray, events: list[dict]) -> list[dict]:
+    """Merge overlapping ten-second windows whose true path stays within 15 cm.
+
+    Require every sampled position to remain close to the window's start. A
+    robot that drives a loop and returns to its start is therefore not a stall.
+    """
+    times, brain = poses_from_states(states)
+    keep = (times >= truth_t[0]) & (times <= truth_t[-1])
+    times, brain = times[keep], brain[keep]
+    selected = [s for s, k in zip(states, keep) if k]
+    true = interpolate_poses(truth_t, truth_pose, times)
+    intervals = []
+    for i, t in enumerate(times):
+        j = int(np.searchsorted(times, t + 10))
+        if j >= len(times) or any(is_complete(s) for s in selected[i:j + 1]):
+            continue
+        # Check the 15 Hz trajectory too, not only the brain's 2 Hz samples.
+        dense = truth_pose[(truth_t >= t) & (truth_t <= times[j]), :2]
+        if len(dense) and np.max(np.linalg.norm(dense - true[i, :2], axis=1)) < .15:
+            if intervals and t <= intervals[-1][1]:
+                intervals[-1][1] = float(times[j])
+            else:
+                intervals.append([float(t), float(times[j])])
+    result = []
+    for start, end in intervals:
+        i = int(np.searchsorted(times, start))
+        result.append(dict(start_t=start, end_t=end, duration_s=end - start,
+                           true_xy=true[i, :2].tolist(), brain_xy=brain[i, :2].tolist(),
+                           events=dict(Counter(e['kind'] for e in events if start <= e['t'] <= end))))
+    return result
+
+
+def save_image(path: Path, image: np.ndarray) -> None:
+    if not cv2.imwrite(str(path), image):
+        raise OSError(f'could not write {path}')
+
+
+def draw_error_plot(path: Path, times: np.ndarray, position: np.ndarray, yaw: np.ndarray) -> None:
+    image = np.full((720, 1200, 3), 255, np.uint8)
+    for row, values, title, colour in [(0, position, 'Position error (m)', (180, 50, 20)),
+                                        (1, yaw, 'Yaw error (degrees)', (20, 80, 180))]:
+        top, bottom = 45 + row * 345, 310 + row * 345
+        cv2.putText(image, title, (85, top - 12), cv2.FONT_HERSHEY_SIMPLEX, .6, (0, 0, 0), 1)
+        cv2.rectangle(image, (85, top), (1150, bottom), (80, 80, 80), 1)
+        if not len(times):
+            continue
+        maximum = max(float(values.max()) * 1.1, .25 if row == 0 else 1.)
+        for fraction in np.linspace(0, 1, 6):
+            y = int(bottom - fraction * (bottom - top))
+            cv2.putText(image, f'{maximum * fraction:.2f}', (8, y + 5), cv2.FONT_HERSHEY_SIMPLEX, .45, (0, 0, 0), 1)
+            x = int(85 + fraction * 1065)
+            cv2.putText(image, f'{times[0] + fraction * (times[-1] - times[0]):.1f}', (x - 12, bottom + 22), cv2.FONT_HERSHEY_SIMPLEX, .45, (0, 0, 0), 1)
+        x = 85 + (times - times[0]) / max(times[-1] - times[0], 1) * 1065
+        y = bottom - values / maximum * (bottom - top)
+        cv2.polylines(image, [np.c_[x, y].astype(np.int32)], False, colour, 2)
+        if row == 0:
+            threshold = int(bottom - .2 / maximum * (bottom - top))
+            cv2.line(image, (85, threshold), (1150, threshold), (0, 0, 210), 1)
+        cv2.putText(image, 'Simulation time (s)', (500, bottom + 42), cv2.FONT_HERSHEY_SIMPLEX, .5, (0, 0, 0), 1)
+    save_image(path, image)
+
+
+def draw_overlay(path: Path, shape: tuple, truth: np.ndarray, layers: list[dict], floorplan: dict) -> None:
+    scale, margin = 50., 90
+    height, width = int(shape[0] * CELL_M * scale), int(shape[1] * CELL_M * scale)
+    base = np.full((*shape, 3), 250, np.uint8)
+    for layer in layers:
+        grid = layer['grid']
+        if grid is not None:
+            h, w = grid.shape
+            patch = base[:h, :w]
+            patch[grid == 255] = (215, 240, 215)
+    base[truth] = (150, 150, 150)
+    for layer in layers:
+        grid = layer['grid']
+        if grid is not None:
+            base[:grid.shape[0], :grid.shape[1]][grid == 0] = (70, 70, 220)
+    image = np.full((height + 2 * margin, width + 2 * margin, 3), 255, np.uint8)
+    image[margin:margin + height, margin:margin + width] = cv2.resize(np.flipud(base), (width, height), interpolation=cv2.INTER_NEAREST)
+
+    def pixel(xy):
+        p = (np.asarray(xy) - ORIGIN) * scale
+        return np.c_[margin + p[..., 0], margin + height - p[..., 1]].astype(np.int32).reshape(-1, 2)
+
+    for layer in layers:
+        for key, colour in [('true', (0, 0, 0)), ('brain', (220, 60, 20))]:
+            points = pixel(layer[key][:, :2])
+            if len(points) > 1:
+                cv2.polylines(image, [points], False, colour, 2, cv2.LINE_AA)
+            if len(points):
+                cv2.putText(image, layer['robot'], tuple(points[-1] + [5, -5]), cv2.FONT_HERSHEY_SIMPLEX, .5, colour, 1)
+        for stall in layer['stalls']:
+            cv2.circle(image, tuple(pixel(stall['true_xy'])[0]), 14, (0, 140, 255), 3)
+    for door in floorplan.get('doors', []):
+        axis = np.array([1., 0.]) if door['wall'] == 'z' else np.array([0., 1.])
+        centre = np.array(door['at'])
+        ends = pixel([centre - axis * door['width'] / 2, centre + axis * door['width'] / 2])
+        cv2.line(image, tuple(ends[0]), tuple(ends[1]), (150, 40, 140), 2)
+    for axis, extent in [(0, shape[1]), (1, shape[0])]:
+        for value in np.arange(-2, -2 + extent * CELL_M + 1e-6, 2):
+            x, y = pixel([value, -2] if axis == 0 else [-2, value])[0]
+            cv2.putText(image, f'{value:g}', (x - 12, y + 25) if axis == 0 else (x - 50, y + 5), cv2.FONT_HERSHEY_SIMPLEX, .5, (0, 0, 0), 1)
+    cv2.putText(image, 'x east (m)', (width // 2, height + margin + 60), cv2.FONT_HERSHEY_SIMPLEX, .6, (0, 0, 0), 1)
+    cv2.putText(image, 'y north (m)', (5, 32), cv2.FONT_HERSHEY_SIMPLEX, .6, (0, 0, 0), 1)
+    cv2.putText(image, 'Truth grey | occupied red | free green | true path black | brain path blue | stalls orange | doors purple', (margin, 60), cv2.FONT_HERSHEY_SIMPLEX, .48, (0, 0, 0), 1)
+    save_image(path, image)
+
+
+def evaluate(recording: Path | str, out: Path | str | None = None) -> dict:
+    recording = Path(recording).resolve()
+    if not (recording / 'meta.json').exists():
+        raise ValueError('recording is still running: meta.json is absent; use tools/watch_run.py')
+    meta = json.loads((recording / 'meta.json').read_text())
+    out = Path(out) if out is not None else Path(__file__).resolve().parents[2] / 'data/runs' / recording.name / 'nav_eval'
+    out.mkdir(parents=True, exist_ok=True)
+    points = load_house_points(recording)
+    floorplan = load_floorplan(recording) or {}
+    collisions = load_collisions(recording)
+    config = Path(__file__).resolve().parents[2] / 'config'
+    scenario_path = config / Path(meta.get('scenario', '')).name
+    if not scenario_path.is_file() and 'house_agents' in recording.name:
+        scenario_path = config / 'scenario_house_agents.json'
+    scenario = json.loads(scenario_path.read_text()) if scenario_path.is_file() else {}
+    reports, layers = {}, []
+    for robot in meta['robots']:
+        robot_dir, output = recording / robot, out / robot
+        output.mkdir(parents=True, exist_ok=True)
+        states = read_json_lines(robot_dir / 'brain_state.jsonl')
+        if not states:
+            raise ValueError(f'{robot}: no completed brain states')
+        truth_t, truth_pose = body_trajectory(recording, robot)
+        localization, t, position, yaw = localization_errors(states, truth_t, truth_pose)
+        convention = pose_convention_check(truth_t, truth_pose, robot, scenario)
+        if scenario:
+            convention['scenario_file'] = str(scenario_path)
+        print(f'{robot} frame check {json.dumps(convention)}; optical +z projected to house x/z, subtract 0.25 m forward; yaw=atan2(-forward_x, forward_z)')
+        lidar = lidar_accuracy(robot_dir, truth_t, truth_pose, states, points)
+        stalls = detect_stalls(states, truth_t, truth_pose, read_json_lines(robot_dir / 'decisions.jsonl'))
+        snapshot = latest_map(robot_dir)
+        if snapshot is None:
+            grid, map_report = None, dict(status='missing_map')
+            shape = (440, 440)
+        else:
+            map_t, grid = snapshot
+            shape = grid.shape
+            map_report, _ = map_accuracy(grid, points, floorplan)
+            map_report.update(status='measured', t=map_t, cell_m=CELL_M, origin_xy=ORIGIN.tolist(), shape=list(shape))
+        report = dict(robot=robot, localization=localization, frame_check=convention, lidar=lidar,
+                      map=map_report, stalls=stalls, collision_seconds=None if collisions is None else collisions.get(robot),
+                      collision_note='Writer supplies aggregate seconds only; contact locations and counts are unavailable.')
+        reports[robot] = report
+        (output / 'report.json').write_text(json.dumps(report, indent=2, allow_nan=False) + '\n')
+        draw_error_plot(output / 'errors.png', t, position, yaw)
+        _, brain_pose = poses_from_states(states)
+        layer = dict(robot=robot, grid=grid, true=truth_pose, brain=brain_pose, stalls=stalls)
+        layers.append(layer)
+        draw_overlay(output / 'overlay.png', shape, truth_occupancy(points, shape), [layer], floorplan)
+    shape = tuple(max((layer['grid'].shape[i] if layer['grid'] is not None else 440) for layer in layers) for i in (0, 1))
+    draw_overlay(out / 'overlay.png', shape, truth_occupancy(points, shape), layers, floorplan)
+    return reports
+
+
+def print_table(reports: dict) -> None:
+    print('robot        pos median/p95/max/final (m)   yaw median/max (deg)   lidar true/brain median (m)   map P/R   stalls   collision s')
+    def number(value):
+        return 'NA' if value is None else f'{value:.3f}'
+    for robot, r in reports.items():
+        p, y, lidar = r['localization']['position_m'], r['localization']['yaw_deg'], r['lidar']
+        print(f"{robot:<12} {'/'.join(number(p[k]) for k in ['median', 'p95', 'max', 'final']):<29} "
+              f"{number(y['median'])}/{number(y['max'])}   "
+              f"{number(lidar.get('true_pose', {}).get('median_m'))}/{number(lidar.get('brain_pose', {}).get('median_m'))}   "
+              f"{number(r['map'].get('precision'))}/{number(r['map'].get('recall'))}   {len(r['stalls'])}   {number(r['collision_seconds'])}")
+        if lidar.get('true_pose', {}).get('median_m', 0) is not None and lidar.get('true_pose', {}).get('median_m', 0) > .05:
+            print(f'LIDAR CONVENTION FAILURE for {robot}: true-pose median exceeds 0.05 m. Check sensor geometry and frame conventions before trusting navigation metrics.')
+        elif not lidar['true_pose']['passed']:
+            print(f"{robot} LiDAR gate NOT VERIFIED: {lidar.get('status')}, {lidar['true_pose'].get('status', '')}")
+        if r['frame_check'].get('passed') is False:
+            print(f'{robot} FRAME CHECK FAILED: initial body pose does not match the scenario spawn; inspect frame_check in report.json.')
+
+
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('recording', type=Path)
+    parser.add_argument('--out', type=Path)
+    args = parser.parse_args(argv)
+    try:
+        reports = evaluate(args.recording, args.out)
+    except (ValueError, OSError, KeyError) as error:
+        print(f'NAV EVALUATION INCOMPLETE: {error}')
+        return 2
+    print_table(reports)
+    if any((r['lidar'].get('true_pose', {}).get('median_m') or 0) > .05
+           or r['frame_check'].get('passed') is False for r in reports.values()):
+        return 1
+    if any(not r['lidar']['true_pose']['passed'] or r['map']['status'] != 'measured'
+           or r['localization']['samples'] == 0 for r in reports.values()):
+        return 2
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
