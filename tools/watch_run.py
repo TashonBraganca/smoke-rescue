@@ -17,7 +17,7 @@ import cv2
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'brain'))
-from brain.nav_io import CELL_M, ORIGIN, interpolate_poses, is_complete, latest_map, poses_from_states
+from brain.nav_io import map_geometry, interpolate_poses, is_complete, latest_map, poses_from_states
 
 KINDS = ('collision_risk', 'collision_hold', 'stuck', 'goal_blacklisted', 'no_progress')
 
@@ -55,15 +55,19 @@ def is_pinned(states):
     return bool(np.max(np.linalg.norm(window - first, axis=1)) < .15)
 
 
-def save_snapshot(robot_dir, state, snap):
+def save_snapshot(robot_dir, state, snap, frame=None):
     latest = latest_map(robot_dir)
     if latest is None:
         return
     _, grid = latest
+    if frame is None:
+        first = JsonTail(robot_dir / 'brain_state.jsonl').read()
+        frame = logged_frame(first)
+    origin, cell = map_geometry(grid.shape, frame)
     image = cv2.cvtColor(np.flipud(grid), cv2.COLOR_GRAY2BGR)
     image = cv2.resize(image, None, fx=3, fy=3, interpolation=cv2.INTER_NEAREST)
     def pixel(xy):
-        p = (np.asarray(xy) - ORIGIN) / CELL_M * 3
+        p = (np.asarray(xy) - origin) / cell * 3
         return np.c_[p[..., 0], image.shape[0] - 1 - p[..., 1]].astype(np.int32).reshape(-1, 2)
     path = state.get('path') or []
     if len(path) > 1:
@@ -71,6 +75,7 @@ def save_snapshot(robot_dir, state, snap):
     xy, yaw = np.array([state['x'], state['y']]), state['yaw_rad']
     arrow = pixel([xy, xy + .5 * np.array([-np.sin(yaw), np.cos(yaw)])])
     cv2.arrowedLine(image, tuple(arrow[0]), tuple(arrow[1]), (30, 30, 230), 2, tipLength=.3)
+    cv2.putText(image, robot_dir.name + ' own logged frame', (8, 20), cv2.FONT_HERSHEY_SIMPLEX, .5, (30, 30, 230), 1)
     snap.mkdir(parents=True, exist_ok=True)
     temporary = snap / f'.{robot_dir.name}_latest.tmp.png'
     if not cv2.imwrite(str(temporary), image):
@@ -78,11 +83,19 @@ def save_snapshot(robot_dir, state, snap):
     temporary.replace(snap / f'{robot_dir.name}_latest.png')
 
 
+def logged_frame(states):
+    if not states:
+        return 'shared'
+    first = states[0]
+    return 'local' if first['t'] <= .1 and np.linalg.norm([first['x'], first['y'], first['yaw_rad']]) < .05 else 'shared'
+
+
 class RunWatcher:
     def __init__(self, recording, snap=None):
         self.recording = Path(recording)
         self.snap = Path(snap) if snap is not None else None
         self.readers, self.history, self.localization = {}, {}, {}
+        self.links, self.frames = {}, {}
 
     def lines(self):
         result = []
@@ -98,9 +111,13 @@ class RunWatcher:
             events = event_reader.read()
             counts = Counter(e['kind'] for e in events)
             for event in events:
+                if event['kind'] == 'frame_linked':
+                    self.links[name] = event
                 if event['kind'] == 'localization':
                     self.localization[name] = event.get('numbers', {})
             states = self.history[name]
+            if states and name not in self.frames:
+                self.frames[name] = logged_frame(states)
             counters = ' '.join(f'{kind}={counts[kind]}' for kind in KINDS)
             spam = [kind for kind, count in counts.items() if count > 30]
             if states:
@@ -109,12 +126,18 @@ class RunWatcher:
                 if is_pinned(states):
                     line += ' PINNED'
                 if self.snap is not None:
-                    save_snapshot(robot, state, self.snap)
+                    save_snapshot(robot, state, self.snap, self.frames[name])
                 # Retain one sample before the fifteen-second window.
                 cut = max(0, int(np.searchsorted([s['t'] for s in states], state['t'] - 15)) - 1)
                 self.history[name] = states[cut:]
             else:
                 line = f'{name} t=NA x=NA y=NA state=waiting {counters}'
+            link = self.links.get(name)
+            if link is None:
+                line += ' frame_link=not linked'
+            else:
+                n = link['numbers']
+                line += f" frame_link=linked at {link['t']:.1f}s dx={n['dx_m']:.3f} dy={n['dy_m']:.3f} dyaw={n['dyaw_deg']:.2f}deg"
             line += ' localization=' + json.dumps(self.localization.get(name), separators=(',', ':'))
             if spam:
                 line += ' SPAM=' + ','.join(sorted(spam))

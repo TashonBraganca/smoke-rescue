@@ -78,13 +78,13 @@ namespace SmokeRescue.Brain
         {
             if (i < 0 || i >= Count) return;
             odds[i] = Mathf.Max(-c.log_odds_cap, odds[i] + c.free_log_odds);
-            observed[i] = true; localTime[i] = localObservationTime; dirty = true;
+            observed[i] = true; localTime[i] = localObservationTime; dirty = roofDirty = true;
         }
         public void ObserveOccupied(int i)
         {
             if (i < 0 || i >= Count) return;
             odds[i] = Mathf.Min(c.log_odds_cap, Mathf.Max(0, odds[i]) + c.occupied_log_odds);
-            observed[i] = true; localTime[i] = localObservationTime; dirty = true;
+            observed[i] = true; localTime[i] = localObservationTime; dirty = roofDirty = true;
         }
         // Keep the inferred contact beyond the current inflated footprint, so replanning can start.
         internal int MarkStuckStrip(BrainPose pose)
@@ -102,7 +102,7 @@ namespace SmokeRescue.Brain
                 odds[i] = Mathf.Max(odds[i], c.stuck_log_odds);
                 observed[i] = true; localTime[i] = time; marked++;
             }
-            dirty = true; return marked;
+            dirty = roofDirty = true; return marked;
         }
         /// <summary>toOwn maps the sender's frame into this one (FrameLink); each own cell looks up the sender cell under it.</summary>
         internal void ReplacePeerLayer(string sender, BrainMessage m, byte[] explored, BrainPose toOwn)
@@ -119,7 +119,7 @@ namespace SmokeRescue.Brain
             Array.Clear(peer, 0, peer.Length);
             foreach (var pair in peerLayers)
                 for (int i = 0; i < Count; i++) if (pair.Value[i] > peer[i]) peer[i] = pair.Value[i];
-            dirty = true;
+            dirty = roofDirty = true;
         }
         internal bool OwnOverlap(string sender)
         {
@@ -165,7 +165,7 @@ namespace SmokeRescue.Brain
                 if (t - heatTime[i] > c.heat_rise_memory_s) rise[i] = 0;
                 if (before != Dangerous(i)) changed = true;
             }
-            time = t; localObservationTime = t; dirty |= changed;
+            time = t; localObservationTime = t; dirty |= changed; roofDirty |= changed;
         }
         public bool Dangerous(int i) => heat[i] >= c.fire_c ||
             (time - heatTime[i] <= c.heat_rise_memory_s && heat[i] + rise[i] * c.heat_prediction_s >= c.fire_c);
@@ -193,7 +193,7 @@ namespace SmokeRescue.Brain
                 int i = row * Size + col;
                 if ((odds[i] <= c.free_log_odds && lidarOdds[i] <= c.free_log_odds) || Vector2.Distance(Centre(i), position) > radius) continue;
                 odds[i] = Mathf.Min(odds[i], c.free_log_odds); lidarOdds[i] = Mathf.Min(lidarOdds[i], c.free_log_odds);
-                observed[i] = true; localTime[i] = localObservationTime; dirty = true;
+                observed[i] = true; localTime[i] = localObservationTime; dirty = roofDirty = true;
             }
         }
         public void IntegrateDepth(RgbdFrame frame, SensorConfig s, BrainPose pose)
@@ -240,8 +240,8 @@ namespace SmokeRescue.Brain
             // As for depth, a grazing beam through a wall cell cannot erase a hit from the same sweep.
             for (int i = 0; i < Count; i++)
             {
-                if (hits[i]) { lidarOdds[i] = Mathf.Min(c.log_odds_cap, Mathf.Max(0, lidarOdds[i]) + c.occupied_log_odds); dirty = true; }
-                else if (frees[i]) { lidarOdds[i] = Mathf.Max(-c.log_odds_cap, lidarOdds[i] + c.free_log_odds); dirty = true; }
+                if (hits[i]) { lidarOdds[i] = Mathf.Min(c.log_odds_cap, Mathf.Max(0, lidarOdds[i]) + c.occupied_log_odds); dirty = roofDirty = true; }
+                else if (frees[i]) { lidarOdds[i] = Mathf.Max(-c.log_odds_cap, lidarOdds[i] + c.free_log_odds); dirty = roofDirty = true; }
             }
         }
         /// <summary>Distance in metres from each cell of a square window to the nearest LiDAR-occupied cell, for scan
@@ -310,6 +310,31 @@ namespace SmokeRescue.Brain
         /// spot that is tighter than the planning clearance; see GridPlanner.Lead.</summary>
         internal bool Passable(int i) => i >= 0 && i < Count && Occupancy(i) == 1 &&
             obstacleDistance[i] > c.robot_radius_m * .8f && fireDistance[i] > CellM;
+        /// <summary>Distance from ceiling evidence, walked through cells that are not walls (4-neighbour steps), out to
+        /// ceiling_radius_m. A straight-line distance reached through exterior walls and counted a strip of yard as
+        /// indoors (check run 5: robot B left by its door and searched along the outside of the west wall).</summary>
+        void RoofDistances()
+        {
+            if (roofDistance == null) roofDistance = new float[Count];
+            for (int i = 0; i < Count; i++) roofDistance[i] = float.PositiveInfinity;
+            var queue = new Queue<int>();
+            for (int i = 0; i < Count; i++)
+                if (roofHits[i] >= c.ceiling_min_hits && OwnOccupancy(i) != 255) { roofDistance[i] = 0; queue.Enqueue(i); }
+            while (queue.Count > 0)
+            {
+                int cell = queue.Dequeue(); float next = roofDistance[cell] + CellM;
+                if (next > c.ceiling_radius_m) continue;
+                int x = cell % Size, y = cell / Size;
+                for (int k = 0; k < 4; k++)
+                {
+                    int nx = x + (k == 0 ? 1 : k == 1 ? -1 : 0), ny = y + (k == 2 ? 1 : k == 3 ? -1 : 0);
+                    if (!Inside(nx, ny)) continue;
+                    int n = ny * Size + nx;
+                    if (roofDistance[n] <= next || OwnOccupancy(n) == 255) continue;
+                    roofDistance[n] = next; queue.Enqueue(n);
+                }
+            }
+        }
         internal float ObstacleDistance(int i) => i < 0 || i >= Count ? 0 : obstacleDistance[i];
         /// <summary>Indoors: within ceiling_radius_m of floor where this robot's own camera has seen a ceiling
         /// (ceiling_min_hits returns in the ceiling height band on a cell that is not a wall). No outline or floor plan
@@ -317,11 +342,7 @@ namespace SmokeRescue.Brain
         public bool Indoors(Vector2 p)
         {
             int i = Cell(p); if (i < 0) return false;
-            if (roofDirty || roofDistance == null)
-            {
-                if (roofDistance == null) roofDistance = new float[Count];
-                Distances(k => roofHits[k] >= c.ceiling_min_hits && OwnOccupancy(k) != 255, roofDistance); roofDirty = false;
-            }
+            if (roofDirty || roofDistance == null) { RoofDistances(); roofDirty = false; }
             return roofDistance[i] <= c.ceiling_radius_m;
         }
         internal float Cost(int i)

@@ -13,10 +13,14 @@ was queued, with the packet size. A footer counts partner maps received and note
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import cv2
 import numpy as np
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'brain'))
+from brain.nav_io import load_scenario, recording_frame, placed_states, transform_xy
 
 W, H = 640, 640
 X0, X1, Z0, Z1 = -1.0, 41.0, -1.0, 29.0       # extent of the top-down capture (footprint plus 1 m)
@@ -37,6 +41,9 @@ class ContextPanel:
         self.mh = int(round(self.mw * img.shape[0] / img.shape[1]))
         self.base = (cv2.resize(img, (self.mw, self.mh), interpolation=cv2.INTER_AREA) * 0.55).astype(np.uint8)
         self.state = {r: _jsonl(rec / r / "brain_state.jsonl") for r in self.robots}
+        scenario = load_scenario(json.loads((rec / 'meta.json').read_text()))
+        self.frames = {r: recording_frame(self.state[r], scenario, r) for r in self.robots}
+        self.state = {r: placed_states(self.state[r], self.frames[r][0]) for r in self.robots}
         self.events = {r: _jsonl(rec / r / "decisions.jsonl") for r in self.robots}
         self.radio = []
         rp = rec / "brain_radio.txt"
@@ -67,18 +74,15 @@ class ContextPanel:
             sectors = [e for e in ev if e["kind"] == "sector_assigned"]
             if sectors:
                 n = sectors[-1]["numbers"]
-                p0, p1 = self.px(n["x0"], n["y1"]), self.px(n["x1"], n["y0"])
-                for x in range(p0[0], p1[0], 12):
-                    cv2.line(img, (x, p0[1]), (min(x + 6, p1[0]), p0[1]), c, 1)
-                    cv2.line(img, (x, p1[1]), (min(x + 6, p1[0]), p1[1]), c, 1)
-                for y in range(p0[1], p1[1], 12):
-                    cv2.line(img, (p0[0], y), (p0[0], min(y + 6, p1[1])), c, 1)
-                    cv2.line(img, (p1[0], y), (p1[0], min(y + 6, p1[1])), c, 1)
+                corners = transform_xy([[n['x0'], n['y0']], [n['x1'], n['y0']],
+                                        [n['x1'], n['y1']], [n['x0'], n['y1']]], self.frames[r][0])
+                pixels = np.array([self.px(*p) for p in corners], np.int32)
+                cv2.polylines(img, [pixels], True, c, 1, cv2.LINE_AA)
             for e in ev:
                 n = e.get("numbers") or {}
                 if "x_m" not in n:
                     continue
-                q = self.px(n["x_m"], n["y_m"])
+                q = self.px(*transform_xy([n["x_m"], n["y_m"]], self.frames[r][0]))
                 if e["kind"] == "survivor_confirmed":
                     cv2.drawMarker(img, q, (90, 230, 90), cv2.MARKER_CROSS, 18, 3)
                     cv2.circle(img, q, 11, c, 2, cv2.LINE_AA)

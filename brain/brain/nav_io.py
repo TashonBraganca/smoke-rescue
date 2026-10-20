@@ -68,3 +68,110 @@ def cell_centres(indices: np.ndarray) -> np.ndarray:
 
 def is_complete(state: dict) -> bool:
     return str(state.get('state', '')).lower() in {'complete', 'mission_complete', 'completed'}
+
+
+def load_scenario(meta: dict) -> dict:
+    """Resolve scenario inheritance for offline evaluation and display."""
+    config = Path(__file__).resolve().parents[2] / 'config'
+    name = meta.get('scenario')
+    if not name:
+        return {}
+    path = Path(name)
+    if not path.is_absolute():
+        path = config / path.name
+    seen = set()
+    def read(path):
+        if path in seen:
+            raise ValueError('scenario inheritance cycle')
+        seen.add(path)
+        data = json.loads(path.read_text())
+        parent = read(path.parent / data['inherits']) if 'inherits' in data else {}
+        return parent | data
+    return read(path)
+
+
+def start_pose(scenario: dict, robot: str) -> np.ndarray | None:
+    spawn = next((r['spawn'] for r in scenario.get('robots', []) if r['id'] == robot), None)
+    return None if spawn is None else np.array([*spawn['at'], -np.radians(spawn['yaw'])], float)
+
+
+def rotation(yaw: float) -> np.ndarray:
+    c, s = np.cos(yaw), np.sin(yaw)
+    return np.array([[c, -s], [s, c]])
+
+
+def transform_xy(xy, transform):
+    return np.asarray(xy) @ rotation(transform[2]).T + transform[:2]
+
+
+def transform_poses(poses, transform):
+    result = np.asarray(poses, dtype=float).copy()
+    result[..., :2] = transform_xy(result[..., :2], transform)
+    result[..., 2] += transform[2]
+    return result
+
+
+def recording_frame(states: list[dict], scenario: dict, robot: str):
+    """Old logs start at the spawn; new logs start at their own origin.
+
+    Missing scenario metadata identifies legacy recordings only when their first
+    state is nonzero. An origin-only log needs a spawn to be placed on a plan.
+    """
+    start = start_pose(scenario, robot)
+    if not states:
+        return np.zeros(3), 'shared'
+    first = states[0]
+    pose = np.array([first['x'], first['y'], first['yaw_rad']])
+    if start is not None:
+        yaw_error = (pose[2] - start[2] + np.pi) % (2 * np.pi) - np.pi
+        if first['t'] <= .1 and np.linalg.norm(pose[:2] - start[:2]) < .05 and abs(yaw_error) < np.radians(2):
+            return np.zeros(3), 'shared'
+        return start, 'local'
+    if first['t'] <= .1 and np.linalg.norm(pose) < .05:
+        raise ValueError(f'{robot}: local-frame recording requires scenario spawn metadata')
+    return np.zeros(3), 'shared'
+
+
+def placed_states(states, transform):
+    result = []
+    for state in states:
+        s = dict(state)
+        s['x'], s['y'], s['yaw_rad'] = transform_poses([s['x'], s['y'], s['yaw_rad']], transform).tolist()
+        for key in ('path', 'goal'):
+            if s.get(key):
+                s[key] = transform_xy(s[key], transform).tolist()
+        result.append(s)
+    return result
+
+
+def map_geometry(shape, frame: str):
+    """Use image dimensions and configured metres; preserve legacy grid layout."""
+    config = json.loads((Path(__file__).resolve().parents[2] / 'config/brain.json').read_text())
+    cell = float(config['cell_m'])
+    if frame == 'local':
+        size = float(config['grid_size_m'])
+        origin = np.array([-size / 2, -size / 2])
+        if tuple(shape) != (round(size / cell), round(size / cell)):
+            raise ValueError(f'local grid shape {shape} disagrees with grid_size_m/cell_m')
+    else:
+        origin = np.array([config.get('grid_origin_x_m', -2.), config.get('grid_origin_z_m', -2.)])
+    return origin, cell
+
+
+def sample_grid(grid, xy, origin, cell):
+    """Sample a south-first grid at arbitrary points, with unknown outside it."""
+    cells = np.floor((np.asarray(xy) - origin) / cell + 1e-8).astype(int)
+    valid = (cells[..., 0] >= 0) & (cells[..., 0] < grid.shape[1]) & (cells[..., 1] >= 0) & (cells[..., 1] < grid.shape[0])
+    result = np.full(valid.shape, 128, np.uint8)
+    result[valid] = grid[cells[..., 1][valid], cells[..., 0][valid]]
+    return result
+
+
+def frame_peer(event: dict, robot: str, robots: list[str]) -> str | None:
+    for key in ('sender', 'peer', 'from', 'peer_id'):
+        if event.get(key) in robots:
+            return event[key]
+    # Existing two-robot decisions identify the peer in the reason string.
+    peers = [r for r in robots if r != robot]
+    mentioned = [r for r in peers if r in event.get('reason', '')]
+    return mentioned[0] if len(mentioned) == 1 else peers[0] if len(peers) == 1 else None

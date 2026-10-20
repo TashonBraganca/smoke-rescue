@@ -12,8 +12,10 @@ from scipy import ndimage
 from scipy.spatial import cKDTree
 from scipy.spatial.transform import Rotation
 
-from brain.nav_io import (CELL_M, ORIGIN, cell_centres, grid_cells, interpolate_poses,
+from brain.nav_io import (CELL_M, ORIGIN, interpolate_poses,
                           is_complete, latest_map, poses_from_states, read_json_lines)
+from brain.nav_io import (load_scenario, start_pose, recording_frame, placed_states,
+                          transform_xy, rotation, map_geometry, sample_grid, frame_peer)
 from brain.oracle import load_collisions, load_floorplan, load_house_points, load_trajectory
 
 
@@ -135,39 +137,39 @@ def lidar_accuracy(robot_dir: Path, truth_t: np.ndarray, truth_pose: np.ndarray,
     return report
 
 
-def truth_occupancy(points: np.ndarray, shape: tuple) -> np.ndarray:
+def truth_occupancy(points: np.ndarray, shape: tuple, origin=ORIGIN, cell=CELL_M) -> np.ndarray:
     height = -points[:, 1]
-    cells = grid_cells(points[(height >= .15) & (height <= 1.9)][:, [0, 2]])
+    cells = np.floor((points[(height >= .15) & (height <= 1.9)][:, [0, 2]] - origin) / cell + 1e-8).astype(int)
     cells = cells[(cells[:, 0] >= 0) & (cells[:, 0] < shape[1]) & (cells[:, 1] >= 0) & (cells[:, 1] < shape[0])]
     result = np.zeros(shape, bool)
     result[cells[:, 1], cells[:, 0]] = True
     return result
 
 
-def distance_to_cells(mask: np.ndarray) -> np.ndarray:
+def distance_to_cells(mask: np.ndarray, cell=CELL_M) -> np.ndarray:
     if not mask.any():
         return np.full(mask.shape, np.inf)
-    return ndimage.distance_transform_edt(~mask) * CELL_M
+    return ndimage.distance_transform_edt(~mask) * cell
 
 
-def phantom_clusters(mask: np.ndarray) -> list[dict]:
+def phantom_clusters(mask: np.ndarray, origin=ORIGIN, cell=CELL_M) -> list[dict]:
     labels, count = ndimage.label(mask)
     if not count:
         return []
     sizes = np.bincount(labels.ravel())
     order = sorted(range(1, count + 1), key=lambda n: sizes[n], reverse=True)[:20]
     centres = ndimage.center_of_mass(mask, labels, order)
-    return [dict(cells=int(sizes[n]), centre_xy=cell_centres(np.array([c[1], c[0]])).tolist())
+    return [dict(cells=int(sizes[n]), centre_xy=(origin + (np.array([c[1], c[0]]) + .5) * cell).tolist())
             for n, c in zip(order, centres)]
 
 
-def door_status(grid: np.ndarray, door: dict) -> str:
+def door_status(grid: np.ndarray, door: dict, origin=ORIGIN, cell=CELL_M) -> str:
     """Restrict 4-connected traversal to the gap, so routes around walls cannot pass."""
     yy, xx = np.indices(grid.shape)
-    x, y = ORIGIN[0] + (xx + .5) * CELL_M, ORIGIN[1] + (yy + .5) * CELL_M
+    x, y = origin[0] + (xx + .5) * cell, origin[1] + (yy + .5) * cell
     cx, cy = door['at']
     normal, tangent = (y - cy, x - cx) if door['wall'] == 'z' else (x - cx, y - cy)
-    corridor = (np.abs(tangent) <= door['width'] / 2) & (np.abs(normal) <= .4 + CELL_M + 1e-8)
+    corridor = (np.abs(tangent) <= door['width'] / 2) & (np.abs(normal) <= .4 + cell + 1e-8)
     start = corridor & (normal <= -.4 + 1e-8)
     end = corridor & (normal >= .4 - 1e-8)
     if not start.any() or not end.any():
@@ -186,23 +188,23 @@ def door_status(grid: np.ndarray, door: dict) -> str:
     return 'closed'
 
 
-def map_accuracy(grid: np.ndarray, points: np.ndarray, floorplan: dict) -> tuple[dict, np.ndarray]:
-    truth = truth_occupancy(points, grid.shape)
+def map_accuracy(grid: np.ndarray, points: np.ndarray, floorplan: dict, origin=ORIGIN, cell=CELL_M) -> tuple[dict, np.ndarray]:
+    truth = truth_occupancy(points, grid.shape, origin, cell)
     occupied, observed = grid == 0, grid != 128
-    truth_distance = distance_to_cells(truth)
-    brain_distance = distance_to_cells(occupied)
-    inside_observed = distance_to_cells(observed) <= .3 + 1e-8
+    truth_distance = distance_to_cells(truth, cell)
+    brain_distance = distance_to_cells(occupied, cell)
+    inside_observed = distance_to_cells(observed, cell) <= .3 + 1e-8
     eligible = truth & inside_observed
     phantom = occupied & (truth_distance > .3 + 1e-8)
     doors = dict(open=[], closed=[], not_observed=[])
     for door in floorplan.get('doors', []):
         if door.get('state') in {'open', 'half', 'removed'}:
-            doors[door_status(grid, door)].append(door['id'])
+            doors[door_status(grid, door, origin, cell)].append(door['id'])
     report = dict(precision=float(np.mean(truth_distance[occupied] <= .15)) if occupied.any() else None,
                   recall=float(np.mean(brain_distance[eligible] <= .15)) if eligible.any() else None,
                   occupied_cells=int(occupied.sum()), truth_cells=int(truth.sum()),
                   observed_truth_cells=int(eligible.sum()), phantom_cells=int(phantom.sum()),
-                  phantom_clusters=phantom_clusters(phantom), doors=doors)
+                  phantom_clusters=phantom_clusters(phantom, origin, cell), doors=doors)
     return report, truth
 
 
@@ -268,9 +270,9 @@ def draw_error_plot(path: Path, times: np.ndarray, position: np.ndarray, yaw: np
     save_image(path, image)
 
 
-def draw_overlay(path: Path, shape: tuple, truth: np.ndarray, layers: list[dict], floorplan: dict) -> None:
+def draw_overlay(path: Path, shape: tuple, truth: np.ndarray, layers: list[dict], floorplan: dict, origin=ORIGIN, cell=CELL_M) -> None:
     scale, margin = 50., 90
-    height, width = int(shape[0] * CELL_M * scale), int(shape[1] * CELL_M * scale)
+    height, width = int(shape[0] * cell * scale), int(shape[1] * cell * scale)
     base = np.full((*shape, 3), 250, np.uint8)
     for layer in layers:
         grid = layer['grid']
@@ -287,7 +289,7 @@ def draw_overlay(path: Path, shape: tuple, truth: np.ndarray, layers: list[dict]
     image[margin:margin + height, margin:margin + width] = cv2.resize(np.flipud(base), (width, height), interpolation=cv2.INTER_NEAREST)
 
     def pixel(xy):
-        p = (np.asarray(xy) - ORIGIN) * scale
+        p = (np.asarray(xy) - origin) * scale
         return np.c_[margin + p[..., 0], margin + height - p[..., 1]].astype(np.int32).reshape(-1, 2)
 
     for layer in layers:
@@ -305,13 +307,32 @@ def draw_overlay(path: Path, shape: tuple, truth: np.ndarray, layers: list[dict]
         ends = pixel([centre - axis * door['width'] / 2, centre + axis * door['width'] / 2])
         cv2.line(image, tuple(ends[0]), tuple(ends[1]), (150, 40, 140), 2)
     for axis, extent in [(0, shape[1]), (1, shape[0])]:
-        for value in np.arange(-2, -2 + extent * CELL_M + 1e-6, 2):
-            x, y = pixel([value, -2] if axis == 0 else [-2, value])[0]
+        for value in np.arange(origin[axis], origin[axis] + extent * cell + 1e-6, 2):
+            x, y = pixel([value, origin[1]] if axis == 0 else [origin[0], value])[0]
             cv2.putText(image, f'{value:g}', (x - 12, y + 25) if axis == 0 else (x - 50, y + 5), cv2.FONT_HERSHEY_SIMPLEX, .5, (0, 0, 0), 1)
     cv2.putText(image, 'x east (m)', (width // 2, height + margin + 60), cv2.FONT_HERSHEY_SIMPLEX, .6, (0, 0, 0), 1)
     cv2.putText(image, 'y north (m)', (5, 32), cv2.FONT_HERSHEY_SIMPLEX, .6, (0, 0, 0), 1)
     cv2.putText(image, 'Truth grey | occupied red | free green | true path black | brain path blue | stalls orange | doors purple', (margin, 60), cv2.FONT_HERSHEY_SIMPLEX, .48, (0, 0, 0), 1)
     save_image(path, image)
+
+
+def frame_link_report(events, receiver, robots, scenario):
+    event = next((e for e in events if e['kind'] == 'frame_linked'), None)
+    if event is None:
+        return dict(t=None, reported_transform=None, position_error_m=None, yaw_error_deg=None)
+    sender = frame_peer(event, receiver, robots)
+    n = event['numbers']
+    reported = dict(dx_m=n['dx_m'], dy_m=n['dy_m'], dyaw_deg=n['dyaw_deg'])
+    result = dict(t=event['t'], sender=sender, reported_transform=reported,
+                  position_error_m=None, yaw_error_deg=None)
+    a, b = start_pose(scenario, receiver), start_pose(scenario, sender)
+    if a is not None and b is not None:
+        xy = rotation(a[2]).T @ (b[:2] - a[:2])
+        yaw = wrap_angle(b[2] - a[2])
+        result.update(truth_transform=dict(dx_m=float(xy[0]), dy_m=float(xy[1]), dyaw_deg=float(np.degrees(yaw))),
+                      position_error_m=float(np.linalg.norm(np.array([n['dx_m'], n['dy_m']]) - xy)),
+                      yaw_error_deg=abs(float(np.degrees(wrap_angle(np.radians(n['dyaw_deg']) - yaw)))))
+    return result
 
 
 def evaluate(recording: Path | str, out: Path | str | None = None) -> dict:
@@ -324,36 +345,66 @@ def evaluate(recording: Path | str, out: Path | str | None = None) -> dict:
     points = load_house_points(recording)
     floorplan = load_floorplan(recording) or {}
     collisions = load_collisions(recording)
-    config = Path(__file__).resolve().parents[2] / 'config'
-    scenario_path = config / Path(meta.get('scenario', '')).name
-    if not scenario_path.is_file() and 'house_agents' in recording.name:
-        scenario_path = config / 'scenario_house_agents.json'
-    scenario = json.loads(scenario_path.read_text()) if scenario_path.is_file() else {}
+    scenario = load_scenario(meta)
+    raw_states = {r: read_json_lines(recording / r / 'brain_state.jsonl') for r in meta['robots']}
+    frames = {r: recording_frame(raw_states[r], scenario, r) for r in meta['robots']}
+    snapshots = {r: latest_map(recording / r) for r in meta['robots']}
+    origin, cell = ORIGIN.copy(), CELL_M
+    common_shape = None
+    if any(frame == 'local' for _, frame in frames.values()):
+        cell = float(json.loads((Path(__file__).resolve().parents[2] / 'config/brain.json').read_text())['cell_m'])
+        bounds = [points[:, [0, 2]]]
+        for r, snapshot in snapshots.items():
+            if snapshot is not None:
+                _, grid = snapshot
+                source_origin, source_cell = map_geometry(grid.shape, frames[r][1])
+                iy, ix = np.nonzero(grid != 128)
+                if len(ix):
+                    bounds.append(transform_xy(source_origin + (np.c_[ix, iy] + .5) * source_cell, frames[r][0]))
+        bounds = np.vstack(bounds)
+        origin = np.floor((bounds.min(axis=0) - 2) / cell) * cell
+        common_shape = tuple(np.ceil((bounds.max(axis=0) + 2 - origin) / cell).astype(int)[::-1])
     reports, layers = {}, []
     for robot in meta['robots']:
         robot_dir, output = recording / robot, out / robot
         output.mkdir(parents=True, exist_ok=True)
-        states = read_json_lines(robot_dir / 'brain_state.jsonl')
+        states = placed_states(raw_states[robot], frames[robot][0])
         if not states:
             raise ValueError(f'{robot}: no completed brain states')
         truth_t, truth_pose = body_trajectory(recording, robot)
         localization, t, position, yaw = localization_errors(states, truth_t, truth_pose)
         convention = pose_convention_check(truth_t, truth_pose, robot, scenario)
         if scenario:
-            convention['scenario_file'] = str(scenario_path)
+            convention['scenario_file'] = meta['scenario']
+        convention['recorded_frame'] = frames[robot][1]
+        initial = states[0]
+        if initial['t'] <= .1 and truth_t[0] <= initial['t'] <= truth_t[-1]:
+            true_initial = interpolate_poses(truth_t, truth_pose, np.array([initial['t']]))[0]
+            convention['transformed_brain_position_error_m'] = float(np.linalg.norm(np.array([initial['x'], initial['y']]) - true_initial[:2]))
+            convention['transformed_brain_yaw_error_deg'] = abs(float(np.degrees(wrap_angle(initial['yaw_rad'] - true_initial[2]))))
+            convention['passed'] = convention.get('passed', True) and convention['transformed_brain_position_error_m'] < .05 and convention['transformed_brain_yaw_error_deg'] < 2
         print(f'{robot} frame check {json.dumps(convention)}; optical +z projected to house x/z, subtract 0.25 m forward; yaw=atan2(-forward_x, forward_z)')
         lidar = lidar_accuracy(robot_dir, truth_t, truth_pose, states, points)
-        stalls = detect_stalls(states, truth_t, truth_pose, read_json_lines(robot_dir / 'decisions.jsonl'))
-        snapshot = latest_map(robot_dir)
+        events = read_json_lines(robot_dir / 'decisions.jsonl')
+        stalls = detect_stalls(states, truth_t, truth_pose, events)
+        link = frame_link_report(events, robot, meta['robots'], scenario)
+        snapshot = snapshots[robot]
         if snapshot is None:
             grid, map_report = None, dict(status='missing_map')
-            shape = (440, 440)
+            shape = common_shape or (440, 440)
         else:
             map_t, grid = snapshot
+            source_origin, source_cell = map_geometry(grid.shape, frames[robot][1])
+            if common_shape is not None:
+                yy, xx = np.indices(common_shape)
+                xy = origin + (np.stack([xx, yy], axis=-1) + .5) * cell
+                transform = frames[robot][0]
+                own = (xy - transform[:2]) @ rotation(transform[2])
+                grid = sample_grid(grid, own, source_origin, source_cell)
             shape = grid.shape
-            map_report, _ = map_accuracy(grid, points, floorplan)
-            map_report.update(status='measured', t=map_t, cell_m=CELL_M, origin_xy=ORIGIN.tolist(), shape=list(shape))
-        report = dict(robot=robot, localization=localization, frame_check=convention, lidar=lidar,
+            map_report, _ = map_accuracy(grid, points, floorplan, origin, cell)
+            map_report.update(status='measured', t=map_t, cell_m=cell, origin_xy=origin.tolist(), shape=list(shape))
+        report = dict(robot=robot, localization=localization, frame_check=convention, frame_link=link, lidar=lidar,
                       map=map_report, stalls=stalls, collision_seconds=None if collisions is None else collisions.get(robot),
                       collision_note='Writer supplies aggregate seconds only; contact locations and counts are unavailable.')
         reports[robot] = report
@@ -362,9 +413,9 @@ def evaluate(recording: Path | str, out: Path | str | None = None) -> dict:
         _, brain_pose = poses_from_states(states)
         layer = dict(robot=robot, grid=grid, true=truth_pose, brain=brain_pose, stalls=stalls)
         layers.append(layer)
-        draw_overlay(output / 'overlay.png', shape, truth_occupancy(points, shape), [layer], floorplan)
-    shape = tuple(max((layer['grid'].shape[i] if layer['grid'] is not None else 440) for layer in layers) for i in (0, 1))
-    draw_overlay(out / 'overlay.png', shape, truth_occupancy(points, shape), layers, floorplan)
+        draw_overlay(output / 'overlay.png', shape, truth_occupancy(points, shape, origin, cell), [layer], floorplan, origin, cell)
+    shape = common_shape or tuple(max((layer['grid'].shape[i] if layer['grid'] is not None else 440) for layer in layers) for i in (0, 1))
+    draw_overlay(out / 'overlay.png', shape, truth_occupancy(points, shape, origin, cell), layers, floorplan, origin, cell)
     return reports
 
 
@@ -378,6 +429,9 @@ def print_table(reports: dict) -> None:
               f"{number(y['median'])}/{number(y['max'])}   "
               f"{number(lidar.get('true_pose', {}).get('median_m'))}/{number(lidar.get('brain_pose', {}).get('median_m'))}   "
               f"{number(r['map'].get('precision'))}/{number(r['map'].get('recall'))}   {len(r['stalls'])}   {number(r['collision_seconds'])}")
+        link = r['frame_link']
+        print(f"{robot} frame_link: not linked" if link['t'] is None else
+              f"{robot} frame_link: linked at {link['t']:.2f}s from {link['sender']} {link['reported_transform']}; error {number(link['position_error_m'])} m / {number(link['yaw_error_deg'])} deg")
         if lidar.get('true_pose', {}).get('median_m', 0) is not None and lidar.get('true_pose', {}).get('median_m', 0) > .05:
             print(f'LIDAR CONVENTION FAILURE for {robot}: true-pose median exceeds 0.05 m. Check sensor geometry and frame conventions before trusting navigation metrics.')
         elif not lidar['true_pose']['passed']:
