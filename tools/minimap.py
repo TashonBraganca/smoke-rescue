@@ -104,6 +104,14 @@ class MiniMap:
         for r in self.robots:
             self._load_robot(r)
         self.people = self._people()
+        self.show_furniture = True
+        self.furniture = []
+        fire_cfg = Path(__file__).resolve().parents[1] / "config" / "fire.json"
+        sizes = json.loads(fire_cfg.read_text()).get("furniture", {}) if fire_cfg.exists() else {}
+        for l in plan.get("landmarks", []):
+            if l["kind"] in sizes and not l["kind"].startswith(("hallway_art", "bedroom1_art", "large_rug")):
+                w, d = sizes[l["kind"]]["size_m"]
+                self.furniture.append(((l["at"][0], l["at"][1]), (w, d), l.get("yaw", 0), l["kind"]))
 
     # ------------------------------------------------------------------ data
     def _load_robot(self, r: str) -> None:
@@ -142,7 +150,8 @@ class MiniMap:
             height = -p[:, 1]                  # house frame has y pointing down
             keep = (height > 0.2) & (height < 1.9)
             cells = np.unique(np.floor(p[keep][:, [0, 2]] / CELL).astype(int), axis=0)
-            pts.append((t, cells))
+            floor = np.unique(np.floor(p[np.abs(height) < 0.12][:, [0, 2]] / CELL).astype(int), axis=0)
+            pts.append((t, cells, floor))
             tp = rdir / "thermal" / f"{assoc[k][0]}.png"
             if th is not None and tp.exists():
                 dk = cv2.imread(str(tp), cv2.IMREAD_UNCHANGED)
@@ -179,21 +188,35 @@ class MiniMap:
     def render(self, t: float) -> np.ndarray:
         img = np.full((SIZE, SIZE, 3), INK["bg"], np.uint8)
         cv2.putText(img, "2D HOUSE MAP", (16, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (235, 235, 235), 2, cv2.LINE_AA)
-        cv2.putText(img, "robots' own map on the true plan (faint)", (190, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (150, 150, 150), 1, cv2.LINE_AA)
+        cv2.putText(img, "grey: mapped surfaces   dim: seen free floor   brown: true furniture", (190, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (150, 150, 150), 1, cv2.LINE_AA)
         for room in self.plan["rooms"]:
             r = room["rect"]
             cv2.rectangle(img, self.px((r[0], r[1])), self.px((r[2], r[3])), INK["wall"], 1, cv2.LINE_AA)
-        hits, fire_cells = {}, set()
+        hits, fire_cells, free_cells = {}, set(), set()
         for r in self.robots:
-            for tt, cells in self.points.get(r, []):
+            for tt, cells, floor in self.points.get(r, []):
                 if tt > t or (r != self.robots[0] and t < self.t_merge):
                     continue
                 for c in map(tuple, cells):
                     hits[c] = hits.get(c, 0) + 1
+                free_cells.update(map(tuple, floor))
             for tt, cells in self.fires.get(r, []):
                 if tt <= t and not (r != self.robots[0] and t < self.t_merge):
                     fire_cells.update(map(tuple, cells))
         seen_cells = [c for c, n in hits.items() if n >= 2]      # seen in at least two frames: drops one-off noise
+        # Seen free floor: dim fill, so empty space that was looked at differs from space never seen (black).
+        fh = max(1, int(CELL * self.scale / 2))
+        for cx, cz in free_cells:
+            p = self.px(((cx + 0.5) * CELL, (cz + 0.5) * CELL))
+            cv2.rectangle(img, (p[0] - fh, p[1] - fh), (p[0] + fh, p[1] + fh), (52, 48, 44), -1)
+        for room in self.plan["rooms"]:
+            r = room["rect"]
+            cv2.rectangle(img, self.px((r[0], r[1])), self.px((r[2], r[3])), INK["wall"], 1, cv2.LINE_AA)
+        if self.show_furniture:
+            for (cx, cz), (w, d), yaw, name in self.furniture:
+                c, sn = np.cos(np.radians(yaw)), np.sin(np.radians(yaw))
+                corners = [(cx + c * a + sn * b, cz - sn * a + c * b) for a, b in ((-w/2, -d/2), (w/2, -d/2), (w/2, d/2), (-w/2, d/2))]
+                cv2.polylines(img, [np.array([self.px(q) for q in corners], np.int32)], True, (110, 90, 60), 1, cv2.LINE_AA)
         half = max(1, int(CELL * self.scale / 2) - 2)
         for cx, cz in seen_cells:
             p = self.px(((cx + 0.5) * CELL, (cz + 0.5) * CELL))
@@ -233,7 +256,8 @@ class MiniMap:
             cv2.putText(img, "robot B not on this map until the maps merge", (16, 52), cv2.FONT_HERSHEY_SIMPLEX, 0.42, INK["B"], 1, cv2.LINE_AA)
         else:
             cv2.putText(img, f"maps merged at {self.t_merge:.0f} s", (16, 52), cv2.FONT_HERSHEY_SIMPLEX, 0.42, INK["B"], 1, cv2.LINE_AA)
-        people = [p for p in self.people if p["t"] <= t]
+        # A person found only by robot B appears once B's map has merged into A's.
+        people = [p for p in self.people if p["t"] <= t and (t >= self.t_merge or self.robots[0] in p["by"])]
         for p in people:
             q = self.px(p["xz"])
             cv2.circle(img, q, 8, INK["person"], -1, cv2.LINE_AA)
