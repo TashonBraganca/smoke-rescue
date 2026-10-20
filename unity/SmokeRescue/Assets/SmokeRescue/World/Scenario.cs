@@ -22,6 +22,15 @@ namespace SmokeRescue.World
         public LookAround look_around = new LookAround();
         public List<Survivor> survivors = new List<Survivor>();
         public Radio radio = new Radio();
+        public FireSpread fire = new FireSpread();
+
+        /// <summary>Whole-house spreading fire (FireSim, config/fire.json). Off: the static fires in floorplan.json.</summary>
+        [Serializable]
+        public class FireSpread
+        {
+            public bool spread;
+            public float head_start_s = 60f;   // fire time when the robots enter
+        }
 
         [Serializable]
         public class Smoke

@@ -127,7 +127,7 @@ namespace SmokeRescue.World
             public string id;
             public double area, temperature, height, smoke, hotSeconds, flashoverTime = -1;
             public long hotTicks;
-            public bool canCollapse;
+            public bool canCollapse, hasFuel;
         }
         sealed class Opening
         {
@@ -230,6 +230,7 @@ namespace SmokeRescue.World
                 // Stable integer mixing, independent of System.Random and UnityEngine.Random.
                 double variation = 1 + cfg.spread.fuel_variation_fraction * (2 * UnitNoise(seed, i) - 1);
                 cells[i].initialFuel *= variation; cells[i].fuel = cells[i].initialFuel;
+                if (cells[i].room >= 0 && cells[i].initialFuel > 0) rooms[cells[i].room].hasFuel = true;
             }
             neighbours = new int[cells.Length][];
             for (int z = 0; z < Height; z++) for (int x = 0; x < Width; x++)
@@ -374,7 +375,7 @@ namespace SmokeRescue.World
                 room.smoke = Clamp((room.smoke * volume + dt * (smokeProduction[i] + smokeFlow[i] -
                     g.smoke_decay_per_s * room.smoke * volume)) / newVolume, 0, 1);
                 room.height = ceiling - newVolume / room.area;
-                if (room.temperature >= config.flashover_threshold_c && room.flashoverTime < 0)
+                if (room.hasFuel && room.temperature >= config.flashover_threshold_c && room.flashoverTime < 0)
                     room.flashoverTime = (tick + 1) * dt;
                 // Left-endpoint accounting: do not count the interval in which a room first
                 // crosses the threshold. The previous tick must also have been hot.
@@ -435,7 +436,7 @@ namespace SmokeRescue.World
         /// <summary>
         /// Uniform upper/lower gas plus the strongest nearby same-room flame contribution.
         /// Horizontal falloff is [1/(1+(r/cellSize)^2)] * [1-r^2/radius^2], zero beyond radius.
-        /// The vertical plume term y/(y+scale) grows above the floor; density does not include it.
+        /// The vertical factor is 0.5+0.5*y/(y+scale); density does not include this plume term.
         /// This bounded temperature proxy is not a radiation heat-flux calculation.
         /// </summary>
         public float AirTemperatureC(Vector3 p)
@@ -494,7 +495,7 @@ namespace SmokeRescue.World
                 for (int i = 0; i < rooms.Length; i++)
                 {
                     var g = rooms[i]; writer.Write(g.id); writer.Write(g.temperature); writer.Write(g.height);
-                    writer.Write(g.smoke); writer.Write(g.hotSeconds); writer.Write(g.hotTicks); writer.Write(g.flashoverTime);
+                    writer.Write(g.smoke); writer.Write(g.hotSeconds); writer.Write(g.hotTicks); writer.Write(g.flashoverTime); writer.Write(g.hasFuel);
                     writer.Write(hotPreviously[i]);
                 }
                 foreach (bool applied in ignitionApplied) writer.Write(applied);
@@ -742,6 +743,19 @@ namespace SmokeRescue.World
                     (ids.Contains(d.between[0]) || d.between[0] == "outside") && (ids.Contains(d.between[1]) || d.between[1] == "outside") &&
                     d.at != null && d.at.Length == 2 && Finite(d.at[0]) && Finite(d.at[1]) && Finite(d.width) && d.width > 0 &&
                     (d.wall == "x" || d.wall == "z") && (d.state == "open" || d.state == "half" || d.state == "removed" || d.state == "closed"), "invalid door");
+                // A named connection must cut both named boundaries. A misplaced door must
+                // not exchange room gas while its grid edge still behaves as a solid wall.
+                foreach (string side in d.between)
+                {
+                    float[] rect = side == "outside" ? plan.footprint : plan.FindRoom(side).rect;
+                    double line = d.RunsAlongX ? d.at[1] : d.at[0];
+                    double loAcross = d.RunsAlongX ? rect[1] : rect[0], hiAcross = d.RunsAlongX ? rect[3] : rect[2];
+                    double along = d.RunsAlongX ? d.at[0] : d.at[1];
+                    double lo = d.RunsAlongX ? rect[0] : rect[1], hi = d.RunsAlongX ? rect[2] : rect[3];
+                    Require((Math.Abs(line - loAcross) < 1e-4 || Math.Abs(line - hiAcross) < 1e-4) &&
+                        along - d.width / 2 >= lo - 1e-4 && along + d.width / 2 <= hi + 1e-4,
+                        "door does not cut its named room boundary");
+                }
             }
             foreach (var l in plan.landmarks)
                 Require(l != null && l.room != null && ids.Contains(l.room) && l.kind != null && l.at != null && l.at.Length == 2 && Finite(l.at[0]) && Finite(l.at[1]) && Finite(l.yaw), "invalid landmark");

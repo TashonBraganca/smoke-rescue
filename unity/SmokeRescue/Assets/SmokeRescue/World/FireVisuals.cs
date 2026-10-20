@@ -27,6 +27,7 @@ namespace SmokeRescue.World
         readonly List<Region> regions = new List<Region>();
         readonly Transform ceilingPlane;
         float simTime;
+        bool warmed;
         static Material flameBody, flameTongue, ember, smoke;
 
         public FireVisuals(Transform parent, float wallHeight, int seed)
@@ -43,33 +44,54 @@ namespace SmokeRescue.World
         }
 
         /// <summary>Advance to sim time t with the current burning regions (centre on the floor, radius, flame height, C).</summary>
+        public const int MaxLights = 8, MaxShadowLights = 8;   // every fire light casts shadows, so walls stop it
+
         public void Apply(float t, IReadOnlyList<(Vector3 centre, float radius, float height, float tempC)> flames)
         {
             while (regions.Count < flames.Count) regions.Add(MakeRegion(regions.Count));
+            // Light budget: HDRP slows down with many shadowed point lights, so only the biggest fires get a light, and
+            // only the biggest few cast shadows.
+            var rank = new List<int>();
+            for (int i = 0; i < flames.Count; i++) if (flames[i].radius > 0f) rank.Add(i);
+            rank.Sort((a, b) => (flames[b].radius * flames[b].height).CompareTo(flames[a].radius * flames[a].height));
+            var lightOrder = new Dictionary<int, int>();
+            for (int k = 0; k < rank.Count && k < MaxLights; k++) lightOrder[rank[k]] = k;
+
             for (int i = 0; i < regions.Count; i++)
             {
                 var r = regions[i];
-                bool on = i < flames.Count;
+                bool on = i < flames.Count && flames[i].radius > 0f;
                 float radius = on ? flames[i].radius : 0f, height = on ? flames[i].height : 0f;
-                if (on) r.Root.position = flames[i].centre;
+                if (on) r.Root.position = flames[i].centre + Vector3.up * FuelTop(flames[i].centre);
                 Shape(r.Body, radius * 0.8f, on ? 40f * Area(radius) : 0f, new Vector2(0.55f, 0.9f) * Mathf.Max(0.6f, height * 0.6f), 2f);
                 Shape(r.Tongues, radius * 0.9f, on ? 18f * Area(radius) : 0f, new Vector2(0.35f, 0.6f) * Mathf.Max(0.6f, height * 0.6f), 2f);
                 Shape(r.Embers, radius, on ? 25f * Area(radius) : 0f, new Vector2(0.015f, 0.035f));
                 Shape(r.Smoke, radius * 0.7f, on ? 6f * Area(radius) : 0f, new Vector2(0.9f, 1.6f) * Mathf.Max(0.8f, radius));
-                var main = r.Body.main; main.startSpeed = new ParticleSystem.MinMaxCurve(0.5f * height, 1.0f * height);
-                var tmain = r.Tongues.main; tmain.startSpeed = new ParticleSystem.MinMaxCurve(0.8f * height, 1.4f * height);
-                for (int k = 0; k < r.Lights.Length; k++)
+                if (on)
                 {
-                    var l = r.Lights[k];
-                    l.enabled = on;
-                    if (!on) continue;
-                    l.transform.localPosition = new Vector3(0f, 0.35f + 0.45f * k * height, 0f);
-                    float n = 0.65f * Mathf.PerlinNoise(r.LightSeed + k, t * 1.3f) + 0.35f * Mathf.PerlinNoise(r.LightSeed + 17f + k, t * 9f);
-                    l.intensity = 9000f * Area(radius) * (0.7f + 0.6f * n) / r.Lights.Length;
-                    l.range = 6f + 6f * radius;
+                    var main = r.Body.main; main.startSpeed = new ParticleSystem.MinMaxCurve(0.5f * height, 1.0f * height);
+                    var tmain = r.Tongues.main; tmain.startSpeed = new ParticleSystem.MinMaxCurve(0.8f * height, 1.4f * height);
                 }
+                bool lit = on && lightOrder.TryGetValue(i, out int order);
+                var l = r.Lights[0];
+                l.enabled = lit;
+                if (!lit) continue;
+                order = lightOrder[i];
+                l.shadows = order < MaxShadowLights ? LightShadows.Soft : LightShadows.None;
+                l.transform.localPosition = new Vector3(0f, 0.3f + 0.4f * height, 0f);
+                float n = 0.65f * Mathf.PerlinNoise(r.LightSeed, t * 1.3f) + 0.35f * Mathf.PerlinNoise(r.LightSeed + 17f, t * 9f);
+                l.intensity = 3000f * Mathf.Clamp(Area(radius), 0.3f, 1.5f) * (0.7f + 0.6f * n);
+                l.range = 8f;
             }
             float dt = t - simTime;
+            if (!warmed)
+            {
+                // The house is already burning when the run starts: pre-run every emitter for 2 s so flames and smoke
+                // are fully formed in the first frame.
+                warmed = true;
+                foreach (var r in regions)
+                    foreach (var ps in new[] { r.Body, r.Tongues, r.Embers, r.Smoke }) ps.Simulate(2f, true, false, true);
+            }
             foreach (var r in regions)
                 foreach (var ps in new[] { r.Body, r.Tongues, r.Embers, r.Smoke })
                 {
@@ -78,6 +100,20 @@ namespace SmokeRescue.World
                 }
             simTime = t;
         }
+
+        /// <summary>Height of what is burning at this spot (sofa seat, bed, table top), so flames start on the fuel instead
+        /// of inside it. A ray down from just under the ceiling onto the furniture colliders; the floor if nothing is hit.</summary>
+        float FuelTop(Vector3 xz)
+        {
+            var key = new Vector2Int(Mathf.RoundToInt(xz.x * 8f), Mathf.RoundToInt(xz.z * 8f));
+            if (fuelTop.TryGetValue(key, out float y)) return y;
+            int mask = 1 << LayerMask.NameToLayer("Props");
+            y = Physics.Raycast(new Vector3(xz.x, ceiling - 0.15f, xz.z), Vector3.down, out var hit, ceiling, mask)
+                ? Mathf.Clamp(hit.point.y, 0f, 1.2f) : 0f;
+            fuelTop[key] = y;
+            return y;
+        }
+        readonly Dictionary<Vector2Int, float> fuelTop = new Dictionary<Vector2Int, float>();
 
         static float Area(float radius) => Mathf.Max(0.15f, radius * radius * 3.1416f);
 
@@ -124,7 +160,11 @@ namespace SmokeRescue.World
             var col = r.Smoke.collision; col.enabled = true; col.type = ParticleSystemCollisionType.Planes;
             col.SetPlane(0, ceilingPlane); col.dampen = 0.6f; col.bounce = 0f; col.lifetimeLoss = 0f; col.radiusScale = 0.4f;
 
-            r.Lights = new Light[3];
+            // Unity only emits from a system that has been started. Start and pause each one now; Apply then advances them
+            // by sim time with Simulate. (Created stopped and only simulated, they aged no particles and emitted none.)
+            foreach (var ps in new[] { r.Body, r.Tongues, r.Embers, r.Smoke }) { ps.Play(false); ps.Pause(false); }
+
+            r.Lights = new Light[1];
             for (int k = 0; k < r.Lights.Length; k++)
             {
                 var lgo = new GameObject($"FireLight{k}");

@@ -379,13 +379,13 @@
     "flame_ramp_s": 8,
     "flame_relaxation_s": 4,
     "flame_min_c": 650,
-    "flame_max_c": 1000,
+    "flame_max_c": 1100,
     "max_temperature_c": 1100,
     "fuel_variation_fraction": 0.08,
     "heat_of_combustion_kj_kg": 18000
   },
   "gas": {
-    "effective_heat_capacity_kj_m2_k": 6,
+    "effective_heat_capacity_kj_m2_k": 6.5,
     "heat_loss_kw_m2_k": 0.055,
     "convective_fraction": 0.65,
     "door_exchange_m3_s_m": 3.5,
@@ -430,7 +430,7 @@
       "url": "https://www.nist.gov/el/fire-research-division-73300/firegov-fire-service/fire-dynamics",
       "accessed": "2026-10-20",
       "parameters": "ambient_c, flashover_threshold_c, spread.flame_min_c, spread.flame_max_c, spread.max_temperature_c",
-      "justification": "20 C ambient is a scenario choice. NIST describes flashover with fire gases over 600 C and about 20 kW/m2 floor heat flux. Use 600 C as a gas-temperature trigger. 650 to 1000 C flame temperature and 1100 C hard bound are selected plausible ranges, not material-specific measurements. Flashover timing depends on ventilation and contents; the requested 180 to 300 s is a calibration target, not a universal rule."
+      "justification": "20 C ambient is a scenario choice. NIST describes flashover with fire gases over 600 C and about 20 kW/m2 floor heat flux. Use 600 C as a gas-temperature trigger. 650 to 1100 C flame temperature and 1100 C hard bound are selected plausible ranges, not material-specific measurements. Flashover timing depends on ventilation and contents; the requested 180 to 300 s is a calibration target, not a universal rule."
     },
     {
       "id": "wood",
@@ -444,7 +444,7 @@
       "url": "https://pages.nist.gov/cfast/",
       "accessed": "2026-10-20",
       "parameters": "gas.*",
-      "justification": "CFAST motivates hot upper and cooler lower room layers; this code does not implement CFAST. Every coefficient is estimated. Effective heat capacity 6 kJ/m2/K includes entrained gas and heated linings. Loss 0.055 kW/m2/K is an effective room heat loss. Convective heat fraction 0.65, exchange 3.5 internal and 0.4 external m3/s per metre of opening, gas capacity 1.2 kJ/m3/K, entrainment 0.0012 m3/s/kW are coarse choices. Initial layer depth 0.05 m and minimum height 0.4 m avoid zero volume. Lower heat fraction 0.12 and lower smoke fraction 0.08 preserve stratification. Smoke production 0.012 density*m3 per full-intensity burning cell per second, reference volume 1 m3 and decay 0.002/s define a dimensionless visual density, not soot concentration or visibility. Door exchange is multiplied by the fraction of the opening below the lower of the two layer interfaces; no hot gas crosses above a door head. The 3.5 value corresponds to a few m/s in a 2.1 m high opening and is an estimate. Heat capacity and exchange were selected using standalone default-house timing diagnostics, not experiments."
+      "justification": "CFAST motivates hot upper and cooler lower room layers; this code does not implement CFAST. Every coefficient is estimated. Effective heat capacity 6.5 kJ/m2/K includes entrained gas and heated linings. Loss 0.055 kW/m2/K is an effective room heat loss. Convective heat fraction 0.65, exchange 3.5 internal and 0.4 external m3/s per metre of opening, gas capacity 1.2 kJ/m3/K, entrainment 0.0012 m3/s/kW are coarse choices. Initial layer depth 0.05 m and minimum height 0.4 m avoid zero volume. Lower heat fraction 0.12 and lower smoke fraction 0.08 preserve stratification. Smoke production 0.012 density*m3 per full-intensity burning cell per second, reference volume 1 m3 and decay 0.002/s define a dimensionless visual density, not soot concentration or visibility. Door exchange is multiplied by the fraction of the opening below the lower of the two layer interfaces; no hot gas crosses above a door head. The 3.5 value corresponds to a few m/s in a 2.1 m high opening and is an estimate. Heat capacity and exchange were selected using standalone default-house timing diagnostics, not experiments."
     },
     {
       "id": "spread_estimates",

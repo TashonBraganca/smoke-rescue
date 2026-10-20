@@ -72,7 +72,7 @@ namespace SmokeRescue.World
             for (int i = 0; i < bodies.Count; i++)
             {
                 int f = i / Lobes, k = i % Lobes;
-                bool on = f < flames.Count;
+                bool on = f < flames.Count && flames[f].radius > 0f;
                 bodies[i].SetActive(on);
                 if (!on) continue;
                 var (c, rad, h, temp) = flames[f];
