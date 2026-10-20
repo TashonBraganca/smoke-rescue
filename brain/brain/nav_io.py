@@ -58,6 +58,15 @@ def latest_map(robot_dir: Path) -> tuple[float, np.ndarray] | None:
     return None
 
 
+def searched_for(robot_dir: Path, map_t: float) -> np.ndarray | None:
+    """Searched-floor mask written beside the snapshot at map_t (255 searched), south row first; None if absent."""
+    path = robot_dir / 'brain_map' / f'{map_t:.6f}.searched.png'
+    if not path.exists():
+        return None
+    image = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
+    return None if image is None else np.flipud(image).copy()
+
+
 def grid_cells(xy: np.ndarray) -> np.ndarray:
     return np.floor((np.asarray(xy) - ORIGIN) / CELL_M + 1e-8).astype(int)
 

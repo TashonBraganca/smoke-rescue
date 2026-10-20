@@ -408,6 +408,11 @@ namespace SmokeRescue.Recording
             Directory.CreateDirectory(Path.Combine(rig.dir, "brain_map"));
             pending.Enqueue(Task.Run(() => File.WriteAllBytes(path, ImageConversion.EncodeArrayToPNG(pixels,
                 UnityEngine.Experimental.Rendering.GraphicsFormat.R8_UNorm, (uint)size, (uint)size))));
+            var searched = new byte[s.searched.Length];
+            for (int i = 0; i < searched.Length; i++) searched[i] = s.searched[i] != 0 ? (byte)255 : (byte)0;
+            string searchedPath = Path.Combine(rig.dir, $"brain_map/{Fmt(t)}.searched.png");
+            pending.Enqueue(Task.Run(() => File.WriteAllBytes(searchedPath, ImageConversion.EncodeArrayToPNG(searched,
+                UnityEngine.Experimental.Rendering.GraphicsFormat.R8_UNorm, (uint)size, (uint)size))));
             rig.mapTxt.Append(Fmt(t)).Append(' ').Append(F(s.pose.position.x)).Append(' ').Append(F(s.pose.position.y)).Append(' ')
                 .Append(F(s.pose.yawRad)).Append(' ').Append(rel).Append('\n');
             // Also flush the brain logs, so a run without agents can be watched live and a crash keeps them.

@@ -995,23 +995,54 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void CeilingPointsOnAWallFaceDoNotMakeTheYardIndoors()
+        {
+            // Run 6: points from the top of an exterior wall face landed just outside the wall cell and counted as
+            // ceiling over the yard. Only ceiling evidence clear of walls may make floor indoors.
+            var c = Settings(); c.grid_size_m = 12; var g = OpenGrid(c);
+            for (float y = -3; y <= 3; y += .05f) g.ObserveOccupied(g.Cell(new Vector2(.05f, y)));   // a wall at x = 0..0.1
+            var roof = (byte[])typeof(OccupancyGrid).GetField("roofHits", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(g);
+            for (float y = -1; y <= 1; y += .1f) roof[g.Cell(new Vector2(-.15f, y))] = 255;              // wall-face points, 0.15 m out
+            g.ObserveFree(g.Cell(new Vector2(-.15f, 0)));
+            Assert.That(g.Indoors(new Vector2(-.9f, 0)), Is.False, "yard 0.9 m outside the wall");
+            for (float y = -1; y <= 1; y += .1f) roof[g.Cell(new Vector2(-1.55f, y))] = 255;             // a real ceiling, clear of walls
+            g.ObserveFree(g.Cell(new Vector2(-1.55f, 0)));
+            typeof(OccupancyGrid).GetField("roofDirty", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).SetValue(g, true);
+            Assert.That(g.Indoors(new Vector2(-.9f, 0)), Is.True, "control: the same spot under real ceiling evidence");
+        }
+
+        /// <summary>A room seen from the test camera: ceiling at 2.8 m, floor, and a far wall wallM ahead; each pixel's depth
+        /// is its ray's first hit (optical z, mm).</summary>
+        static RgbdFrame RoomImage(double t, float wallM)
+        {
+            var frame = Image(t, true, 0); float p = 10 * Mathf.Deg2Rad, sp = Mathf.Sin(p), cp = Mathf.Cos(p);
+            for (int v = 0; v < 60; v++) for (int u = 0; u < 80; u++)
+            {
+                float dn = (v - 29.5f) / 52f, up = -(sp + dn * cp), forward = cp - dn * sp, z = float.PositiveInfinity;
+                if (up > 1e-4f) z = Mathf.Min(z, (2.8f - 1.6f) / up);            // ceiling
+                if (up < -1e-4f) z = Mathf.Min(z, 1.6f / -up);                   // floor
+                if (forward > 1e-4f) z = Mathf.Min(z, (wallM - .25f) / forward); // far wall
+                frame.Depth[v * 80 + u] = (ushort)Mathf.Clamp(Mathf.RoundToInt(z * 1000), 0, 65535);
+            }
+            return frame;
+        }
+
+        [Test]
         public void SearchNeedsACeilingSeenByTheRobotsOwnCamera()
         {
             // No outline: with search_requires_ceiling a frontier must lie near floor where the camera saw a ceiling.
-            var c = Settings(); c.search_requires_ceiling = true;
+            // The test camera is 80 x 60 sampled every 4th pixel, about one ceiling return per cell (640 x 480 in runs).
+            var c = Settings(); c.search_requires_ceiling = true; c.ceiling_min_hits = 1;
             var a = new RobotBrain(Calibration(), c, "A", 0);
-            Motion(a, 0); a.OnAirTemperature(0, 20); a.OnLidar(RoomScan(0, Vector2.zero, 0, 6f, 720)); a.Step(0, 1f / 60);
+            Motion(a, 0); a.OnAirTemperature(0, 20); a.OnLidar(RoomScan(0, Vector2.zero, 0, 9f, 720)); a.Step(0, 1f / 60);
             Assert.That(a.FrontierOptions(0, 10), Is.Empty, "a room mapped only by LiDAR, ceiling never seen: nothing to search yet");
-            // A frame 4 m deep: its top rows reach 2.5 to 3.5 m up, a ceiling over the floor 3 to 4 m ahead.
-            Motion(a, .1); a.OnAirTemperature(.1, 20); a.OnRgbd(Image(.1, true, 4000)); a.OnLidar(RoomScan(.1, Vector2.zero, 0, 6f, 720)); a.Step(.1, .1f);
+            Motion(a, .1); a.OnAirTemperature(.1, 20); a.OnRgbd(RoomImage(.1, 7f)); a.OnLidar(RoomScan(.1, Vector2.zero, 0, 9f, 720)); a.Step(.1, .1f);
             var g = Map(a);
-            Assert.That(g.Indoors(new Vector2(0, 3.6f)), Is.True, "ceiling seen overhead");
+            Assert.That(g.Indoors(new Vector2(0, 4.5f)), Is.True, "ceiling seen overhead");
             Assert.That(g.Indoors(new Vector2(0, -4f)), Is.False, "behind the robot no ceiling was seen");
-            // A wall between ceiling and floor: the far side is not indoors, however close (run 5, the yard outside a wall).
-            // The 4 m frame's top rows see ceiling up to about 4.6 m ahead; put the wall just past that.
-            Assert.That(g.Indoors(new Vector2(0, 5.6f)), Is.True, "control: 1 m past the last ceiling cell, no wall yet");
-            for (float x = -3; x <= 3; x += .05f) g.ObserveOccupied(g.Cell(new Vector2(x, 5.25f)));
-            Assert.That(g.Indoors(new Vector2(0, 5.6f)), Is.False, "beyond a wall, though within the radius in a straight line");
+            // Beyond the far wall the camera mapped at 7 m: within 1.5 m of ceiling evidence in a straight line, but not
+            // reachable without crossing the wall (run 5, the yard outside a wall).
+            Assert.That(g.Indoors(new Vector2(0, 7.6f)), Is.False, "beyond a wall");
             var options = a.FrontierOptions(.1, 10);
             Assert.That(options, Is.Not.Empty);
             Assert.That(options.All(f => g.Indoors(f.position)), Is.True);

@@ -314,5 +314,9 @@
   "link_verifications_per_step": 4,
   "link_verifications_per_step_reason": "At most this many map verifications per brain step, so fingerprint linking cannot stall the 60 Hz loop (check run 3 slowed to 3.6 sim s per minute).",
   "link_coarse_min_fit": 0.35,
-  "link_coarse_min_fit_reason": "The coarse 10 cm / 2 degree search only has to find the neighbourhood; a candidate needs this fit there, then link_min_fit after fine refinement."
+  "link_coarse_min_fit_reason": "The coarse 10 cm / 2 degree search only has to find the neighbourhood; a candidate needs this fit there, then link_min_fit after fine refinement.",
+  "link_diagnostics": true,
+  "link_diagnostics_reason": "Log every rejected fingerprint comparison (place_rejected) during the overnight verification runs; turn off for the final demo runs.",
+  "ceiling_wall_margin_m": 0.4,
+  "ceiling_wall_margin_m_reason": "Ceiling evidence counts only on cells at least this far from a mapped wall: wall faces reach the ceiling height band, and their noisy points outside an exterior wall made the yard look roofed (run 6). 0.4 m is under half the narrowest hallway."
 }

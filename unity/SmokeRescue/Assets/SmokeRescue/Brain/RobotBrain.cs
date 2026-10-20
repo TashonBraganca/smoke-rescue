@@ -50,7 +50,7 @@ namespace SmokeRescue.Brain
             sensors = cfg ?? throw new ArgumentNullException(nameof(cfg)); c = brainCfg ?? throw new ArgumentNullException(nameof(brainCfg));
             c.Validate(); ValidateCalibration(cfg);
             if (string.IsNullOrWhiteSpace(robotId)) throw new ArgumentException("Robot ID is required.", nameof(robotId));
-            id = robotId; scanSign = (seed & 1) == 0 ? 1 : -1;
+            id = robotId; scanSign = (seed & 1) == 0 ? 1 : -1; LinkDiagnostics = c.link_diagnostics;
             var entry = entryPose.HasValue ? entryPose.Value.pose : new BrainPose();
             home = entry.position;
             airC = c.ambient_c; motion = new DeadReckoning(c.motion_stale_s, c.frame_max_age_s + c.frame_pair_tolerance_s, entry); grid = new OccupancyGrid(c);
@@ -677,7 +677,7 @@ namespace SmokeRescue.Brain
             occupancy = grid.CopyOccupancy(), heat = grid.CopyHeat(), path = path.ToArray(), goal = goal,
             mode = health.Thermal ? "thermal" : "rgb", state = State, heatBudget = budget,
             confirmedSurvivors = survivors.ToArray(), fireHotspots = grid.FireHotspots(),
-            peerExplored = grid.CopyPeerExplored(), peers = CopyPeers(), survivors = CopySurvivors()
+            peerExplored = grid.CopyPeerExplored(), searched = grid.CopySearched(), peers = CopyPeers(), survivors = CopySurvivors()
         };
         static void ValidateCalibration(SensorConfig s)
         {

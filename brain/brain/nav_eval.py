@@ -12,6 +12,7 @@ from scipy import ndimage
 from scipy.spatial import cKDTree
 from scipy.spatial.transform import Rotation
 
+from brain.nav_io import searched_for
 from brain.nav_io import (CELL_M, ORIGIN, interpolate_poses,
                           is_complete, latest_map, poses_from_states, read_json_lines)
 from brain.nav_io import (load_scenario, start_pose, recording_frame, placed_states,
@@ -335,6 +336,21 @@ def frame_link_report(events, receiver, robots, scenario):
     return result
 
 
+def floor_mask(floorplan: dict, scenario: dict, shape: tuple, origin, cell, occupied: np.ndarray) -> np.ndarray:
+    """True floor a camera could search: cells inside the scenario's rooms that hold no wall or furniture.
+    Evaluation only: the scenario's search_area picks which rooms belong to this run's building."""
+    yy, xx = np.indices(shape)
+    centres = origin + (np.stack([xx, yy], axis=-1) + .5) * cell
+    area = scenario.get('search_area') if scenario else None
+    mask = np.zeros(shape, bool)
+    for room in floorplan.get('rooms', []):
+        x0, y0, x1, y1 = room['rect']
+        if area and not (x0 >= area[0] - 1e-6 and y0 >= area[1] - 1e-6 and x1 <= area[2] + 1e-6 and y1 <= area[3] + 1e-6):
+            continue
+        mask |= (centres[..., 0] >= x0) & (centres[..., 0] < x1) & (centres[..., 1] >= y0) & (centres[..., 1] < y1)
+    return mask & ~occupied
+
+
 def evaluate(recording: Path | str, out: Path | str | None = None) -> dict:
     recording = Path(recording).resolve()
     if not (recording / 'meta.json').exists():
@@ -365,6 +381,7 @@ def evaluate(recording: Path | str, out: Path | str | None = None) -> dict:
         origin = np.floor((bounds.min(axis=0) - 2) / cell) * cell
         common_shape = tuple(np.ceil((bounds.max(axis=0) + 2 - origin) / cell).astype(int)[::-1])
     reports, layers = {}, []
+    team_searched, team_floor = None, 0
     for robot in meta['robots']:
         robot_dir, output = recording / robot, out / robot
         output.mkdir(parents=True, exist_ok=True)
@@ -404,6 +421,15 @@ def evaluate(recording: Path | str, out: Path | str | None = None) -> dict:
             shape = grid.shape
             map_report, _ = map_accuracy(grid, points, floorplan, origin, cell)
             map_report.update(status='measured', t=map_t, cell_m=cell, origin_xy=origin.tolist(), shape=list(shape))
+            searched = searched_for(robot_dir, map_t)
+            if searched is not None:
+                if common_shape is not None:
+                    searched = sample_grid(searched, own, source_origin, source_cell)
+                floor = floor_mask(floorplan, scenario, shape, origin, cell, truth_occupancy(points, shape, origin, cell))
+                covered = (searched == 255) & floor
+                map_report['searched_floor_share'] = float(covered.sum() / max(1, floor.sum()))
+                team_searched = covered if team_searched is None else team_searched | covered
+                team_floor = int(floor.sum())
         report = dict(robot=robot, localization=localization, frame_check=convention, frame_link=link, lidar=lidar,
                       map=map_report, stalls=stalls, collision_seconds=None if collisions is None else collisions.get(robot),
                       collision_note='Writer supplies aggregate seconds only; contact locations and counts are unavailable.')
@@ -414,6 +440,10 @@ def evaluate(recording: Path | str, out: Path | str | None = None) -> dict:
         layer = dict(robot=robot, grid=grid, true=truth_pose, brain=brain_pose, stalls=stalls)
         layers.append(layer)
         draw_overlay(output / 'overlay.png', shape, truth_occupancy(points, shape, origin, cell), [layer], floorplan, origin, cell)
+    if team_searched is not None:
+        team = dict(searched_floor_share=float(team_searched.sum() / max(1, team_floor)), floor_cells=team_floor)
+        (out / 'team.json').write_text(json.dumps(team, indent=2) + '\n')
+        print(f"team searched floor share {team['searched_floor_share']:.3f} of {team_floor} floor cells")
     shape = common_shape or tuple(max((layer['grid'].shape[i] if layer['grid'] is not None else 440) for layer in layers) for i in (0, 1))
     draw_overlay(out / 'overlay.png', shape, truth_occupancy(points, shape, origin, cell), layers, floorplan, origin, cell)
     return reports

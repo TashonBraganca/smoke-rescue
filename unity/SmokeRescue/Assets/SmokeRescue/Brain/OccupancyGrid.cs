@@ -127,6 +127,11 @@ namespace SmokeRescue.Brain
             for (int i = 0; i < Count; i++) if (observed[i] && layer[i] != 0) return true;
             return false;
         }
+        public byte[] CopySearched()
+        {
+            var copy = new byte[Count]; for (int i = 0; i < Count; i++) if (observed[i] || peer[i] != 0) copy[i] = 1;
+            return copy;
+        }
         public byte[] CopyPeerExplored()
         {
             var copy = new byte[Count]; for (int i = 0; i < Count; i++) if (peer[i] != 0) copy[i] = 1;
@@ -317,9 +322,14 @@ namespace SmokeRescue.Brain
         {
             if (roofDistance == null) roofDistance = new float[Count];
             for (int i = 0; i < Count; i++) roofDistance[i] = float.PositiveInfinity;
+            PrepareNavigation();
             var queue = new Queue<int>();
+            // Ceiling evidence counts only away from walls: the top of a wall face is in the ceiling height band too,
+            // and depth noise put some of its points outside the wall cell, which made a strip of yard look roofed
+            // (run 6: robot B's search target at 0.55 m outside the west wall).
             for (int i = 0; i < Count; i++)
-                if (roofHits[i] >= c.ceiling_min_hits && OwnOccupancy(i) != 255) { roofDistance[i] = 0; queue.Enqueue(i); }
+                if (roofHits[i] >= c.ceiling_min_hits && OwnOccupancy(i) != 255 && obstacleDistance[i] >= c.ceiling_wall_margin_m)
+                { roofDistance[i] = 0; queue.Enqueue(i); }
             while (queue.Count > 0)
             {
                 int cell = queue.Dequeue(); float next = roofDistance[cell] + CellM;
