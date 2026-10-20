@@ -11,8 +11,14 @@ must cite the id of a perception result that supports it, or it is refused and t
 
 from __future__ import annotations
 
+import json
 import math
 from dataclasses import dataclass, field
+from pathlib import Path as _Path
+
+# Thresholds come from config/brain.json, each with its reason there.
+_CONFIG = json.loads((_Path(__file__).resolve().parents[3] / "config" / "brain.json").read_text())
+CONFIRM_MAX_RANGE_M = float(_CONFIG["person_confirm_max_range_m"])
 from pathlib import Path
 
 from brain.agent import vision
@@ -176,6 +182,15 @@ class ToolRegistry:
             return {"refused": True, "reason": why}
         return None
 
+    @staticmethod
+    def _inspection_range(ev: dict) -> float | None:
+        """Measured range of the inspected person, else the requested range."""
+        candidate = ev.get("candidate") or {}
+        r = candidate.get("range_m")
+        if r is None:
+            r = (ev.get("params") or {}).get("range_m")
+        return None if r is None else float(r)
+
     def _near(self, ev: dict, args: dict, tol: float = 1.0) -> bool:
         return ev.get("x") is None or math.hypot(ev["x"] - float(args["x"]), ev["y"] - float(args["y"])) <= tol
 
@@ -184,6 +199,11 @@ class ToolRegistry:
         if name == "confirm_survivor":
             refusal = self._need(args, ("inspect_candidate",), lambda ev: ev.get("verdict") == "person" and self._near(ev, args),
                                  "the cited inspection is not a person verdict at that position")
+            if refusal is None:
+                looked = self._inspection_range(self.evidence[str(args["evidence_id"])])
+                if looked is not None and looked > CONFIRM_MAX_RANGE_M:
+                    refusal = {"refused": True, "reason": f"the inspection looked from {looked:.1f} m; confirm only within "
+                               f"{CONFIRM_MAX_RANGE_M:.1f} m: approach_candidate citing it, then inspect again"}
         elif name == "reject_candidate":
             refusal = self._need(args, ("inspect_candidate",), lambda ev: ev.get("verdict") == "not_person" and self._near(ev, args),
                                  "the cited inspection is not a not_person verdict at that position")

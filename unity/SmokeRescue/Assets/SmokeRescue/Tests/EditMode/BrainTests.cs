@@ -752,6 +752,39 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void AReturnUsesALinkedPartnersEntryWhenItsOwnIsCutOff()
+        {
+            // Slow-fire run: robot B's way home was cut by fire 5.5 m from the door robot A had used, and it held still.
+            // With A's map linked, A's entry (the origin of A's frame) is a known way out too. Control: no link. (The test
+            // camera sees corridor walls 1 m to each side, so the entry is placed ahead in the corridor.)
+            string ReturnPlan(bool linked)
+            {
+                var c = Settings(); c.grid_size_m = 12; c.robot_radius_m = .25f; c.mission_time_limit_s = 3.5f; c.frames_shared_at_start = false;
+                var b = new RobotBrain(Calibration(), c, "B", 0); Room(b, -5, 5, -2, 6);
+                var partner = new RobotBrain(Calibration(), c, "A", 0); Motion(partner, 0); partner.OnAirTemperature(0, 20); partner.Step(0, .05f);
+                var events = new List<BrainEvent>();
+                for (int i = 0; i < 75; i++)
+                {
+                    double t = i / 15.0; Motion(b, t, t < 3 ? 1f : 0); b.OnRgbd(Image(t, true)); b.OnAirTemperature(t, 20);
+                    if (i == 1) b.OnPeerMessage(Wire(partner.BuildMessage(0)), t);
+                    if (i == 1 && linked)
+                    {
+                        var links = (System.Collections.IDictionary)typeof(RobotBrain).GetField("links", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(b);
+                        links["A"] = new BrainPose { position = new Vector2(0, 4), yawRad = 0 };   // A's entry lies 1 m ahead of B's position
+                    }
+                    var g = Map(b);
+                    if (t >= 3.2) for (float x = -5; x <= 5; x += .1f) g.ObserveHeat(g.Cell(new Vector2(x, 1.2f)), 500, t);   // fire across the room
+                    b.Step(t, 1f / 15); events.AddRange(b.DrainEvents());
+                }
+                var plans = events.Where(e => e.kind == "replan" && (e.reason.StartsWith("Return to the start") || e.reason.StartsWith("The known return route"))).ToList();
+                Assert.That(plans, Is.Not.Empty, "the time limit started a return");
+                return plans.Last().reason;
+            }
+            Assert.That(ReturnPlan(true), Does.StartWith("Return to the start"), "a route to the partner's entry");
+            Assert.That(ReturnPlan(false), Does.StartWith("The known return route is blocked"), "control: own entry only");
+        }
+
+        [Test]
         public void AReturnEndsWithinHalfAMetreOfADoorwayStart()
         {
             // House reflex check: robot B stopped 0.3 m from its doorway start, where the return path ended, and replanned
