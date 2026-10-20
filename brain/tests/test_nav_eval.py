@@ -412,3 +412,17 @@ def test_sample_grid_fill_marks_cells_outside_the_source_map():
     xy = np.array([[[.05, .05], [5.0, 5.0]]])
     assert sample_grid(grid, xy, np.zeros(2), .1).tolist() == [[255, 128]]
     assert sample_grid(grid, xy, np.zeros(2), .1, fill=0).tolist() == [[255, 0]]
+
+
+def test_a_stall_is_explained_only_by_a_short_deliberate_stop():
+    from brain.nav_eval import detect_stalls
+    times = np.arange(0., 41.)
+    states = [dict(t=t, x=0., y=0., yaw_rad=0., state='explore') for t in times]
+    still = np.zeros((len(times), 3))
+    sweep = [dict(t=2., kind='sweep_started')]
+    long = detect_stalls(states, times, still, sweep)
+    assert len(long) == 1 and long[0]['duration_s'] > 20 and not long[0]['explained']   # outlasts the sweep
+    short = detect_stalls(states[:15], times[:15], still[:15], sweep)
+    assert len(short) == 1 and short[0]['explained'] and short[0]['reason'] == ['sweep_started']
+    unexplained = detect_stalls(states[:15], times[:15], still[:15], [dict(t=2., kind='replan')])
+    assert len(unexplained) == 1 and not unexplained[0]['explained']
