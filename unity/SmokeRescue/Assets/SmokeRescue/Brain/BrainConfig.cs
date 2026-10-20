@@ -13,7 +13,6 @@ namespace SmokeRescue.Brain
         public float full_snapshot_s = 10;
         public float peer_claim_s = 15;
         public float peer_claim_radius_m = 1;
-        public float peer_local_priority_s = 5;
         public float grid_size_m = 44.0f;
         public bool fixed_grid_origin = false;
         public float grid_origin_x_m = -2.0f;
@@ -89,6 +88,15 @@ namespace SmokeRescue.Brain
         public float frontier_gain_weight = 0.04f;
         public int frontier_gain_cap_cells = 150, frontier_min_information_cells = 10;
         public float visited_radius_m = 0.8f, visited_hold_s = 90f;
+        public float sweep_max_s = 12f;
+        public float collision_escape_s = 3f;
+        public float collision_margin_m = 0.05f;
+        public float lead_max_m = 1.0f;
+        public float frontier_cluster_max_m = 2.5f;
+        public int scan_beam_stride = 3, scan_min_beams = 40;
+        public float scan_match_range_m = 8f, scan_sigma_m = 0.05f, scan_window_m = 0.1f, scan_step_m = 0.025f;
+        public float scan_window_deg = 1.5f, scan_step_deg = 0.5f, scan_min_fit = 0.3f, scan_softness = 0.004f;
+        public float localization_report_s = 5f;
         public float sweep_spacing_m = 3.0f, sweep_repeat_s = 120f, sweep_hold_s = 0.6f, sweep_yaw_dps = 45f, sweep_tolerance_deg = 6f;
         public float area_report_radius_m = 4.0f;
         public int progress_min_cells = 40;
@@ -155,7 +163,11 @@ namespace SmokeRescue.Brain
                 stuck_turn_deg <= 0 || stuck_turn_deg > 90 || stuck_turn_timeout_s <= 0 ||
                 stuck_repeat_radius_m < cell_m || stuck_repeat_count < 2 || stuck_blacklist_s <= stuck_window_s)
                 throw new ArgumentException("Invalid stuck detection or recovery configuration.");
-            if (full_snapshot_s <= 0 || peer_claim_s <= 0 || peer_claim_radius_m <= 0 || peer_local_priority_s < 0 ||
+            if (collision_margin_m < 0 || lead_max_m < cell_m || frontier_cluster_max_m < cell_m * 2 || scan_beam_stride < 1 || scan_min_beams < 3 || scan_match_range_m <= 0 ||
+                scan_sigma_m <= 0 || scan_window_m < 0 || scan_step_m <= 0 || scan_window_deg < 0 || scan_step_deg <= 0 ||
+                scan_min_fit < 0 || scan_min_fit > 1 || scan_softness <= 0 || localization_report_s <= 0 || collision_escape_s <= 0)
+                throw new ArgumentException("Invalid LiDAR localization or collision margin configuration.");
+            if (full_snapshot_s <= 0 || peer_claim_s <= 0 || peer_claim_radius_m <= 0 ||
                 cell_m <= 0 || cell_m > BrainMessage.ResolutionM ||
                 Math.Abs(BrainMessage.ResolutionM / cell_m - Math.Round(BrainMessage.ResolutionM / cell_m)) > .0001 || grid_size_m < cell_m * 5 || grid_size_m / cell_m > 1000 || depth_stride < 1 || health_stride < 1 ||
                 robot_radius_m <= 0 || free_log_odds >= 0 || occupied_log_odds <= 0 || free_threshold >= 0 || occupied_threshold <= 0 ||

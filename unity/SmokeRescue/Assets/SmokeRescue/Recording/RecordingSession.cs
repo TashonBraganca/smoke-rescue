@@ -44,6 +44,9 @@ namespace SmokeRescue.Recording
             public RgbdCamera rgbd;
             public ThermalCamera thermal;
             public AirTemperatureSensor air;
+            public LidarSensor lidar;
+            public LidarScan lastScan;
+            public StringBuilder lidarTxt, mapTxt = new StringBuilder("# brain occupancy snapshots, 8-bit PNG, 0 occupied, 128 unknown, 255 free; row 0 is the grid's south edge\n# t x y yaw_rad file\n");
             public RobotBrain brain;
             public BrainCommand command;
             public bool missionDone;
@@ -109,6 +112,20 @@ namespace SmokeRescue.Recording
                 }
                 if (sensorCfg.air_temperature != null)
                     rig.air = new AirTemperatureSensor(sensorCfg.air_temperature, scenario.seed * 1000 + i * 10 + 5) { NoiseEnabled = noise };
+                if (sensorCfg.lidar != null)
+                {
+                    rig.lidar = new LidarSensor(sensorCfg.lidar, scenario.seed * 1000 + i * 10 + 7)
+                    {
+                        NoiseEnabled = noise, LocalDensity = atmosphere.Field.Density, Self = rig.robot.transform,
+                        Mask = LayerMask.GetMask("Walls", "Props", "Robots"),
+                    };
+                    var ci = CultureInfo.InvariantCulture; var l = sensorCfg.lidar;
+                    rig.lidarTxt = new StringBuilder("# planar LiDAR, one sweep per line, ranges in millimetres, 0 = no return\n" +
+                        "# body frame: beam i at angle_min_rad + i * increment_rad, 0 = forward, positive = left (counter-clockwise seen from above)\n" +
+                        $"# beams {l.beams} angle_min_rad {rig.lidar.AngleMinRad.ToString("F6", ci)} increment_rad {rig.lidar.AngleIncrementRad.ToString("F6", ci)} " +
+                        $"mount_height_m {l.mount.height_m.ToString("F3", ci)} mount_forward_m {l.mount.forward_offset_m.ToString("F3", ci)} min_m {l.min_m.ToString("F3", ci)} max_m {l.max_m.ToString("F3", ci)}\n" +
+                        "# t r0 r1 ...\n");
+                }
                 rig.imu = new ImuSensor(sensorCfg, scenario.seed * 1000 + i * 10 + 2) { NoiseEnabled = noise };
                 rig.odom = new OdometrySensor(sensorCfg, scenario.seed * 1000 + i * 10 + 3) { NoiseEnabled = noise };
                 rig.imu.Reset(rig.robot.Body.position, rig.robot.Body.rotation);
@@ -125,6 +142,7 @@ namespace SmokeRescue.Recording
                     rig.brain = new RobotBrain(sensorCfg, BrainConfig.Load(), spec.id, scenario.seed * 1000 + i * 10 + 6, entry);
                     if (scenario.search_area != null)
                         rig.brain.SearchArea = Rect.MinMaxRect(scenario.search_area[0], scenario.search_area[1], scenario.search_area[2], scenario.search_area[3]);
+                    rig.brain.AgentConfirms = AgentUrl != null;
                     var r0 = rig;
                     rig.robot.Driver.Command = () => (r0.command.forwardMps, -r0.command.yawRateDeg, r0.missionDone);
                 }
@@ -178,6 +196,14 @@ namespace SmokeRescue.Recording
                         if (o.HasValue) rig.brain?.OnOdometry(o.Value);
                         if (o.HasValue)
                             rig.odomTxt.Append(ts).Append(' ').Append(F(o.Value.Vx)).Append(' ').Append(F(o.Value.Vy)).Append(' ').Append(F(o.Value.Wz)).Append('\n');
+                        var scan = rig.lidar?.Step(t, rig.robot.transform.position, rig.robot.transform.rotation);
+                        if (scan != null)
+                        {
+                            rig.lastScan = scan; rig.brain?.OnLidar(scan);
+                            rig.lidarTxt.Append(ts);
+                            foreach (float r in scan.RangesM) rig.lidarTxt.Append(' ').Append(Mathf.RoundToInt(r * 1000f));
+                            rig.lidarTxt.Append('\n');
+                        }
                     }
 
                 if (k % airEvery == 0)
@@ -214,6 +240,7 @@ namespace SmokeRescue.Recording
                             NoteAgentTrigger(rig, e);
                         }
                         if (k % stateEvery == 0) rig.brainState.Append(BrainStateLine(t, rig.brain.Snapshot())).Append('\n');
+                        if (k % (ClockHz * MapEveryS) == 0) WriteBrainMap(rig, t, pending);
                     }
 
                 if (k % brainEvery == 0 && AgentUrl != null) AgentDecisions(world, rigs, t, pending, sensorCfg, scenario, root);
@@ -284,6 +311,8 @@ namespace SmokeRescue.Recording
                 File.WriteAllText(Path.Combine(rig.dir, "associations.txt"), rig.assoc.ToString());
                 File.WriteAllText(Path.Combine(rig.dir, "imu.txt"), rig.imuTxt.ToString());
                 File.WriteAllText(Path.Combine(rig.dir, "odom.txt"), rig.odomTxt.ToString());
+                if (rig.lidarTxt != null) File.WriteAllText(Path.Combine(rig.dir, "lidar.txt"), rig.lidarTxt.ToString());
+                if (rig.brain != null) File.WriteAllText(Path.Combine(rig.dir, "brain_map.txt"), rig.mapTxt.ToString());
                 File.WriteAllText(Path.Combine(rig.dir, "camera.yaml"), CameraYaml(sensorCfg));
                 if (rig.thermal != null)
                 {
@@ -336,6 +365,7 @@ namespace SmokeRescue.Recording
                 ["noise"] = noise,
                 ["thermal"] = sensorCfg.thermal != null ? "thermal/<t>.png 16-bit kelvin x 10, 320x256, 15 Hz, see thermal.yaml" : null,
                 ["air_temperature"] = sensorCfg.air_temperature != null ? "air_temp.txt, 10 Hz, C" : null,
+                ["lidar"] = sensorCfg.lidar != null ? $"lidar.txt, planar 360 degree, {sensorCfg.lidar.beams} beams, {sensorCfg.lidar.rate_hz} Hz, {sensorCfg.lidar.mount.height_m} m up" : null,
                 ["fire"] = atmosphere.FireSpread != null ? $"spreading fire (config/fire.json), head start {atmosphere.FireSpread.HeadStart} s" : "static fires",
                 ["camera_mount"] = sensorCfg.camera.mount,
                 ["exposure"] = $"per-sensor deterministic auto exposure, target grey {RgbdCamera.TargetGrey * 255:0}, EV100 {RgbdCamera.ExposureMinEv} to {RgbdCamera.ExposureMaxEv}",
@@ -364,6 +394,26 @@ namespace SmokeRescue.Recording
                     rows.Add(new { u, v, z_m = Math.Round(z, 4), collider = hit.collider.name });
                 }
             File.WriteAllText(Path.Combine(root, "oracle", $"{robotId}_orientation_probe.json"), JsonConvert.SerializeObject(rows, Formatting.Indented));
+        }
+
+        const int MapEveryS = 5;
+        /// <summary>The brain's own occupancy grid every 5 s, for the watcher and the evaluator (not read by any robot).
+        /// EncodeArrayToPNG puts array row 0 at the bottom of the image, which is the grid's south edge, so north is up.</summary>
+        static void WriteBrainMap(RobotRig rig, double t, Queue<Task> pending)
+        {
+            var s = rig.brain.Snapshot();
+            var pixels = new byte[s.occupancy.Length];
+            for (int i = 0; i < pixels.Length; i++) pixels[i] = s.occupancy[i] == 255 ? (byte)0 : s.occupancy[i] == 1 ? (byte)255 : (byte)128;
+            string rel = $"brain_map/{Fmt(t)}.png", path = Path.Combine(rig.dir, rel); int size = s.gridSize;
+            Directory.CreateDirectory(Path.Combine(rig.dir, "brain_map"));
+            pending.Enqueue(Task.Run(() => File.WriteAllBytes(path, ImageConversion.EncodeArrayToPNG(pixels,
+                UnityEngine.Experimental.Rendering.GraphicsFormat.R8_UNorm, (uint)size, (uint)size))));
+            rig.mapTxt.Append(Fmt(t)).Append(' ').Append(F(s.pose.position.x)).Append(' ').Append(F(s.pose.position.y)).Append(' ')
+                .Append(F(s.pose.yawRad)).Append(' ').Append(rel).Append('\n');
+            // Also flush the brain logs, so a run without agents can be watched live and a crash keeps them.
+            File.WriteAllText(Path.Combine(rig.dir, "brain_map.txt"), rig.mapTxt.ToString());
+            File.WriteAllText(Path.Combine(rig.dir, "decisions.jsonl"), rig.decisions.ToString());
+            File.WriteAllText(Path.Combine(rig.dir, "brain_state.jsonl"), rig.brainState.ToString());
         }
 
         static string CameraYaml(SensorConfig c)

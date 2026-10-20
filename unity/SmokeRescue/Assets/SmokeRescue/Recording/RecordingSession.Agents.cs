@@ -29,10 +29,14 @@ namespace SmokeRescue.Recording
     {
         /// <summary>Agent server URL, for example http://localhost:8080. Null records without agents.</summary>
         public static string AgentUrl;
-        static readonly HttpClient Http = new HttpClient { Timeout = TimeSpan.FromSeconds(300) };
+        // The agent server bounds a step at about 75 s plus one 45 s call; past 120 s the reflex layer carries on alone.
+        static readonly HttpClient Http = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
         static readonly HashSet<string> AgentTriggers = new HashSet<string>
-            { "survivor_candidate", "sensor_switch", "avoid_fire", "retreat", "stuck" };   // collisions stay with the reflex layer
-        const double AgentPeriodS = 20, AgentMinGapS = 4, CommanderPeriodS = 30, OrderHoldS = 15;
+            { "survivor_candidate", "survivor_view_ready", "sensor_switch", "avoid_fire", "retreat", "stuck",
+              // The model chooses where to search next: ask it whenever an area is done or a route has failed.
+              "area_searched", "no_progress", "goal_blacklisted", "collision_hold" };
+        const double AgentPeriodS = 20, AgentMinGapS = 4, CommanderPeriodS = 30, OrderHoldS = 15, ExploreHoldS = 60;
+        const int FrontierOptions = 6;
 
         partial class RobotRig
         {
@@ -90,7 +94,8 @@ namespace SmokeRescue.Recording
         static void NoteAgentTrigger(RobotRig rig, Brain.BrainEvent e)
         {
             if (!AgentTriggers.Contains(e.kind)) return;
-            if (rig.trigger != null && rig.trigger.Value<string>("kind") == "survivor_candidate") return;   // keep the most important
+            string held = rig.trigger?.Value<string>("kind");
+            if ((held == "survivor_candidate" || held == "survivor_view_ready") && e.kind != "survivor_view_ready") return;   // keep the most important
             rig.trigger = JObject.FromObject(new { e.kind, e.reason, e.numbers });
         }
 
@@ -120,6 +125,12 @@ namespace SmokeRescue.Recording
                     ["inbox"] = new JArray(rig.inbox),
                     ["survivors"] = new JArray((s.confirmedSurvivors ?? new Vector2[0]).Select(p => new JArray(p.x, p.y))),
                     ["search_area"] = scenario.search_area != null ? new JArray(scenario.search_area) : null,
+                    ["frontiers"] = new JArray(rig.brain.FrontierOptions(t, FrontierOptions).Select(f => (object)new JObject
+                    {
+                        ["id"] = f.id, ["x"] = Math.Round(f.position.x, 2), ["y"] = Math.Round(f.position.y, 2),
+                        ["path_m"] = Math.Round(f.pathM, 1), ["unsearched_m2"] = Math.Round(f.unsearchedM2, 1), ["in_my_sector"] = f.inSector,
+                    })),
+                    ["lidar"] = LidarSummary(rig.lastScan),
                 };
                 rig.inbox.Clear();
                 var reply = Post($"/robot/{rig.robot.RobotId}/step", req);
@@ -153,6 +164,7 @@ namespace SmokeRescue.Recording
             switch (type)
             {
                 case "go_to": brain.AgentGoTo(P(), t, OrderHoldS, o.Value<string>("reason")); break;
+                case "explore_frontier": brain.AgentExplore(P(), t, ExploreHoldS, o.Value<string>("reason")); break;
                 case "confirm_survivor": brain.AgentConfirmSurvivor(P(), t, ev); break;
                 case "reject_candidate": brain.AgentRejectCandidate(P(), t, ev); break;
                 case "avoid_area": brain.AgentAvoidArea(P(), o.Value<float?>("radius_m") ?? 1.5f, t, o.Value<double?>("seconds") ?? 30, ev); break;
@@ -220,6 +232,24 @@ namespace SmokeRescue.Recording
                 }
                 if (sent) w.postOutbox.RemoveAt(i);
             }
+        }
+
+        /// <summary>Nearest LiDAR return in eight 45 degree sectors (bearing + right, 0 ahead), for the agent's context.</summary>
+        static JObject LidarSummary(LidarScan scan)
+        {
+            if (scan == null) return null;
+            var nearest = Enumerable.Repeat(float.PositiveInfinity, 8).ToArray(); int returns = 0;
+            for (int i = 0; i < scan.RangesM.Length; i++)
+            {
+                float r = scan.RangesM[i]; if (r <= 0) continue; returns++;
+                float bearingRight = -scan.Angle(i) * Mathf.Rad2Deg;
+                int sector = Mathf.RoundToInt(Mathf.Repeat(bearingRight, 360f) / 45f) % 8;
+                nearest[sector] = Mathf.Min(nearest[sector], r);
+            }
+            string[] names = { "ahead", "front_right", "right", "back_right", "behind", "back_left", "left", "front_left" };
+            var o = new JObject { ["t"] = Math.Round(scan.Timestamp, 2), ["return_share"] = Math.Round(returns / (double)scan.RangesM.Length, 2) };
+            for (int k = 0; k < 8; k++) o[names[k] + "_m"] = float.IsPositiveInfinity(nearest[k]) ? (JToken)null : Math.Round(nearest[k], 2);
+            return o;
         }
 
         static void FlushForAgent(RobotRig rig, Queue<Task> pending, SensorConfig cfg)

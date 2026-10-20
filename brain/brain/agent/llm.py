@@ -108,7 +108,8 @@ class AzureOpenAIBackend:
     """Azure OpenAI chat completions with tools. Credentials come from the environment or from
     ~/.config/smoke-rescue/azure.env (outside the repo, mode 600); they are never logged or written to traces."""
 
-    def __init__(self, deployment: str | None = None, reasoning_effort: str | None = None, timeout: float = 180.0):
+    def __init__(self, deployment: str | None = None, reasoning_effort: str | None = None, timeout: float = 45.0):
+        # 45 s per call: the recorder pauses the simulation while it waits, and a stuck call froze run v8 for minutes.
         env = {**_load_env_file(Path.home() / ".config" / "smoke-rescue" / "azure.env"), **os.environ}
         self.endpoint = env["AZURE_OPENAI_ENDPOINT"].rstrip("/")
         self.key = env["AZURE_OPENAI_API_KEY"]
@@ -128,7 +129,7 @@ class AzureOpenAIBackend:
                 body.pop("reasoning_effort")            # deployment does not take the parameter
                 continue
             if r.status_code in (429, 500, 502, 503) and attempt < 3:
-                time.sleep(float(r.headers.get("retry-after", 2 ** attempt)))
+                time.sleep(min(10.0, float(r.headers.get("retry-after", 2 ** attempt))))
                 continue
             break
         r.raise_for_status()

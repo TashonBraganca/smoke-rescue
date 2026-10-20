@@ -5,11 +5,16 @@ using UnityEngine;
 
 namespace SmokeRescue.Brain
 {
-    /// <summary>Sensor-only log-odds map and maximum observed surface temperature layer.</summary>
+    /// <summary>Sensor-only log-odds map and maximum observed surface temperature layer.
+    /// Two geometry layers: the depth camera (odds) and the planar LiDAR (lidarOdds). Navigation uses both: a cell is
+    /// occupied if either layer says so, because each sees obstacles the other misses (the LiDAR plane passes over low
+    /// debris; the camera on its mast cannot see the floor within about 2 m). "Observed" stays camera-only: it means
+    /// searched, since only the cameras can see a person, so frontiers and the shared explored mask follow the cameras
+    /// while the LiDAR makes the near field safe to drive.</summary>
     public sealed class OccupancyGrid
     {
         readonly BrainConfig c;
-        readonly float[] odds, heat, rise;
+        readonly float[] odds, lidarOdds, heat, rise;
         readonly double[] heatTime;
         readonly bool[] hits, frees, observed;
         readonly double[] localTime, ownHeatTime;
@@ -29,7 +34,7 @@ namespace SmokeRescue.Brain
             c = config; Size = Mathf.CeilToInt(c.grid_size_m / c.cell_m);
             Origin = c.fixed_grid_origin ? new Vector2(c.grid_origin_x_m, c.grid_origin_z_m) :
                 new Vector2(-Size * c.cell_m / 2, -Size * c.cell_m / 2);
-            odds = new float[Count]; heat = new float[Count]; rise = new float[Count]; heatTime = new double[Count];
+            odds = new float[Count]; lidarOdds = new float[Count]; heat = new float[Count]; rise = new float[Count]; heatTime = new double[Count];
             hits = new bool[Count]; frees = new bool[Count]; observed = new bool[Count];
             localTime = new double[Count]; peer = new byte[Count];
             ownHeat = new float[Count]; ownHeatTime = new double[Count];
@@ -42,17 +47,27 @@ namespace SmokeRescue.Brain
         }
         public Vector2 Centre(int index) => Origin + new Vector2(index % Size + .5f, index / Size + .5f) * CellM;
         public bool Inside(int x, int y) => x >= 0 && y >= 0 && x < Size && y < Size;
-        public byte OwnOccupancy(int index) => index < 0 || index >= Count ? (byte)0 :
-            odds[index] >= c.occupied_threshold ? (byte)255 : odds[index] <= c.free_threshold ? (byte)1 : (byte)0;
+        public byte OwnOccupancy(int index)
+        {
+            if (index < 0 || index >= Count) return 0;
+            if (odds[index] >= c.occupied_threshold || lidarOdds[index] >= c.occupied_threshold) return 255;
+            return odds[index] <= c.free_threshold || lidarOdds[index] <= c.free_threshold ? (byte)1 : (byte)0;
+        }
+        public byte LidarOccupancy(int i) => i < 0 || i >= Count ? (byte)0 :
+            lidarOdds[i] >= c.occupied_threshold ? (byte)255 : lidarOdds[i] <= c.free_threshold ? (byte)1 : (byte)0;
+        /// <summary>Seen by this robot's own cameras, which is what "searched" means.</summary>
         public bool OwnObserved(int i) => i >= 0 && i < Count && observed[i];
         public bool PeerExplored(int i) => i >= 0 && i < Count && peer[i] != 0;
+        /// <summary>No camera on the team has looked at this cell yet and it is not a known obstacle: a search target.</summary>
+        public bool Unsearched(int i) => i >= 0 && i < Count && !observed[i] && peer[i] == 0 && OwnOccupancy(i) != 255;
+        /// <summary>Own evidence first. A peer's map only fills cells this robot has no evidence for: the peer's walls
+        /// arrive at 20 cm resolution and carry its own drift, and letting them override cells this robot has seen
+        /// free closed 0.9 m doors, whose drivable gap is about 0.26 m.</summary>
         public byte Occupancy(int i)
         {
             if (i < 0 || i >= Count) return 0;
             byte own = OwnOccupancy(i);
-            if (own == 255) return own;
-            if (own == 1 && (peer[i] != 255 || time - localTime[i] <= c.peer_local_priority_s)) return own;
-            return peer[i] != 0 ? peer[i] : own;
+            return own != 0 ? own : peer[i];
         }
         public byte OccupancyAt(Vector2 p) => Occupancy(Cell(p));
         public float Heat(int i) => heat[i];
@@ -146,9 +161,6 @@ namespace SmokeRescue.Brain
                 if (t - heatTime[i] > c.heat_rise_memory_s) rise[i] = 0;
                 if (before != Dangerous(i)) changed = true;
             }
-            // Local free evidence can lose priority over a peer obstacle as it ages.
-            if (t > time) for (int i = 0; i < Count; i++)
-                if (peer[i] == 255 && time - localTime[i] <= c.peer_local_priority_s && t - localTime[i] > c.peer_local_priority_s) { changed = true; break; }
             time = t; localObservationTime = t; dirty |= changed;
         }
         public bool Dangerous(int i) => heat[i] >= c.fire_c ||
@@ -162,6 +174,22 @@ namespace SmokeRescue.Brain
                 int col = cell % Size + x, row = cell / Size + y;
                 if (Inside(col, row) && Vector2.Distance(Centre(row * Size + col), position) <= c.robot_radius_m)
                     ObserveFree(row * Size + col);
+            }
+        }
+        /// <summary>The robot stands here, so nothing solid can occupy its body. Cells inside the body radius that read
+        /// occupied (depth noise, smoke, an inferred contact strip after the robot moved) are reset to free; without this
+        /// a phantom cell under the robot blocks every heading and the robot never moves again.</summary>
+        public void ClearBody(Vector2 position, float radius)
+        {
+            int cell = Cell(position); if (cell < 0) return;
+            int r = Mathf.CeilToInt(radius / CellM);
+            for (int y = -r; y <= r; y++) for (int x = -r; x <= r; x++)
+            {
+                int col = cell % Size + x, row = cell / Size + y; if (!Inside(col, row)) continue;
+                int i = row * Size + col;
+                if ((odds[i] <= c.free_log_odds && lidarOdds[i] <= c.free_log_odds) || Vector2.Distance(Centre(i), position) > radius) continue;
+                odds[i] = Mathf.Min(odds[i], c.free_log_odds); lidarOdds[i] = Mathf.Min(lidarOdds[i], c.free_log_odds);
+                observed[i] = true; localTime[i] = localObservationTime; dirty = true;
             }
         }
         public void IntegrateDepth(RgbdFrame frame, SensorConfig s, BrainPose pose)
@@ -184,6 +212,51 @@ namespace SmokeRescue.Brain
             for (int i = 0; i < Count; i++)
                 if (hits[i]) ObserveOccupied(i); else if (frees[i] && frame.Timestamp >= localTime[i]) ObserveFree(i);
             localObservationTime = time;
+        }
+        /// <summary>One LiDAR sweep at its capture pose: free along each beam, occupied at its end. A beam with no
+        /// return carries no evidence, because smoke can swallow a pulse in front of a wall.</summary>
+        public void IntegrateLidar(LidarScan scan, BrainPose pose)
+        {
+            Array.Clear(hits, 0, Count); Array.Clear(frees, 0, Count);
+            Vector2 origin = pose.Transform(0, scan.MountForwardM);
+            int start = Cell(origin); if (start < 0) return;
+            for (int i = 0; i < scan.RangesM.Length; i++)
+            {
+                float r = scan.RangesM[i];
+                if (!(r >= scan.MinM) || r > scan.MaxM) continue;
+                float a = pose.yawRad + scan.Angle(i);
+                Ray(start, origin + new Vector2(-Mathf.Sin(a), Mathf.Cos(a)) * r, true);
+            }
+            // As for depth, a grazing beam through a wall cell cannot erase a hit from the same sweep.
+            for (int i = 0; i < Count; i++)
+            {
+                if (hits[i]) { lidarOdds[i] = Mathf.Min(c.log_odds_cap, Mathf.Max(0, lidarOdds[i]) + c.occupied_log_odds); dirty = true; }
+                else if (frees[i]) { lidarOdds[i] = Mathf.Max(-c.log_odds_cap, lidarOdds[i] + c.free_log_odds); dirty = true; }
+            }
+        }
+        /// <summary>Distance in metres from each cell of a square window to the nearest LiDAR-occupied cell, for scan
+        /// matching. Window cells are indexed [y * side + x] from (x0, y0); cells outside the grid count as empty.</summary>
+        internal float[] LidarDistanceWindow(int x0, int y0, int side)
+        {
+            var f = new float[side]; var d = new float[side]; var sites = new int[side]; var cuts = new float[side + 1];
+            var temp = new float[side * side]; var output = new float[side * side];
+            for (int y = 0; y < side; y++)
+            {
+                for (int x = 0; x < side; x++)
+                {
+                    int gx = x0 + x, gy = y0 + y;
+                    f[x] = Inside(gx, gy) && lidarOdds[gy * Size + gx] >= c.occupied_threshold ? 0 : 1e10f;
+                }
+                DistanceLine(f, d, sites, cuts);
+                for (int x = 0; x < side; x++) temp[y * side + x] = d[x];
+            }
+            for (int x = 0; x < side; x++)
+            {
+                for (int y = 0; y < side; y++) f[y] = temp[y * side + x];
+                DistanceLine(f, d, sites, cuts);
+                for (int y = 0; y < side; y++) output[y * side + x] = Mathf.Sqrt(d[y]) * CellM;
+            }
+            return output;
         }
         /// <summary>Returns body x right, y forward, z height above floor. Depth is optical z.</summary>
         public static Vector3 BackProject(float u, float v, float z, SensorConfig s)
@@ -212,8 +285,9 @@ namespace SmokeRescue.Brain
         internal void PrepareNavigation()
         {
             if (!dirty) return;
-            obstacleDistance = Distances(i => Occupancy(i) == 255);
-            fireDistance = Distances(Dangerous); dirty = false;
+            if (obstacleDistance == null) { obstacleDistance = new float[Count]; fireDistance = new float[Count]; }
+            Distances(i => Occupancy(i) == 255, obstacleDistance);
+            Distances(Dangerous, fireDistance); dirty = false;
         }
         internal bool Walkable(int i)
         {
@@ -222,6 +296,11 @@ namespace SmokeRescue.Brain
             float padding = CellM * .707107f;
             return obstacleDistance[i] > c.robot_radius_m + padding && fireDistance[i] > c.fire_clearance_m + padding;
         }
+        /// <summary>Free and wide enough for the body itself, without the planning margin. Used only to step out of a
+        /// spot that is tighter than the planning clearance; see GridPlanner.Lead.</summary>
+        internal bool Passable(int i) => i >= 0 && i < Count && Occupancy(i) == 1 &&
+            obstacleDistance[i] > c.robot_radius_m * .8f && fireDistance[i] > CellM;
+        internal float ObstacleDistance(int i) => i < 0 || i >= Count ? 0 : obstacleDistance[i];
         internal float Cost(int i)
         {
             float strength = Mathf.Clamp01((c.heat_cost_radius_m - fireDistance[i]) / (c.heat_cost_radius_m - c.fire_clearance_m));
@@ -238,10 +317,13 @@ namespace SmokeRescue.Brain
             var list = new List<Vector2>(); for (int i = 0; i < Count; i++) if (Dangerous(i)) list.Add(Centre(i)); return list.ToArray();
         }
         // Exact squared Euclidean distance transform, two one-dimensional passes, O(grid cells).
-        float[] Distances(Func<int, bool> source)
+        // Scratch buffers reused across calls: the map changes 25 times a second per robot, and fresh arrays each time
+        // (about 3 MB) kept the garbage collector busy enough to slow the whole recording.
+        float[] dtTemp, dtF, dtD, dtCuts; int[] dtSites;
+        void Distances(Func<int, bool> source, float[] output)
         {
-            var temp = new float[Count]; var output = new float[Count];
-            var f = new float[Size]; var d = new float[Size]; var sites = new int[Size]; var cuts = new float[Size + 1];
+            if (dtTemp == null) { dtTemp = new float[Count]; dtF = new float[Size]; dtD = new float[Size]; dtSites = new int[Size]; dtCuts = new float[Size + 1]; }
+            var temp = dtTemp; var f = dtF; var d = dtD; var sites = dtSites; var cuts = dtCuts;
             for (int y = 0; y < Size; y++)
             {
                 for (int x = 0; x < Size; x++) f[x] = source(y * Size + x) ? 0 : 1e10f;
@@ -254,7 +336,6 @@ namespace SmokeRescue.Brain
                 DistanceLine(f, d, sites, cuts);
                 for (int y = 0; y < Size; y++) output[y * Size + x] = Mathf.Sqrt(d[y]) * CellM;
             }
-            return output;
         }
         static void DistanceLine(float[] f, float[] d, int[] sites, float[] cuts)
         {

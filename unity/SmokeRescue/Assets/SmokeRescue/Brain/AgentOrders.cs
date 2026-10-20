@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace SmokeRescue.Brain
@@ -20,9 +21,35 @@ namespace SmokeRescue.Brain
         public void AgentGoTo(Vector2 target, double t, double holdS, string reason)
         {
             if (!InSearchArea(target)) { Emit(t, "agent_order", "Refused go_to outside the search area.", "x_m", target.x, "y_m", target.y); return; }
-            agentGoal = target; agentGoalUntil = t + holdS; agentGoalReason = reason ?? "";
+            agentGoal = target; agentGoalUntil = t + holdS; agentGoalReason = reason ?? ""; agentGoalIsFrontier = false;
             if (active == null) ClearPath();
             Emit(t, "agent_order", "go_to: " + agentGoalReason, "x_m", target.x, "y_m", target.y, "hold_s", holdS);
+        }
+
+        bool agentGoalIsFrontier;
+
+        /// <summary>The frontiers the agent chooses from: reachable, worth searching, not claimed by a partner, inside
+        /// the search area. Positions are the walkable cell the robot would drive to; path_m is the planned distance
+        /// including heat and wall costs; unsearched_m2 is the floor no camera on the team has seen near it.</summary>
+        public IReadOnlyList<BrainFrontier> FrontierOptions(double t, int max)
+        {
+            System.Func<Vector2, bool> excluded = p => ClaimBlocks(p, t) || GoalBlacklisted(p, t) || VisitedGoal(p, t) || !InSearchArea(p);
+            var list = new List<BrainFrontier>();
+            foreach (var f in planner.Frontiers(motion.Pose.position, excluded))
+            {
+                if (list.Count >= max) break;
+                list.Add(new BrainFrontier { id = list.Count, position = f.position, pathM = f.cost,
+                    unsearchedM2 = f.information * grid.CellM * grid.CellM, inSector = !sector.HasValue || sector.Value.Contains(f.position) });
+            }
+            return list;
+        }
+
+        /// <summary>Agent order: search this frontier next. It is driven like a go_to, and on arrival the robot sweeps
+        /// and marks it visited exactly as for a frontier it chose itself.</summary>
+        public void AgentExplore(Vector2 target, double t, double holdS, string reason)
+        {
+            AgentGoTo(target, t, holdS, "explore: " + (reason ?? ""));
+            agentGoalIsFrontier = agentGoal.HasValue;
         }
 
         public void AgentConfirmSurvivor(Vector2 p, double t, string evidence)

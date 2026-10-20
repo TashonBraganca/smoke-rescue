@@ -113,9 +113,26 @@ namespace SmokeRescue.Robots
             // Physical body: a capsule against walls and furniture. Used only when a brain drives the robot.
             int solid = (1 << LayerMask.NameToLayer("Walls")) | (1 << LayerMask.NameToLayer("Props"));
             robot.Driver.Blocked = xz => Physics.CheckCapsule(new Vector3(xz.x, 0.25f, xz.y), new Vector3(xz.x, 0.55f, xz.y), 0.22f, solid, QueryTriggerInteraction.Ignore);
+            robot.Driver.ContactNormal = xz => ContactNormal(xz, solid);
             robot.StoreMountRest();
             robot.ApplyPose();
             return robot;
+        }
+
+        /// <summary>Sum of directions from each overlapping collider's closest point to the body axis, in (x, z).</summary>
+        static Vector2 ContactNormal(Vector2 xz, int solid)
+        {
+            var centre = new Vector3(xz.x, 0.4f, xz.y); var sum = Vector2.zero;
+            foreach (var hit in Physics.OverlapCapsule(new Vector3(xz.x, 0.25f, xz.y), new Vector3(xz.x, 0.55f, xz.y), 0.22f, solid, QueryTriggerInteraction.Ignore))
+            {
+                bool convex = !(hit is MeshCollider mesh) || mesh.convex;
+                var closest = convex ? hit.ClosestPoint(centre) : hit.bounds.ClosestPoint(centre);
+                var away = new Vector2(centre.x - closest.x, centre.z - closest.z);
+                // Centre inside the collider: push out from its middle instead.
+                if (away.sqrMagnitude < 1e-8f) away = new Vector2(centre.x - hit.bounds.center.x, centre.z - hit.bounds.center.z);
+                if (away.sqrMagnitude > 1e-8f) sum += away.normalized;
+            }
+            return sum.sqrMagnitude > 1e-8f ? sum.normalized : Vector2.zero;
         }
 
         /// <summary>Downloaded quadruped model (set by the editor before robots are created). Null uses the placeholder box body.</summary>
