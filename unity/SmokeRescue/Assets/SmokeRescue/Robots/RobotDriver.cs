@@ -46,9 +46,18 @@ namespace SmokeRescue.Robots
         public float Speed { get; private set; }          // forward m/s
         public float YawRateDeg { get; private set; }     // deg/s
         public float Distance { get; private set; }       // metres travelled
-        public bool Finished => mode == Mode.Done;
+        public bool Finished => Command != null ? commandDone : mode == Mode.Done;
         public int TargetIndex => target;
         public float GaitPhase { get; private set; }      // radians, advances with distance
+        /// <summary>Autonomous mode: forward speed (m/s) and yaw rate (deg/s) from the robot's brain, read every step.
+        /// When set, the scripted route is ignored. The simulator still enforces the limits and stops the body at
+        /// walls and furniture (the brain cannot drive through them).</summary>
+        public System.Func<(float v, float wDeg, bool done)> Command { get; set; }
+        /// <summary>World-side collision test for a body position (x, z); set by Robot.</summary>
+        public System.Func<Vector2, bool> Blocked { get; set; }
+        /// <summary>Steps on which the body was stopped by a collision (scored, never shown to the brain).</summary>
+        public int CollisionSteps { get; private set; }
+        bool commandDone;
 
         Mode mode = Mode.Driving;
         int target;
@@ -90,10 +99,19 @@ namespace SmokeRescue.Robots
                 throw new System.InvalidOperationException($"{spec.id}: {spec.look_around_at.Count - lookIndices.Count} look_around_at point(s) are not on the route");
         }
 
+        /// <summary>Set while the arm works: the legs stand still and commands are ignored.</summary>
+        public bool HoldPosition { get; set; }
+
         public void Step(float dt)
         {
+            if (HoldPosition) { Speed = 0f; YawRateDeg = 0f; return; }
             float vCmd = 0f, wCmd = 0f;
-            switch (mode)
+            if (Command != null)
+            {
+                var c = Command();
+                (vCmd, wCmd, commandDone) = (c.v, c.wDeg, c.done);
+            }
+            else switch (mode)
             {
                 case Mode.Done:
                     break;
@@ -109,8 +127,15 @@ namespace SmokeRescue.Robots
             Speed = Mathf.Clamp(Mathf.Clamp(vCmd, Speed - dvMax, Speed + dvMax), -limits.maxReverse, limits.maxForward);
             YawRateDeg = Mathf.Clamp(wCmd, -limits.maxYawRateDeg, limits.maxYawRateDeg);
             YawDeg = Mathf.Repeat(YawDeg + YawRateDeg * dt, 360f);
-            Position += Forward * (Speed * dt);
-            Distance += Mathf.Abs(Speed * dt);
+            var next = Position + Forward * (Speed * dt);
+            if (Blocked != null && Mathf.Abs(Speed) > 1e-4f && Blocked(next))
+            {
+                Speed = 0f;              // the body hits the obstacle and stops; turning in place stays possible
+                CollisionSteps++;
+                next = Position;
+            }
+            Distance += Vector2.Distance(Position, next);
+            Position = next;
             GaitPhase = Distance / StrideLength * 2f * Mathf.PI + Mathf.Abs(YawRateDeg) * 0.004f;
         }
 

@@ -4,8 +4,8 @@
     "robot_A": {
       "frames": 1028,
       "median": 1072.0,
-      "p5": 639.7,
-      "min": 85,
+      "p5": 623.35,
+      "min": 84,
       "low_stretches_s": [
         [
           35.733333,
@@ -16,11 +16,16 @@
     },
     "robot_B": {
       "frames": 1028,
-      "median": 1187.0,
-      "p5": 676.7,
-      "min": 283,
-      "low_stretches_s": [],
-      "pass": true
+      "median": 1189.0,
+      "p5": 603.7,
+      "min": 133,
+      "low_stretches_s": [
+        [
+          50.933333,
+          51.066667
+        ]
+      ],
+      "pass": false
     }
   },
   "pass": false

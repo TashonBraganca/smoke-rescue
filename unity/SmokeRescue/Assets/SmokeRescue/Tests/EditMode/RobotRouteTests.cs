@@ -76,7 +76,9 @@ namespace SmokeRescue.Tests.EditMode
                             closest = Mathf.Min(closest, Vector3.Distance(col.ClosestPoint(c + Vector3.up * 0.3f), c + Vector3.up * 0.3f));
                     }
                     report.Add($"{spec.id}: finished={robot.Driver.Finished} t={t:0.0}s dist={robot.Driver.Distance:0.0}m " +
-                               $"maxV={maxV:0.000} maxW={maxW:0.0}deg/s maxA={maxA:0.00} bob={maxBob * 100:0.00}cm clearance={closest:0.000}m hits=[{string.Join(",", hits)}]");
+                               $"maxV={maxV:0.000} maxW={maxW:0.0}deg/s maxA={maxA:0.00} bob={maxBob * 100:0.00}cm clearance={closest:0.000}m hits=[{string.Join(",", hits)}] " +
+                               $"at=({robot.Driver.Position.x:0.00},{robot.Driver.Position.y:0.00}) target={robot.Driver.TargetIndex} " +
+                               $"blocked={robot.Driver.CollisionSteps * Dt:0.0}s");
                     Assert.IsTrue(robot.Driver.Finished, $"{spec.id} did not finish its route: {report.Last()}");
                     Assert.LessOrEqual(t, scenario.duration_s, $"{spec.id} route longer than the scenario: {report.Last()}");
                     Assert.LessOrEqual(maxV, limits.maxForward + 1e-4f, report.Last());

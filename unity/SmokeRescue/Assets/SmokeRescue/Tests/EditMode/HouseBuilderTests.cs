@@ -95,7 +95,10 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(wallObjs.All(c => c.gameObject.layer == walls));
             float floorArea = house.transform.Find("Floors").GetComponentsInChildren<MeshFilter>()
                 .Sum(m => m.sharedMesh.bounds.size.x * m.sharedMesh.bounds.size.z);
-            Assert.AreEqual(280f, floorArea, 0.01f);
+            // Floors must tile the footprint exactly: no gaps, no overlaps (1120 m2 for the 2x2 building).
+            var f = plan.footprint;
+            Assert.AreEqual((f[2] - f[0]) * (f[3] - f[1]), floorArea, 0.01f);
+            Assert.AreEqual(plan.rooms.Sum(r => r.Rect.width * r.Rect.height), floorArea, 0.01f);
         }
 
         static string Fingerprint(GameObject root)

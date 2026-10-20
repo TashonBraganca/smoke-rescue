@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smoke Rescue</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <h1>Smoke Rescue</h1>
+  <p>Autonomous robots search a smoke-filled house. Each robot reasons with an Amazon Bedrock model and calls deterministic OpenCV 5 vision tools. This page talks to the agent service running on AWS Fargate.</p>
+
+  <section>
+    <h2>Agent service</h2>
+    <dl id="health"><dt>Status</dt><dd id="status">checking</dd><dt>Backend</dt><dd id="backend">unknown</dd><dt>Model</dt><dd id="model">unknown</dd></dl>
+  </section>
+
+  <section>
+    <h2>Try a frame</h2>
+    <form id="try">
+      <label>Tool <input id="tool" value="assess_visibility" required pattern="[a-z_]+"></label>
+      <label>Image <input id="file" type="file" accept="image/png,image/jpeg" required></label>
+      <button type="submit">Send</button>
+    </form>
+    <pre id="out" aria-live="polite"></pre>
+  </section>
+
+  <p class="small">Calls go to <code>/api/*</code> on this same address. Request volume is rate limited.</p>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

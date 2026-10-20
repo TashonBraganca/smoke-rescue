@@ -1,0 +1,7 @@
+*
+!brain/pyproject.toml
+!brain/uv.lock
+!brain/README.md
+!brain/brain/
+!deploy/aws/batch/pipeline_entrypoint.sh
+**/__pycache__

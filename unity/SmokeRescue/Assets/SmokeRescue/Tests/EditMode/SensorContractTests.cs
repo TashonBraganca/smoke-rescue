@@ -46,6 +46,34 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(pitch.AngularRate.x, Is.EqualTo(-1).Within(0.01));
         }
         [Test]
+        public void GyroIntegratesTurnsAccuratelyAtTheRecorderTickRate()
+        {
+            // As in the recorder: 600 Hz steps, the robot root turns and the IMU reads the Body child's world rotation
+            // (gait roll sway on the child). Slow turns matter most: per-tick angles near 0.02 deg were lost entirely.
+            var sensor = new ImuSensor(Config(), 9) { NoiseEnabled = false };
+            var root = new GameObject("ImuTestRoot"); var body = new GameObject("Body").transform;
+            body.SetParent(root.transform, false);
+            try
+            {
+                const float dt = 1f / 600f;
+                float heading = 270f, integrated = 0f, expected = 0f;
+                root.transform.rotation = Quaternion.Euler(0, heading, 0);
+                sensor.Reset(Vector3.zero, body.rotation);
+                for (int k = 1; k <= 9000; k++)
+                {
+                    float t = k * dt, rate = t <= 5f ? 12f : t <= 10f ? -30f : 6f;
+                    heading += rate * dt; expected += rate * dt;
+                    root.transform.rotation = Quaternion.Euler(0, heading, 0);
+                    body.localRotation = Quaternion.Euler(0, 0, 1.5f * Mathf.Sin(2 * Mathf.PI * 2.2f * t));
+                    var s = sensor.Step(t, Vector3.zero, body.rotation, dt);
+                    if (s.HasValue) integrated += s.Value.AngularRate.y * Mathf.Rad2Deg / 200f;   // body y is down: right-positive yaw
+                }
+                Assert.That(integrated, Is.EqualTo(expected).Within(0.5f), "gyro heading change in degrees");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(root); }
+        }
+
+        [Test]
         public void ImuRotatesGravityIntoTiltedBodyAndMeasuresAcceleration()
         {
             var sensor = new ImuSensor(Config(), 9) { NoiseEnabled = false };

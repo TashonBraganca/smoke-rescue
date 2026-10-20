@@ -1,4 +1,5 @@
 using SmokeRescue.Recording;
+using SmokeRescue.World;
 using UnityEditor;
 using UnityEngine;
 
@@ -24,9 +25,20 @@ namespace SmokeRescue.Editor
         [MenuItem("Tools/Smoke Rescue/Record/Haze full run")]
         public static void HazeFull() => Run("scenario_haze_2agents.json", "unity_haze");
 
+        // Autonomous robots sharing maps in the 2x2 building; new run ids so earlier recordings stay intact.
+        [MenuItem("Tools/Smoke Rescue/Record/Haze autonomous 20 s test")]
+        public static void HazeAutoTest() => Run("scenario_haze_2agents.json", "unity_haze_auto_test20", 20f);
+
+        [MenuItem("Tools/Smoke Rescue/Record/Haze autonomous full run")]
+        public static void HazeAutoFull() => Run("scenario_haze_2agents.json", "unity_haze_auto_v1");
+
         static void Run(string scenario, string runId, float maxSeconds = float.PositiveInfinity, bool noise = true)
         {
             SmokeRescue.Robots.Robot.BodyPrefab = UseQuadruped ? FurnitureBuilder.RobotBodyPrefab() : null;
+            var sc = Scenario.Load(scenario);
+            FurnitureBuilder.PlaceScenarioObstacles(sc);
+            ScenePreview.PlaceSurvivors(sc);
+            ThermalPreview.TagSurvivors();
             var r = RecordingSession.Record(scenario, runId, maxSeconds, noise, msg => Debug.Log($"[SmokeRescue] {runId} {msg}"));
             Debug.Log($"[SmokeRescue] Recording done: {r.dir}");
         }

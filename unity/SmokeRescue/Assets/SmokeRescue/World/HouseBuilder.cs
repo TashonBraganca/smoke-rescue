@@ -126,12 +126,18 @@ namespace SmokeRescue.World
             foreach (var line in WallLines(plan, fp))
             {
                 var cuts = DoorCuts(plan, line.alongX, line.at, line.a, line.b);
+                var wins = WindowCuts(plan, fp, line.alongX, line.at, line.a, line.b);
                 string id = $"{(line.alongX ? "Z" : "X")}{line.at:0.00}";
                 int k = 0;
-                foreach (var (a, b) in Subtract((line.a, line.b), cuts))
+                foreach (var (a, b) in Subtract((line.a, line.b), cuts.Concat(wins).OrderBy(c => c.Item1).ToList()))
                     WallBox(parent, $"Wall_{id}_{k++}", line, a, b, 0f, H, mat, layer);
                 foreach (var (a, b) in cuts)
                     WallBox(parent, $"Lintel_{id}_{k++}", line, a, b, D, H, mat, layer);
+                foreach (var (a, b) in wins)
+                {
+                    WallBox(parent, $"Sill_{id}_{k++}", line, a, b, 0f, WindowSill, mat, layer);
+                    WallBox(parent, $"WindowHead_{id}_{k++}", line, a, b, WindowSill + WindowHeight, H, mat, layer);
+                }
             }
         }
 
@@ -183,11 +189,17 @@ namespace SmokeRescue.World
                 float a = a0 + T(!alongX, a0) / 2, b = b0 - T(!alongX, b0) / 2;
                 float plane = at + (alongX ? n.z : n.x) * (t / 2 + SkinOffset);
                 var cuts = DoorCuts(plan, alongX, at, a0, b0);
+                var wins = WindowCuts(plan, fp, alongX, at, a0, b0);
                 int k = 0;
-                foreach (var (sa, sb) in Subtract((a, b), cuts))
+                foreach (var (sa, sb) in Subtract((a, b), cuts.Concat(wins).OrderBy(c => c.Item1).ToList()))
                     Skin(parent, $"Finish_{room.id}_{side}_{k++}", alongX, plane, sa, sb, 0f, H, n, mat);
                 foreach (var (sa, sb) in cuts)
                     Skin(parent, $"Finish_{room.id}_{side}_{k++}", alongX, plane, sa, sb, D, H, n, mat);
+                foreach (var (sa, sb) in wins)
+                {
+                    Skin(parent, $"Finish_{room.id}_{side}_{k++}", alongX, plane, sa, sb, 0f, WindowSill, n, mat);
+                    Skin(parent, $"Finish_{room.id}_{side}_{k++}", alongX, plane, sa, sb, WindowSill + WindowHeight, H, n, mat);
+                }
             }
         }
 
@@ -256,14 +268,21 @@ namespace SmokeRescue.World
 
         // ------------------------------------------------------------------ windows
 
+        public const float WindowWidth = 1.2f, WindowHeight = 1.3f, WindowSill = 0.85f;
+        /// <summary>Rooms where the fire starts: their windows have burst, the way fire vents through windows.</summary>
+        static readonly HashSet<string> BrokenWindowRooms = new HashSet<string> { "living", "kitchen" };
+
+        public struct WindowSpan { public bool alongX; public float at, pos; public Vector3 inward; public string room; }
+
         /// <summary>
-        /// One covered window per exterior wall of each room (SIMULATION_SPEC 3.2: windows exist but show night).
-        /// Frame and dark glass sit on the inside face; walls stay solid. Positions avoid doors (0.8 m) and landmarks (1.2 m).
+        /// One real window opening per exterior wall of each room longer than 2.2 m, at the first clear spot from the
+        /// centre: at least 0.8 m from any door and 1.2 m from any landmark. Walls and wall finishes leave the opening
+        /// open (sill below, head above), so robots and cameras see through it to the night outside.
         /// </summary>
-        static void BuildWindows(FloorPlan plan, Rect fp, GameObject parent, Material trim, Material glass)
+        public static List<WindowSpan> WindowSpans(FloorPlan plan, Rect fp)
         {
-            const float w = 1.0f, h = 1.2f, sill = 0.9f, frame = 0.06f;
-            int props = LayerMask.NameToLayer(PropsLayer);
+            var list = new List<WindowSpan>();
+            const float w = WindowWidth;
             foreach (var room in plan.rooms)
             {
                 Rect r = room.Rect;
@@ -276,8 +295,6 @@ namespace SmokeRescue.World
                 {
                     bool exterior = alongX ? (Near(at, fp.yMin) || Near(at, fp.yMax)) : (Near(at, fp.xMin) || Near(at, fp.xMax));
                     if (!exterior || b - a < 2.2f) continue;
-                    float plane = at + (alongX ? n.z : n.x) * (plan.exterior_wall_thickness / 2 + 0.004f);
-                    // Candidate positions along the wall, centre first; take the first clear one.
                     float mid = (a + b) / 2;
                     foreach (var pos in new[] { mid, mid - 1.2f, mid + 1.2f, mid - 2.2f, mid + 2.2f })
                     {
@@ -285,19 +302,70 @@ namespace SmokeRescue.World
                         Vector2 p2 = alongX ? new Vector2(pos, at) : new Vector2(at, pos);
                         if (plan.doors.Any(d => Vector2.Distance(new Vector2(d.at[0], d.at[1]), p2) < w / 2 + d.width / 2 + 0.8f)) continue;
                         if (plan.landmarks.Any(l => Vector2.Distance(new Vector2(l.at[0], l.at[1]), p2) < 1.2f)) continue;
-                        var win = Child(parent, $"Window_{room.id}_{(alongX ? "Z" : "X")}{at:0}");
-                        Vector3 C(float along, float y, float off) => alongX ? new Vector3(along, y, plane + n.z * off) : new Vector3(plane + n.x * off, y, along);
-                        Vector3 Sz(float along, float y, float depth) => alongX ? new Vector3(along, y, depth) : new Vector3(depth, y, along);
-                        AddQuad(win, "Glass", C(pos, sill + h / 2, 0.002f), n, w, h, glass);
-                        AddBox(win, "FrameTop", C(pos, sill + h + frame / 2, 0.02f), Sz(w + 2 * frame, frame, 0.04f), trim, collider: false);
-                        AddBox(win, "FrameSill", C(pos, sill - frame / 2, 0.03f), Sz(w + 2 * frame, frame, 0.06f), trim, collider: false);
-                        AddBox(win, "FrameL", C(pos - w / 2 - frame / 2, sill + h / 2, 0.02f), Sz(frame, h, 0.04f), trim, collider: false);
-                        AddBox(win, "FrameR", C(pos + w / 2 + frame / 2, sill + h / 2, 0.02f), Sz(frame, h, 0.04f), trim, collider: false);
-                        AddBox(win, "Mullion", C(pos, sill + h / 2, 0.015f), Sz(0.03f, h, 0.02f), trim, collider: false);
-                        foreach (var t in win.GetComponentsInChildren<Transform>()) t.gameObject.layer = props;
+                        list.Add(new WindowSpan { alongX = alongX, at = at, pos = pos, inward = n, room = room.id });
                         break;
                     }
                 }
+            }
+            return list;
+        }
+
+        static List<(float, float)> WindowCuts(FloorPlan plan, Rect fp, bool alongX, float at, float a, float b)
+        {
+            var cuts = new List<(float, float)>();
+            foreach (var win in WindowSpans(plan, fp))
+                if (win.alongX == alongX && Near(win.at, at) && win.pos >= a - Eps && win.pos <= b + Eps)
+                    cuts.Add((win.pos - WindowWidth / 2, win.pos + WindowWidth / 2));
+            cuts.Sort();
+            return cuts;
+        }
+
+        /// <summary>Frame, mullion and glass in each opening. Windows of the rooms where the fire starts are broken:
+        /// no pane, a few jagged shards left in the frame, soot streaks above the opening outside.</summary>
+        static void BuildWindows(FloorPlan plan, Rect fp, GameObject parent, Material trim, Material glass)
+        {
+            const float w = WindowWidth, h = WindowHeight, sill = WindowSill, frame = 0.06f;
+            int props = LayerMask.NameToLayer(PropsLayer);
+            foreach (var span in WindowSpans(plan, fp))
+            {
+                var line = WallLines(plan, fp).First(l => l.alongX == span.alongX && Near(l.at, span.at) && span.pos >= l.a - Eps && span.pos <= l.b + Eps);
+                bool alongX = span.alongX;
+                float pos = span.pos, depth = line.thickness + 0.02f;
+                var win = Child(parent, $"Window_{span.room}_{(alongX ? "Z" : "X")}{span.at:0}");
+                Vector3 C(float along, float y, float off = 0f) => alongX ? new Vector3(along, y, line.centre + off) : new Vector3(line.centre + off, y, along);
+                Vector3 Sz(float along, float y, float d) => alongX ? new Vector3(along, y, d) : new Vector3(d, y, along);
+                AddBox(win, "FrameTop", C(pos, sill + h - frame / 2), Sz(w, frame, depth), trim, collider: false);
+                AddBox(win, "FrameSill", C(pos, sill + frame / 2), Sz(w + 0.08f, frame, depth + 0.06f), trim, collider: true);
+                AddBox(win, "FrameL", C(pos - w / 2 + frame / 2, sill + h / 2), Sz(frame, h, depth), trim, collider: false);
+                AddBox(win, "FrameR", C(pos + w / 2 - frame / 2, sill + h / 2), Sz(frame, h, depth), trim, collider: false);
+                AddBox(win, "Mullion", C(pos, sill + h / 2), Sz(0.04f, h - 2 * frame, 0.05f), trim, collider: false);
+                AddBox(win, "Transom", C(pos, sill + h * 0.62f), Sz(w - 2 * frame, 0.04f, 0.05f), trim, collider: false);
+                if (!BrokenWindowRooms.Contains(span.room))
+                {
+                    foreach (var side in new[] { -1f, 1f })
+                        AddQuad(win, "Glass", C(pos, sill + h / 2, side * 0.004f), side * (alongX ? Vector3.forward : Vector3.right), w - 2 * frame, h - 2 * frame, glass);
+                }
+                else
+                {
+                    // Shards: small jagged triangles of glass stuck in two corners.
+                    var rng = new System.Random(span.room.GetHashCode());
+                    for (int k = 0; k < 3; k++)
+                    {
+                        float u = k == 0 ? -w / 2 + frame : k == 1 ? w / 2 - frame : -w / 2 + frame;
+                        float v = k == 2 ? sill + h - frame : sill + frame;
+                        float du = (k == 1 ? -1f : 1f) * (0.12f + 0.1f * (float)rng.NextDouble());
+                        float dv = (k == 2 ? -1f : 1f) * (0.15f + 0.15f * (float)rng.NextDouble());
+                        var shard = new GameObject("Shard");
+                        shard.transform.SetParent(win.transform, false);
+                        var mesh = new Mesh { name = "Shard" };
+                        mesh.vertices = new[] { C(pos + u, v), C(pos + u + du, v), C(pos + u, v + dv) };
+                        mesh.triangles = new[] { 0, 1, 2, 0, 2, 1 };
+                        mesh.RecalculateNormals();
+                        shard.AddComponent<MeshFilter>().sharedMesh = mesh;
+                        shard.AddComponent<MeshRenderer>().sharedMaterial = glass;
+                    }
+                }
+                foreach (var t in win.GetComponentsInChildren<Transform>()) t.gameObject.layer = props;
             }
         }
 
@@ -305,10 +373,13 @@ namespace SmokeRescue.World
         static Material GlassMaterial()
         {
             if (glassMat != null) return glassMat;
-            glassMat = new Material(Shader.Find("HDRP/Lit")) { name = "NightGlass" };
-            glassMat.SetColor("_BaseColor", new Color(0.015f, 0.02f, 0.03f));
-            glassMat.SetFloat("_Smoothness", 0.95f);
+            glassMat = new Material(Shader.Find("HDRP/Lit")) { name = "WindowGlass" };
+            glassMat.SetFloat("_SurfaceType", 1f);          // transparent
+            glassMat.SetFloat("_BlendMode", 0f);            // alpha
+            glassMat.SetColor("_BaseColor", new Color(0.55f, 0.6f, 0.62f, 0.18f));
+            glassMat.SetFloat("_Smoothness", 0.96f);
             glassMat.SetFloat("_Metallic", 0f);
+            glassMat.SetFloat("_DoubleSidedEnable", 1f);
             HDMaterial.ValidateMaterial(glassMat);
             return glassMat;
         }

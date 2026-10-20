@@ -163,7 +163,10 @@ namespace SmokeRescue.World
             // (heat field, flame bodies) and what the air-temperature sensors read.
             if (scenario.fire != null && scenario.fire.spread)
             {
-                var spread = new FireSimHeat(plan, scenario.seed, scenario.fire.head_start_s);
+                // The fire sees this run's obstacles as fuel too (burning wood piles in the hallway).
+                var firePlan = FloorPlan.Load();     // a fresh copy, so the shared plan keeps only the house
+                if (scenario.obstacles != null) firePlan.landmarks.AddRange(scenario.obstacles);
+                var spread = new FireSimHeat(firePlan, scenario.seed, scenario.fire.head_start_s);
                 a.fireSim = spread;
                 a.thermal = new ThermalField(plan, spread);
                 a.field.Override = spread.SmokeDensity;

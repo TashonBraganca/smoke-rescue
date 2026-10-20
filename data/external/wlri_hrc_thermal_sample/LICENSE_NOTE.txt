@@ -1,0 +1,5 @@
+Dataset: WLRI-HRC (Suem e et al.), Zenodo record 14228565, DOI 10.5281/zenodo.14228565
+Zenodo license field: cc-by-4.0 (full text in LICENSE_CC-BY-4.0.txt)
+Author usage note quoted from the Zenodo description: "You may use this data for scientific, non-commercial purposes, provided that you give credit to the owners when publishing any work based on this data."
+Read 2026-10-20.
+Cite: Sume, S., Ponomarjova, K.-M., Wendt, T. M., Rupitsch, S. J. (2025) J. Sens. Sens. Syst. 14, 37-46, doi:10.5194/jsss-14-37-2025
