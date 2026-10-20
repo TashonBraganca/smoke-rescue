@@ -85,7 +85,6 @@ class AgentContext:
     x: float                      # building frame, metres (x right, y = Unity z)
     y: float
     heading_deg: float            # right-positive, 0 faces +y
-    search_area: tuple[float, float, float, float] | None = None
     event_kind: str = ""
     torch: str = "wide"
     frame_times: list[float] = field(default_factory=list)   # recent thermal stamps, oldest first
@@ -180,10 +179,6 @@ class ToolRegistry:
     def _near(self, ev: dict, args: dict, tol: float = 1.0) -> bool:
         return ev.get("x") is None or math.hypot(ev["x"] - float(args["x"]), ev["y"] - float(args["y"])) <= tol
 
-    def _in_area(self, x: float, y: float) -> bool:
-        a = self.ctx.search_area
-        return a is None or (a[0] <= x <= a[2] and a[1] <= y <= a[3])
-
     def _action(self, name: str, args: dict) -> dict:
         refusal = None
         if name == "confirm_survivor":
@@ -211,9 +206,8 @@ class ToolRegistry:
             else:
                 args = {**args, "x": float(match[0]["x"]), "y": float(match[0]["y"])}
         elif name == "go_to":
-            if not self._in_area(float(args["x"]), float(args["y"])):
-                refusal = {"refused": True, "reason": "target is outside the search area"}
-            elif self.ctx.event_kind in ("avoid_fire", "retreat"):
+            # No outline exists (no prior knowledge); the brain refuses targets not known to be indoors.
+            if self.ctx.event_kind in ("avoid_fire", "retreat"):
                 refusal = {"refused": True, "reason": "no go_to during a heat event: use track_fire_spread and avoid_area, "
                            "and let the reflex layer back away"}
         elif name == "approach_candidate":
