@@ -285,9 +285,7 @@ namespace SmokeRescue.Brain
                 if (path.Count == 0 || blocked)
                 {
                     System.Func<Vector2, bool> excluded = p => ClaimBlocks(p, t) || GoalBlacklisted(p, t) || VisitedGoal(p, t) || !InSearchArea(p);
-                    // The commander's sector first; anywhere in the building once the sector has no reachable frontier.
-                    var frontier = sector.HasValue ? planner.Frontier(motion.Pose.position, p => excluded(p) || !sector.Value.Contains(p)) : null;
-                    if (frontier == null) frontier = planner.Frontier(motion.Pose.position, excluded);
+                    var frontier = planner.Frontier(motion.Pose.position, excluded);
                     lastPlan = t;
                     if (frontier != null)
                     {
@@ -702,6 +700,8 @@ namespace SmokeRescue.Brain
         /// <summary>Where this robot may search. With search_requires_ceiling, only floor its own camera has seen a
         /// ceiling over (OccupancyGrid.Indoors): no building outline, floor plan or operator map is given to any robot.</summary>
         public bool InSearchArea(Vector2 p) => !c.search_requires_ceiling || grid.Indoors(p);
+        /// <summary>The indoor layer (OccupancyGrid.CopyIndoors), written beside each map snapshot.</summary>
+        public byte[] IndoorMask() => grid.CopyIndoors();
         /// <summary>Set when an agent layer is running: survivors are then confirmed only by the agent's OpenCV-backed
         /// decision, never by the reflex dwell alone.</summary>
         public bool AgentConfirms { get; set; }

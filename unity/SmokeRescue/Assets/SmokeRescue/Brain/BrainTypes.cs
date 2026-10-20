@@ -53,7 +53,6 @@ namespace SmokeRescue.Brain
         public int id;
         public Vector2 position;
         public float pathM, unsearchedM2;
-        public bool inSector;
     }
     public readonly struct PersonDetection
     {
