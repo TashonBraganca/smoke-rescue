@@ -186,8 +186,8 @@ namespace SmokeRescue.Brain
                 foreach (var track in tracks)
                 {
                     if (!track.candidate || track.confirmed || track.retryAfter > t || GoalBlacklisted(track.position, t) || t - track.lastSeen > c.survivor_fresh_s) continue;
-                    // Blobs on the exterior wall plane are windows: warm air behind a broken pane, not a person inside.
-                    if (!InSearchArea(track.position, ExteriorWallInsetM)) continue;
+                    // A warm shape outside the ceilinged floor is beyond a window or door: not a person inside.
+                    if (!InSearchArea(track.position)) continue;
                     float range = Vector2.Distance(track.position, motion.Pose.position);
                     if (range < best) { best = range; active = track; }
                 }
@@ -327,7 +327,9 @@ namespace SmokeRescue.Brain
                     matched++; fitSum += match.fit; correctionSum += new Vector3(match.dx, match.dy, match.dyawRad * Mathf.Rad2Deg);
                 }
                 else unmatched++;
-                grid.IntegrateLidar(scan, motion.At(scan.Timestamp));
+                var integrated = motion.At(scan.Timestamp);
+                grid.IntegrateLidar(scan, integrated);
+                KeepKeyframe(scan, integrated, t);
                 lastLidar = scan.Timestamp;
             }
             if (t >= nextLocalizationReport && matched + unmatched > 0)
@@ -662,17 +664,12 @@ namespace SmokeRescue.Brain
             var result = new List<BrainEvent>(); foreach (var item in indexed) result.Add(item.value); events.Clear();
             return result.AsReadOnly();
         }
-        /// <summary>Operator-supplied building outline in building coordinates (x_min, y_min, x_max, y_max), like the entry
-        /// pose: an incident commander sees the outline from outside. Frontiers outside it are never goals, so a robot
-        /// standing at its door explores the building rather than the yard. Null searches everywhere.</summary>
-        public Rect? SearchArea { get; set; }
+        /// <summary>Where this robot may search. With search_requires_ceiling, only floor its own camera has seen a
+        /// ceiling over (OccupancyGrid.Indoors): no building outline, floor plan or operator map is given to any robot.</summary>
+        public bool InSearchArea(Vector2 p) => !c.search_requires_ceiling || grid.Indoors(p);
         /// <summary>Set when an agent layer is running: survivors are then confirmed only by the agent's OpenCV-backed
         /// decision, never by the reflex dwell alone.</summary>
         public bool AgentConfirms { get; set; }
-        public bool InSearchArea(Vector2 p, float insetM = 0f) => !SearchArea.HasValue ||
-            Rect.MinMaxRect(SearchArea.Value.xMin + insetM, SearchArea.Value.yMin + insetM,
-                            SearchArea.Value.xMax - insetM, SearchArea.Value.yMax - insetM).Contains(p);
-        const float ExteriorWallInsetM = 0.3f;   // exterior walls are 0.25 m thick
 
         public BrainSnapshot Snapshot() => new BrainSnapshot
         {

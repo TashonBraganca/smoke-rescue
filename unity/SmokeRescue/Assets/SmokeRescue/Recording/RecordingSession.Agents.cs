@@ -70,7 +70,7 @@ namespace SmokeRescue.Recording
             var obstacles = GameObject.Find("Obstacles");
             if (obstacles != null) w.obstacles = new ObstacleRuntime(obstacles.transform);
             foreach (var rig in rigs) rig.actions = new RobotActions(rig.robot, w.doors, w.obstacles);
-            var at = scenario.robots[0].spawn.at;    // the incident commander stands at the first entry
+            var at = scenario.robots[0].spawn.at;    // world side only: where the commander's radio stands, outside the first entry
             w.post = new Vector3(at[0], 0f, at[1] - 2f);
             return w;
         }
@@ -124,13 +124,14 @@ namespace SmokeRescue.Recording
                     ["frame_times"] = new JArray(rig.thermalTimes.Skip(Math.Max(0, rig.thermalTimes.Count - 45)).Select(x => (object)x)),
                     ["inbox"] = new JArray(rig.inbox),
                     ["survivors"] = new JArray((s.confirmedSurvivors ?? new Vector2[0]).Select(p => new JArray(p.x, p.y))),
-                    ["search_area"] = scenario.search_area != null ? new JArray(scenario.search_area) : null,
                     ["frontiers"] = new JArray(rig.brain.FrontierOptions(t, FrontierOptions).Select(f => (object)new JObject
                     {
                         ["id"] = f.id, ["x"] = Math.Round(f.position.x, 2), ["y"] = Math.Round(f.position.y, 2),
-                        ["path_m"] = Math.Round(f.pathM, 1), ["unsearched_m2"] = Math.Round(f.unsearchedM2, 1), ["in_my_sector"] = f.inSector,
+                        ["path_m"] = Math.Round(f.pathM, 1), ["unsearched_m2"] = Math.Round(f.unsearchedM2, 1),
                     })),
                     ["lidar"] = LidarSummary(rig.lastScan),
+                    ["partners"] = new JArray(s.peers.Select(p => (object)new JObject { ["robot"] = p.robot, ["maps_linked"] = p.linked,
+                        ["position"] = p.linked ? new JArray(Math.Round(p.pose.position.x, 2), Math.Round(p.pose.position.y, 2)) : null })),
                 };
                 rig.inbox.Clear();
                 var reply = Post($"/robot/{rig.robot.RobotId}/step", req);
@@ -207,10 +208,23 @@ namespace SmokeRescue.Recording
                 foreach (var to in rigs.Where(r => r != from && r.brain != null))
                     if (radio.Evaluate(from.robot.transform.position, to.robot.transform.position).delivered)
                     {
-                        foreach (var m in from.outbox) { to.inbox.Add(m); to.brain.Log(t, "team_message_received", $"{m["from"]}: {m["text"]}"); }
+                        foreach (var m in from.outbox)
+                        {
+                            // The sender's position is in its own frame: convert it once the frames are linked, else drop it.
+                            var copy = (JObject)m.DeepClone();
+                            if (copy["x"] != null && to.brain.PartnerToOwn(from.robot.RobotId, new Vector2(copy.Value<float>("x"), copy.Value<float>("y")), out var own))
+                            { copy["x"] = Math.Round(own.x, 2); copy["y"] = Math.Round(own.y, 2); copy["position"] = "converted into your frame"; }
+                            else { copy.Remove("x"); copy.Remove("y"); copy["position"] = "unknown: your frames are not linked yet"; }
+                            to.inbox.Add(copy); to.brain.Log(t, "team_message_received", $"{m["from"]}: {m["text"]}");
+                        }
                         delivered = true;
                     }
-                if (radio.Evaluate(from.robot.transform.position, w.post).delivered) { w.postInbox.AddRange(from.outbox); delivered = true; }
+                if (radio.Evaluate(from.robot.transform.position, w.post).delivered)
+                {
+                    // The commander has no map: robot positions (each in its own frame) would mean nothing to it.
+                    foreach (var m in from.outbox) { var copy = (JObject)m.DeepClone(); copy.Remove("x"); copy.Remove("y"); w.postInbox.Add(copy); }
+                    delivered = true;
+                }
                 if (delivered) from.outbox.Clear();   // otherwise the texts wait for a link
             }
             for (int i = w.postOutbox.Count - 1; i >= 0; i--)
@@ -220,14 +234,9 @@ namespace SmokeRescue.Recording
                 foreach (var rig in rigs.Where(r => r.brain != null && (to == "*" || to == r.robot.RobotId)))
                 {
                     if (!radio.Evaluate(w.post, rig.robot.transform.position).delivered) continue;
-                    if (order.Value<string>("type") == "assign_sector" && order["rect"] is JArray r)
-                        rig.brain.AssignSector(Rect.MinMaxRect(r[0].Value<float>(), r[1].Value<float>(), r[2].Value<float>(), r[3].Value<float>()),
-                            t, "commander", order.Value<string>("reason"));
-                    else
-                    {
-                        rig.inbox.Add(new JObject { ["from"] = "commander", ["t"] = t, ["text"] = order.Value<string>("text") });
-                        rig.brain.Log(t, "team_message_received", "commander: " + order.Value<string>("text"));
-                    }
+                    // The commander only talks: it has no map and assigns no areas (Tashon, 2026-10-20).
+                    rig.inbox.Add(new JObject { ["from"] = "commander", ["t"] = t, ["text"] = order.Value<string>("text") });
+                    rig.brain.Log(t, "team_message_received", "commander: " + order.Value<string>("text"));
                     sent = true;
                 }
                 if (sent) w.postOutbox.RemoveAt(i);

@@ -20,7 +20,7 @@ namespace SmokeRescue.Brain
 
         public void AgentGoTo(Vector2 target, double t, double holdS, string reason)
         {
-            if (!InSearchArea(target)) { Emit(t, "agent_order", "Refused go_to outside the search area.", "x_m", target.x, "y_m", target.y); return; }
+            if (!InSearchArea(target)) { Emit(t, "agent_order", "Refused go_to: no ceiling has been seen over that point, so it is not known to be inside.", "x_m", target.x, "y_m", target.y); return; }
             agentGoal = target; agentGoalUntil = t + holdS; agentGoalReason = reason ?? ""; agentGoalIsFrontier = false;
             if (active == null) ClearPath();
             Emit(t, "agent_order", "go_to: " + agentGoalReason, "x_m", target.x, "y_m", target.y, "hold_s", holdS);

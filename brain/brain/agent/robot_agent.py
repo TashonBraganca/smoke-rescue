@@ -34,15 +34,20 @@ Rules:
 - If inspect_candidate says uncertain, do not confirm; go_to a closer viewpoint or inspect from another bearing.
 - Tell your partner what changes their plan: confirmed survivors, spreading fire, blocked routes, areas you cover.
 - Ask for human approval before entering a room where fire is spreading toward you.
-- Positions are building coordinates in metres: x to the right, y forward, as given in the context.
+- Positions are in YOUR OWN map frame, in metres from where you entered: y is the direction you faced on entry, x
+  to its right. Nobody has given you a map or a building outline; everything you know you mapped yourself or heard
+  on the radio. Your partner's coordinates are in its own frame, so do not reuse numbers from its messages as
+  positions; describe places in words (the room past the hallway, the door on your left) when you radio. Once
+  partners shows maps_linked, your robot has matched LiDAR fingerprints with that partner: its position and the area
+  it searched are already converted into your frame and your frontier list leaves its searched area out.
 - Be brief. Call the tools you need, then finish with one sentence saying what you decided and why.
 
 Choosing where to search (you, not the reflex layer, pick every search target):
 - The context lists frontiers: unsearched floor the robot can reach, each with id, x, y, path_m, unsearched_m2 and
-  in_my_sector. After area_searched, no_progress, goal_blacklisted, collision_hold, and at every periodic check-in
+  how far it is from your partner's claim. After area_searched, no_progress, goal_blacklisted, collision_hold, and at every periodic check-in
   when nothing more urgent is happening, call explore_frontier with one id and a one-line reason.
-- Prefer frontiers in your sector, then more unsearched area per metre of path; skip areas your partner said they
-  cover; do not pick a frontier next to a spot that just failed (goal_blacklisted, collision_hold).
+- Prefer more unsearched area per metre of path; skip areas your partner said they cover; do not pick a frontier
+  next to a spot that just failed (goal_blacklisted, collision_hold).
 - The lidar entry gives the nearest obstacle in eight directions; under 0.4 m means the robot is in a tight spot,
   so prefer a frontier on the open side.
 - If the list is empty, say so to your partner and the commander: your reachable area is searched.
@@ -113,7 +118,7 @@ class RobotAgent:
         ctx.frontiers = list(req.get("frontiers") or [])
         tools = ToolRegistry(Path(req["robot_dir"]), ctx, Path(req.get("debug_dir") or Path(self.trace_path).parent / "agent_debug"))
         context = {k: req[k] for k in ("robot", "t", "pose", "torch", "mode", "state", "goal", "heat_budget", "air_c", "event",
-                                       "inbox", "orders", "survivors", "search_area", "frontiers", "lidar") if k in req}
+                                       "inbox", "orders", "survivors", "search_area", "frontiers", "lidar", "partners") if k in req}
         messages = [{"role": "system", "content": SYSTEM},
                     {"role": "user", "content": "Decision needed. Context:\n" + json.dumps(context, default=str)}]
         step_id = f"{req['robot']}@{float(req['t']):.3f}"

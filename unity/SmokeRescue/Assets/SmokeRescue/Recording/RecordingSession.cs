@@ -136,12 +136,12 @@ namespace SmokeRescue.Recording
                 {
                     // The robot drives itself: its brain sees only this robot's sensors (fed below at their own rates)
                     // and returns forward speed and yaw rate. Brain yaw is left-positive; Unity yaw is right-positive.
-                    // The incident commander logs which door each robot entered, in building coordinates. That is
-                    // operator knowledge, not ground truth during the run, and it puts every brain in one frame.
-                    var entry = new EntryPose(spec.spawn.at[0], spec.spawn.at[1], spec.spawn.yaw);
-                    rig.brain = new RobotBrain(sensorCfg, BrainConfig.Load(), spec.id, scenario.seed * 1000 + i * 10 + 6, entry);
-                    if (scenario.search_area != null)
-                        rig.brain.SearchArea = Rect.MinMaxRect(scenario.search_area[0], scenario.search_area[1], scenario.search_area[2], scenario.search_area[3]);
+                    // No prior knowledge: each brain starts at the origin of its own frame, facing its own +y. Frames are
+                    // linked only from matched LiDAR fingerprints (FrameLink); nobody tells a robot where it is.
+                    var brainCfg = BrainConfig.Load();
+                    rig.brain = brainCfg.frames_shared_at_start
+                        ? new RobotBrain(sensorCfg, brainCfg, spec.id, scenario.seed * 1000 + i * 10 + 6, new EntryPose(spec.spawn.at[0], spec.spawn.at[1], spec.spawn.yaw))
+                        : new RobotBrain(sensorCfg, brainCfg, spec.id, scenario.seed * 1000 + i * 10 + 6);
                     rig.brain.AgentConfirms = AgentUrl != null;
                     var r0 = rig;
                     rig.robot.Driver.Command = () => (r0.command.forwardMps, -r0.command.yawRateDeg, r0.missionDone);

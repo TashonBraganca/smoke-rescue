@@ -27,7 +27,6 @@ from brain.agent.robot_agent import RobotAgent
 RUN_DIR = Path(os.environ.get("AGENT_RUN_DIR", "/tmp/smoke-rescue-agent"))
 RUN_DIR.mkdir(parents=True, exist_ok=True)
 TRACE = RUN_DIR / "agent_trace.jsonl"
-AREA = tuple(float(v) for v in os.environ.get("SEARCH_AREA", "0,0,40,28").split(","))
 APPROVAL_MODE = os.environ.get("APPROVAL_MODE", "simulated")
 
 app = FastAPI(title="Smoke Rescue agents")
@@ -60,7 +59,7 @@ async def robot_step(robot: str, request: Request):
 @app.post("/commander/step")
 async def commander_step(request: Request):
     req = await request.json()
-    return Commander(backend(), Path(req.get("trace_path") or TRACE), AREA).step(req)
+    return Commander(backend(), Path(req.get("trace_path") or TRACE)).step(req)
 
 
 @app.post("/approval")

@@ -14,6 +14,10 @@ namespace SmokeRescue.Brain
             public byte[] explored;
             public long acknowledgedOurs, completeMapSequence;
             public bool overlapLogged;
+            // In this robot's frame; null or unset until the frames are linked.
+            public BrainClaim claim;
+            public BrainPose pose;
+            public Vector2? goal;
         }
         readonly SortedDictionary<string, PeerState> peers = new SortedDictionary<string, PeerState>(StringComparer.Ordinal);
         readonly List<BrainSurvivor> confirmed = new List<BrainSurvivor>();
@@ -56,7 +60,7 @@ namespace SmokeRescue.Brain
             int cells = SharedSize * SharedSize, bytes = (cells + 7) / 8;
             var m = new BrainMessage { Sender = id, BaseSequence = full ? 0 : baseline, GridSize = SharedSize,
                 Origin = grid.Origin, Pose = motion.Pose, Goal = goal,
-                Explored = new byte[bytes], Occupied = new byte[bytes], Survivors = confirmed.ToArray() };
+                Explored = new byte[bytes], Occupied = new byte[bytes], Survivors = confirmed.ToArray(), Keyframes = KeyframesToSend() };
             if (frontierGoal && goal.HasValue && !completed && !returning && !retreating && active == null)
                 m.Claim = new BrainClaim { centre = frontierCentre, radiusM = frontierRadius, expiresAt = t + c.peer_claim_s };
             for (int i = 0; i < grid.Count; i++)
@@ -76,7 +80,7 @@ namespace SmokeRescue.Brain
             // real send time here because dense heat encodes sample ages relative to it.
             if (m.Hotspots.Length > 0) m.SentAt = t;
             byte[] state = m.ToBytes();
-            if (!full && m.Claim == null && m.Hotspots.Length == 0 && Equal(lastState, state)) return null;
+            if (!full && m.Claim == null && m.Hotspots.Length == 0 && m.Keyframes.Length == 0 && Equal(lastState, state)) return null;
             m.Sequence = sequence + 1; m.SentAt = t; m.FullSnapshot = full;
             m.ToBytes(); // Check the complete packet before advancing sender state.
             sequence = m.Sequence; lastState = state; if (full) lastFull = t;
@@ -107,19 +111,37 @@ namespace SmokeRescue.Brain
             foreach (var ack in m.Acknowledgements)
                 if (ack.sender == id && ack.sequence <= sequence) peer.acknowledgedOurs = Math.Max(peer.acknowledgedOurs, ack.sequence);
             lastPeerReceived = tReceived;
-            grid.DecayTo(tReceived); grid.ReplacePeerLayer(m.Sender, m, peer.explored);
+            grid.DecayTo(tReceived);
+            ReceiveKeyframes(m.Sender, m, tReceived);
+            Emit(tReceived, "peer_message_received", "Accepted sensor-derived state from " + m.Sender + (TryPartnerLink(m.Sender, out _) ? "." : "; frames not linked yet, so only its fingerprints are used."),
+                "sequence", m.Sequence, "age_s", Math.Max(0, tReceived - m.SentAt), "bytes", bytes.Length, "keyframes", m.Keyframes.Length);
+            ApplyPeerContent(m.Sender, peer, tReceived);
+        }
+
+        /// <summary>The partner's map, claim, survivors and heat, converted into this frame. Nothing is applied before
+        /// the frames are linked: a coordinate from another frame would put walls, fires and people in the wrong place.</summary>
+        void ApplyPeerContent(string sender, PeerState peer, double t)
+        {
+            var m = peer.message;
+            if (!TryPartnerLink(sender, out var link)) { peer.claim = null; peer.goal = null; return; }
+            grid.ReplacePeerLayer(sender, m, peer.explored, link);
+            peer.pose = new BrainPose { position = link.Transform(m.Pose.position.x, m.Pose.position.y), yawRad = m.Pose.yawRad + link.yawRad };
+            peer.goal = m.Goal.HasValue ? link.Transform(m.Goal.Value.x, m.Goal.Value.y) : (Vector2?)null;
+            peer.claim = m.Claim == null ? null : new BrainClaim { centre = link.Transform(m.Claim.centre.x, m.Claim.centre.y), radiusM = m.Claim.radiusM, expiresAt = m.Claim.expiresAt };
             foreach (var hot in m.Hotspots)
             {
-                // Fill every local cell of the shared 20 cm cell, preserving its full hazard extent.
-                int ratio = Mathf.RoundToInt(BrainMessage.ResolutionM / grid.CellM);
-                Vector2 corner = m.Centre(hot.cell) - Vector2.one * (BrainMessage.ResolutionM / 2);
-                for (int y = 0; y < ratio; y++) for (int x = 0; x < ratio; x++)
-                    grid.ObservePeerHeat(grid.Cell(corner + new Vector2(x + .5f, y + .5f) * grid.CellM), hot.temperatureC, hot.observedAt, tReceived);
+                // Fill every local cell under the shared 20 cm cell, preserving its full hazard extent.
+                Vector2 centre = link.Transform(m.Centre(hot.cell).x, m.Centre(hot.cell).y);
+                float half = BrainMessage.ResolutionM * .75f;
+                for (float y = -half; y <= half; y += grid.CellM) for (float x = -half; x <= half; x += grid.CellM)
+                    grid.ObservePeerHeat(grid.Cell(centre + new Vector2(x, y)), hot.temperatureC, hot.observedAt, t);
             }
-            foreach (var survivor in m.Survivors) ReceiveSurvivor(survivor, m.Sender, tReceived);
-            Emit(tReceived, "peer_message_received", "Accepted sensor-derived building-frame state from " + m.Sender + ".",
-                "sequence", m.Sequence, "age_s", Math.Max(0, tReceived - m.SentAt), "bytes", bytes.Length);
-            InvalidatePeerGoal(tReceived); CheckMapOverlap(tReceived);
+            foreach (var survivor in m.Survivors)
+            {
+                var s = survivor; s.position = link.Transform(survivor.position.x, survivor.position.y);
+                ReceiveSurvivor(s, sender, t);
+            }
+            InvalidatePeerGoal(t); CheckMapOverlap(t);
         }
 
         BrainHotspot[] LocalHotspots(BrainMessage m, double t)
@@ -159,8 +181,11 @@ namespace SmokeRescue.Brain
         {
             foreach (var pair in peers)
             {
-                var claim = pair.Value.message.Claim;
-                if (claim == null || claim.expiresAt <= t || Vector2.Distance(p, claim.centre) > claim.radiusM) continue;
+                var claim = pair.Value.claim;
+                // Same overlap rule as InvalidatePeerGoal: a frontier here would carry our own claim radius, so it is
+                // blocked whenever the two circles would overlap. A narrower test let a robot pick a goal that the
+                // yield check dropped on the next step, dozens of times a second (check run, robot B, 7.4 s).
+                if (claim == null || claim.expiresAt <= t || Vector2.Distance(p, claim.centre) > claim.radiusM + c.peer_claim_radius_m) continue;
                 // Keep our existing contested claim only when our ID wins. Avoid all other live claims.
                 if (frontierGoal && goal.HasValue && Vector2.Distance(frontierCentre, claim.centre) <= claim.radiusM + frontierRadius && CompareIds(id, pair.Key) < 0) continue;
                 return true;
@@ -173,7 +198,7 @@ namespace SmokeRescue.Brain
             bool keepsContested = false;
             foreach (var pair in peers)
             {
-                var claim = pair.Value.message.Claim;
+                var claim = pair.Value.claim;
                 if (claim == null || claim.expiresAt <= t || Vector2.Distance(frontierCentre, claim.centre) > claim.radiusM + frontierRadius) continue;
                 if (CompareIds(id, pair.Key) < 0) { keepsContested = true; continue; }
                 Emit(t, "goal_yielded", "The lower robot ID " + pair.Key + " keeps the contested frontier.", "x_m", goal.Value.x, "y_m", goal.Value.y);
@@ -201,8 +226,8 @@ namespace SmokeRescue.Brain
             var result = new List<PeerSnapshot>();
             foreach (var p in peers)
             {
-                var m = p.Value.message; var claim = m.Claim;
-                result.Add(new PeerSnapshot { robot = p.Key, sequence = m.Sequence, sentAt = m.SentAt, pose = m.Pose, goal = m.Goal,
+                var m = p.Value.message; var claim = p.Value.claim; bool linked = TryPartnerLink(p.Key, out _);
+                result.Add(new PeerSnapshot { robot = p.Key, sequence = m.Sequence, sentAt = m.SentAt, pose = p.Value.pose, goal = p.Value.goal, linked = linked,
                     claim = claim == null || claim.expiresAt <= t ? null : new BrainClaim { centre = claim.centre, radiusM = claim.radiusM, expiresAt = claim.expiresAt } });
             }
             return result.ToArray();

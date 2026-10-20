@@ -26,12 +26,15 @@ namespace SmokeRescue.Brain
     { public int cell; public float temperatureC; public double observedAt; }
     [Serializable] public struct BrainAck
     { public string sender; public long sequence; }
+    /// <summary>A LiDAR keyframe for linking frames (FrameLink): pose in the sender's own frame, ranges in whole cm.</summary>
+    [Serializable] public struct BrainKeyframe
+    { public int id; public BrainPose pose; public float angleMinRad, incrementRad, minM, maxM, mountForwardM; public ushort[] rangesCm; }
     public sealed class PeerSnapshot
-    { public string robot; public long sequence; public double sentAt; public BrainPose pose; public Vector2? goal; public BrainClaim claim; }
+    { public string robot; public long sequence; public double sentAt; public BrainPose pose; public Vector2? goal; public BrainClaim claim; public bool linked; }
     [Serializable] public struct SurvivorSnapshot
     { public Vector2 position; public double confirmedAt; public string source, sourceRobot; }
 
-    /// <summary>Version 1 binary radio state, using building coordinates. Masks are row-major,
+    /// <summary>Version 2 binary radio state (version 1 plus LiDAR keyframes), in the sender's own map frame. Masks are row-major,
     /// least-significant bit first. Explored is cumulative since BaseSequence; Occupied is always full.
     /// ToBytes is the transport format. JSON/base64 and transport headers are outside EstimatedBytes.
     /// Sequence numbers last for one run; create new brains when restarting a sender.</summary>
@@ -52,6 +55,7 @@ namespace SmokeRescue.Brain
         public BrainSurvivor[] Survivors = Array.Empty<BrainSurvivor>();
         public BrainHotspot[] Hotspots = Array.Empty<BrainHotspot>();
         public BrainAck[] Acknowledgements = Array.Empty<BrainAck>();
+        public BrainKeyframe[] Keyframes = Array.Empty<BrainKeyframe>();
         public int EstimatedBytes => ToBytes().Length;
         internal static bool Bit(byte[] mask, int cell) => (mask[cell >> 3] & (1 << (cell & 7))) != 0;
         internal static void Set(byte[] mask, int cell) { mask[cell >> 3] |= (byte)(1 << (cell & 7)); }
@@ -66,7 +70,7 @@ namespace SmokeRescue.Brain
             using (var stream = new MemoryStream())
             using (var w = new BinaryWriter(stream, Encoding.UTF8, true))
             {
-                w.Write((byte)1); WriteString(w, Sender); w.Write(Sequence); w.Write(BaseSequence); w.Write(SentAt); w.Write(FullSnapshot);
+                w.Write((byte)2); WriteString(w, Sender); w.Write(Sequence); w.Write(BaseSequence); w.Write(SentAt); w.Write(FullSnapshot);
                 w.Write(GridSize); Write(w, Origin); Write(w, Pose.position); w.Write(Pose.yawRad);
                 w.Write(Goal.HasValue); if (Goal.HasValue) Write(w, Goal.Value);
                 w.Write(Claim != null);
@@ -77,6 +81,14 @@ namespace SmokeRescue.Brain
                 WriteHeat(w);
                 w.Write(Acknowledgements.Length);
                 foreach (var a in Acknowledgements) { WriteString(w, a.sender); w.Write(a.sequence); }
+                w.Write(Keyframes.Length);
+                foreach (var k in Keyframes)
+                {
+                    if (k.rangesCm == null || k.rangesCm.Length > 4096) throw new InvalidDataException("Invalid keyframe sweep.");
+                    w.Write(k.id); Write(w, k.pose.position); w.Write(k.pose.yawRad);
+                    w.Write(k.angleMinRad); w.Write(k.incrementRad); w.Write(k.minM); w.Write(k.maxM); w.Write(k.mountForwardM);
+                    w.Write((ushort)k.rangesCm.Length); foreach (var r in k.rangesCm) w.Write(r);
+                }
                 w.Flush();
                 if (stream.Length >= MaxBytes) throw new InvalidDataException("Brain state exceeds the 40000-byte radio limit; increase compression before using this scene.");
                 return stream.ToArray();
@@ -88,7 +100,7 @@ namespace SmokeRescue.Brain
             using (var stream = new MemoryStream(bytes, false))
             using (var r = new BinaryReader(stream, Encoding.UTF8))
             {
-                if (r.ReadByte() != 1) throw new InvalidDataException("Unsupported brain message version.");
+                if (r.ReadByte() != 2) throw new InvalidDataException("Unsupported brain message version.");
                 var m = new BrainMessage { Sender = ReadString(r), Sequence = r.ReadInt64(), BaseSequence = r.ReadInt64(), SentAt = r.ReadDouble(),
                     FullSnapshot = r.ReadBoolean(), GridSize = r.ReadInt32(), Origin = ReadPoint(r) };
                 m.Pose = new BrainPose { position = ReadPoint(r), yawRad = r.ReadSingle() };
@@ -102,6 +114,15 @@ namespace SmokeRescue.Brain
                 m.ReadHeat(r);
                 m.Acknowledgements = new BrainAck[ReadCount(r, 64)];
                 for (int i = 0; i < m.Acknowledgements.Length; i++) m.Acknowledgements[i] = new BrainAck { sender = ReadString(r), sequence = r.ReadInt64() };
+                m.Keyframes = new BrainKeyframe[ReadCount(r, 16)];
+                for (int i = 0; i < m.Keyframes.Length; i++)
+                {
+                    var k = new BrainKeyframe { id = r.ReadInt32(), pose = new BrainPose { position = ReadPoint(r), yawRad = r.ReadSingle() },
+                        angleMinRad = r.ReadSingle(), incrementRad = r.ReadSingle(), minM = r.ReadSingle(), maxM = r.ReadSingle(), mountForwardM = r.ReadSingle() };
+                    k.rangesCm = new ushort[r.ReadUInt16()];
+                    for (int j = 0; j < k.rangesCm.Length; j++) k.rangesCm[j] = r.ReadUInt16();
+                    m.Keyframes[i] = k;
+                }
                 if (stream.Position != stream.Length) throw new InvalidDataException("Trailing brain packet bytes.");
                 return m;
             }
