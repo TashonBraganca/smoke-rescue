@@ -174,6 +174,13 @@ namespace SmokeRescue.Brain
                 if (NeedPlan(t))
                 {
                     SetPath(planner.Plan(motion.Pose.position, home)); lastPlan = t;
+                    if (path.Count == 0 && returnReason == WayOutClosing)
+                    {
+                        // Fire cut the way home while the robot was on it (agent run 12: robot A held still for the rest
+                        // of the run). Same as finding it cut: retreat to the coolest floor and search on while it is cool.
+                        LoseWayOut(t);
+                        return Command(0, 0, dt, true);
+                    }
                     Emit(t, "replan", path.Count > 0 ? "Return to the start through observed free space." : "The known return route is blocked; hold and keep sensing.", "path_points", path.Count);
                 }
                 return FollowOrHold(t, dt);
@@ -578,11 +585,7 @@ namespace SmokeRescue.Brain
             var route = planner.Plan(motion.Pose.position, home);
             if (route.Count == 0)
             {
-                if (hadWayOut)
-                {
-                    hadWayOut = false; ResetStuckRecovery(); retreating = true; sweeping = false; active = null; dwell = 0; ClearPath();
-                    Emit(t, "escape_closing", "The known way out is closed; retreat to the coolest reachable floor.", "route_points", 0);
-                }
+                if (hadWayOut) LoseWayOut(t);
                 return;
             }
             hadWayOut = true;
@@ -592,8 +595,16 @@ namespace SmokeRescue.Brain
             if (closest < c.escape_fire_margin_m)
             {
                 Emit(t, "escape_closing", "Fire is closing on the way out; leave while it is open.", "fire_distance_m", closest, "margin_m", c.escape_fire_margin_m);
-                BeginReturn(t, "The way out was closing.");
+                BeginReturn(t, WayOutClosing);
             }
+        }
+        const string WayOutClosing = "The way out was closing.";
+        void LoseWayOut(double t)
+        {
+            hadWayOut = false; returning = false; ResetStuckRecovery(); retreating = true; sweeping = false; active = null; dwell = 0; ClearPath();
+            // A route that reappears next to the fire would start a return that is cut again at once; wait a while.
+            nextWayOutCheck = t + c.escape_recheck_s;
+            Emit(t, "escape_closing", "The known way out is closed; retreat to the coolest reachable floor and search on while it is cool.", "route_points", 0);
         }
         void BeginReturn(double t, string reason)
         {

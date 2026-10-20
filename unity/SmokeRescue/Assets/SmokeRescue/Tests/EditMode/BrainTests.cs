@@ -708,6 +708,27 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void AReturnCutByFireBecomesARetreatNotAStandstill()
+        {
+            // Agent run 12: robot A started home as fire closed on its route, the route was cut a moment later, and it
+            // held still for the rest of the run. It must retreat to cool floor (and search on) instead.
+            var c = Settings(); c.grid_size_m = 12; c.robot_radius_m = .25f;
+            var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -5, 5, -2, 6);
+            var events = new List<BrainEvent>();
+            for (int i = 0; i < 120; i++)
+            {
+                double t = i / 15.0; Motion(b, t, t < 3 ? 1f : 0); b.OnRgbd(Image(t, true)); b.OnAirTemperature(t, 20);
+                var g = Map(b);
+                if (t >= 3.2) for (float dx = -.3f; dx <= .3f; dx += .1f) for (float dy = -.3f; dy <= .3f; dy += .1f) g.ObserveHeat(g.Cell(new Vector2(1.9f + dx, .8f + dy)), 500, t);
+                if (events.Any(e => e.kind == "goal" && e.reason.StartsWith("The way out was closing")))
+                    for (float x = -5; x <= 5; x += .1f) g.ObserveHeat(g.Cell(new Vector2(x, 1.5f)), 500, t);   // then fire cuts the room
+                b.Step(t, 1f / 15); events.AddRange(b.DrainEvents());
+            }
+            Assert.That(events.Count(e => e.kind == "escape_closing"), Is.EqualTo(2), "closing, then lost");
+            Assert.That(b.Snapshot().state, Is.Not.EqualTo("return"), "no standstill on a cut route");
+        }
+
+        [Test]
         public void AReturnEndsWithinHalfAMetreOfADoorwayStart()
         {
             // House reflex check: robot B stopped 0.3 m from its doorway start, where the return path ended, and replanned
