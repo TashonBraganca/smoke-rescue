@@ -94,7 +94,7 @@ namespace SmokeRescue.Brain
         public float lead_max_m = 1.0f;
         public float frontier_cluster_max_m = 2.5f;
         public bool search_requires_ceiling = false;
-        public float ceiling_min_height_m = 2.5f, ceiling_max_height_m = 3.5f, ceiling_radius_m = 1.5f, ceiling_wall_margin_m = 0.4f;
+        public float ceiling_min_height_m = 2.5f, ceiling_max_height_m = 3.5f, ceiling_radius_m = 0.6f, ceiling_wall_margin_m = 0.4f;
         public int ceiling_min_hits = 2;
         public bool frames_shared_at_start = true;
         public float keyframe_spacing_m = 1.0f, keyframe_turn_deg = 45f;
