@@ -90,7 +90,7 @@ def build_prompt(context: dict, *, has_thermal: bool = False) -> str:
 
 # A 2B model parrots any list of example objects put in the prompt (measured on unity_haze: every sentence then
 # claimed flames, smoke, a person and a blocked doorway). So the prompt stays neutral and style is fixed here instead.
-_PREFIX = re.compile(r"^(the|this)\s+(robot'?s?\s+)?(rgb\s+)?(camera|image|view|scene)\s+(captures?|captured|shows?|showed|reveals?|depicts?|displays?)\s+(a\s+view\s+of\s+|a\s+scene\s+(inside|in)\s+)?", re.I)
+_PREFIX = re.compile(r"^(?:robot_[a-z]\s+is\s+looking\s+at\s+|(?:the|this)\s+(?:robot'?s?\s+)?(?:rgb\s+)?(?:camera|image|view|scene)\s+(?:captures?|captured|shows?|showed|reveals?|depicts?|displays?)\s+(?:a\s+view\s+of\s+|a\s+scene\s+(?:inside|in)\s+)?)", re.I)
 _MOOD = re.compile(r"\b(cozy|cosy|inviting|warm and inviting|charming|lovely|beautiful)\s+", re.I)
 
 
@@ -247,7 +247,7 @@ def narration_jobs(run: Path, robot: str, associations: list[Association], every
     return jobs
 
 
-def run(recording: Path, run_dir: Path, every: float = 10, model_id: str = DEFAULT_MODEL,
+def run(recording: Path, run_dir: Path, every: float = 10, model_id: str = DEFAULT_MODEL, use_thermal: bool = False,
         device: str = "mps") -> dict:
     if not math.isfinite(every) or every <= 0:
         raise ValueError("--every must be finite and positive")
@@ -277,7 +277,9 @@ def run(recording: Path, run_dir: Path, every: float = 10, model_id: str = DEFAU
             rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
             thermal_path = camera_path(recording / robot, Path("thermal") / relative.name, "thermal")
             thermal = None
-            if narrator.supports_multiple_images and thermal_path.exists():
+            # Off by default: with the thermal image added, the 2B model described the thermal camera instead of the
+            # scene and took 2.3 s per sentence instead of 0.9 s (measured on the burning-house run).
+            if use_thermal and narrator.supports_multiple_images and thermal_path.exists():
                 thermal = cv2.imread(str(thermal_path), cv2.IMREAD_UNCHANGED)
                 if thermal is None:
                     raise ValueError(f"cannot read thermal image: {thermal_path}")
@@ -307,9 +309,10 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--every", type=float, default=10)
     parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--device", default="mps")
+    parser.add_argument("--thermal", action="store_true", help="also give the model the false-colour thermal image")
     args = parser.parse_args(argv)
     try:
-        summary = run(args.recording_dir, args.run_dir, args.every, args.model, args.device)
+        summary = run(args.recording_dir, args.run_dir, every=args.every, model_id=args.model, device=args.device, use_thermal=args.thermal)
     except (ValueError, FileNotFoundError, RuntimeError) as exc:
         parser.exit(1, f"narration failed: {exc}\n")
     print(json.dumps(summary, allow_nan=False))

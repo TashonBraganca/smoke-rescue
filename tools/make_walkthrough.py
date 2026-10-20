@@ -53,10 +53,17 @@ IRONBOW = np.array([(0, 0, 0), (92, 0, 33), (153, 0, 140), (64, 51, 217), (0, 14
 
 def ironbow(dk: np.ndarray) -> np.ndarray:
     """Thermal frame (kelvin x 10) to ironbow false colour with plateau histogram equalisation, like a thermal camera."""
-    hist = np.bincount(dk.ravel(), minlength=65536).astype(np.float64)
-    hist = np.minimum(hist, max(4, dk.size // 300))
-    lut = np.cumsum(hist) / max(hist.sum(), 1)
-    v = lut[dk] * (len(IRONBOW) - 1)
+    lo, hi = np.percentile(dk, [1, 99])
+    if hi - lo < 100:
+        # Nearly uniform scene (a wall at one temperature): equalising would stretch 0.05 K sensor noise over the whole
+        # palette. Thermal cameras keep a minimum span instead; use a linear 10 K window around the median.
+        mid = float(np.median(dk))
+        v = np.clip((dk.astype(np.float32) - (mid - 50)) / 100.0, 0, 1) * (len(IRONBOW) - 1)
+    else:
+        hist = np.bincount(dk.ravel(), minlength=65536).astype(np.float64)
+        hist = np.minimum(hist, max(4, dk.size // 300))
+        lut = np.cumsum(hist) / max(hist.sum(), 1)
+        v = lut[dk] * (len(IRONBOW) - 1)
     i = np.minimum(v.astype(int), len(IRONBOW) - 2)
     f = (v - i)[..., None]
     return (IRONBOW[i] * (1 - f) + IRONBOW[i + 1] * f).astype(np.uint8)
