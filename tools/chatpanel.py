@@ -24,7 +24,7 @@ FONT = cv2.FONT_HERSHEY_SIMPLEX
 
 DECISION_TEXT = {
     "goal": lambda e: f"Heading to new goal: {e.get('reason', '')}",
-    "replan": lambda e: f"Replanning: {e.get('reason', '')}",
+    "replan": None,                     # reflex-layer chatter several times a second; hidden so decisions stay readable
     "avoid_fire": lambda e: f"Avoiding fire: {e.get('reason', '')}",
     "retreat": lambda e: f"Too hot, retreating: {e.get('reason', '')}",
     "sensor_switch": lambda e: f"Camera: {e.get('reason', '')}",
