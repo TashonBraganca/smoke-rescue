@@ -23,6 +23,7 @@ class Scripted:
 def fake_vision(monkeypatch, verdict="person"):
     monkeypatch.setattr(T.vision, "load_frame", lambda d, t: object())
     monkeypatch.setattr(T.vision, "inspect_candidate", lambda f, b, r, output_dir: {"id": "ev1", "tool": "inspect_candidate", "verdict": verdict})
+    monkeypatch.setattr(T.vision, "track_fire_spread", lambda frames: {"id": "fire1", "tool": "track_fire_spread"})
     monkeypatch.setattr(T.vision, "assess_visibility", lambda f: {"id": "vis1", "tool": "assess_visibility", "usable_rgb": False})
 
 
@@ -89,3 +90,19 @@ def test_replay_backend_reproduces_a_recorded_step(tmp_path, monkeypatch):
 def test_request_key_changes_with_content():
     m = [{"role": "user", "content": "a"}]
     assert request_key(m, []) != request_key([{"role": "user", "content": "b"}], [])
+
+
+def test_approach_candidate_stops_short_of_the_inspected_spot(tmp_path, monkeypatch):
+    fake_vision(monkeypatch, "uncertain")
+    out, _ = run(tmp_path, [[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": 5})],
+                            [ToolCall("approach_candidate", {"evidence_id": "ev1"})]])
+    (o,) = out["orders"]
+    assert o["type"] == "go_to" and o["x"] == pytest.approx(5.0) and o["y"] == pytest.approx(8.5)   # 5 m ahead, 1.5 m short
+
+
+def test_no_go_to_during_a_heat_event(tmp_path, monkeypatch):
+    fake_vision(monkeypatch)
+    req = request(tmp_path) | {"event": {"kind": "avoid_fire"}}
+    agent = RobotAgent(Scripted([[ToolCall("go_to", {"x": 6, "y": 6, "reason": "toward"})]]), tmp_path / "t.jsonl")
+    out = agent.step(req)
+    assert out["orders"] == [] and out["refusals"][0]["tool"] == "go_to"

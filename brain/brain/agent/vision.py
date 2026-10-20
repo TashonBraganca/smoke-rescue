@@ -113,8 +113,15 @@ def _safe_file(folder, relative, sensor=None):
     return path
 
 
-@lru_cache(maxsize=24)
 def _index(folder, sensor):
+    # Key the cache on the index file's size and mtime: during a live recording the recorder rewrites it before every
+    # agent step, and a plain cache served the first index forever, so every later step saw the frame at t = 0.
+    st = _safe_file(folder, sensor + ".txt").stat()
+    return _index_cached(folder, sensor, st.st_mtime_ns, st.st_size)
+
+
+@lru_cache(maxsize=24)
+def _index_cached(folder, sensor, _mtime_ns, _size):
     rows = []
     for line in _safe_file(folder,sensor+".txt").read_text().splitlines():
         if not line.strip() or line.lstrip().startswith("#"): continue
@@ -151,6 +158,8 @@ def load_frame(robot_dir: str | Path, t: float) -> Frame:
     stamps,images = {},{}
     for sensor in ("rgb","depth","thermal"):
         stamp,path = min(_index(folder,sensor),key=lambda row:(abs(row[0]-t),row[0]))
+        if abs(stamp - t) > 0.5:
+            raise ValueError(f"no {sensor} frame within 0.5 s of t={t:.3f} (nearest {stamp:.3f}); the index is stale or incomplete")
         image = cv2.imread(str(path),cv2.IMREAD_COLOR if sensor == "rgb" else cv2.IMREAD_UNCHANGED)
         if image is None: raise ValueError(f"cannot read {path}")
         stamps[sensor],images[sensor] = stamp,image
