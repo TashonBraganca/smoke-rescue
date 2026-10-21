@@ -130,6 +130,10 @@ namespace SmokeRescue.Brain
         public float lookahead_m = 0.45f;
         public float goal_tolerance_m = 0.18f, return_arrive_m = 0.5f;
         public float escape_check_s = 2f, escape_fire_margin_m = 2f, escape_ignore_m = 2f, escape_recheck_s = 10f;
+        // Off unless brain.json turns it on, so the existing reflex tests keep their exact behaviour.
+        public bool route_watch = false;
+        public float route_watch_stale_s = 15f, route_watch_max_stale_share = 0.5f, route_watch_min_interval_s = 90f,
+            route_watch_dwell_s = 4.5f, route_watch_max_s = 12f;
         public float heat_emergency_fraction = 0.15f, emergency_fire_clearance_m = 0.5f;
         public float heat_cool_after_s = 2f;
         public float open_speed_mps = 0.6f;
@@ -191,6 +195,9 @@ namespace SmokeRescue.Brain
                 stuck_turn_deg <= 0 || stuck_turn_deg > 90 || stuck_turn_timeout_s <= 0 ||
                 stuck_repeat_radius_m < cell_m || stuck_repeat_count < 2 || stuck_blacklist_s <= stuck_window_s)
                 throw new ArgumentException("Invalid stuck detection or recovery configuration.");
+            if (route_watch_stale_s <= 0 || route_watch_max_stale_share <= 0 || route_watch_max_stale_share >= 1 ||
+                route_watch_min_interval_s < 0 || route_watch_dwell_s < 0 || route_watch_max_s <= route_watch_dwell_s)
+                throw new ArgumentException("Invalid route watch configuration.");
             if (scan_yaw_gain < 0 || scan_yaw_gain > 1 || collision_margin_m < 0 || lead_max_m < cell_m || agent_avoid_min_radius_m < cell_m || agent_avoid_max_radius_m < agent_avoid_min_radius_m || frontier_cluster_max_m < cell_m * 2 || ceiling_min_height_m <= obstacle_max_height_m || ceiling_radius_m < 0 || ceiling_min_hits < 1 || ceiling_wall_margin_m < 0 ||
                 enclosure_rays < 8 || enclosure_range_m <= cell_m || enclosure_min_closed_share <= 0 || enclosure_min_closed_share > 1 || enclosure_max_open_share < 0 || enclosure_max_open_share >= 1 || lidar_open_span_deg <= 0 || frontier_peek_m < 0 || see_over_clearance_m < 0 || carried_person_radius_m <= 0 || search_max_range_m <= 0 ||
                 keyframe_spacing_m <= 0 || keyframe_turn_deg <= 0 || keyframe_beams < 36 || keyframe_max < 2 || keyframes_per_message < 1 || keyframes_per_message > 16 ||
