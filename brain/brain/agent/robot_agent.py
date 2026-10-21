@@ -70,6 +70,9 @@ Facts about your robot and the context:
   is unsearched floor your planner cannot reach, with its bearing, distance and the nearest reachable approach point.
   water_l is the water left for spray_water.
 - go_to, approach_candidate and turn_to_face end with an agent_goal_reached event when done.
+- mission_time_left_s: seconds until the robot's operating limit, when it must be out of the building.
+- frontiers lists up to 8 options, nearest first; some are the frontiers opening onto the largest unsearched areas the map
+  shows, so not every option is close by.
 - Each perception tool returns the same result if called again in this step.
 - send_team_message reaches your partner and the commander only within radio range and through at most one wall;
   what you do not radio, they do not know.
@@ -142,7 +145,7 @@ class RobotAgent:
         ctx.survivors = [list(p) for p in req.get("survivors") or []]
         tools = ToolRegistry(Path(req["robot_dir"]), ctx, Path(req.get("debug_dir") or Path(self.trace_path).parent / "agent_debug"))
         context = {k: req[k] for k in ("robot", "t", "pose", "torch", "mode", "state", "goal", "heat_budget", "air_c", "event",
-                                       "inbox", "orders", "survivors", "frontiers", "lidar", "partners", "blocked_unsearched", "fire_blocks_frontier",
+                                       "inbox", "orders", "survivors", "frontiers", "lidar", "partners", "blocked_unsearched", "fire_blocks_frontier", "mission_time_left_s",
                                        "water_l", "carrying_person") if k in req}
         context["survivors_to_rescue"] = survivors_to_rescue(req["robot"], pose, req.get("survivors") or [])
         pending = tools.pending()

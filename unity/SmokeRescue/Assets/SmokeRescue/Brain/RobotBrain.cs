@@ -208,7 +208,10 @@ namespace SmokeRescue.Brain
                 {
                     completed = true; ClearPath(); carryClearFrom = stepAwayFrom = new Vector2(float.NaN, float.NaN);
                     // Left early to stay safe, or carried someone out: it may go back in once that is safe (CheckReenter).
-                    canReenter = returnReason == WayOutClosing || returnReason == EmergencyExit || returnReason == CarryingOut || returnReason == HeatLeave;
+                    // NoFrontierLeft too: the exclusions that emptied the list (fire-cut blacklist, visited circles, a
+                    // partner's claim) expire, and CheckReenter still needs a reachable frontier with the fire clear of the way
+                    // (Codex review of held-out seed 914: "no frontier" ended the search for good).
+                    canReenter = returnReason == WayOutClosing || returnReason == EmergencyExit || returnReason == CarryingOut || returnReason == HeatLeave || returnReason == NoFrontierLeft;
                     if (returnReason == HeatLeave || returnReason == EmergencyExit) { burned = true; heatExitAt = t; }
                     if (returnReason == CarryingOut && !carriedOutReported)
                     {
@@ -451,7 +454,7 @@ namespace SmokeRescue.Brain
                             Emit(t, "no_frontier", "No reachable unsearched floor in this robot's map; returning after the scan unless ordered on.",
                                 "scan_s", c.no_frontier_scan_s);
                         }
-                        if (t - scanSince >= c.no_frontier_scan_s) BeginReturn(t, "No reachable frontier remains after a full scan.");
+                        if (t - scanSince >= c.no_frontier_scan_s) BeginReturn(t, NoFrontierLeft);
                     }
                 }
             }
@@ -996,6 +999,7 @@ namespace SmokeRescue.Brain
         // Set when the brain finds no reachable frontier (it would return after its scan unless an agent orders it on);
         // cleared when it finds one again. cutOff: the way out was lost and the robot retreats to cool floor.
         double noFrontierAt = double.NaN, nextCutOffCheck; bool cutOff;
+        const string NoFrontierLeft = "No reachable frontier remains after a full scan.";
         // Left once because heat was building (a heat return or an emergency exit), and when.
         bool burned; double heatExitAt = double.NegativeInfinity;
         const string HeatLeave = "No reachable frontier was left and the air was heating.";
@@ -1268,6 +1272,8 @@ namespace SmokeRescue.Brain
         /// <summary>The live 3D map's top-height layer (centimetres per cell, this brain's grid), from the agent service.</summary>
         public void OnTopHeights(ushort[] cm) => grid.SetTopHeights(cm);
         public bool InSearchArea(Vector2 p) => !c.search_requires_ceiling || grid.Indoors(p);
+        /// <summary>Seconds until the robot's operating limit (mission_time_limit_s), for the agent.</summary>
+        public double MissionTimeLeft(double t) => Math.Max(0, c.mission_time_limit_s - t);
         /// <summary>The indoor layer (OccupancyGrid.CopyIndoors), written beside each map snapshot.</summary>
         public byte[] IndoorMask() => grid.CopyIndoors();
         /// <summary>Set when an agent layer is running: survivors are then confirmed only by the agent's OpenCV-backed

@@ -103,16 +103,39 @@ namespace SmokeRescue.Brain
                 return false;
             }
             var list = new List<BrainFrontier>(); var all = planner.Frontiers(motion.Pose.position, Excluded);
-            foreach (var f in all)
+            // Nearest first alone fills the list with corners of the room the robot stands in once floor behind furniture
+            // is unsearched (held-out seed 914 runs 3 and 4: 102 of 162 options were in the robot's current room; in the
+            // foyer all six were corners while the doors to three unsearched rooms were not offered). Up to
+            // frontier_wide_options slots go to the frontiers opening onto the largest distinct regions of mapped but
+            // unsearched floor, one per region; the rest stay nearest first; the agent gets them all nearest first.
+            var picked = new List<int>(); int wide = 0;
+            if (c.frontier_wide_options > 0 && all.Count > max)
             {
-                if (list.Count >= max) break;
+                var label = grid.UnsearchedRegions(); var nearestOf = new Dictionary<int, int>();
+                for (int i = 0; i < all.Count; i++)
+                    foreach (int l in grid.RegionsNear(label, all[i].position)) if (!nearestOf.ContainsKey(l)) nearestOf[l] = i;
+                var regions = new List<(int index, float m2)>();
+                foreach (int i in new HashSet<int>(nearestOf.Values))
+                {
+                    float m2 = grid.UnsearchedFloorBeyond(all[i].position, c.frontier_beyond_m);
+                    if (m2 >= c.frontier_wide_min_m2) regions.Add((i, m2));
+                }
+                regions.Sort((a, b) => b.m2.CompareTo(a.m2));
+                for (int k = 0; k < regions.Count && wide < c.frontier_wide_options; k++) { picked.Add(regions[k].index); wide++; }
+            }
+            for (int i = 0; i < all.Count && picked.Count < max; i++) if (!picked.Contains(i)) picked.Add(i);
+            picked.Sort();
+            foreach (int index in picked)
+            {
+                var f = all[index];
                 list.Add(new BrainFrontier { id = list.Count, position = f.position, pathM = f.cost,
                     unsearchedM2 = f.information * grid.CellM * grid.CellM, provenIndoors = InSearchArea(f.position),
                     mappedUnsearchedM2 = grid.UnsearchedFloorBeyond(f.position, c.frontier_beyond_m) });
             }
             if (!provenOnly) return list;
             Emit(t, "frontier_options", $"{all.Count} frontiers; boundary cells dropped as claimed by a partner, blacklisted, visited, or not known to be indoors.",
-                "frontiers", all.Count, "cells_claimed", claimed, "cells_blacklisted", blacklisted, "cells_visited", visited, "cells_not_indoors", outside);
+                "frontiers", all.Count, "cells_claimed", claimed, "cells_blacklisted", blacklisted, "cells_visited", visited, "cells_not_indoors", outside,
+                "wide_options", wide);
             return list;
         }
 
