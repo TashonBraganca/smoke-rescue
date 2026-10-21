@@ -21,6 +21,8 @@
     "tow_offset_m": 0.9,
     "tow_offset_m_reason": "The sled rides this far behind the robot body on its strap.",
     "carry_speed_mps": 0.25,
-    "carry_speed_mps_reason": "Walking speed while dragging an adult on a low-friction rescue sled. Assumed for a Spot-class robot pulling roughly 150 to 200 N (sled friction on a smooth floor); slow enough to keep the strap and sled stable."
+    "carry_speed_mps_reason": "Walking speed while dragging an adult on a low-friction rescue sled. Assumed for a Spot-class robot pulling roughly 150 to 200 N (sled friction on a smooth floor); slow enough to keep the strap and sled stable.",
+    "grip_cone_deg": 60.0,
+    "grip_cone_deg_reason": "A person may be gripped only within this angle of the robot's heading; the same 60 deg cone RobotActions.BeginExtract applies to the arm's contact check."
   }
 }

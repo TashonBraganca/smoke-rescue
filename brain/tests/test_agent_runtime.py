@@ -328,3 +328,22 @@ def test_memory_of_close_looks_and_lifts_resets_with_a_new_recording(tmp_path, m
     for k in range(2):
         look("run_b", 20.0 + k)
     assert look("run_b", 1.0)["orders"], "same folder, clock restarted: a new recording"
+
+
+def test_lift_may_cite_the_confirming_inspection_once_within_reach_and_facing(tmp_path, monkeypatch):
+    # Run 25: robot A stood 1.34 m from the person it had confirmed, facing them, and the re-inspection was uncertain:
+    # a person lying that close is below the colour camera's view. The lift may cite the confirming inspection when the
+    # robot is within reach and facing them. Controls: beyond reach, and facing away, are refused.
+    fake_vision(monkeypatch, "person")
+    T.ToolRegistry._confirmed.clear(); RobotAgent._recent.clear()
+    out, _ = run(tmp_path, [[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": 3})],
+                            [ToolCall("confirm_survivor", {"x": 5, "y": 8, "evidence_id": "ev1"})]])
+    assert [o["type"] for o in out["orders"]] == ["confirm_survivor"]
+    def lift(x, y, heading, t):
+        req = request(tmp_path) | {"t": t, "pose": {"x": x, "y": y, "heading_deg": heading}}
+        return RobotAgent(Scripted([[ToolCall("extract_survivor", {"evidence_id": "ev1"})]]), tmp_path / "t.jsonl").step(req)
+    near = lift(5.0, 6.8, 0.0, 20.0)                 # 1.2 m short of them, facing +y
+    assert [o["type"] for o in near["orders"]] == ["extract_survivor"]
+    T.ToolRegistry._lifted.clear()
+    assert lift(5.0, 4.0, 0.0, 30.0)["refusals"], "control: 4 m away"
+    assert lift(5.0, 6.8, 180.0, 40.0)["refusals"], "control: facing away"

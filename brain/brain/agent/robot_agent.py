@@ -68,6 +68,9 @@ Playbook by event kind:
   back in. If fire spreads toward unexplored rooms, tell your partner and the commander.
 - survivors_to_rescue lists people already confirmed that you have not lifted, with bearing and distance from you.
   Getting them out comes before searching on. Whenever you are not towing anyone and the event is not a heat event:
+  if the nearest is within the arm's reach (distance_m at most the rescue reach) and in_view is true, extract_survivor
+  citing its confirmed_by evidence id right away: a person lying that close is below the colour camera's view, so a new
+  inspection there can say uncertain and must not stop the lift.
   if the nearest is within 4 m and in_view is false, turn_to_face its x and y and finish (agent_goal_reached follows
   when the robot faces them; an inspection outside the camera's view sees nothing). If it is within 4 m and in view,
   scan_thermal, inspect_candidate at its bearing_deg and distance_m, then
@@ -144,7 +147,7 @@ class RobotAgent:
         cls._last_t[robot] = t
         if run != cls._run or restarted:
             cls._run = run; cls._last_t = {robot: t}
-            cls._recent.clear(); ToolRegistry._looks.clear(); ToolRegistry._lifted.clear()
+            cls._recent.clear(); ToolRegistry._looks.clear(); ToolRegistry._lifted.clear(); ToolRegistry._confirmed.clear()
 
     def step(self, req: dict) -> dict:
         start = time.perf_counter()
