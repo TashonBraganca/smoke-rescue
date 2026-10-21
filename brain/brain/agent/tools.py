@@ -124,6 +124,10 @@ class ToolRegistry:
     _looks: dict = {}
     # Where each robot has lifted someone, from its own extract orders, so a lifted person is not offered again.
     _lifted: dict = {}
+    # People each robot confirmed, with the confirming inspection: robot -> [{"id", "x", "y"}]. A lying person within
+    # the arm's reach is below the colour camera's view (1.6 m up, pitched 10 deg down, 60 deg vertical view: floor visible
+    # from about 1.9 m), so a lift cites the inspection that confirmed them (run 25: re-inspection at 1.34 m, uncertain).
+    _confirmed: dict = {}
     MAX_LOOKS, LOOK_CELL_M, LOOK_MEMORY_S = 2, 1.5, 90.0
 
     def __init__(self, robot_dir: Path, ctx: AgentContext, debug_dir: Path | None = None):
@@ -237,9 +241,26 @@ class ToolRegistry:
                                  "the cited scan found no hotspot")
         elif name == "extract_survivor":
             reach = float(_RESCUE["reach_m"])
-            refusal = self._need(args, ("inspect_candidate",), lambda ev: ev.get("verdict") == "person" and
-                                 self._inspection_range(ev) is not None and self._inspection_range(ev) <= reach,
-                                 f"the cited inspection is not a person verdict within {reach:.1f} m; approach_candidate first")
+            known = next((c for c in self._confirmed.get(self.ctx.robot, []) if c["id"] == str(args.get("evidence_id"))), None)
+            if known is not None and str(args.get("evidence_id")) not in self.evidence:
+                # The inspection that confirmed this person: the robot must now stand within reach of them and face them.
+                dx, dy = known["x"] - self.ctx.x, known["y"] - self.ctx.y
+                bearing = (math.degrees(math.atan2(dx, dy)) - self.ctx.heading_deg + 180) % 360 - 180
+                refusal = None
+                if math.hypot(dx, dy) > reach:
+                    refusal = {"refused": True, "reason": f"the confirmed person is {math.hypot(dx, dy):.1f} m away, beyond the "
+                               f"arm's {reach:.1f} m reach; go_to their approach point first"}
+                elif abs(bearing) > float(_RESCUE["grip_cone_deg"]):
+                    refusal = {"refused": True, "reason": f"the confirmed person is {bearing:.0f} deg off the heading; "
+                               "turn_to_face them first"}
+                else:
+                    self.evidence[str(args["evidence_id"])] = {"id": known["id"], "tool": "inspect_candidate",
+                                                               "verdict": "person", "x": known["x"], "y": known["y"]}
+            else:
+                refusal = self._need(args, ("inspect_candidate",), lambda ev: ev.get("verdict") == "person" and
+                                     self._inspection_range(ev) is not None and self._inspection_range(ev) <= reach,
+                                     f"the cited inspection is not a person verdict within {reach:.1f} m; approach_candidate "
+                                     "first, or cite the inspection that confirmed them once within reach")
             if refusal is None and self.ctx.carrying_person:
                 refusal = {"refused": True, "reason": "already towing a person; take them out first"}
             if refusal is None:
@@ -319,6 +340,8 @@ class ToolRegistry:
                 order["evidence"] = {k: v for k, v in self.evidence[args["evidence_id"]].items() if k not in ("intrinsics", "rgb_to_thermal")}
         self.orders.append(order)
         if name == "confirm_survivor":
+            self._confirmed.setdefault(self.ctx.robot, []).append(
+                {"id": str(args["evidence_id"]), "x": float(args["x"]), "y": float(args["y"])})
             # Run 15: robot A confirmed a person from 2.7 m and searched on; the next step to get them out was only in the
             # prompt. The result says it, from the same inspection.
             looked, reach = self._inspection_range(self.evidence[str(args["evidence_id"])]), float(_RESCUE["reach_m"])
@@ -347,7 +370,8 @@ def survivors_to_rescue(robot: str, pose: dict, survivors: list, standoff_m: flo
         dist = math.hypot(dx, dy)
         bearing = (math.degrees(math.atan2(dx, dy)) - float(pose["heading_deg"]) + 180) % 360 - 180
         k = max(0.0, dist - standoff_m) / max(dist, 1e-6)
+        ev = next((c["id"] for c in ToolRegistry._confirmed.get(robot, []) if math.hypot(c["x"] - x, c["y"] - y) <= lifted_within_m), None)
         out.append({"x": round(x, 2), "y": round(y, 2), "bearing_deg": round(bearing, 1), "distance_m": round(dist, 2),
-                    "in_view": abs(bearing) <= CAMERA_HALF_HFOV_DEG,
+                    "in_view": abs(bearing) <= CAMERA_HALF_HFOV_DEG, "confirmed_by": ev,
                     "approach": {"x": round(float(pose["x"]) + dx * k, 2), "y": round(float(pose["y"]) + dy * k, 2)}})
     return sorted(out, key=lambda s: s["distance_m"])
