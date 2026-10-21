@@ -232,12 +232,13 @@ def _place_request(operation, robot, req):
 
 @app.post('/place/{robot}/keyframe')
 async def place_keyframe(robot: str, request: Request):
-    """Store a keyframe from this robot's frame at t. Returns {ok, id, features, payload_b64} or {ok: false, reason}."""
+    """Store an own view. Success returns {ok, id, database_id, t, features, payload_b64}; t is the actual RGB stamp.
+    A restarted database changes database_id before reusing service ids."""
     return await run_in_threadpool(_place_request, 'keyframe', robot, await request.json())
 
 
 @app.post('/place/{robot}/match')
 async def place_match(robot: str, request: Request):
     """Match a partner keyframe payload against this robot's keyframes. Returns the partner body pose in the matched
-    own keyframe's body frame, or {matched: false, reason}."""
+    own keyframe's body frame, or {matched: false, reason}. Both include database_id to prevent stale capture poses."""
     return await run_in_threadpool(_place_request, 'match', robot, await request.json())

@@ -96,3 +96,64 @@ def test_endpoints_round_trip():
         assert client.post("/place/t_A/keyframe", json={"robot_dir": A}).status_code == 400
         empty = client.post("/place/t_other/match", json={"robot_dir": B, "t": 1.0, "payload_b64": r["payload_b64"]}).json()
         assert empty["matched"] is False
+
+
+def test_database_identity_changes_when_service_ids_restart(tmp_path, monkeypatch):
+    settings = place.load_settings()
+    rng = np.random.default_rng(2)
+    kf = place.Keyframe(rng.integers(0, 256, (24, 32), dtype=np.uint8), rng.uniform(-1, 1, (24, 3)))
+
+    class Frame:
+        rgb, depth_m, K = None, None, None
+        def __getitem__(self, key):
+            return {"stamps": {"rgb": 10.0}}[key]
+
+    monkeypatch.setattr(place.vision, "load_frame", lambda *_: Frame())
+    monkeypatch.setattr(place, "make_keyframe", lambda *_: (kf, len(kf)))
+    db = place.PlaceDatabase(settings)
+    first = db.keyframe(tmp_path / "run" / "A", 10)
+    second = db.keyframe(tmp_path / "run" / "A", 11)
+    assert first["database_id"] == second["database_id"]
+    assert first["id"] == 0 and second["id"] == 1
+    assert first["t"] == 10.0
+    # A backwards clock restarts service ids. A caller must not reuse the old capture pose for a fresh id 0.
+    restarted = db.keyframe(tmp_path / "run" / "A", 5)
+    assert restarted["id"] == 0 and restarted["database_id"] != first["database_id"]
+    assert db.match(restarted["payload_b64"])["database_id"] == restarted["database_id"]
+    other = place.PlaceDatabase(settings).keyframe(tmp_path / "run" / "A", 5)
+    assert other["database_id"] != restarted["database_id"]
+    from brain.agent import server
+    monkeypatch.setattr(place, "_robot", lambda robot: db)
+    with TestClient(server.app) as client:
+        endpoint = client.post("/place/A/keyframe", json={"robot_dir": str(tmp_path / "run" / "A"), "t": 20}).json()
+        assert endpoint["ok"] and endpoint["database_id"] == restarted["database_id"]
+        assert endpoint["t"] == 10  # actual frame stamp, even when the caller requested t=20
+        matched = client.post("/place/A/match", json={"robot_dir": str(tmp_path / "run" / "A"), "t": 20,
+                              "payload_b64": endpoint["payload_b64"]}).json()
+        assert matched["matched"] and matched["database_id"] == endpoint["database_id"]
+
+
+def test_repeated_texture_descriptors_cannot_fix_a_place_pose():
+    settings = place.load_settings()
+    # The nearest and second-nearest Hamming distances tie on identical tiles, even with identical 3D layouts.
+    desc = np.zeros((96, 32), np.uint8)
+    positions = np.column_stack((np.linspace(-1, 1, 96), np.linspace(0, 4, 96), np.ones(96)))
+    repeated = place.Keyframe(desc, positions)
+    assert place.match_keyframes(repeated, [(0, repeated)], settings)["matched"] is False
+    rng = np.random.default_rng(3)
+    distinct = place.Keyframe(rng.integers(0, 256, (96, 32), dtype=np.uint8), positions)
+    accepted = place.match_keyframes(distinct, [(0, distinct)], settings)
+    assert accepted["matched"] and accepted["inliers"] == 96  # control: distinct descriptors at the same points
+
+
+def test_place_endpoints_report_worker_failure_as_unavailable(monkeypatch, tmp_path):
+    from brain.agent import server
+    def down(*args):
+        raise RuntimeError("place worker timed out")
+    monkeypatch.setattr(server.place, "keyframe", down)
+    with TestClient(server.app) as client:
+        reply = client.post("/place/A/keyframe", json={"robot_dir": str(tmp_path), "t": 1})
+        assert reply.status_code == 503 and "timed out" in reply.json()["detail"]
+        monkeypatch.setattr(server.place, "keyframe", lambda *args: {"ok": False, "reason": "no usable image"})
+        control = client.post("/place/A/keyframe", json={"robot_dir": str(tmp_path), "t": 1})
+        assert control.status_code == 200 and control.json()["ok"] is False

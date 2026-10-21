@@ -97,10 +97,17 @@ namespace SmokeRescue.Brain
         {
             // Max per cell and per frame avoids estimating a temperature slope between pixels of one image.
             var maximum = new Dictionary<int, float>();
+            // Every pixel with a depth match is a look at its cell, whatever its temperature, so cool floor counts as seen
+            // (RobotBrain route watch). This is BackProject then pose.Transform, with the angles' sines taken once per frame:
+            // it runs for every pixel (82k at 15 Hz on the house camera), not only the few hot ones.
+            var k = s.camera; float pitch = k.mount.pitch_down_deg * Mathf.Deg2Rad, cosPitch = Mathf.Cos(pitch), sinPitch = Mathf.Sin(pitch);
+            float cosYaw = Mathf.Cos(pose.yawRad), sinYaw = Mathf.Sin(pose.yawRad);
             for (int y = 0; y < thermal.Height; y++) for (int x = 0; x < thermal.Width; x++)
             {
-                float temperature = thermal.Celsius(x, y); if (temperature <= c.heat_project_min_c) continue;
                 if (!Match(x, y, rgb, s, out int u, out int v, out float z)) continue;
+                float right = (u - k.cx) / k.fx * z, ahead = k.mount.forward_offset_m + z * cosPitch - (v - k.cy) / k.fy * z * sinPitch;
+                grid.MarkHeatLook(grid.Cell(pose.position + new Vector2(cosYaw * right - sinYaw * ahead, sinYaw * right + cosYaw * ahead)), thermal.Timestamp);
+                float temperature = thermal.Celsius(x, y); if (temperature <= c.heat_project_min_c) continue;
                 var p = OccupancyGrid.BackProject(u, v, z, s); int cell = grid.Cell(pose.Transform(p.x, p.y));
                 if (cell >= 0 && (!maximum.TryGetValue(cell, out float old) || temperature > old)) maximum[cell] = temperature;
             }

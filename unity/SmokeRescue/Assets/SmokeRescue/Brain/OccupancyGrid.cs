@@ -16,6 +16,8 @@ namespace SmokeRescue.Brain
         readonly BrainConfig c;
         readonly float[] odds, lidarOdds, heat, rise;
         readonly double[] heatTime;
+        // When this robot's own thermal camera last looked at each cell, at any temperature (RobotBrain route watch).
+        readonly double[] heatLookTime;
         readonly bool[] hits, frees, observed;
         readonly byte[] roofHits;
         // Floor on a clear sight line from an indoor camera to ceiling it saw (see MarkCeilingSightLines).
@@ -49,9 +51,11 @@ namespace SmokeRescue.Brain
             localTime = new double[Count]; peer = new byte[Count]; roofHits = new byte[Count];
             sightIndoors = new bool[Count]; openGround = new bool[Count]; roofFrame = new int[Count];
             ownHeat = new float[Count]; ownHeatTime = new double[Count]; externalHeat = new float[Count]; externalTime = new double[Count];
+            heatLookTime = new double[Count];
             for (int i = 0; i < Count; i++)
             {
                 heat[i] = c.ambient_c; heatTime[i] = double.NegativeInfinity; ownHeat[i] = c.ambient_c; ownHeatTime[i] = double.NegativeInfinity;
+                heatLookTime[i] = double.NegativeInfinity;
                 externalHeat[i] = c.ambient_c; externalTime[i] = double.NegativeInfinity;
             }
         }
@@ -170,6 +174,10 @@ namespace SmokeRescue.Brain
         }
         internal float LocalHeat(int i) => ownHeat[i];
         internal double LocalHeatTime(int i) => ownHeatTime[i];
+        /// <summary>When this robot's own thermal camera last looked at the cell, whatever it read (cool floor too);
+        /// negative infinity if never. Partner heat and agent keep-out areas do not count: they are not a look of its own.</summary>
+        public double HeatLookTime(int i) => i < 0 || i >= Count ? double.NegativeInfinity : heatLookTime[i];
+        internal void MarkHeatLook(int i, double t) { if (i >= 0 && i < Count && t > heatLookTime[i]) heatLookTime[i] = t; }
         float ExternalHeatAt(int i, double t) => double.IsNegativeInfinity(externalTime[i]) ? c.ambient_c :
             Mathf.Max(c.ambient_c, externalHeat[i] - c.heat_decay_c_per_s * (float)(t - externalTime[i]));
         internal void ObservePeerHeat(int i, float temperatureC, double observedAt, double receivedAt)

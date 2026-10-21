@@ -113,6 +113,10 @@ namespace SmokeRescue.Brain
         public bool frames_shared_at_start = true;
         public float keyframe_spacing_m = 1.0f, keyframe_turn_deg = 45f;
         public int keyframe_beams = 360, keyframe_max = 400, keyframes_per_message = 2;
+        public bool visual_place_linking = true;
+        public int visual_lidar_keyframes_per_message = 1, visual_keyframe_max_payload_bytes = 3653;
+        public int visual_keyframe_max = 200, visual_keyframes_per_message = 1, visual_link_min_inliers = 16;
+        public float visual_keyframe_period_s = 2f;
         public int link_shortlist = 5, link_max_candidates = 20, link_turn_candidates = 3, link_verifications_per_step = 4;
         public float link_max_descriptor_distance = 0.3f, link_window_m = 0.8f, link_step_m = 0.1f, link_window_deg = 12f, link_step_deg = 2f;
         public float link_min_fit = 0.6f, link_agree_m = 0.3f, link_agree_deg = 4f, link_min_separation_m = 1.0f;
@@ -134,6 +138,10 @@ namespace SmokeRescue.Brain
         public float lookahead_m = 0.45f;
         public float goal_tolerance_m = 0.18f, return_arrive_m = 0.5f;
         public float escape_check_s = 2f, escape_fire_margin_m = 2f, escape_ignore_m = 2f, escape_recheck_s = 10f;
+        // Off unless brain.json turns it on, so the existing reflex tests keep their exact behaviour.
+        public bool route_watch = false;
+        public float route_watch_stale_s = 15f, route_watch_max_stale_share = 0.5f, route_watch_min_interval_s = 90f,
+            route_watch_dwell_s = 4.5f, route_watch_max_s = 12f;
         public float heat_emergency_fraction = 0.15f, emergency_fire_clearance_m = 0.5f;
         public float heat_cool_after_s = 2f;
         public float open_speed_mps = 0.6f;
@@ -195,9 +203,12 @@ namespace SmokeRescue.Brain
                 stuck_turn_deg <= 0 || stuck_turn_deg > 90 || stuck_turn_timeout_s <= 0 ||
                 stuck_repeat_radius_m < cell_m || stuck_repeat_count < 2 || stuck_blacklist_s <= stuck_window_s)
                 throw new ArgumentException("Invalid stuck detection or recovery configuration.");
+            if (route_watch_stale_s <= 0 || route_watch_max_stale_share <= 0 || route_watch_max_stale_share >= 1 ||
+                route_watch_min_interval_s < 0 || route_watch_dwell_s < 0 || route_watch_max_s <= route_watch_dwell_s)
+                throw new ArgumentException("Invalid route watch configuration.");
             if (scan_yaw_gain < 0 || scan_yaw_gain > 1 || collision_margin_m < 0 || lead_max_m < cell_m || agent_avoid_min_radius_m < cell_m || agent_avoid_max_radius_m < agent_avoid_min_radius_m || frontier_cluster_max_m < cell_m * 2 || ceiling_min_height_m <= obstacle_max_height_m || ceiling_radius_m < 0 || ceiling_min_hits < 1 || ceiling_wall_margin_m < 0 ||
                 enclosure_rays < 8 || enclosure_range_m <= cell_m || enclosure_min_closed_share <= 0 || enclosure_min_closed_share > 1 || enclosure_max_open_share < 0 || enclosure_max_open_share >= 1 || lidar_open_span_deg <= 0 || fire_cut_blacklist_s < 0 || candidate_wall_extent_m <= 0 || candidate_wall_disc_m <= 0 || candidate_wall_window_m < candidate_wall_disc_m || last_resort_fire_clearance_m <= 0 || last_resort_fire_clearance_m > emergency_fire_clearance_m || air_warm_c <= ambient_c || air_rise_c_per_min <= 0 || air_rise_window_s <= 0 || air_rise_min_delta_c < 0 || air_rise_baseline_s < air_rise_window_s || frontier_peek_m < 0 || see_over_clearance_m < 0 || carried_person_radius_m <= 0 || search_max_range_m <= 0 ||
-                keyframe_spacing_m <= 0 || keyframe_turn_deg <= 0 || keyframe_beams < 36 || keyframe_max < 2 || keyframes_per_message < 1 || keyframes_per_message > 16 ||
+                keyframe_spacing_m <= 0 || keyframe_turn_deg <= 0 || keyframe_beams < 36 || keyframe_max < 2 || keyframes_per_message < 1 || keyframes_per_message > 16 || visual_keyframe_max_payload_bytes < 1 || visual_keyframe_max_payload_bytes > BrainMessage.MaxVisualPayloadBytes || visual_lidar_keyframes_per_message < 1 || visual_lidar_keyframes_per_message > keyframes_per_message || visual_keyframe_max < 1 || visual_keyframes_per_message < 0 || visual_keyframes_per_message > 16 || visual_link_min_inliers < 3 || !(visual_keyframe_period_s > 0) ||
                 link_shortlist < 1 || link_max_candidates < 2 || link_turn_candidates < 1 || link_verifications_per_step < 1 || link_max_descriptor_distance <= 0 || link_window_m < 0 || link_step_m <= 0 ||
                 link_window_deg < 0 || link_step_deg <= 0 || link_min_fit <= 0 || link_min_fit > 1 || link_agree_m <= 0 || link_agree_deg <= 0 || link_min_separation_m < 0 ||
                 keyframe_min_return_share < 0 || keyframe_min_return_share > 1 || link_unique_shift_m <= 0 || link_unique_ratio <= 0 || link_unique_ratio >= 1 || link_coarse_min_fit <= 0 || link_coarse_min_fit > link_min_fit ||

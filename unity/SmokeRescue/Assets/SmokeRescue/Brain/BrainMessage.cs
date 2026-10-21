@@ -25,6 +25,10 @@ namespace SmokeRescue.Brain
     /// <summary>A person this robot strapped onto its sled, at the position they were confirmed (sender's frame).</summary>
     [Serializable] public struct BrainCarried
     { public Vector2 position; public double at; public string sourceRobot; }
+    /// <summary>A camera keyframe for visual place recognition: id and pose in the sender's own frame, and an opaque payload
+    /// of ORB features with body-frame positions made by the robot's own OpenCV 5 place service (version-tagged inside).</summary>
+    [Serializable] public struct BrainVisualKeyframe
+    { public int id; public BrainPose pose; public byte[] payload; }
     [Serializable] public struct BrainHotspot
     { public int cell; public float temperatureC; public double observedAt; }
     [Serializable] public struct BrainAck
@@ -60,9 +64,12 @@ namespace SmokeRescue.Brain
         public BrainAck[] Acknowledgements = Array.Empty<BrainAck>();
         public BrainKeyframe[] Keyframes = Array.Empty<BrainKeyframe>();
         public BrainCarried[] CarriedOut = Array.Empty<BrainCarried>();
+        public BrainVisualKeyframe[] VisualKeyframes = Array.Empty<BrainVisualKeyframe>();
         /// <summary>Version 3 adds CarriedOut after the keyframes (hidden-corner run: robot B went back for a person
-        /// robot A had already carried out, because only confirmations travelled).</summary>
-        public const byte Version = 3;
+        /// robot A had already carried out, because only confirmations travelled). Version 4 adds VisualKeyframes after
+        /// CarriedOut, so maps can also be linked by places the cameras recognise (run 3 never linked by LiDAR alone).</summary>
+        public const byte Version = 4;
+        public const int MaxVisualPayloadBytes = 8192;
         public int EstimatedBytes => ToBytes().Length;
         internal static bool Bit(byte[] mask, int cell) => (mask[cell >> 3] & (1 << (cell & 7))) != 0;
         internal static void Set(byte[] mask, int cell) { mask[cell >> 3] |= (byte)(1 << (cell & 7)); }
@@ -98,6 +105,12 @@ namespace SmokeRescue.Brain
                 }
                 w.Write(CarriedOut.Length);
                 foreach (var cOut in CarriedOut) { Write(w, cOut.position); w.Write(cOut.at); WriteString(w, cOut.sourceRobot); }
+                w.Write(VisualKeyframes.Length);
+                foreach (var v in VisualKeyframes)
+                {
+                    if (v.payload == null || v.payload.Length > MaxVisualPayloadBytes) throw new InvalidDataException("Invalid visual keyframe payload.");
+                    w.Write(v.id); Write(w, v.pose.position); w.Write(v.pose.yawRad); w.Write((ushort)v.payload.Length); w.Write(v.payload);
+                }
                 w.Flush();
                 if (stream.Length >= MaxBytes) throw new InvalidDataException("Brain state exceeds the 40000-byte radio limit; increase compression before using this scene.");
                 return stream.ToArray();
@@ -134,6 +147,14 @@ namespace SmokeRescue.Brain
                 }
                 m.CarriedOut = new BrainCarried[ReadCount(r, 1024)];
                 for (int i = 0; i < m.CarriedOut.Length; i++) m.CarriedOut[i] = new BrainCarried { position = ReadPoint(r), at = r.ReadDouble(), sourceRobot = ReadString(r) };
+                m.VisualKeyframes = new BrainVisualKeyframe[ReadCount(r, 16)];
+                for (int i = 0; i < m.VisualKeyframes.Length; i++)
+                {
+                    var v = new BrainVisualKeyframe { id = r.ReadInt32(), pose = new BrainPose { position = ReadPoint(r), yawRad = r.ReadSingle() } };
+                    int n = r.ReadUInt16(); if (n > MaxVisualPayloadBytes) throw new InvalidDataException("Invalid visual keyframe payload.");
+                    v.payload = r.ReadBytes(n); if (v.payload.Length != n) throw new InvalidDataException("Truncated visual keyframe.");
+                    m.VisualKeyframes[i] = v;
+                }
                 if (stream.Position != stream.Length) throw new InvalidDataException("Trailing brain packet bytes.");
                 return m;
             }
