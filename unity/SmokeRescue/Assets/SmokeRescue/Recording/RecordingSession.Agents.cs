@@ -146,7 +146,7 @@ namespace SmokeRescue.Recording
                 var frontiers = new JArray(rig.brain.FrontierOptions(t, FrontierOptions).Select(f => (object)new JObject
                 {
                     ["id"] = f.id, ["x"] = Math.Round(f.position.x, 2), ["y"] = Math.Round(f.position.y, 2),
-                    ["path_m"] = Math.Round(f.pathM, 1), ["unsearched_m2"] = Math.Round(f.unsearchedM2, 1),
+                    ["path_m"] = Math.Round(f.pathM, 1), ["unsearched_m2"] = Math.Round(f.unsearchedM2, 1), ["proven_indoors"] = f.provenIndoors,
                 }));
                 var req = new JObject
                 {
@@ -220,7 +220,9 @@ namespace SmokeRescue.Recording
                     brain.AgentGoTo(P(), t, OrderHoldS, o.Value<string>("reason"),
                         o["face_x"] != null && o["face_y"] != null ? new Vector2(o.Value<float>("face_x"), o.Value<float>("face_y")) : (Vector2?)null);
                     break;
-                case "explore_frontier": brain.AgentExplore(P(), t, ExploreHoldS, o.Value<string>("reason")); break;
+                case "explore_frontier":
+                    brain.AgentExplore(P(), t, ExploreHoldS, o.Value<string>("reason"), o.Value<bool?>("unproven") == true ? ev : null);
+                    break;
                 case "confirm_survivor": brain.AgentConfirmSurvivor(P(), t, ev); break;
                 case "reject_candidate": brain.AgentRejectCandidate(P(), t, ev); break;
                 case "avoid_area": brain.AgentAvoidArea(P(), o.Value<float?>("radius_m") ?? 1.5f, t, o.Value<double?>("seconds") ?? 30, ev); break;

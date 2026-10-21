@@ -72,6 +72,23 @@ namespace SmokeRescue.Brain
         /// including heat and wall costs; unsearched_m2 is the floor no camera on the team has seen near it.</summary>
         public IReadOnlyList<BrainFrontier> FrontierOptions(double t, int max)
         {
+            // Proven frontiers first; then floor the robot cannot yet prove is indoors, which only the agent may choose
+            // (with an OpenCV indoor check of its own frame). Unentered rooms have unmapped walls and were never proven,
+            // so they were never searched (hidden-corner run: robot A walked out with 30 % of the floor unsearched).
+            var proven = FrontierOptions(t, max, true);
+            if (proven.Count >= max) return proven;
+            var list = new List<BrainFrontier>(proven);
+            foreach (var f in FrontierOptions(t, max, false))
+            {
+                if (list.Count >= max) break;
+                if (f.provenIndoors) continue;
+                var copy = f; copy.id = list.Count; list.Add(copy);
+            }
+            return list;
+        }
+
+        IReadOnlyList<BrainFrontier> FrontierOptions(double t, int max, bool provenOnly)
+        {
             // Frontier cells dropped by each filter, so a short list can be explained from the log (agent run 9: robot A
             // was offered one 0.5 m2 frontier at 20 s with most of its LiDAR-mapped floor unsearched).
             int claimed = 0, blacklisted = 0, visited = 0, outside = 0;
@@ -80,7 +97,7 @@ namespace SmokeRescue.Brain
                 if (ClaimBlocks(p, t)) { claimed++; return true; }
                 if (GoalBlacklisted(p, t)) { blacklisted++; return true; }
                 if (VisitedGoal(p, t)) { visited++; return true; }
-                if (!InSearchArea(p)) { outside++; return true; }
+                if (provenOnly && !InSearchArea(p)) { outside++; return true; }
                 return false;
             }
             var list = new List<BrainFrontier>(); var all = planner.Frontiers(motion.Pose.position, Excluded);
@@ -88,8 +105,9 @@ namespace SmokeRescue.Brain
             {
                 if (list.Count >= max) break;
                 list.Add(new BrainFrontier { id = list.Count, position = f.position, pathM = f.cost,
-                    unsearchedM2 = f.information * grid.CellM * grid.CellM });
+                    unsearchedM2 = f.information * grid.CellM * grid.CellM, provenIndoors = InSearchArea(f.position) });
             }
+            if (!provenOnly) return list;
             Emit(t, "frontier_options", $"{all.Count} frontiers; boundary cells dropped as claimed by a partner, blacklisted, visited, or not known to be indoors.",
                 "frontiers", all.Count, "cells_claimed", claimed, "cells_blacklisted", blacklisted, "cells_visited", visited, "cells_not_indoors", outside);
             return list;
@@ -140,8 +158,18 @@ namespace SmokeRescue.Brain
 
         /// <summary>Agent order: search this frontier next. It is driven like a go_to, and on arrival the robot sweeps
         /// and marks it visited exactly as for a frontier it chose itself.</summary>
-        public void AgentExplore(Vector2 target, double t, double holdS, string reason)
+        public void AgentExplore(Vector2 target, double t, double holdS, string reason, string indoorEvidence = null)
         {
+            if (!string.IsNullOrEmpty(indoorEvidence) && !InSearchArea(target))
+            {
+                // Floor the robot cannot prove is indoors, chosen by the agent on an OpenCV indoor check of its own frame.
+                agentGoal = target; agentGoalUntil = t + holdS; agentGoalReason = "explore (unproven, OpenCV indoor check " + indoorEvidence + "): " + (reason ?? "");
+                agentGoalIsFrontier = true; agentFace = null; facing = null; agentHoldUntil = double.NegativeInfinity;
+                if (active == null) ClearPath();
+                Emit(t, "agent_order", "explore_frontier on floor not yet proven indoors, citing OpenCV evidence " + indoorEvidence + ": " + (reason ?? ""),
+                    "x_m", target.x, "y_m", target.y, "hold_s", holdS);
+                return;
+            }
             AgentGoTo(target, t, holdS, "explore: " + (reason ?? ""));
             agentGoalIsFrontier = agentGoal.HasValue;
         }

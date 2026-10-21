@@ -1737,7 +1737,29 @@ namespace SmokeRescue.Tests.EditMode
             Motion(yard, 0); yard.OnAirTemperature(0, 20); yard.OnLidar(SegmentScan(0, Vector2.zero, 0, facade)); yard.Step(0, 1f / 60);
             var h = Map(yard);
             Assert.That(h.Indoors(new Vector2(0, 2)), Is.False, "1 m in front of a facade");
-            Assert.That(yard.FrontierOptions(0, 10), Is.Empty, "nothing to search in front of a facade");
+            // Nothing the robot will search by itself: anything offered there is marked unproven, for the agent to check
+            // with OpenCV first (and the brain refuses an explore there without that evidence).
+            Assert.That(yard.FrontierOptions(0, 10).All(f => !f.provenIndoors), Is.True, "nothing proven in front of a facade");
+        }
+
+        [Test]
+        public void FloorNotProvenIndoorsIsExploredOnlyWithAnOpenCvIndoorCheck()
+        {
+            // Hidden-corner run: rooms not yet entered had unmapped walls, were never proven indoors, never offered, and
+            // the robot walked out with 30 % unsearched. Such frontiers are now offered marked unproven; the brain drives
+            // there only for an agent order citing OpenCV evidence. Control: the same order without evidence is refused.
+            var c = Settings(); c.search_requires_ceiling = true;
+            string Order(string evidence)
+            {
+                var b = new RobotBrain(Calibration(), c, "A", 0);
+                Motion(b, 0); b.OnAirTemperature(0, 20); b.OnLidar(RoomScan(0, Vector2.zero, 0, 9f, 720)); b.Step(0, 1f / 60); b.DrainEvents();
+                var unproven = b.FrontierOptions(0, 10).Where(f => !f.provenIndoors).ToList();
+                Assert.That(unproven, Is.Not.Empty, "unproven floor is offered");
+                b.AgentExplore(unproven[0].position, 0, 30, "check", evidence);
+                return b.DrainEvents().Last(e => e.kind == "agent_order").reason;
+            }
+            Assert.That(Order("ev_indoors"), Does.StartWith("explore_frontier on floor not yet proven indoors, citing OpenCV evidence ev_indoors"));
+            Assert.That(Order(null), Does.StartWith("Refused go_to"), "control: no evidence, refused");
         }
 
         [Test]
@@ -1773,7 +1795,7 @@ namespace SmokeRescue.Tests.EditMode
             var a = new RobotBrain(Calibration(), c, "A", 0);
             Motion(a, 0); a.OnAirTemperature(0, 20); a.OnLidar(RoomScan(0, Vector2.zero, 0, 9f, 720)); a.Step(0, 1f / 60);
             a.DrainEvents();
-            Assert.That(a.FrontierOptions(0, 10), Is.Empty, "an 18 m hall mapped only by LiDAR: not walled in within 10 m and no ceiling seen, nothing to search yet");
+            Assert.That(a.FrontierOptions(0, 10).All(f => !f.provenIndoors), Is.True, "an 18 m hall mapped only by LiDAR: not walled in within 10 m and no ceiling seen, nothing proven to search yet");
             // The log says why the list is empty: frontier cells dropped as not known to be indoors, none for other reasons.
             var why = a.DrainEvents().Single(e => e.kind == "frontier_options").numbers;
             Assert.That(why["frontiers"], Is.Zero);
@@ -1788,7 +1810,8 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(g.UnderCeiling(new Vector2(0, 7.6f)), Is.False, "ceiling distance does not pass a wall");
             var options = a.FrontierOptions(.1, 10);
             Assert.That(options, Is.Not.Empty);
-            Assert.That(options.All(f => g.Indoors(f.position)), Is.True);
+            Assert.That(options.Where(f => f.provenIndoors).All(f => g.Indoors(f.position)), Is.True);
+            Assert.That(options.Any(f => f.provenIndoors), Is.True, "floor under the seen ceiling is proven");
             // The agent has no outline either: the brain refuses a go_to where no ceiling was seen, and accepts one under it.
             a.DrainEvents();
             a.AgentGoTo(new Vector2(0, -4f), .1, 30, "behind");

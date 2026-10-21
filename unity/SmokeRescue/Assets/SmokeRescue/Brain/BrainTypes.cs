@@ -66,6 +66,9 @@ namespace SmokeRescue.Brain
         public int id;
         public Vector2 position;
         public float pathM, unsearchedM2;
+        /// <summary>False when the robot has no evidence of its own that this floor is indoors (no ceiling seen, walls
+        /// not mapped around it). The agent may still choose it, citing an OpenCV check of its own camera frame.</summary>
+        public bool provenIndoors;
     }
     public readonly struct PersonDetection
     {
