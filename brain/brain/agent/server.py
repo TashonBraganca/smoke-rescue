@@ -5,15 +5,19 @@
 
 Endpoints: GET /health; POST /robot/{robot}/step; POST /commander/step; POST /approval (ask), GET /approvals,
 POST /approvals/{id} (a person answers); POST /vision/{tool} with a PNG body for the judge demo; GET /trace.
+POST /map3d/{robot}/integrate, /layers, /export fuse each robot's own depth and estimated pose.
 """
 
 from __future__ import annotations
 
+import base64
+from contextlib import asynccontextmanager
 import io
 import itertools
 import json
 import os
 import time
+import threading
 from pathlib import Path
 
 import cv2
@@ -24,13 +28,29 @@ from starlette.concurrency import run_in_threadpool
 from brain.agent.commander import Commander, simulated_operator
 from brain.agent.llm import make_backend
 from brain.agent.robot_agent import RobotAgent
+from brain.agent.map3d import RobotMap3D
 
 RUN_DIR = Path(os.environ.get("AGENT_RUN_DIR", "/tmp/smoke-rescue-agent"))
 RUN_DIR.mkdir(parents=True, exist_ok=True)
 TRACE = RUN_DIR / "agent_trace.jsonl"
 APPROVAL_MODE = os.environ.get("APPROVAL_MODE", "simulated")
 
-app = FastAPI(title="Smoke Rescue agents")
+_maps3d: dict[str, RobotMap3D] = {}
+_maps3d_lock = threading.Lock()
+
+
+@asynccontextmanager
+async def lifespan(app):
+    try:
+        yield
+    finally:
+        with _maps3d_lock:
+            for volume in _maps3d.values():
+                volume.close()
+            _maps3d.clear()
+
+
+app = FastAPI(title="Smoke Rescue agents", lifespan=lifespan)
 _backend = None
 _approvals: dict[str, dict] = {}
 _ids = itertools.count(1)
@@ -152,3 +172,44 @@ def trace(n: int = 200):
         return []
     lines = TRACE.read_text().splitlines()[-max(1, min(n, 2000)):]
     return [json.loads(l) for l in lines]
+
+
+def _map3d_request(robot, operation, req):
+    start = time.perf_counter()
+    with _maps3d_lock:
+        volume = _maps3d.get(robot)
+        if volume is None:
+            volume = _maps3d[robot] = RobotMap3D()
+    try:
+        if operation == 'integrate':
+            volume.integrate(req['robot_dir'], req['t'], req['pose'])
+            result = {'ok': True}
+        elif operation == 'layers':
+            top, seen = volume.layers(req['cell_m'], req['origin'], req['size'])
+            result = {'top_cm': base64.b64encode(top.astype('<u2').tobytes(order='C')).decode('ascii'),
+                      'seen': base64.b64encode(np.packbits(seen.ravel(), bitorder='little').tobytes()).decode('ascii')}
+        else:
+            volume.export(req['path'])
+            result = {'ok': True}
+    except (ValueError, KeyError, TypeError, OSError) as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc)) from exc
+    result['ms'] = (time.perf_counter() - start) * 1000
+    return result
+
+
+@app.post('/map3d/{robot}/integrate')
+async def map3d_integrate(robot: str, request: Request):
+    return await run_in_threadpool(_map3d_request, robot, 'integrate', await request.json())
+
+
+@app.post('/map3d/{robot}/layers')
+async def map3d_layers(robot: str, request: Request):
+    """Row zero is south. Seen bits use little bit order with zero padding."""
+    return await run_in_threadpool(_map3d_request, robot, 'layers', await request.json())
+
+
+@app.post('/map3d/{robot}/export')
+async def map3d_export(robot: str, request: Request):
+    return await run_in_threadpool(_map3d_request, robot, 'export', await request.json())
