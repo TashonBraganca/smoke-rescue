@@ -1,0 +1,30 @@
+                                unity_house_heldout_run1
+duration_s                                         200.0
+survivors_total                                        5
+survivors_found                                        1
+first_found_s                                        0.0
+confirmations                                          1
+duplicate_confirmations                                0
+moved_confirmations                                    0
+false_confirmations                                    0
+confirmation_precision                               1.0
+area_searched_m2                                   206.8
+double_coverage_share                              0.213
+people_carried_out                                     1
+collision_s                   {'robot_A': 0.0, 'robot_B'
+unity_house_heldout_run1 heat {'robot_A': {'max_air_c': 72.0, 's_air_over_60c': 8.6, 'max_surface_within_1m_c': 144.1}, 'robot_B': {'max_air_c': 46.3, 's_air_over_60c': 0.0, 'max_surface_within_1m_c': 187.1}} agent {'steps': 65, 'orders': 69, 'refusals': 6, 'errors': 0, 'orders_by_type': {'send_team_message': 26, 'explore_frontier': 8, 'confirm_survivor': 1, 'go_to': 13, 'set_torch': 1, 'broadcast': 3, 'avoid_area': 6, 'extract_survivor': 1, 'reject_candidate': 12, 'spray_water': 1}}
+robot_B frame check {"t": 0.0, "body_xy": [10.0, -1.2], "yaw_deg": -0.0, "spawn_xy": [10.0, -1.2], "spawn_yaw_deg": 0, "position_error_m": 0.0, "yaw_error_deg": 0.0, "passed": true, "scenario_file": "scenario_house_heldout.json", "recorded_frame": "local", "transformed_brain_position_error_m": 0.0, "transformed_brain_yaw_error_deg": 0.0}; optical +z projected to house x/z, subtract 0.25 m forward; yaw=atan2(-forward_x, forward_z)
+team searched floor share 0.804 of 21545 floor cells
+robot        pos median/p95/max/final (m)   yaw median/max (deg)   lidar true/brain median (m)   map P/R   stalls   collision s
+robot_A      0.058/0.091/0.101/0.082       0.136/1.289   0.009/0.034   0.890/0.851   3 (1 unexplained)   0.000
+robot_A frame_link: linked at 171.02s from robot_B {'dx_m': 8.429686546325684, 'dy_m': 11.20812702178955, 'dyaw_deg': -269.8582763671875}; error 0.230 m / 0.142 deg
+robot_B      0.133/0.167/0.187/0.129       0.131/0.394   0.013/0.049   0.824/0.879   2 (1 unexplained)   1.173
+robot_B frame_link: linked at 172.07s from robot_A {'dx_m': -11.184946060180664, 'dy_m': 8.388157844543457, 'dyaw_deg': -89.89756774902344}; error 0.189 m / 0.102 deg
+== people
+s1 foyer [10.98, 0.0, 2.47]
+s2 workshop_tools [20.86, 0.0, 23.28]
+s3 apt_bed_1 [26.91, 0.0, 10.47]
+s4 workshop_parts [30.85, 0.0, 23.15]
+s6 office_wash [17.67, 0.0, 23.13]
+{"t":55.0,"robot":"robot_B","event":"gripped","person":"Survivor_s1_lying_on_side"}
+{"t":83.2,"robot":"robot_B","event":"released","person":"Survivor_s1_lying_on_side","x":10.3,"z":-2.67,"outside_building":true}

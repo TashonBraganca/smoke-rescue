@@ -1,0 +1,57 @@
+[
+  {
+    "id": "s1",
+    "room": "foyer",
+    "position_house": [
+      10.9756794,
+      0.0,
+      2.4691112
+    ],
+    "yaw": 192.905167,
+    "pose": "lying_on_side"
+  },
+  {
+    "id": "s2",
+    "room": "workshop_tools",
+    "position_house": [
+      20.8589115,
+      0.0,
+      23.281517
+    ],
+    "yaw": 332.575684,
+    "pose": "slumped_against_wall"
+  },
+  {
+    "id": "s3",
+    "room": "apt_bed_1",
+    "position_house": [
+      26.9096527,
+      0.0,
+      10.4721594
+    ],
+    "yaw": 159.603943,
+    "pose": "collapsed_at_desk"
+  },
+  {
+    "id": "s4",
+    "room": "workshop_parts",
+    "position_house": [
+      30.8470516,
+      0.0,
+      23.15271
+    ],
+    "yaw": 323.085449,
+    "pose": "curled_on_bed"
+  },
+  {
+    "id": "s6",
+    "room": "office_wash",
+    "position_house": [
+      17.6669674,
+      0.0,
+      23.1265011
+    ],
+    "yaw": 250.781982,
+    "pose": "slumped_against_wall"
+  }
+]

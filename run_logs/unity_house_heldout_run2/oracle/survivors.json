@@ -1,0 +1,57 @@
+[
+  {
+    "id": "s1",
+    "room": "living",
+    "position_house": [
+      6.369507,
+      0.0,
+      2.4691112
+    ],
+    "yaw": 192.905167,
+    "pose": "lying_on_side"
+  },
+  {
+    "id": "s2",
+    "room": "laundry",
+    "position_house": [
+      16.70661,
+      0.0,
+      9.281517
+    ],
+    "yaw": 332.575684,
+    "pose": "slumped_against_wall"
+  },
+  {
+    "id": "s3",
+    "room": "foyer",
+    "position_house": [
+      10.1110516,
+      0.0,
+      1.3326993
+    ],
+    "yaw": 320.3459,
+    "pose": "collapsed_at_desk"
+  },
+  {
+    "id": "s4",
+    "room": "bathroom",
+    "position_house": [
+      6.01312828,
+      0.0,
+      9.39802
+    ],
+    "yaw": 184.7561,
+    "pose": "curled_on_bed"
+  },
+  {
+    "id": "s6",
+    "room": "bedroom_2",
+    "position_house": [
+      15.0287933,
+      0.0,
+      13.1033907
+    ],
+    "yaw": 139.472137,
+    "pose": "slumped_against_wall"
+  }
+]
