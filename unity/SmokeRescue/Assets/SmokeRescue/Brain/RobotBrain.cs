@@ -170,26 +170,46 @@ namespace SmokeRescue.Brain
                 float toExit = float.PositiveInfinity; foreach (var e in Exits()) toExit = Mathf.Min(toExit, Vector2.Distance(motion.Pose.position, e));
                 bool clearing = !float.IsNaN(carryClearFrom.x);
                 bool arrived = toExit <= Mathf.Max(c.goal_tolerance_m, c.return_arrive_m) || clearing;
-                if (arrived && returnReason == CarryingOut && carryTowM > 0)
+                if (arrived && returnReason == CarryingOut && carryTowM > 0 && float.IsNaN(stepAwayFrom.x))
                 {
-                    // The sled rides carryTowM behind the robot: keep walking straight out until it, not just the robot,
-                    // is past the way out (hidden-corner run: the robot stopped 0.5 m short of its start and set the person
-                    // down 5 cm inside the front doorway).
-                    if (!clearing) { carryClearFrom = motion.Pose.position; carryClearM = toExit + carryTowM; }
-                    bool clear = Vector2.Distance(motion.Pose.position, carryClearFrom) < carryClearM;
+                    // The sled rides carryTowM behind the robot: keep walking straight out until the person lies a body
+                    // radius plus a robot's width past the way out (hidden-corner run 1: the robot stopped 0.5 m short of its
+                    // start, set the person down 5 cm inside the front doorway, then drove into them 13 times trying to go
+                    // back in, outside for 156 of 200 s).
+                    if (!clearing) { carryClearFrom = motion.Pose.position; carryClearM = toExit + carryTowM + c.carried_person_radius_m + 2 * c.robot_radius_m; }
+                    bool more = Vector2.Distance(motion.Pose.position, carryClearFrom) < carryClearM;
                     var ahead = motion.Pose.position + motion.Pose.Forward * Mathf.Max(grid.CellM, carryingSpeed * dt);
-                    if (clear && planner.SegmentSafe(motion.Pose.position, ahead)) return Command(carryingSpeed, 0, dt, false);
+                    if (more && planner.SegmentSafe(motion.Pose.position, ahead)) return Command(carryingSpeed, 0, dt, false);
+                    // Set them down here. The robot knows where: on its own trail, carryTowM behind it. A person lying on the
+                    // floor is below the LiDAR plane and too close for the camera, so the map would never show them; it
+                    // marks them itself, then steps clear of that mark so its next plan does not start inside it.
+                    Vector2 body = motion.Pose.position - motion.Pose.Forward * carryTowM;
+                    setDownAt = body;   // marked once the robot has stepped clear, or its own spot would be inside the mark
+                    Emit(t, "person_carried_out", "Set the person down past the way out and marked where they lie.",
+                        "distance_to_exit_m", toExit, "person_x_m", body.x, "person_y_m", body.y);
+                    stepAwayFrom = motion.Pose.position; stepAwaySpeed = carryingSpeed; carryingSpeed = 0;
+                    stepAwayM = Mathf.Max(0, c.carried_person_radius_m + c.robot_radius_m + grid.CellM * 1.5f - carryTowM);
+                    carriedOutReported = true;
+                }
+                if (!float.IsNaN(stepAwayFrom.x))
+                {
+                    var ahead = motion.Pose.position + motion.Pose.Forward * Mathf.Max(grid.CellM, stepAwaySpeed * dt);
+                    if (Vector2.Distance(motion.Pose.position, stepAwayFrom) < stepAwayM && planner.SegmentSafe(motion.Pose.position, ahead))
+                        return Command(stepAwaySpeed, 0, dt, false);
+                    grid.PlaceObstacle(setDownAt, c.carried_person_radius_m);
+                    arrived = true;
                 }
                 if (arrived)
                 {
-                    completed = true; ClearPath(); carryClearFrom = new Vector2(float.NaN, float.NaN);
+                    completed = true; ClearPath(); carryClearFrom = stepAwayFrom = new Vector2(float.NaN, float.NaN);
                     // Left early to stay safe, or carried someone out: it may go back in once that is safe (CheckReenter).
                     canReenter = returnReason == WayOutClosing || returnReason == EmergencyExit || returnReason == CarryingOut;
-                    if (returnReason == CarryingOut)
+                    if (returnReason == CarryingOut && !carriedOutReported)
                     {
                         carryingSpeed = 0;
                         Emit(t, "person_carried_out", "Reached a way out with the person on the sled.", "distance_to_exit_m", toExit);
                     }
+                    carriedOutReported = false;
                     Emit(t, "mission_complete", returnReason + " Reached a known way out.", "distance_to_start_m", Vector2.Distance(motion.Pose.position, home),
                         "distance_to_exit_m", toExit);
                     return Command(0, 0, dt, true);
@@ -699,7 +719,8 @@ namespace SmokeRescue.Brain
             facing = null; agentFace = null; agentHoldUntil = double.NegativeInfinity;
         }
         const string WayOutClosing = "The way out was closing.", EmergencyExit = "Emergency exit.", CarryingOut = "Carrying a person out.";
-        float carryingSpeed, carryTowM, carryClearM; Vector2 carryClearFrom = new Vector2(float.NaN, float.NaN);
+        float carryingSpeed, carryTowM, carryClearM, stepAwayM, stepAwaySpeed; bool carriedOutReported;
+        Vector2 carryClearFrom = new Vector2(float.NaN, float.NaN), stepAwayFrom = new Vector2(float.NaN, float.NaN), setDownAt;
         /// <summary>A person is strapped onto the sled: take them to the nearest known way out at carry speed, then the
         /// robot may go back in (CheckReenter). The heat reflexes stay active.</summary>
         public void BeginCarry(double t, float speedMps, string who, float towOffsetM = 0)

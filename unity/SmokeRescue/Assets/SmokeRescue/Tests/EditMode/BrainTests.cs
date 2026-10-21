@@ -960,30 +960,45 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
-        public void ACarriedPersonEndsPastTheWayOutNotOnTheThreshold()
+        public void ACarriedPersonIsSetDownClearOfTheWayOutAndTheRobotPlansBackInAroundThem()
         {
-            // Hidden-corner run: the robot stopped 0.5 m short of its start (outside the front door) and the sled, 0.9 m
-            // behind it, set the person down 5 cm inside the doorway. With a tow offset the robot walks straight on until
-            // the sled is past its start. Control: tow offset 0 completes on arrival as before.
-            float FinalDistancePastStart(float tow)
+            // Hidden-corner run 1: the robot stopped 0.5 m short of its start, the sled 0.9 m behind it set the person down
+            // 5 cm inside the front doorway, and the robot drove into them 13 times trying to go back in (outside for 156
+            // of 200 s). Now: the person ends at least a body radius plus a robot's width past the start; the robot marks
+            // where it set them down, steps clear, and its plan back in goes around them. Control: tow offset 0 completes
+            // on arrival as before.
+            var c = Settings();
+            (Vector2 person, Vector2 robot, RobotBrain brain)? Carry(float tow)
             {
-                var b = new RobotBrain(Calibration(), Settings(), "A", 0); Room(b, -4, 4, -4, 4);
+                var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -6, 6, -6, 6);
                 b.AgentGoTo(new Vector2(0, 2.0f), 0, 30, "person");
-                var command = new BrainCommand(); int tick = 0; bool carrying = false;
-                for (; tick < 1200; tick++)
+                var command = new BrainCommand(); bool carrying = false; Vector2? person = null;
+                for (int tick = 0; tick < 1600; tick++)
                 {
                     command = DriveTick(b, tick, command.forwardMps, command.yawRateDeg);
                     var events = b.DrainEvents();
                     if (!carrying && events.Any(e => e.kind == "agent_goal_reached")) { b.BeginCarry(tick / 20.0, .25f, "p", tow); carrying = true; }
-                    if (events.Any(e => e.kind == "person_carried_out")) break;
+                    var released = events.FirstOrDefault(e => e.kind == "person_carried_out");
+                    if (released != null)
+                        person = released.numbers.ContainsKey("person_x_m") ? new Vector2((float)released.numbers["person_x_m"], (float)released.numbers["person_y_m"]) : b.Snapshot().pose.position;
+                    if (events.Any(e => e.kind == "mission_complete")) return (person ?? Vector2.zero, b.Snapshot().pose.position, b);
                 }
-                Assert.That(tick, Is.LessThan(1200), "carried out");
-                var pose = b.Snapshot().pose;
-                // Distance beyond the start along the way the robot left (toward -y): where the sled ends is tow behind it.
-                return -pose.position.y;
+                return null;
             }
-            Assert.That(FinalDistancePastStart(.9f), Is.GreaterThanOrEqualTo(.9f - .05f), "the sled is past the start");
-            Assert.That(FinalDistancePastStart(0f), Is.LessThan(.6f), "control: no tow, completes on arrival");
+            var done = Carry(.9f);
+            Assert.That(done.HasValue, Is.True, "carried out and finished");
+            var (body, at, brain) = done.Value;
+            Assert.That(-body.y, Is.GreaterThanOrEqualTo(c.carried_person_radius_m + 2 * c.robot_radius_m - .05f), "the person lies clear of the way out");
+            Assert.That(Vector2.Distance(at, body), Is.GreaterThanOrEqualTo(c.carried_person_radius_m + c.robot_radius_m), "the robot stepped clear of them");
+            var planner = (GridPlanner)typeof(RobotBrain).GetField("planner", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(brain);
+            var back = planner.Plan(at, new Vector2(0, 2f));
+            Assert.That(back, Is.Not.Empty, "a way back in exists");
+            float closest = float.PositiveInfinity;
+            for (int k = 1; k < back.Count; k++) for (float f = 0; f <= 1; f += .05f) closest = Mathf.Min(closest, Vector2.Distance(Vector2.Lerp(back[k - 1], back[k], f), body));
+            Assert.That(closest, Is.GreaterThanOrEqualTo(c.carried_person_radius_m + c.robot_radius_m - .05f), "the way back in goes around the person");
+            var none = Carry(0f);
+            Assert.That(none.HasValue, Is.True);
+            Assert.That(-none.Value.robot.y, Is.LessThan(.6f), "control: no tow, completes on arrival");
         }
 
         [Test]
