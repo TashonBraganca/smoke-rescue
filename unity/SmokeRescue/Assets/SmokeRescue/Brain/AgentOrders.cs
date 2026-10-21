@@ -176,6 +176,12 @@ namespace SmokeRescue.Brain
 
         public void AgentConfirmSurvivor(Vector2 p, double t, string evidence)
         {
+            if (AtOwnSetDown(p))
+            {
+                Emit(t, "agent_order", "Refused confirm_survivor: this robot set down a person it carried out there; that is the person already rescued.",
+                    "x_m", p.x, "y_m", p.y);
+                return;
+            }
             foreach (var known in survivors) if (Vector2.Distance(known, p) <= c.survivor_merge_m) return;
             survivors.Add(p);
             confirmed.Add(new BrainSurvivor { position = p, confirmedAt = t, sourceRobot = id });

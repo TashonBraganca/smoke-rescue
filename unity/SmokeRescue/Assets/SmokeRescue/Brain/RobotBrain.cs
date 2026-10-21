@@ -185,6 +185,7 @@ namespace SmokeRescue.Brain
                     // marks them itself, then steps clear of that mark so its next plan does not start inside it.
                     Vector2 body = motion.Pose.position - motion.Pose.Forward * carryTowM;
                     setDownAt = body;   // marked once the robot has stepped clear, or its own spot would be inside the mark
+                    NoteSetDown(body);
                     Emit(t, "person_carried_out", "Set the person down past the way out and marked where they lie.",
                         "distance_to_exit_m", toExit, "person_x_m", body.x, "person_y_m", body.y);
                     stepAwayFrom = motion.Pose.position; stepAwaySpeed = carryingSpeed; carryingSpeed = 0;
@@ -478,7 +479,7 @@ namespace SmokeRescue.Brain
             foreach (var detection in detections)
             {
                 bool known = false; foreach (var person in survivors) if (Vector2.Distance(person, detection.position) <= c.survivor_merge_m) { known = true; break; }
-                if (known) continue;
+                if (known || AtOwnSetDown(detection.position)) continue;
                 Track nearest = null; float best = c.survivor_merge_m;
                 foreach (var track in tracks)
                 {
@@ -515,6 +516,7 @@ namespace SmokeRescue.Brain
             float heading = pose.yawRad - bearingDegRight * Mathf.Deg2Rad;
             var position = camera + new Vector2(-Mathf.Sin(heading), Mathf.Cos(heading)) * rangeM;
             foreach (var person in survivors) if (Vector2.Distance(person, position) <= c.survivor_merge_m) return;
+            if (AtOwnSetDown(position)) return;
             Track nearest = null; float best = c.survivor_merge_m;
             foreach (var track in tracks)
             {
@@ -721,6 +723,28 @@ namespace SmokeRescue.Brain
         const string WayOutClosing = "The way out was closing.", EmergencyExit = "Emergency exit.", CarryingOut = "Carrying a person out.";
         float carryingSpeed, carryTowM, carryClearM, stepAwayM, stepAwaySpeed; bool carriedOutReported;
         Vector2 carryClearFrom = new Vector2(float.NaN, float.NaN), stepAwayFrom = new Vector2(float.NaN, float.NaN), setDownAt;
+        readonly List<Vector2> setDownPoints = new List<Vector2>();
+        /// <summary>Where this robot set down each person it carried out (own frame). Someone seen within survivor_merge_m
+        /// (the same-person distance used everywhere) of one is that person, not a new survivor. Held-out run 2: robot B's
+        /// agent confirmed the person B itself had set down in the yard as a new survivor at 99.5 s (the sighting lay 0.09 m
+        /// from the set-down point). A set-down point lies at least carried_person_radius_m plus a robot's width past the
+        /// way out, outside, so a person lying just inside the doorway stays farther than survivor_merge_m from it.</summary>
+        internal bool AtOwnSetDown(Vector2 p)
+        {
+            foreach (var s in setDownPoints) if (Vector2.Distance(s, p) <= c.survivor_merge_m) return true;
+            return false;
+        }
+        void NoteSetDown(Vector2 p)
+        {
+            setDownPoints.Add(p);
+            // A track already open there (the person seen while being set down) must not become a candidate either.
+            foreach (var track in tracks)
+            {
+                if (track.confirmed || Vector2.Distance(track.position, p) > c.survivor_merge_m) continue;
+                track.candidate = false; track.retryAfter = double.PositiveInfinity;
+                if (active == track) { active = null; dwell = 0; inspecting = false; }
+            }
+        }
         /// <summary>A person is strapped onto the sled: take them to the nearest known way out at carry speed, then the
         /// robot may go back in (CheckReenter). The heat reflexes stay active.</summary>
         public void BeginCarry(double t, float speedMps, string who, float towOffsetM = 0)
