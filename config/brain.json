@@ -307,6 +307,8 @@
   "enclosure_range_m_reason": "A ray that reaches a wall within this distance counts as closed; one that runs this far over floor mapped free counts as open. Longer than the house's rooms and corridors, shorter than the 12 m LiDAR range.",
   "enclosure_min_closed_share": 0.6,
   "enclosure_min_closed_share_reason": "A cell is walled in when at least this share of rays reach a wall. Rays into unmapped space count as neither, so a room partly hidden behind door jambs still qualifies.",
+  "frontier_peek_m": 1.2,
+  "frontier_peek_m_reason": "Unsearched floor this far past a standable cell, reached only through cells too tight for the body (a gap beside furniture, a strip along a wall), still makes that standable cell a frontier, so the robot goes there and looks in. The strip next to any obstacle is robot_radius_m plus half a cell diagonal (0.32 m) wide, and furniture a person can hide behind is about 0.6 to 0.9 m deep; 1.2 m covers both. Hidden-corner run: a woman behind a desk across a kitchen corner had no standable cell next to her floor, so no frontier was ever offered.",
   "enclosure_max_open_share": 0.1,
   "enclosure_max_open_share_reason": "And at most this share run out over open mapped ground. Open ground has most of its rays open (or ending in unmapped space, which counts as neither). Through a 1 m open outside door, a room cell 2 m inside sees open ground in about 8 percent of directions and is walled in; cells within about 1.5 m of such a door are not (14 percent at 1 m) and need the ceiling rule.",
   "frames_shared_at_start": false,

@@ -186,7 +186,7 @@ namespace SmokeRescue.Recording
                 var id = rig.robot.RobotId; var r0 = rig;
                 rig.actions.GripCompleted += who =>
                 {
-                    r0.brain?.BeginCarry(SimNow, world.rescue.carry_speed_mps, who);
+                    r0.brain?.BeginCarry(SimNow, world.rescue.carry_speed_mps, who, world.rescue.tow_offset_m);
                     world.rescueLog.Append(new JObject { ["t"] = Math.Round(SimNow, 3), ["robot"] = id, ["event"] = "gripped", ["person"] = who }.ToString(Formatting.None)).Append('\n');
                 };
                 rig.actions.SprayStarted += (nozzleAt, headingRad, flow, seconds) =>

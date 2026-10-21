@@ -428,7 +428,12 @@ namespace SmokeRescue.Tests.EditMode
             var blocked = Check(true, out int withFire);
             Assert.That(withFire, Is.Zero, "the fire margin cuts the corridor");
             Assert.That(blocked.HasValue, Is.True);
-            Assert.That(Mathf.Abs(blocked.Value.bearingDegRight), Is.LessThan(20), "straight ahead");
+            // Where the hose must aim: inside the corridor, between the robot and the fire (not sideways or behind). With
+            // frontiers that look past tight strips, the best frontier beyond the fire may sit beside a corridor wall, so
+            // the route can meet the margin up to the corridor's half width off the centre line.
+            Assert.That(blocked.Value.blockAt.y, Is.InRange(0f, 2f), "ahead, before the fire");
+            Assert.That(Mathf.Abs(blocked.Value.blockAt.x), Is.LessThan(1f), "inside the corridor");
+            Assert.That(Mathf.Abs(blocked.Value.bearingDegRight), Is.LessThan(Mathf.Atan2(1f, blocked.Value.distanceM) * Mathf.Rad2Deg), "within the corridor's angle from here");
             Assert.That(blocked.Value.distanceM, Is.InRange(.3f, 1.2f), "where the route meets the 1.2 m margin before the fire at 2 m");
             var walled = Check(false, out int withWall);
             Assert.That(withWall, Is.Zero, "control: the wall cuts it too");
@@ -868,6 +873,73 @@ namespace SmokeRescue.Tests.EditMode
             var plain = Drive(null);
             Assert.That(plain.events.Count(e => e.kind == "agent_goal_reached" && e.reason.StartsWith("Arrived where the agent asked: ")), Is.EqualTo(1), "control");
             Assert.That(Mathf.Abs(Mathf.DeltaAngle(plain.yawDeg, 0)), Is.LessThan(20f), "control: no turn toward anything");
+        }
+
+        static void WalledRoom(OccupancyGrid g, float half, System.Func<Vector2, bool> mapped = null, System.Func<Vector2, bool> unknown = null)
+        {
+            for (int i = 0; i < g.Count; i++)
+            {
+                var p = g.Centre(i);
+                bool inside = Mathf.Abs(p.x) <= half && Mathf.Abs(p.y) <= half;
+                bool wall = !inside && Mathf.Abs(p.x) <= half + .1f && Mathf.Abs(p.y) <= half + .1f;
+                if (wall) { if (mapped == null || mapped(p)) g.ObserveOccupied(i); }
+                else if (inside && (unknown == null || !unknown(p))) g.ObserveFree(i);
+            }
+        }
+
+        [Test]
+        public void UnsearchedFloorBehindFurnitureThroughAGapTooTightToStandInIsAFrontier()
+        {
+            // Hidden-corner run: a woman behind a desk across a kitchen corner; no standable cell touched her floor, so no
+            // frontier was offered and the robot finished. A standable cell that looks through a strip too tight for the
+            // body counts. Controls: the same pocket already searched gives no frontier there, and frontier_peek_m 0
+            // (the old rule) gives none either.
+            List<BrainFrontier> Options(bool pocketSearched, float peek)
+            {
+                var settings = Settings(); settings.frontier_peek_m = peek;
+                var b = new RobotBrain(Calibration(), settings, "A", 0); var g = Map(b);
+                bool Pocket(Vector2 p) => p.x > 2.05f && p.y > 2.05f;
+                WalledRoom(g, 3f, null, pocketSearched ? null : (System.Func<Vector2, bool>)Pocket);
+                for (int i = 0; i < g.Count; i++)
+                {
+                    var p = g.Centre(i);
+                    bool bar = (Mathf.Abs(p.y - 2.0f) <= .05f && p.x >= 1.95f && p.x <= 2.6f) || (Mathf.Abs(p.x - 2.0f) <= .05f && p.y >= 1.95f && p.y <= 3.05f);
+                    if (bar) g.ObserveOccupied(i);   // an L of furniture; a 0.4 m gap to the east wall, narrower than the body
+                }
+                return b.FrontierOptions(0, 6).ToList();
+            }
+            var open = Options(false, 1.2f);
+            Assert.That(open.Any(f => Vector2.Distance(f.position, new Vector2(2.75f, 1.7f)) <= 1.0f), Is.True,
+                "a frontier at the gap: " + string.Join(", ", open.Select(f => f.position.ToString())));
+            Assert.That(Options(true, 1.2f).Any(f => Vector2.Distance(f.position, new Vector2(2.75f, 1.7f)) <= 1.0f), Is.False, "control: pocket searched");
+            Assert.That(Options(false, 0f).Any(f => Vector2.Distance(f.position, new Vector2(2.75f, 1.7f)) <= 1.0f), Is.False, "control: no peek, old rule");
+        }
+
+        [Test]
+        public void ACarriedPersonEndsPastTheWayOutNotOnTheThreshold()
+        {
+            // Hidden-corner run: the robot stopped 0.5 m short of its start (outside the front door) and the sled, 0.9 m
+            // behind it, set the person down 5 cm inside the doorway. With a tow offset the robot walks straight on until
+            // the sled is past its start. Control: tow offset 0 completes on arrival as before.
+            float FinalDistancePastStart(float tow)
+            {
+                var b = new RobotBrain(Calibration(), Settings(), "A", 0); Room(b, -4, 4, -4, 4);
+                b.AgentGoTo(new Vector2(0, 2.0f), 0, 30, "person");
+                var command = new BrainCommand(); int tick = 0; bool carrying = false;
+                for (; tick < 1200; tick++)
+                {
+                    command = DriveTick(b, tick, command.forwardMps, command.yawRateDeg);
+                    var events = b.DrainEvents();
+                    if (!carrying && events.Any(e => e.kind == "agent_goal_reached")) { b.BeginCarry(tick / 20.0, .25f, "p", tow); carrying = true; }
+                    if (events.Any(e => e.kind == "person_carried_out")) break;
+                }
+                Assert.That(tick, Is.LessThan(1200), "carried out");
+                var pose = b.Snapshot().pose;
+                // Distance beyond the start along the way the robot left (toward -y): where the sled ends is tow behind it.
+                return -pose.position.y;
+            }
+            Assert.That(FinalDistancePastStart(.9f), Is.GreaterThanOrEqualTo(.9f - .05f), "the sled is past the start");
+            Assert.That(FinalDistancePastStart(0f), Is.LessThan(.6f), "control: no tow, completes on arrival");
         }
 
         [Test]
