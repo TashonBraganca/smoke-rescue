@@ -34,8 +34,10 @@ worthwhile frontier itself. It leaves the building when its own heat rules say s
 Limits the tools enforce (an action that breaks one is refused, and the refusal is returned to you):
 - Every action except go_to, explore_frontier on proven floor, turn_to_face, send_team_message and finish cites the
   evidence_id of a perception result from this step, of the kind its description names.
-- confirm_survivor needs an inspect_candidate verdict of person; reject_candidate needs not_person; extract_survivor
-  needs person within the rescue reach. The robot never confirms a person by itself.
+- confirm_survivor needs an inspect_candidate verdict of person; reject_candidate needs not_person. extract_survivor
+  needs the person within the rescue reach and the grip cone (numbers in its description), cited either by the evidence
+  that confirmed them (survivors_to_rescue) or by a person verdict taken within that reach. The robot never confirms a
+  person by itself.
 - explore_frontier on a frontier with proven_indoors false needs a check_indoors result saying indoors within its
   bearing tolerance of that frontier. go_to is refused where no ceiling has been seen.
 - No exploring or go_to during a heat event (avoid_fire, retreat).

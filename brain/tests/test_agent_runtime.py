@@ -368,6 +368,32 @@ def test_lift_may_cite_the_confirming_inspection_once_within_reach_and_facing(tm
     assert lift(5.0, 6.8, 180.0, 40.0)["refusals"], "control: facing away"
 
 
+def test_the_lift_description_states_both_ways_the_check_accepts():
+    # Held-out seed 914 run 5: the description named only a fresh person verdict taken within the reach, which a lying
+    # person below the camera's view cannot give; both agents re-inspected confirmed people for 70 s and lifted no one.
+    from brain.agent.robot_agent import SYSTEM
+    d = next(t for t in T.ALL_TOOLS if t["function"]["name"] == "extract_survivor")["function"]["description"]
+    assert "survivors_to_rescue" in d and "confirmed" in d
+    assert f"{float(T._RESCUE['reach_m']):.1f} m" in d and f"{float(T._RESCUE['grip_cone_deg']):.0f} deg" in d
+    assert "evidence\n  that confirmed them" in SYSTEM or "evidence that confirmed them" in SYSTEM.replace("\n  ", " ")
+
+
+def test_walking_back_to_a_person_this_robot_confirmed_is_not_another_uncertain_look(tmp_path, monkeypatch):
+    # Run 5, robot A: it confirmed a person, then cited a newer uncertain look at them and was refused after two looks.
+    # Control: the same uncertain looks at a spot nobody confirmed are still limited.
+    for confirmed, refused in ((True, False), (False, True)):
+        T.ToolRegistry._looks.clear(); T.ToolRegistry._pending.clear(); T.ToolRegistry._confirmed.clear()
+        if confirmed:
+            T.ToolRegistry._confirmed["robot_A"] = [{"id": "old", "x": 5.0, "y": 10.0}]
+        fake_vision(monkeypatch, "uncertain")
+        for k in range(3):
+            req = request(tmp_path) | {"t": 50.0 + k}
+            out = RobotAgent(Scripted([[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": 5})],
+                                       [ToolCall("approach_candidate", {"evidence_id": "ev1"})]]), tmp_path / "t.jsonl").step(req)
+        assert bool(out["refusals"]) is refused, confirmed
+    T.ToolRegistry._confirmed.clear()
+
+
 def test_an_approach_to_an_uncertain_candidate_is_finished_before_exploring(tmp_path, monkeypatch):
     # Hidden-corner run 3: both agents ordered an approach and dropped it for a frontier on the next area_searched event,
     # so nobody was confirmed. explore_frontier is refused while the approach is open; the context shows it. It opens
