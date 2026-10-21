@@ -168,9 +168,21 @@ namespace SmokeRescue.Brain
                 // the nearest walkable cell short of it (house reflex check: robot B stopped 0.3 m from its start and replanned
                 // the same 3-point path for 45 s). Within return_arrive_m of the start counts as back.
                 float toExit = float.PositiveInfinity; foreach (var e in Exits()) toExit = Mathf.Min(toExit, Vector2.Distance(motion.Pose.position, e));
-                if (toExit <= Mathf.Max(c.goal_tolerance_m, c.return_arrive_m))
+                bool clearing = !float.IsNaN(carryClearFrom.x);
+                bool arrived = toExit <= Mathf.Max(c.goal_tolerance_m, c.return_arrive_m) || clearing;
+                if (arrived && returnReason == CarryingOut && carryTowM > 0)
                 {
-                    completed = true; ClearPath();
+                    // The sled rides carryTowM behind the robot: keep walking straight out until it, not just the robot,
+                    // is past the way out (hidden-corner run: the robot stopped 0.5 m short of its start and set the person
+                    // down 5 cm inside the front doorway).
+                    if (!clearing) { carryClearFrom = motion.Pose.position; carryClearM = toExit + carryTowM; }
+                    bool clear = Vector2.Distance(motion.Pose.position, carryClearFrom) < carryClearM;
+                    var ahead = motion.Pose.position + motion.Pose.Forward * Mathf.Max(grid.CellM, carryingSpeed * dt);
+                    if (clear && planner.SegmentSafe(motion.Pose.position, ahead)) return Command(carryingSpeed, 0, dt, false);
+                }
+                if (arrived)
+                {
+                    completed = true; ClearPath(); carryClearFrom = new Vector2(float.NaN, float.NaN);
                     // Left early to stay safe, or carried someone out: it may go back in once that is safe (CheckReenter).
                     canReenter = returnReason == WayOutClosing || returnReason == EmergencyExit || returnReason == CarryingOut;
                     if (returnReason == CarryingOut)
@@ -684,13 +696,14 @@ namespace SmokeRescue.Brain
             facing = null; agentFace = null; agentHoldUntil = double.NegativeInfinity;
         }
         const string WayOutClosing = "The way out was closing.", EmergencyExit = "Emergency exit.", CarryingOut = "Carrying a person out.";
-        float carryingSpeed;
+        float carryingSpeed, carryTowM, carryClearM; Vector2 carryClearFrom = new Vector2(float.NaN, float.NaN);
         /// <summary>A person is strapped onto the sled: take them to the nearest known way out at carry speed, then the
         /// robot may go back in (CheckReenter). The heat reflexes stay active.</summary>
-        public void BeginCarry(double t, float speedMps, string who)
+        public void BeginCarry(double t, float speedMps, string who, float towOffsetM = 0)
         {
             if (!(speedMps > 0)) throw new ArgumentOutOfRangeException(nameof(speedMps));
-            carryingSpeed = speedMps; canReenter = false; completed = false; retreating = false; emergencyExit = false;
+            if (!(towOffsetM >= 0)) throw new ArgumentOutOfRangeException(nameof(towOffsetM));
+            carryingSpeed = speedMps; carryTowM = towOffsetM; carryClearFrom = new Vector2(float.NaN, float.NaN); canReenter = false; completed = false; retreating = false; emergencyExit = false;
             Emit(t, "carrying_out", "Person strapped onto the sled; taking them to the nearest known way out.", "speed_mps", speedMps);
             BeginReturn(t, CarryingOut);
         }

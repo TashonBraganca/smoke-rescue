@@ -88,6 +88,7 @@ namespace SmokeRescue.Brain
             if (!Lead(from, out int start, out var lead)) return choices;
             Search(start, -1, out var distance, out var parent);
             var boundary = new bool[grid.Count];
+            var peek = PeekCells();
             for (int i = 0; i < grid.Count; i++)
             {
                 if (float.IsPositiveInfinity(distance[i]) || !grid.Walkable(i) || grid.PeerExplored(i)) continue;
@@ -95,6 +96,7 @@ namespace SmokeRescue.Brain
                 for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++)
                     if (Math.Abs(dx) + Math.Abs(dy) == 1 && grid.Inside(x + dx, y + dy) && grid.Unsearched((y + dy) * grid.Size + x + dx))
                         boundary[i] = true;
+                if (peek[i]) boundary[i] = true;
                 // Filters run on boundary cells only, so a caller counting rejections counts frontier cells.
                 if (boundary[i] && excluded != null && excluded(grid.Centre(i))) boundary[i] = false;
             }
@@ -111,7 +113,8 @@ namespace SmokeRescue.Brain
                     cluster.Add(cell);
                     if (Vector2.Distance(from, grid.Centre(cell)) >= c.frontier_min_distance_m && distance[cell] < targetCost)
                     { targetCost = distance[cell]; target = cell; }
-                    int r = c.frontier_information_radius_cells;
+                    // A peek cell's information lies past the tight strip, up to frontier_peek_m away.
+                    int r = peek[cell] ? Math.Max(c.frontier_information_radius_cells, Mathf.CeilToInt(c.frontier_peek_m / grid.CellM)) : c.frontier_information_radius_cells;
                     for (int dy = -r; dy <= r; dy++) for (int dx = -r; dx <= r; dx++)
                         if (grid.Inside(x + dx, y + dy))
                         {
@@ -143,6 +146,38 @@ namespace SmokeRescue.Brain
             order.Sort((x, y) => { int k = choices[x].score.CompareTo(choices[y].score); return k != 0 ? k : x.CompareTo(y); });
             var sorted = new List<FrontierChoice>(); foreach (int i in order) sorted.Add(choices[i]);
             return sorted;
+        }
+        /// <summary>
+        /// Standable cells that look into unsearched floor through cells too tight for the body: a multi-source search
+        /// from every unsearched cell, out through known non-wall cells that are not standable, up to frontier_peek_m;
+        /// the standable cells it reaches are marked. Never through a wall or an obstacle cell. Hidden-corner run: a
+        /// person behind a desk across a room corner had no standable cell beside her floor, so no frontier was offered
+        /// and the robot finished with her unfound.
+        /// </summary>
+        bool[] PeekCells()
+        {
+            var peek = new bool[grid.Count];
+            if (c.frontier_peek_m <= 0) return peek;
+            var depth = new int[grid.Count]; for (int i = 0; i < grid.Count; i++) depth[i] = -1;
+            int maxDepth = Mathf.FloorToInt(c.frontier_peek_m / grid.CellM);
+            var queue = new Queue<int>();
+            for (int i = 0; i < grid.Count; i++) if (grid.Unsearched(i)) { depth[i] = 0; queue.Enqueue(i); }
+            while (queue.Count > 0)
+            {
+                int cell = queue.Dequeue(), x = cell % grid.Size, y = cell / grid.Size;
+                if (depth[cell] >= maxDepth) continue;
+                for (int k = 0; k < 4; k++)
+                {
+                    int nx = x + (k == 0 ? 1 : k == 1 ? -1 : 0), ny = y + (k == 2 ? 1 : k == 3 ? -1 : 0);
+                    if (!grid.Inside(nx, ny)) continue;
+                    int n = ny * grid.Size + nx;
+                    if (depth[n] >= 0 || grid.Occupancy(n) != 1) continue;   // known free floor only, never a wall
+                    depth[n] = depth[cell] + 1;
+                    if (grid.Walkable(n)) { if (depth[cell] > 0) peek[n] = true; continue; }   // adjacent ones are frontiers already
+                    queue.Enqueue(n);
+                }
+            }
+            return peek;
         }
         /// <summary>Unsearched walkable floor in the search area that no known path reaches (behind debris, a closed door or
         /// fire): the nearest such cell, the reachable walkable cell nearest to it, and how many such cells there are.</summary>
