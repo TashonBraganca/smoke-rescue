@@ -115,7 +115,8 @@ def test_approach_candidate_stops_short_of_the_inspected_spot(tmp_path, monkeypa
     (o,) = out["orders"]
     # 5 m ahead, stopping the brain's standoff short of it, which must be inside the arm's reach so a lift can follow.
     assert o["type"] == "go_to" and o["x"] == pytest.approx(5.0) and o["y"] == pytest.approx(10.0 - T.APPROACH_STANDOFF_M)
-    assert T.APPROACH_STANDOFF_M < float(T._RESCUE["reach_m"])
+    # A walk to a person (not this uncertain look) ends inside the arm's measured reach so a lift can follow.
+    assert T.RESCUE_APPROACH_M < float(T._RESCUE["reach_m"])
 
 
 def test_no_go_to_during_a_heat_event(tmp_path, monkeypatch):
@@ -251,9 +252,11 @@ def test_extract_survivor_needs_a_close_person_verdict_and_a_free_sled(tmp_path,
                                      [ToolCall("extract_survivor", {"evidence_id": f"ev{range_m:g}"})]]), tmp_path / f"x{extract.t}.jsonl")
         return agent.step({**request(tmp_path), "t": extract.t, "carrying_person": carrying})
     extract.t = 0
-    assert [o["type"] for o in extract(1.2)["orders"]] == ["extract_survivor"]
-    assert extract(3.0)["refusals"][0]["tool"] == "extract_survivor", "too far: approach first"
-    assert "already towing" in extract(1.2, carrying=True)["refusals"][0]["reason"]
+    # Within the arm's measured reach (actuators.json rescue.reach_m, 0.85 m); 1.2 m was accepted before and the arm
+    # then refused it (seed 914 run 6).
+    assert [o["type"] for o in extract(0.7)["orders"]] == ["extract_survivor"]
+    assert extract(1.2)["refusals"][0]["tool"] == "extract_survivor", "beyond the arm's reach: approach first"
+    assert "already towing" in extract(0.7, carrying=True)["refusals"][0]["reason"]
 
 
 
@@ -279,7 +282,7 @@ def test_a_confirmation_says_how_to_get_the_person_out(tmp_path, monkeypatch):
         assert [o["type"] for o in out["orders"]] == ["confirm_survivor"]
         return [m for m in backend.seen[-1] if m.get("role") == "tool" and m.get("name") == "confirm_survivor"][-1]["content"]
     assert "approach_candidate" in told(2.7) and "extract_survivor" not in told(2.7)
-    assert "extract_survivor" in told(1.2)
+    assert "extract_survivor" in told(0.7) and "extract_survivor" not in told(1.2)
 
 
 def test_confirmed_people_not_yet_lifted_are_listed_with_bearing_and_approach():
@@ -289,7 +292,7 @@ def test_confirmed_people_not_yet_lifted_are_listed_with_bearing_and_approach():
     out = T.survivors_to_rescue("robot_A", pose, [[3.0, 0.0], [0.0, -5.0]])
     assert [s["x"] for s in out] == [3.0, 0.0]                 # nearest first
     assert out[0]["bearing_deg"] == pytest.approx(0.0) and out[0]["distance_m"] == pytest.approx(3.0)
-    assert out[0]["approach"]["x"] == pytest.approx(3.0 - T.APPROACH_STANDOFF_M)
+    assert out[0]["approach"]["x"] == pytest.approx(3.0 - T.RESCUE_APPROACH_M)
     assert out[1]["bearing_deg"] == pytest.approx(90.0)        # -y is to the right of a robot facing +x
     T.ToolRegistry._lifted["robot_A"] = [(3.1, 0.1)]
     assert [s["x"] for s in T.survivors_to_rescue("robot_A", pose, [[3.0, 0.0], [0.0, -5.0]])] == [0.0]
@@ -359,13 +362,13 @@ def test_lift_may_cite_the_confirming_inspection_once_within_reach_and_facing(tm
     def lift(x, y, heading, t):
         req = request(tmp_path) | {"t": t, "pose": {"x": x, "y": y, "heading_deg": heading}}
         return RobotAgent(Scripted([[ToolCall("extract_survivor", {"evidence_id": "ev1"})]]), tmp_path / "t.jsonl").step(req)
-    near = lift(5.0, 6.8, 0.0, 20.0)                 # 1.2 m short of them, facing +y
+    near = lift(5.0, 7.3, 0.0, 20.0)                 # 0.7 m short of them (inside the 0.85 m reach), facing +y
     assert [o["type"] for o in near["orders"]] == ["extract_survivor"]
     # The order names the person: the arm lifts only the body at that spot.
     assert (near["orders"][0]["target_x"], near["orders"][0]["target_y"]) == (5.0, 8.0)
     T.ToolRegistry._lifted.clear()
     assert lift(5.0, 4.0, 0.0, 30.0)["refusals"], "control: 4 m away"
-    assert lift(5.0, 6.8, 180.0, 40.0)["refusals"], "control: facing away"
+    assert lift(5.0, 7.3, 180.0, 40.0)["refusals"], "control: facing away"
 
 
 def test_the_lift_description_states_both_ways_the_check_accepts():
