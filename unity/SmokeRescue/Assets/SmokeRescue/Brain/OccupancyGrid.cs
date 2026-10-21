@@ -18,7 +18,7 @@ namespace SmokeRescue.Brain
         readonly double[] heatTime;
         // When this robot's own thermal camera last looked at each cell, at any temperature (RobotBrain route watch).
         readonly double[] heatLookTime;
-        readonly bool[] hits, frees, observed;
+        readonly bool[] hits, frees, observed, lows;
         readonly byte[] roofHits;
         // Floor on a clear sight line from an indoor camera to ceiling it saw (see MarkCeilingSightLines).
         readonly bool[] sightIndoors;
@@ -47,7 +47,7 @@ namespace SmokeRescue.Brain
             Origin = c.fixed_grid_origin ? new Vector2(c.grid_origin_x_m, c.grid_origin_z_m) :
                 new Vector2(-Size * c.cell_m / 2, -Size * c.cell_m / 2);
             odds = new float[Count]; lidarOdds = new float[Count]; heat = new float[Count]; rise = new float[Count]; heatTime = new double[Count];
-            hits = new bool[Count]; frees = new bool[Count]; observed = new bool[Count];
+            hits = new bool[Count]; frees = new bool[Count]; observed = new bool[Count]; lows = new bool[Count];
             localTime = new double[Count]; peer = new byte[Count]; roofHits = new byte[Count];
             sightIndoors = new bool[Count]; openGround = new bool[Count]; roofFrame = new int[Count];
             ownHeat = new float[Count]; ownHeatTime = new double[Count]; externalHeat = new float[Count]; externalTime = new double[Count];
@@ -268,7 +268,8 @@ namespace SmokeRescue.Brain
         public void IntegrateDepth(RgbdFrame frame, SensorConfig s, BrainPose pose)
         {
             localObservationTime = frame.Timestamp;
-            Array.Clear(hits, 0, Count); Array.Clear(frees, 0, Count);
+            Array.Clear(hits, 0, Count); Array.Clear(frees, 0, Count); Array.Clear(lows, 0, Count);
+            float eyeHeight = s.camera.mount.height_m;
             Vector2 camera = pose.Transform(0, s.camera.mount.forward_offset_m);
             int start = Cell(camera); if (start < 0) { localObservationTime = time; return; }
             depthFrames++; frameRoof.Clear();
@@ -291,6 +292,11 @@ namespace SmokeRescue.Brain
                 Vector2 end = pose.Transform(p.x, p.y);
                 bool obstacle = p.z >= c.obstacle_min_height_m;
                 Ray(start, end, obstacle);
+                // Searched floor is where the ray runs within search_low_m of it: a person lying there would have blocked
+                // it. Higher up, a ray over a table to the wall behind says nothing about the floor below (held-out seed
+                // 914 run 1: a person slumped by the kitchen island lay on floor marked searched and was never in view).
+                if (c.search_low_m > 0 && p.z < c.search_low_m && eyeHeight > c.search_low_m)
+                    LowRay(Cell(camera + (end - camera) * ((eyeHeight - c.search_low_m) / (eyeHeight - p.z))), end);
             }
             // Aggregate a frame before updating odds. A floor ray cannot erase a wall hit in this frame.
             // Free floor further than search_max_range_m from the camera is mapped but not searched: a person lying there
@@ -301,7 +307,7 @@ namespace SmokeRescue.Brain
                 if (hits[i]) ObserveOccupied(i);
                 else if (frees[i] && frame.Timestamp >= localTime[i])
                 {
-                    if (Vector2.Distance(Centre(i), eye) <= reach) ObserveFree(i); else MapFree(i);
+                    if (Vector2.Distance(Centre(i), eye) <= reach && (c.search_low_m <= 0 || lows[i])) ObserveFree(i); else MapFree(i);
                 }
             MarkCeilingSightLines(start);
             localObservationTime = time;
@@ -400,6 +406,23 @@ namespace SmokeRescue.Brain
             return new Vector3((u - k.cx) / k.fx * z,
                 k.mount.forward_offset_m + z * Mathf.Cos(pitch) - down * Mathf.Sin(pitch),
                 k.mount.height_m - z * Mathf.Sin(pitch) - down * Mathf.Cos(pitch));
+        }
+        /// <summary>The cells a depth ray crosses within search_low_m of the floor, from where it comes down to that height
+        /// to its end.</summary>
+        void LowRay(int from, Vector2 end)
+        {
+            if (from < 0) return;
+            int x = from % Size, y = from / Size;
+            int ex = Mathf.FloorToInt((end.x - Origin.x) / CellM), ey = Mathf.FloorToInt((end.y - Origin.y) / CellM);
+            int dx = Math.Abs(ex - x), dy = Math.Abs(ey - y), sx = x < ex ? 1 : -1, sy = y < ey ? 1 : -1, error = dx - dy;
+            for (int n = 0; n <= Size * 2 && Inside(x, y); n++)
+            {
+                lows[y * Size + x] = true;
+                if (x == ex && y == ey) break;
+                int twice = 2 * error;
+                if (twice > -dy) { error -= dy; x += sx; }
+                if (twice < dx) { error += dx; y += sy; }
+            }
         }
         void Ray(int start, Vector2 end, bool obstacle)
         {
@@ -564,6 +587,36 @@ namespace SmokeRescue.Brain
         public bool Indoors(Vector2 p) => UnderCeiling(p) || (OwnOccupancy(Cell(p)) == 1 && Enclosed(Cell(p)));
         /// <summary>The ceiling half of Indoors: within ceiling_radius_m of wall-clear ceiling evidence, walked across known
         /// free floor.</summary>
+        /// <summary>
+        /// Floor beyond a frontier as far as this robot's map knows: cells mapped free by its own sensors that no camera on
+        /// the team has searched, joined to p through such cells and within maxM of it. With search_requires_ceiling only
+        /// cells under seen ceiling count (the fill still crosses the rest), so the yard past a front door adds nothing.
+        /// The frontier's own unsearched_m2 counts only cells beside the frontier, so a doorway onto a whole unsearched
+        /// hallway read 1.5 m2 (held-out seed 914 run 1, robot B, which chose the kitchen at 8.5 m2 instead).
+        /// </summary>
+        public float UnsearchedFloorBeyond(Vector2 p, float maxM)
+        {
+            int start = Cell(p); if (start < 0) return 0;
+            var mark = new HashSet<int>(); var queue = new Queue<int>(); int count = 0;
+            bool Open(int n) => OwnOccupancy(n) == 1 && Unsearched(n) && Vector2.Distance(Centre(n), p) <= maxM;
+            int sx = start % Size, sy = start / Size;
+            for (int dy = -2; dy <= 2; dy++) for (int dx = -2; dx <= 2; dx++)
+                if (Inside(sx + dx, sy + dy)) { int n = (sy + dy) * Size + sx + dx; if (Open(n) && mark.Add(n)) queue.Enqueue(n); }
+            while (queue.Count > 0)
+            {
+                int cell = queue.Dequeue();
+                if (!c.search_requires_ceiling || UnderCeiling(Centre(cell))) count++;
+                int x = cell % Size, y = cell / Size;
+                for (int k = 0; k < 4; k++)
+                {
+                    int nx = x + (k == 0 ? 1 : k == 1 ? -1 : 0), ny = y + (k == 2 ? 1 : k == 3 ? -1 : 0);
+                    if (!Inside(nx, ny)) continue;
+                    int n = ny * Size + nx;
+                    if (Open(n) && mark.Add(n)) queue.Enqueue(n);
+                }
+            }
+            return count * CellM * CellM;
+        }
         public bool UnderCeiling(Vector2 p)
         {
             int i = Cell(p); if (i < 0) return false;
