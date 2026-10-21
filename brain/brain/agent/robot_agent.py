@@ -45,7 +45,9 @@ Rules:
 Choosing where to search (you, not the reflex layer, pick every search target):
 - The context lists frontiers: unsearched floor the robot can reach, each with id, x, y, path_m, unsearched_m2 and
   how far it is from your partner's claim. After area_searched, no_progress, goal_blacklisted, collision_hold, and at every periodic check-in
-  when nothing more urgent is happening, call explore_frontier with one id and a one-line reason.
+  when nothing more urgent is happening, call explore_frontier with one id and a one-line reason. Exception: while
+  pending_candidate is set you are walking to look closer at a warm shape; finish that first (inspect it once you are
+  there, then confirm or reject), and do not pick a frontier.
 - Frontiers marked proven_indoors false are floor your robot cannot yet prove is inside; call check_indoors at the
   frontier bearing before exploring it, explore only if the verdict is indoors, cite its evidence_id, and never guess.
   The camera sees about 37 degrees either side of straight ahead: for a frontier further round, turn_to_face it first.
@@ -151,6 +153,7 @@ class RobotAgent:
         if run != cls._run or restarted:
             cls._run = run; cls._last_t = {robot: t}
             cls._recent.clear(); ToolRegistry._looks.clear(); ToolRegistry._lifted.clear(); ToolRegistry._confirmed.clear()
+            ToolRegistry._pending.clear()
 
     def step(self, req: dict) -> dict:
         start = time.perf_counter()
@@ -172,6 +175,9 @@ class RobotAgent:
                                        "inbox", "orders", "survivors", "frontiers", "lidar", "partners", "blocked_unsearched", "fire_blocks_frontier",
                                        "water_l", "carrying_person") if k in req}
         context["survivors_to_rescue"] = survivors_to_rescue(req["robot"], pose, req.get("survivors") or [])
+        pending = tools.pending()
+        if pending is not None:
+            context["pending_candidate"] = pending
         messages = [{"role": "system", "content": SYSTEM},
                     {"role": "user", "content": "Decision needed. Context:\n" + json.dumps(context, default=str)}]
         step_id = f"{req['robot']}@{float(req['t']):.3f}"
