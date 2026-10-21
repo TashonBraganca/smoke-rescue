@@ -299,6 +299,9 @@ namespace SmokeRescue.Brain
                 if (!agentGoalIsFrontier) AgentArrived(t, "Arrived where the agent asked: ");
                 var reached = agentGoal.Value; bool frontier = agentGoalIsFrontier; agentGoal = null; agentGoalIsFrontier = false;
                 if (frontier) { ClearPath(); OnFrontierReached(reached, t); if (sweeping) return SweepStep(t, dt); }
+                // Turn or hold from this tick on, before any frontier is chosen (Codex review).
+                var turn = FaceStep(t, dt); if (turn.HasValue) return turn.Value;
+                if (t < agentHoldUntil) return Command(0, 0, dt, true);
             }
             if (NeedPlan(t))
             {
@@ -631,6 +634,7 @@ namespace SmokeRescue.Brain
             var route = PlanOut();
             if (route.Count == 0)
             {
+                wayOutPoints.Clear(); wayOutRates.Clear();
                 if (hadWayOut) LoseWayOut(t);
                 return;
             }
@@ -638,31 +642,47 @@ namespace SmokeRescue.Brain
             float closest = float.PositiveInfinity; Vector2 at = motion.Pose.position;
             foreach (var p in route)
                 if (Vector2.Distance(p, at) > c.escape_ignore_m) closest = Mathf.Min(closest, grid.FireDistance(grid.Cell(p)));
-            // How fast is the fire closing on the route? Measured from this robot's own fire map over escape_rate_window_s.
+            // How fast is the fire closing on the way out? The fire distance at the previous check's route points, then and
+            // now: fixed points, so the robot walking nearer a still fire (a new route passing closer) does not read as a
+            // closing front (Codex review, run 23 robot A at 14 s).
             float routeM = 0; for (int i = 1; i < route.Count; i++) routeM += Vector2.Distance(route[i - 1], route[i]);
             float walkS = routeM / c.open_speed_mps, closeS = float.PositiveInfinity;
-            // No fire on the map reads as 1e4 m (the distance transform's empty value), not infinity: no front to track.
-            if (closest > c.grid_size_m) wayOutFire.Clear(); else wayOutFire.Add((t, closest));
-            while (wayOutFire.Count > 3) wayOutFire.RemoveAt(0);
-            if (wayOutFire.Count == 3 && t - wayOutFire[0].t >= c.escape_rate_window_s)
+            if (wayOutPoints.Count > 0)
             {
-                // The smaller of the last two intervals' closing rates: an advancing front closes in both, while fire
-                // seen for the first time nearer the route (run 22, robot A at 10 s) moves the distance in one jump.
-                float r1 = (wayOutFire[0].fire - wayOutFire[1].fire) / (float)(wayOutFire[1].t - wayOutFire[0].t);
-                float r2 = (wayOutFire[1].fire - wayOutFire[2].fire) / (float)(wayOutFire[2].t - wayOutFire[1].t);
-                float rate = Mathf.Min(r1, r2);
-                if (rate > 0) closeS = Mathf.Max(0, closest - c.fire_clearance_m) / rate;
+                float now = float.PositiveInfinity; foreach (int cell in wayOutPoints) now = Mathf.Min(now, grid.FireDistance(cell));
+                // No fire on the map reads as 1e4 m (the distance transform's empty value): no front to track.
+                if (now <= c.grid_size_m && wayOutThen <= c.grid_size_m && t > wayOutThenT)
+                    wayOutRates.Add((wayOutThen - now) / (float)(t - wayOutThenT));
+                while (wayOutRates.Count > 2) wayOutRates.RemoveAt(0);
+                // The smaller of the last two intervals' rates: an advancing front closes in both, while fire seen for the
+                // first time nearer the route (run 22, robot A at 10 s) moves the distance in one jump.
+                if (wayOutRates.Count == 2 && 2 * c.escape_check_s >= c.escape_rate_window_s - 1e-3f)
+                {
+                    float rate = Mathf.Min(wayOutRates[0], wayOutRates[1]);
+                    if (rate > 0) closeS = Mathf.Max(0, closest - c.fire_clearance_m) / rate;
+                }
             }
+            wayOutPoints.Clear();
+            foreach (var p in route) if (Vector2.Distance(p, at) > c.escape_ignore_m) wayOutPoints.Add(grid.Cell(p));
+            wayOutThen = float.PositiveInfinity; foreach (int cell in wayOutPoints) wayOutThen = Mathf.Min(wayOutThen, grid.FireDistance(cell));
+            wayOutThenT = t;
             if (closest < c.escape_fire_margin_m || closeS < walkS * c.escape_time_factor)
             {
                 Emit(t, "escape_closing", closest < c.escape_fire_margin_m ? "Fire is closing on the way out; leave while it is open."
                     : "Fire is closing on the way out faster than the robot could walk it later; leave while it is open.",
                     "fire_distance_m", closest, "margin_m", c.escape_fire_margin_m, "closes_in_s", float.IsInfinity(closeS) ? -1 : closeS, "walk_out_s", walkS);
-                wayOutFire.Clear();
                 BeginReturn(t, WayOutClosing);
             }
         }
-        readonly List<(double t, float fire)> wayOutFire = new List<(double t, float fire)>();
+        readonly List<int> wayOutPoints = new List<int>(); readonly List<float> wayOutRates = new List<float>();
+        float wayOutThen; double wayOutThenT;
+        /// <summary>Forget the way-out history and any pending agent arrival: on a return, a retreat or a lost route the
+        /// next readings belong to another route and another situation (Codex review).</summary>
+        void ResetWayOutAndArrival()
+        {
+            wayOutPoints.Clear(); wayOutRates.Clear();
+            facing = null; agentFace = null; agentHoldUntil = double.NegativeInfinity;
+        }
         const string WayOutClosing = "The way out was closing.", EmergencyExit = "Emergency exit.", CarryingOut = "Carrying a person out.";
         float carryingSpeed;
         /// <summary>A person is strapped onto the sled: take them to the nearest known way out at carry speed, then the
@@ -746,14 +766,14 @@ namespace SmokeRescue.Brain
         }
         void LoseWayOut(double t)
         {
-            hadWayOut = false; returning = false; ResetStuckRecovery(); retreating = true; sweeping = false; active = null; dwell = 0; ClearPath();
+            hadWayOut = false; returning = false; ResetStuckRecovery(); ResetWayOutAndArrival(); retreating = true; sweeping = false; active = null; dwell = 0; ClearPath();
             // A route that reappears next to the fire would start a return that is cut again at once; wait a while.
             nextWayOutCheck = t + c.escape_recheck_s;
             Emit(t, "escape_closing", "The known way out is closed; retreat to the coolest reachable floor and search on while it is cool.", "route_points", 0);
         }
         void BeginReturn(double t, string reason)
         {
-            ResetStuckRecovery(); returning = true; active = null; dwell = 0; returnReason = reason; ClearPath();
+            ResetStuckRecovery(); ResetWayOutAndArrival(); returning = true; active = null; dwell = 0; returnReason = reason; ClearPath();
             Emit(t, "goal", reason + " Return to the estimated start.", "x_m", home.x, "y_m", home.y);
         }
         BrainCommand FollowOrHold(double t, float dt)

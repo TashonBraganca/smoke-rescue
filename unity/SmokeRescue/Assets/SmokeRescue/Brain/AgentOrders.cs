@@ -21,7 +21,10 @@ namespace SmokeRescue.Brain
         /// then tell the agent it arrived (the camera sees about 37 degrees either side, the arm grips within 60).</summary>
         public void AgentGoTo(Vector2 target, double t, double holdS, string reason, Vector2? face = null)
         {
-            if (!InSearchArea(target)) { Emit(t, "agent_order", "Refused go_to: no ceiling has been seen over that point, so it is not known to be inside.", "x_m", target.x, "y_m", target.y); return; }
+            // Turning where the robot stands (turn_to_face) goes nowhere new, so it needs no indoor evidence (Codex review:
+            // near an entrance the robot's own cell may not be known to be inside yet).
+            bool turnInPlace = face.HasValue && Vector2.Distance(target, motion.Pose.position) <= c.goal_tolerance_m;
+            if (!turnInPlace && !InSearchArea(target)) { Emit(t, "agent_order", "Refused go_to: no ceiling has been seen over that point, so it is not known to be inside.", "x_m", target.x, "y_m", target.y); return; }
             agentGoal = target; agentGoalUntil = t + holdS; agentGoalReason = reason ?? ""; agentGoalIsFrontier = false;
             agentFace = face; facing = null; agentHoldUntil = double.NegativeInfinity;
             if (active == null) ClearPath();
