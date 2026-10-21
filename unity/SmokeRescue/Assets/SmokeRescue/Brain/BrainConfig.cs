@@ -98,7 +98,7 @@ namespace SmokeRescue.Brain
         public float agent_avoid_min_radius_m = 0.3f, agent_avoid_max_radius_m = 4f;
         public float frontier_cluster_max_m = 2.5f;
         public bool search_requires_ceiling = false, ceiling_sight_lines = true;
-        public float ceiling_min_height_m = 2.5f, ceiling_max_height_m = 3.5f, ceiling_radius_m = 0.6f, ceiling_wall_margin_m = 0.4f;
+        public float ceiling_min_height_m = 2.5f, ceiling_radius_m = 0.6f, ceiling_wall_margin_m = 0.4f;
         public int ceiling_min_hits = 2;
         public int enclosure_rays = 36;
         public float enclosure_range_m = 10f, enclosure_min_closed_share = 0.6f, enclosure_max_open_share = 0.1f;
@@ -188,7 +188,7 @@ namespace SmokeRescue.Brain
                 stuck_turn_deg <= 0 || stuck_turn_deg > 90 || stuck_turn_timeout_s <= 0 ||
                 stuck_repeat_radius_m < cell_m || stuck_repeat_count < 2 || stuck_blacklist_s <= stuck_window_s)
                 throw new ArgumentException("Invalid stuck detection or recovery configuration.");
-            if (scan_yaw_gain < 0 || scan_yaw_gain > 1 || collision_margin_m < 0 || lead_max_m < cell_m || agent_avoid_min_radius_m < cell_m || agent_avoid_max_radius_m < agent_avoid_min_radius_m || frontier_cluster_max_m < cell_m * 2 || ceiling_min_height_m <= obstacle_max_height_m || ceiling_max_height_m <= ceiling_min_height_m || ceiling_radius_m < 0 || ceiling_min_hits < 1 || ceiling_wall_margin_m < 0 ||
+            if (scan_yaw_gain < 0 || scan_yaw_gain > 1 || collision_margin_m < 0 || lead_max_m < cell_m || agent_avoid_min_radius_m < cell_m || agent_avoid_max_radius_m < agent_avoid_min_radius_m || frontier_cluster_max_m < cell_m * 2 || ceiling_min_height_m <= obstacle_max_height_m || ceiling_radius_m < 0 || ceiling_min_hits < 1 || ceiling_wall_margin_m < 0 ||
                 enclosure_rays < 8 || enclosure_range_m <= cell_m || enclosure_min_closed_share <= 0 || enclosure_min_closed_share > 1 || enclosure_max_open_share < 0 || enclosure_max_open_share >= 1 || frontier_peek_m < 0 ||
                 keyframe_spacing_m <= 0 || keyframe_turn_deg <= 0 || keyframe_beams < 36 || keyframe_max < 2 || keyframes_per_message < 1 || keyframes_per_message > 16 ||
                 link_shortlist < 1 || link_max_candidates < 2 || link_turn_candidates < 1 || link_verifications_per_step < 1 || link_max_descriptor_distance <= 0 || link_window_m < 0 || link_step_m <= 0 ||
