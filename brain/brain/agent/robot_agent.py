@@ -48,6 +48,7 @@ Choosing where to search (you, not the reflex layer, pick every search target):
   when nothing more urgent is happening, call explore_frontier with one id and a one-line reason.
 - Frontiers marked proven_indoors false are floor your robot cannot yet prove is inside; call check_indoors at the
   frontier bearing before exploring it, explore only if the verdict is indoors, cite its evidence_id, and never guess.
+  The camera sees about 37 degrees either side of straight ahead: for a frontier further round, turn_to_face it first.
 - Prefer more unsearched area per metre of path; skip areas your partner said they cover; do not pick a frontier
   next to a spot that just failed (goal_blacklisted, collision_hold).
 - The lidar entry gives the nearest obstacle in eight directions; under 0.4 m means the robot is in a tight spot,

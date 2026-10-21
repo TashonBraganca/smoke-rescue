@@ -82,7 +82,10 @@ def test_tall_ceiling_has_no_height_band_and_sensor_range_is_respected(tmp_path)
 
 @pytest.mark.parametrize('bearing', [90., -90., 180.])
 def test_unseen_bearing_is_unknown(bearing, tmp_path):
-    assert v.check_indoors(room_frame(), bearing, output_dir=tmp_path)['verdict'] == 'unknown'
+    r = v.check_indoors(room_frame(), bearing, output_dir=tmp_path)
+    assert r['verdict'] == 'unknown'
+    # Run 3: the agent asked 45 deg, outside the camera's view, got "no rays" and gave up; the reason now says what to do.
+    assert any('turn_to_face' in reason for reason in r['reasons'])
 
 
 @pytest.mark.parametrize('bearing', [float('nan'), float('inf')])

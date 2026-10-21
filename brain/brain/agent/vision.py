@@ -623,7 +623,8 @@ def check_indoors(frame: Frame, bearing_deg: float, *, output_dir: str | Path,
     lower_share = fraction(valid, lower)
     verdict, reasons = "unknown", []
     if not upward.any() or not lower.any():
-        reasons.append("The bearing has no upward and lower rays in this frame.")
+        reasons.append("This bearing is outside the camera's view in this frame; turn_to_face it, then call check_indoors "
+                       "again with the bearing measured from the new heading.")
     elif (ceiling_share >= config["min_ceiling_upward_fraction"] and
           lower_share >= config["min_lower_return_fraction"] and
           any(wall["hit_fraction"] >= config["min_wall_fraction"] for wall in walls)):
