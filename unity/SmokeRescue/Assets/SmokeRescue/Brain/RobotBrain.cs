@@ -130,6 +130,9 @@ namespace SmokeRescue.Brain
                 Emit(t, "goal", "Cool air and a recovered heat budget permit travel again.", "air_c", airC, "heat_budget", budget);
             }
             CheckReenter(t);
+            if (doorwayProbeGoal.HasValue && (returning || retreating || completed || nearFire || active != null ||
+                AgentGoalActive(t) || recoveryPhase != 0 || t - doorwayProbeStarted >= c.sweep_max_s))
+                EndDoorwayProbe(t, "Evidence look cancelled by safety, a survivor, an agent order, or its time limit.");
             if (routeLook.HasValue && (retreating || returning || completed || nearFire))
                 EndRouteLook(t, "Cancelled: a heat reflex or a return to the way out takes precedence over the route look.", true);
             if (completed && !retreating) return Command(0, 0, dt, true);
@@ -364,6 +367,10 @@ namespace SmokeRescue.Brain
                 }
                 if (active != null) return FollowOrHold(t, dt);
             }
+            var doorwayLook = DoorwayProbeStep(t, dt);
+            if (doorwayLook.HasValue) return doorwayLook.Value;
+            if (!sweeping && !AgentGoalActive(t) && !facing.HasValue && t >= agentHoldUntil && NeedPlan(t) && TryStartDoorwayProbe(t))
+                return DoorwayProbeStep(t, dt).Value;
             if (goal.HasValue && Vector2.Distance(goal.Value, motion.Pose.position) <= c.goal_tolerance_m)
             {
                 bool wasFrontier = frontierGoal; var reached = goal.Value;
@@ -1119,12 +1126,12 @@ namespace SmokeRescue.Brain
             ResetStuckRecovery(); ResetWayOutAndArrival(); returning = true; active = null; dwell = 0; returnReason = reason; ClearPath();
             Emit(t, "goal", reason + " Return to the estimated start.", "x_m", home.x, "y_m", home.y);
         }
-        BrainCommand FollowOrHold(double t, float dt)
+        BrainCommand FollowOrHold(double t, float dt, float? arriveM = null)
         {
             if (path.Count == 0 || !goal.HasValue) return Command(0, 0, dt, true);
             Vector2 position = motion.Pose.position;
             while (cursor + 1 < path.Count && Vector2.Distance(position, path[cursor]) < c.goal_tolerance_m) cursor++;
-            if (Vector2.Distance(position, goal.Value) < c.goal_tolerance_m) return Command(0, 0, dt, true);
+            if (Vector2.Distance(position, goal.Value) < (arriveM ?? c.goal_tolerance_m)) return Command(0, 0, dt, true);
             Vector2 target = path[cursor], previous = position; float remain = c.lookahead_m;
             for (int i = cursor; i < path.Count; i++)
             {
