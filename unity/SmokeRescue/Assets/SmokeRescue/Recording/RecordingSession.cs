@@ -66,6 +66,7 @@ namespace SmokeRescue.Recording
             static StringBuilder Header(string what) => new StringBuilder($"# {what}\n# Smoke Rescue shared simulation clock\n# timestamp filename\n");
         }
 
+        const int YieldEveryS = 5;
         public static Result Record(string scenarioFile, string runId, float maxSeconds = float.PositiveInfinity, bool noise = true, Action<string> progress = null)
         {
             Result last = null;
@@ -74,7 +75,7 @@ namespace SmokeRescue.Recording
         }
 
         /// <summary>
-        /// The recording as steps: null after each simulated second, then the result. The editor menu runs one step per
+        /// The recording as steps: null every YieldEveryS simulated seconds, then the result. The editor menu runs one step per
         /// editor update, so the editor completes a frame every simulated second. Run as one call, a 200 s recording was a
         /// single 20-minute editor frame, and macOS frees each render's Metal objects only when a frame ends: the editor's
         /// footprint grew about 1 GB a minute (13 GB to 21 GB in 10 minutes of run 15) until the system killed it
@@ -215,7 +216,10 @@ namespace SmokeRescue.Recording
             {
                 double t = k / (double)ClockHz;
                 if (t > duration + 1e-9) break;
-                if (k > 0 && k % ClockHz == 0) yield return null;   // let the editor finish a frame (see RecordSteps)
+                // Let the editor finish a frame (see RecordSteps). Every 5 simulated seconds: about 0.5 GB of render objects
+                // build up in between, and each editor frame costs a scene repaint (yielding every second, run 16 took 3 times as
+                // long per simulated second).
+                if (k > 0 && k % (ClockHz * YieldEveryS) == 0) yield return null;
                 SimNow = t;
                 // Every reader of the smoke field sees this tick's time. It was set only at camera frames, so the LiDAR
                 // asked the fire simulation for a time older than the thermocouple had, and each such request reloaded

@@ -53,6 +53,13 @@ namespace SmokeRescue.Brain
         public Vector2 point, approach;
         public float bearingDegRight, distanceM, areaM2;
     }
+    /// <summary>Unsearched floor reachable only through the fire margin (RobotBrain.FireBlockedFrontier): where the route
+    /// first enters the margin, as a bearing (degrees, right positive) and distance from the robot.</summary>
+    public struct BrainFireBlock
+    {
+        public Vector2 blockAt, frontier;
+        public float bearingDegRight, distanceM, frontierPathM, unsearchedM2;
+    }
     /// <summary>A search target offered to the agent (RobotBrain.FrontierOptions).</summary>
     public struct BrainFrontier
     {

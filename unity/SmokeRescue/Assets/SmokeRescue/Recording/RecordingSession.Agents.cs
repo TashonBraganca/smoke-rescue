@@ -142,6 +142,11 @@ namespace SmokeRescue.Recording
                 rig.trigger = null; rig.lastAgent = t;
                 FlushForAgent(rig, pending, cfg);
                 var s = rig.brain.Snapshot();
+                var frontiers = new JArray(rig.brain.FrontierOptions(t, FrontierOptions).Select(f => (object)new JObject
+                {
+                    ["id"] = f.id, ["x"] = Math.Round(f.position.x, 2), ["y"] = Math.Round(f.position.y, 2),
+                    ["path_m"] = Math.Round(f.pathM, 1), ["unsearched_m2"] = Math.Round(f.unsearchedM2, 1),
+                }));
                 var req = new JObject
                 {
                     ["robot_dir"] = Path.GetFullPath(rig.dir), ["t"] = t,
@@ -154,11 +159,12 @@ namespace SmokeRescue.Recording
                     ["frame_times"] = new JArray(rig.thermalTimes.Skip(Math.Max(0, rig.thermalTimes.Count - 45)).Select(x => (object)x)),
                     ["inbox"] = new JArray(rig.inbox),
                     ["survivors"] = new JArray((s.confirmedSurvivors ?? new Vector2[0]).Select(p => new JArray(p.x, p.y))),
-                    ["frontiers"] = new JArray(rig.brain.FrontierOptions(t, FrontierOptions).Select(f => (object)new JObject
+                    ["frontiers"] = frontiers,
+                    ["fire_blocks_frontier"] = frontiers.Count > 0 ? null : rig.brain.FireBlockedFrontier(t) is Brain.BrainFireBlock fb ? new JObject
                     {
-                        ["id"] = f.id, ["x"] = Math.Round(f.position.x, 2), ["y"] = Math.Round(f.position.y, 2),
-                        ["path_m"] = Math.Round(f.pathM, 1), ["unsearched_m2"] = Math.Round(f.unsearchedM2, 1),
-                    })),
+                        ["bearing_deg"] = Math.Round(fb.bearingDegRight, 1), ["distance_m"] = Math.Round(fb.distanceM, 2),
+                        ["frontier_path_m"] = Math.Round(fb.frontierPathM, 1), ["unsearched_m2"] = Math.Round(fb.unsearchedM2, 1),
+                    } : null,
                     ["lidar"] = LidarSummary(rig.lastScan),
                     ["water_l"] = Math.Round(rig.actions?.WaterLitres ?? 0, 2),
                     ["carrying_person"] = rig.actions?.Carrying != null,
