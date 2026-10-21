@@ -28,6 +28,7 @@ namespace SmokeRescue.Brain
         static readonly float[] SweepOffsetsDeg = { 60f, -60f, 0f };   // left, right, back to the arrival heading
         int knownCells, knownAtMark;
         double progressMark = double.NaN, nextCount;
+        Vector2 progressPose; float travelSinceMark;
 
         bool VisitedGoal(Vector2 p, double t)
         {
@@ -113,13 +114,19 @@ namespace SmokeRescue.Brain
             for (int i = 0; i < grid.Count; i++) if (grid.OwnObserved(i)) n++;
             knownCells = n;
             bool exploring = active == null && !retreating && !returning && !sweeping && !AgentGoalActive(t);
-            if (!exploring || double.IsNaN(progressMark)) { progressMark = t; knownAtMark = n; return; }
-            if (n - knownAtMark >= c.progress_min_cells) { progressMark = t; knownAtMark = n; return; }
+            Vector2 at = motion.Pose.position;
+            if (!exploring || double.IsNaN(progressMark)) { progressMark = t; knownAtMark = n; progressPose = at; travelSinceMark = 0; return; }
+            travelSinceMark += Vector2.Distance(at, progressPose); progressPose = at;
+            if (n - knownAtMark >= c.progress_min_cells) { progressMark = t; knownAtMark = n; travelSinceMark = 0; return; }
             if (t - progressMark < c.progress_window_s) return;
+            // Standing (turning in place, held between agent orders) is not circling: the frontiers near a robot that has
+            // not moved are not what failed (held-out seed 914 run 4, robot A: a 2.5 m circle set aside the open door of an
+            // unsearched bedroom while A turned in place to face warm shapes).
+            if (travelSinceMark < c.progress_min_travel_m) { progressMark = t; knownAtMark = n; travelSinceMark = 0; return; }
             visited.Add(new Visited { position = motion.Pose.position, radius = c.progress_skip_radius_m, until = t + c.visited_hold_s });
             Emit(t, "no_progress", $"Map grew by only {n - knownAtMark} cells in {t - progressMark:0} s; leave this spot for the next unexplored area.",
                 "x_m", motion.Pose.position.x, "y_m", motion.Pose.position.y, "new_cells", n - knownAtMark);
-            progressMark = t; knownAtMark = n;
+            progressMark = t; knownAtMark = n; travelSinceMark = 0;
             ClearPath();
         }
     }

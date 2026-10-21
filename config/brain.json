@@ -251,6 +251,8 @@
   "progress_min_cells_reason": "0.4 m^2 of newly mapped floor per window counts as progress.",
   "progress_window_s": 15,
   "progress_window_s_reason": "Exploring this long without progress means the robot is circling.",
+  "progress_min_travel_m": 1.0,
+  "progress_min_travel_m_reason": "The progress watchdog counts the robot as circling only if it travelled at least this far in the window. Over 15 s a robot circling at the 0.3 m/s doorway speed covers 4.5 m; one turning in place or held between agent orders covers under 0.2 m of odometry drift. Held-out seed 914 run 4: robot A, turning in place to face warm shapes, had a 2.5 m circle set aside around its doorway, which held the open door of an unsearched bedroom 2.3 m away.",
   "progress_skip_radius_m": 2.5,
   "progress_skip_radius_m_reason": "Frontiers this close to a no-progress spot are set aside.",
   "sweep_max_s": 12,

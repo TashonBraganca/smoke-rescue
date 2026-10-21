@@ -913,6 +913,36 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void CutOffInWarmAirWithNoRouteOutTheRobotNeitherFlipsNorRefusesMoves()
+        {
+            // Held-out seed 914 run 4, robot B: way out closed by fire, no emergency route, air in the 30 to 35 C band (heat
+            // "building" from air_warm_c, yet cool enough to end a retreat below heat_recover_below_c). Every two ticks it
+            // started a return (stay_overridden), found the way out closed (escape_closing, retreat), ended the retreat as
+            // cool, and started again: 360 returns in 45 s, and every agent move was refused as "the robot is leaving" while
+            // it could not leave. Now a cut-off robot never starts a normal return; it retries the emergency exit every
+            // escape_check_s and agent moves stay allowed.
+            var c = Settings(); c.grid_size_m = 12; c.robot_radius_m = .25f; c.last_resort_fire_clearance_m = c.emergency_fire_clearance_m;
+            var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -5, 5, -2, 6);
+            var events = new List<BrainEvent>(); double cutAt = double.NaN;
+            for (int i = 0; i < 15 * 40; i++)
+            {
+                double t = i / 15.0;
+                if (double.IsNaN(cutAt) && events.Any(e => e.kind == "goal" && e.reason.StartsWith("The way out was closing"))) cutAt = t;
+                Motion(b, t, t < 3 ? 1f : 0); b.OnRgbd(Image(t, true)); b.OnAirTemperature(t, double.IsNaN(cutAt) ? 20 : 32);
+                var g = Map(b);
+                if (t >= 3.2) for (float dx = -.3f; dx <= .3f; dx += .1f) for (float dy = -.3f; dy <= .3f; dy += .1f) g.ObserveHeat(g.Cell(new Vector2(1.9f + dx, .8f + dy)), 500, t);
+                if (!double.IsNaN(cutAt))
+                    for (float x = -5; x <= 5; x += .05f) if (Mathf.Abs(x) >= .45f) g.ObserveHeat(g.Cell(new Vector2(x, 1.5f)), 500, t);
+                b.Step(t, 1f / 15); events.AddRange(b.DrainEvents());
+            }
+            Assert.That(double.IsNaN(cutAt), Is.False, "the way out started closing");
+            Assert.That(events.Count(e => e.kind == "escape_closing" && e.reason.StartsWith("The known way out is closed")), Is.LessThanOrEqualTo(2), "cut off once, not every two ticks");
+            Assert.That(events.Count(e => e.kind == "stay_overridden"), Is.LessThanOrEqualTo(1), "no return started toward a closed way out");
+            var refusal = typeof(RobotBrain).GetMethod("AgentMoveRefusal", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            Assert.That(refusal.Invoke(b, new object[] { 40.0 }), Is.Null, "a robot that cannot leave may still be moved by its agent");
+        }
+
+        [Test]
         public void OnAnEmergencyExitOnlyMeasuredFireShutsTheDoorNotAFastRisingReading()
         {
             // Held-out seed 914, robot B: in the hot gas filling the foyer its thermal camera read the floor of the only door
@@ -1538,7 +1568,8 @@ namespace SmokeRescue.Tests.EditMode
                 typeof(RobotBrain).GetField("canReenter", flags).SetValue(b, leftEarly);
                 if (hotAir) typeof(RobotBrain).GetField("budget", flags).SetValue(b, .2f);   // spent, and the air keeps it low
                 reentries = 0;
-                for (int i = 0; i < 60; i++)
+                // 8 s: re-entry waits for the fire's closing rate along the way in, measured over two checks (escape_rate_window_s).
+                for (int i = 0; i < 120; i++)
                 {
                     double t = i / 15.0; Motion(b, t); b.OnRgbd(Image(t, true)); b.OnAirTemperature(t, hotAir ? 60 : 20);
                     b.Step(t, 1f / 15); reentries += b.DrainEvents().Count(e => e.kind == "reenter");
@@ -1551,6 +1582,77 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(none, Is.Zero);
             Assert.That(After(true, true, out int hot), Is.Not.EqualTo("explore"), "control: hot air, budget not recovered");
             Assert.That(hot, Is.Zero);
+        }
+
+        [Test]
+        public void ARobotGoesBackInOnlyWhereTheFireIsNotClosingOnTheWayIn()
+        {
+            // Held-out seed 914 run 4, robot A: it left at 50 s because the fire was closing on its way out and re-entered in
+            // the same second it got out (75 s), along the route the front was still advancing on. Re-entry now applies the
+            // leave rule's closing test: the fire distance at fixed route cells over two checks spanning escape_rate_window_s
+            // must not close faster than the robot could walk the route. A still fire 3 m off the route passes after the
+            // measurement; a front advancing 0.5 m/s from the same place does not.
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            bool[] Checks(float speed)
+            {
+                var c = Settings(); c.grid_size_m = 12;
+                var b = new RobotBrain(Calibration(), c, "A", 0); var g = Map(b);
+                var route = new List<Vector2>(); for (float y = 0; y <= 6f; y += .1f) route.Add(new Vector2(0, y));
+                var steady = typeof(RobotBrain).GetMethod("ReentryFrontSteady", flags);
+                var prepare = typeof(OccupancyGrid).GetMethod("PrepareNavigation", flags);
+                var results = new List<bool>();
+                for (int k = 0; k <= 3; k++)
+                {
+                    double t = k * c.escape_check_s; float x = 4f - speed * (float)t;
+                    for (float y = 3.5f; y <= 4.5f; y += .1f) g.ObserveHeat(g.Cell(new Vector2(x, y)), 500, t);
+                    prepare.Invoke(g, null);
+                    results.Add((bool)steady.Invoke(b, new object[] { t, route, x }));
+                }
+                return results.ToArray();
+            }
+            Assert.That(Checks(0), Is.EqualTo(new[] { false, false, true, true }), "a still fire: in once two intervals are measured");
+            var closing = Checks(.5f);
+            Assert.That(closing[2] || closing[3], Is.False, "a front advancing 0.5 m/s keeps the robot out");
+            // Wired into CheckReenter: a robot that left early goes back in only once the rate is measured.
+            var cfg = Settings(); cfg.grid_size_m = 12; cfg.robot_radius_m = .25f;
+            var brain = new RobotBrain(Calibration(), cfg, "A", 0); Room(brain, -5, 5, -2, 6);
+            typeof(RobotBrain).GetField("completed", flags).SetValue(brain, true);
+            typeof(RobotBrain).GetField("canReenter", flags).SetValue(brain, true);
+            double back = double.NaN;
+            for (int i = 0; i < 150 && double.IsNaN(back); i++)
+            {
+                double t = i / 15.0; Motion(brain, t); brain.OnRgbd(Image(t, true)); brain.OnAirTemperature(t, 20);
+                brain.Step(t, 1f / 15); if (brain.DrainEvents().Any(e => e.kind == "reenter")) back = t;
+            }
+            Assert.That(back, Is.GreaterThanOrEqualTo(cfg.escape_rate_window_s - 1e-3), "re-entry waits for two measured intervals");
+        }
+
+        [Test]
+        public void AStandingRobotIsNotCirclingSoTheProgressWatchdogLeavesTheNearbyDoorsAlone()
+        {
+            // Held-out seed 914 run 4, robot A: turning in place on its agent's orders to face warm shapes, it mapped nothing
+            // new for 15 s; the progress watchdog, meant for a robot circling, set aside a 2.5 m circle around the doorway
+            // it stood in, which held the open door of an unsearched bedroom 2.3 m away. Now only a robot that travelled
+            // progress_min_travel_m in the window counts as circling. Control: the same 25 s spent driving back and forth
+            // over the same floor (several metres travelled, nothing new seen) still trips the watchdog.
+            int NoProgress(float speed)
+            {
+                var c = Settings(); c.grid_size_m = 12; c.robot_radius_m = .25f;
+                var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -5, 5, -5, 5);
+                var g = Map(b); for (int i = 0; i < g.Count; i++) { var p = g.Centre(i); if (p.x > 4.5f) g.ObserveFree(i); }
+                int count = 0; var kinds = new Dictionary<string, int>();
+                for (int k = 0; k <= 15 * 25; k++)
+                {
+                    double t = k / 15.0;
+                    Motion(b, t, ((int)(t / 2)) % 2 == 0 ? speed : -speed); b.OnRgbd(Image(t, true)); b.OnAirTemperature(t, 20);
+                    b.Step(t, 1f / 15);
+                    foreach (var e in b.DrainEvents()) { if (e.kind == "no_progress") count++; kinds[e.kind] = kinds.TryGetValue(e.kind, out int n) ? n + 1 : 1; }
+                }
+                TestContext.WriteLine($"speed {speed}: " + string.Join(", ", kinds.Select(kv => kv.Key + "=" + kv.Value)) + " state " + b.Snapshot().state);
+                return count;
+            }
+            Assert.That(NoProgress(0), Is.Zero, "standing still is not circling");
+            Assert.That(NoProgress(.3f), Is.GreaterThan(0), "control: driving back and forth over seen floor is");
         }
 
         [Test]
@@ -1605,7 +1707,8 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(Settle(b), Is.LessThanOrEqualTo(.25f + 1e-4f), "carry speed");
             Assert.That(Settle(free), Is.GreaterThan(.25f), "control: not carrying");
             var home = new RobotBrain(Calibration(), c, "A", 0); Room(home, -5, 5, -2, 6); var done = new List<BrainEvent>();
-            for (int i = 0; i < 30; i++)
+            // 8 s: going back in waits for the fire's closing rate along the way in (two checks, escape_rate_window_s).
+            for (int i = 0; i < 120; i++)
             {
                 double t = i / 15.0; Motion(home, t); home.OnRgbd(Image(t, true)); home.OnAirTemperature(t, 20);
                 if (i == 2) home.BeginCarry(t, .25f, "Survivor_s1");
