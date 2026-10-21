@@ -46,7 +46,7 @@ namespace SmokeRescue.Recording
               // It asked to go somewhere to look, lift or measure: the arrival is its cue.
               "agent_goal_reached" };
         const double AgentPeriodS = 20, AgentMinGapS = 4, CommanderPeriodS = 30, OrderHoldS = 15, ExploreHoldS = 60;
-        const int FrontierOptions = 6;
+        const int FrontierOptions = 8;
 
         partial class RobotRig
         {
@@ -156,7 +156,7 @@ namespace SmokeRescue.Recording
                 }));
                 var req = new JObject
                 {
-                    ["robot_dir"] = Path.GetFullPath(rig.dir), ["t"] = t,
+                    ["robot_dir"] = Path.GetFullPath(rig.dir), ["t"] = t, ["mission_time_left_s"] = Math.Round(rig.brain.MissionTimeLeft(t)),
                     ["trace_path"] = Path.Combine(root, "agent_trace.jsonl"),
                     ["debug_dir"] = Path.Combine(root, "agent_debug"),
                     ["pose"] = JObject.FromObject(new { x = s.pose.position.x, y = s.pose.position.y, heading_deg = -s.pose.yawRad * Mathf.Rad2Deg }),

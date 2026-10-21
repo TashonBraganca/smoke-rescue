@@ -604,7 +604,7 @@ namespace SmokeRescue.Brain
             bool Open(int n) => OwnOccupancy(n) == 1 && Unsearched(n) && Vector2.Distance(Centre(n), p) <= maxM;
             int sx = start % Size, sy = start / Size, reach = Mathf.Max(2, Mathf.CeilToInt(c.frontier_peek_m / CellM));
             for (int dy = -reach; dy <= reach; dy++) for (int dx = -reach; dx <= reach; dx++)
-                if (dx * dx + dy * dy <= reach * reach && Inside(sx + dx, sy + dy)) { int n = (sy + dy) * Size + sx + dx; if (Open(n) && mark.Add(n)) queue.Enqueue(n); }
+                if (dx * dx + dy * dy <= reach * reach && Inside(sx + dx, sy + dy)) { int n = (sy + dy) * Size + sx + dx; if (Open(n) && ClearLine(start, n) && mark.Add(n)) queue.Enqueue(n); }
             while (queue.Count > 0)
             {
                 int cell = queue.Dequeue();
@@ -619,6 +619,55 @@ namespace SmokeRescue.Brain
                 }
             }
             return count * CellM * CellM;
+        }
+        /// <summary>No cell this robot's own map holds as occupied lies on the straight line between two cells, so floor seen
+        /// past a frontier is not counted through a wall (Codex review: a 1.2 m seed disc reached the room behind a thin wall).</summary>
+        bool ClearLine(int from, int to)
+        {
+            int x = from % Size, y = from / Size, ex = to % Size, ey = to / Size;
+            int dx = Math.Abs(ex - x), dy = Math.Abs(ey - y), sx = x < ex ? 1 : -1, sy = y < ey ? 1 : -1, error = dx - dy;
+            while (true)
+            {
+                if (OwnOccupancy(y * Size + x) == 255) return false;
+                if (x == ex && y == ey) return true;
+                int twice = 2 * error;
+                if (twice > -dy) { error -= dy; x += sx; }
+                if (twice < dx) { error += dx; y += sy; }
+            }
+        }
+        /// <summary>Connected regions of floor this robot mapped free that no camera on the team has searched (4-connected):
+        /// a label per cell, -1 elsewhere. Labels only; no indoor test, which would cost rays per cell.</summary>
+        public int[] UnsearchedRegions()
+        {
+            var label = new int[Count]; for (int i = 0; i < Count; i++) label[i] = -1;
+            var queue = new Queue<int>(); int next = 0;
+            for (int s = 0; s < Count; s++)
+            {
+                if (label[s] >= 0 || OwnOccupancy(s) != 1 || !Unsearched(s)) continue;
+                label[s] = next; queue.Enqueue(s);
+                while (queue.Count > 0)
+                {
+                    int cell = queue.Dequeue(), x = cell % Size, y = cell / Size;
+                    for (int k = 0; k < 4; k++)
+                    {
+                        int nx = x + (k == 0 ? 1 : k == 1 ? -1 : 0), ny = y + (k == 2 ? 1 : k == 3 ? -1 : 0);
+                        if (!Inside(nx, ny)) continue;
+                        int n = ny * Size + nx;
+                        if (label[n] < 0 && OwnOccupancy(n) == 1 && Unsearched(n)) { label[n] = next; queue.Enqueue(n); }
+                    }
+                }
+                next++;
+            }
+            return label;
+        }
+        /// <summary>The labels (UnsearchedRegions) within frontier_peek_m of p: the regions a frontier at p opens onto.</summary>
+        public HashSet<int> RegionsNear(int[] label, Vector2 p)
+        {
+            var found = new HashSet<int>(); int start = Cell(p); if (start < 0) return found;
+            int sx = start % Size, sy = start / Size, reach = Mathf.Max(2, Mathf.CeilToInt(c.frontier_peek_m / CellM));
+            for (int dy = -reach; dy <= reach; dy++) for (int dx = -reach; dx <= reach; dx++)
+                if (dx * dx + dy * dy <= reach * reach && Inside(sx + dx, sy + dy)) { int n = (sy + dy) * Size + sx + dx; if (label[n] >= 0 && ClearLine(start, n)) found.Add(label[n]); }
+            return found;
         }
         public bool UnderCeiling(Vector2 p)
         {

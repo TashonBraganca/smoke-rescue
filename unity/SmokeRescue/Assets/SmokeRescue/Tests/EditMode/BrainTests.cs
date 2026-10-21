@@ -2372,6 +2372,9 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(g.UnsearchedFloorBeyond(new Vector2(0, 1.9f), 1f), Is.LessThan(corridorM2 / 3), "bounded by the radius");
             // Run 3: frontiers stand on searched floor with the unsearched floor starting up to frontier_peek_m away.
             Assert.That(g.UnsearchedFloorBeyond(new Vector2(0, 1f), 12f), Is.GreaterThan(.8f * 8f * 1.8f), "from 1 m back from the doorway too");
+            // Codex review: the seed disc must not reach through a wall. 0.9 m along the room's east wall, inside, the corridor
+            // and the yard lie behind walls, not through the door.
+            Assert.That(g.UnsearchedFloorBeyond(new Vector2(1.6f, 1.6f), 12f), Is.LessThan(1f), "nothing counted through the wall");
         }
 
         [Test]
@@ -2428,6 +2431,71 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(b.Snapshot().confirmedSurvivors, Has.Length.EqualTo(1), "a partner's survivor elsewhere still counts");
             b.AgentConfirmSurvivor(spot, .5, "ev3");
             Assert.That(b.Snapshot().confirmedSurvivors, Has.Length.EqualTo(2), "a fresh confirmation here counts again");
+        }
+
+        [Test]
+        public void TheAgentIsOfferedTheDoorwayOntoTheLargestUnsearchedAreaNotOnlyNearbyCorners()
+        {
+            // Held-out seed 914 runs 3 and 4: 102 of 162 options were in the robot's current room; in the foyer all six were
+            // corners with under 2.5 m2 beyond them while the doors to three unsearched rooms were not offered. A searched
+            // 12 x 12 m room with twelve small unsearched pockets 2 to 3.3 m from the robot and a doorway 6 m away onto a
+            // 12 x 1.8 m corridor the LiDAR mapped. Control: with no wide slots the eight nearest options are all pockets.
+            (bool doorway, int pockets) Offer(int wide)
+            {
+                // The shipped gain weight (config/brain.json 0.01, a 1.5 m bonus at the cap); the C# default 0.04 gives a 6 m
+                // bonus that ranks the doorway first on its own and hides what the robots actually run with.
+                var c = Settings(); c.grid_size_m = 26; c.frontier_wide_options = wide; c.frontier_gain_weight = .01f;
+                var b = new RobotBrain(Calibration(), c, "A", 0); var g = Map(b);
+                var lidar = (float[])typeof(OccupancyGrid).GetField("lidarOdds", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(g);
+                var pockets = new List<Vector2>();
+                for (int k = 0; k < 12; k++) { float a = (k * 30 + 15) * Mathf.Deg2Rad; pockets.Add(new Vector2(Mathf.Sin(a), Mathf.Cos(a)) * (2f + .12f * k)); }
+                for (int i = 0; i < g.Count; i++)
+                {
+                    var p = g.Centre(i); float ax = Mathf.Abs(p.x), ay = Mathf.Abs(p.y);
+                    bool room = ax < 6f && ay < 6f, wall = !room && ax < 6.2f && ay < 6.2f, door = wall && p.y > 0 && ax < .5f;
+                    bool corridor = ax < 6f && p.y >= 6.2f && p.y < 8f;
+                    bool pocket = pockets.Exists(q => Mathf.Abs(p.x - q.x) < .3f && Mathf.Abs(p.y - q.y) < .3f);
+                    if (wall && !door) g.ObserveOccupied(i);
+                    else if (room && !pocket) g.ObserveFree(i);
+                    else if (room || door || corridor) lidar[i] = -c.log_odds_cap;   // mapped free by LiDAR, not searched
+                }
+                typeof(OccupancyGrid).GetField("dirty", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).SetValue(g, true);
+                Motion(b, 0);
+                var options = b.FrontierOptions(0, 8);
+                TestContext.WriteLine($"wide {wide}: " + string.Join("; ", options.Select(f => $"({f.position.x:0.0},{f.position.y:0.0}) cost {f.pathM:0.00} beyond {f.mappedUnsearchedM2:0.0} proven {f.provenIndoors}")));
+                return (options.Any(f => Mathf.Abs(f.position.x) < 1f && f.position.y > 4.5f && f.mappedUnsearchedM2 > 10f),
+                        options.Count(f => pockets.Exists(q => Vector2.Distance(q, f.position) < .9f)));
+            }
+            var wide = Offer(3);
+            Assert.That(wide.doorway, Is.True, "the doorway onto the corridor is offered");
+            Assert.That(wide.pockets, Is.GreaterThanOrEqualTo(5), "nearby pockets are still offered too");
+            var nearest = Offer(0);
+            Assert.That(nearest.doorway, Is.False, "control: nearest first offers only pockets");
+        }
+
+        [Test]
+        public void ARobotThatLeftForLackOfFrontiersGoesBackInWhenATemporaryExclusionExpires()
+        {
+            // Codex review of held-out seed 914: "no reachable frontier" ended the search for good, although the exclusions
+            // that emptied the list (a fire-cut blacklist, visited circles, a partner's claim) expire. The one unsearched pocket
+            // is blacklisted for 20 s; the robot scans, leaves, and goes back in once the blacklist lapses.
+            var c = Settings(); c.grid_size_m = 12;
+            var b = new RobotBrain(Calibration(), c, "A", 0); var g = Map(b);
+            for (int i = 0; i < g.Count; i++) { var p = g.Centre(i); if (!(Mathf.Abs(p.x) < .6f && p.y > 3f && p.y < 4f)) g.ObserveFree(i); }
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var blacklist = typeof(RobotBrain).GetMethod("BlacklistGoal", flags);
+            blacklist.Invoke(b, new object[] { new Vector2(0, 3.5f), 0.0, 0, 20.0, "test: fire cut", 1.5f });
+            var kinds = new List<(string kind, double t)>();
+            for (int k = 0; k <= 15 * 45; k++)
+            {
+                double t = k / 15.0;
+                Motion(b, t); b.OnRgbd(Image(t, true, 0)); b.OnAirTemperature(t, 20); b.Step(t, 1f / 15);
+                foreach (var e in b.DrainEvents()) kinds.Add((e.kind, e.t));
+            }
+            double done = kinds.FirstOrDefault(e => e.kind == "mission_complete").t;
+            Assert.That(kinds.Any(e => e.kind == "no_frontier"), Is.True, "the pocket was excluded at first");
+            Assert.That(kinds.Any(e => e.kind == "mission_complete"), Is.True, "so the robot left");
+            Assert.That(kinds.Any(e => e.kind == "reenter" && e.t > done && e.t >= 20), Is.True, "and went back in once the blacklist lapsed");
         }
 
         [Test]
