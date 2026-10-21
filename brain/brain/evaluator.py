@@ -135,16 +135,16 @@ def evaluate_merge(out_dir: Path, details: dict, pair: tuple[str, str], recordin
 
 def evaluate_map(recording: Path, out_dir: Path, details: dict, pair: tuple[str, str]) -> dict:
     """Median distance from merged map points (in the house frame) to the true surfaces, and floor coverage."""
-    import open3d as o3d
+    from brain.pointcloud import read_cloud
     from scipy.spatial import cKDTree
     result = {"coverage_pct": None, "map_median_error_m": None}
     merged = out_dir / "merge" / "merged_map.ply"
     truth = truth_folder(recording) / "house_truth.ply"
     if merged.exists() and truth.exists():
-        pts = np.asarray(o3d.io.read_point_cloud(str(merged)).points)
+        pts = read_cloud(merged).points
         T = alignment_matrix(details[pair[0]])
         pts_h = pts @ T[:3, :3].T + T[:3, 3]
-        tp = np.asarray(o3d.io.read_point_cloud(str(truth)).points)
+        tp = read_cloud(truth).points
         dist, _ = cKDTree(tp).query(pts_h, k=1)
         result["map_median_error_m"] = float(np.median(dist))
         result["map_points"] = int(len(pts_h))

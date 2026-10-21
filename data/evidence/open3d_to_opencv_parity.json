@@ -1,0 +1,355 @@
+{
+ "before": {
+  "dense": {
+   "robot_A": {
+    "points": 36713,
+    "min": [
+     -5.6874186861581855,
+     -4.340090825048327,
+     1.4639999866485596
+    ],
+    "max": [
+     4.50814251893663,
+     0.874213487189132,
+     9.869999885559082
+    ]
+   },
+   "robot_B": {
+    "points": 13510,
+    "min": [
+     -1.8611941116605184,
+     -1.5492462800589089,
+     0.47683950191662633
+    ],
+    "max": [
+     1.939159480913566,
+     0.49925023145258834,
+     3.5759999752044678
+    ]
+   }
+  },
+  "verify": [
+   {
+    "recording": "data/fixtures/tiny_2robots",
+    "query": [
+     "robot_A",
+     0
+    ],
+    "reference": [
+     "robot_A",
+     0
+    ],
+    "inliers": 2306,
+    "fitness": 1.0,
+    "accepted": true,
+    "matches": 2306,
+    "icp_rmse": 0.0,
+    "T_ref_query": [
+     [
+      0.9999999999999999,
+      7.951817415727491e-16,
+      5.0972643310046e-16,
+      -9.43689570931383e-16
+     ],
+     [
+      -7.15728064760089e-16,
+      1.0000000000000002,
+      2.3513353355777595e-15,
+      -5.440092820663267e-15
+     ],
+     [
+      -5.551115123125783e-16,
+      -2.3314683517128287e-15,
+      1.0000000000000002,
+      -8.881784197001252e-16
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    "reason": "accepted"
+   },
+   {
+    "recording": "data/fixtures/tiny_2robots",
+    "query": [
+     "robot_A",
+     0
+    ],
+    "reference": [
+     "robot_A",
+     1
+    ],
+    "inliers": 1630,
+    "fitness": 0.9920717713331942,
+    "accepted": true,
+    "matches": 1718,
+    "icp_rmse": 0.01249907997225344,
+    "T_ref_query": [
+     [
+      0.9999997890907799,
+      -9.180207882443689e-05,
+      -0.0006429547213006391,
+      0.0006714310225707604
+     ],
+     [
+      9.188970641128118e-05,
+      0.9999999864946544,
+      0.00013626067793319583,
+      -0.001137266415790862
+     ],
+     [
+      0.0006429422036037091,
+      -0.00013631973011483215,
+      0.9999997840211039,
+      0.000640757385694267
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    "reason": "accepted"
+   },
+   {
+    "recording": "data/fixtures/tiny_2robots",
+    "query": [
+     "robot_A",
+     0
+    ],
+    "reference": [
+     "robot_B",
+     0
+    ],
+    "inliers": 3,
+    "fitness": 0.0,
+    "accepted": false,
+    "matches": 47,
+    "reason": "RANSAC found no consistent transform (3 inliers)"
+   },
+   {
+    "recording": "data/recordings/unity_house_hidden_run1",
+    "query": [
+     "robot_A",
+     0
+    ],
+    "reference": [
+     "robot_A",
+     1
+    ],
+    "inliers": 25,
+    "fitness": 0.9971947269990421,
+    "accepted": false,
+    "matches": 56,
+    "icp_rmse": 0.017525982282804223,
+    "T_ref_query": [
+     [
+      0.9999478266534675,
+      0.0018557971078853172,
+      -0.010044898610859563,
+      -0.0004673174699081753
+     ],
+     [
+      -0.0018542569687863785,
+      0.9999982676387332,
+      0.00016263648273699222,
+      -0.0003920580285377667
+     ],
+     [
+      0.010045183029780707,
+      -0.00014400217419784545,
+      0.9999495355073039,
+      -0.002452949777826083
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    "reason": "inliers 25 <= 60"
+   }
+  ],
+  "evaluator": {
+   "unity_clear_seed7": {
+    "coverage_pct": 69.82142857142857,
+    "map_median_error_m": 0.07606298087496247,
+    "map_points": 1764169
+   },
+   "unity_haze": {
+    "coverage_pct": 76.00446428571429,
+    "map_median_error_m": 0.28987276057378486,
+    "map_points": 3151038
+   }
+  }
+ },
+ "scope": {
+  "hidden_dense_map": "No KeyFrameTrajectory.txt for unity_house_hidden_run1 under data/runs.",
+  "fixture_poses": "Same deterministic test poses as test_slam.py: all 15 association times, identity rotation, x = frame_index * 0.01 m, keyframes every second frame."
+ },
+ "merge_rerun_2026_10_21": {
+  "open3d": {
+   "unity_clear_seed7": {
+    "merged": true,
+    "accepted": 9,
+    "t_merge": 112.05185,
+    "T_A_B": [
+     [
+      -0.9919465598302265,
+      -0.01213334463600843,
+      0.12607459850787994,
+      7.239517050888913
+     ],
+     [
+      0.0344722088939134,
+      0.9319608435325113,
+      0.3609164071307145,
+      -3.1525790413465193
+     ],
+     [
+      -0.12187571232593337,
+      0.3623558583355779,
+      -0.9240370894476766,
+      16.737798186449215
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    "pose_graph_edges": 9,
+    "seconds": 34.5,
+    "map": {
+     "coverage_pct": 69.82142857142857,
+     "map_median_error_m": 0.07606298087496008,
+     "map_points": 1764169
+    }
+   },
+   "unity_clear": {
+    "merged": true,
+    "accepted": 22,
+    "t_merge": 110.05243,
+    "T_A_B": [
+     [
+      -0.9805579925438455,
+      -0.041431967490266904,
+      0.1918056707406496,
+      6.220771522054883
+     ],
+     [
+      0.022990494898536176,
+      0.9464674058066472,
+      0.321979637384038,
+      -3.0111410625023995
+     ],
+     [
+      -0.19487806547352984,
+      0.32012941416796054,
+      -0.927113638008726,
+      18.59630637547524
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    "pose_graph_edges": 21,
+    "seconds": 65.5,
+    "map": {
+     "coverage_pct": 73.79464285714286,
+     "map_median_error_m": 0.07736165384530853,
+     "map_points": 2554179
+    }
+   }
+  },
+  "opencv5": {
+   "unity_clear_seed7": {
+    "merged": true,
+    "accepted": 9,
+    "t_merge": 112.05185,
+    "T_A_B": [
+     [
+      -0.9919104640071391,
+      -0.010949060846806611,
+      0.126466396563333,
+      7.237542662876767
+     ],
+     [
+      0.03587389764820889,
+      0.9314822835526032,
+      0.36201356175584487,
+      -3.1668046771318963
+     ],
+     [
+      -0.12176491637851647,
+      0.3636218825843681,
+      -0.9235542386049301,
+      16.734895128515078
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    "pose_graph_edges": 9,
+    "seconds": 416.6,
+    "map": {
+     "coverage_pct": 69.84375,
+     "map_median_error_m": 0.0751500357275052,
+     "map_points": 1818148
+    }
+   },
+   "unity_clear": {
+    "merged": true,
+    "accepted": 21,
+    "t_merge": 110.05243,
+    "T_A_B": [
+     [
+      -0.9809235123097135,
+      -0.04123960284325616,
+      0.189969361096221,
+      6.2397413226041305
+     ],
+     [
+      0.022694735601014593,
+      0.9462612622941946,
+      0.32260590890031415,
+      -3.0110528511449863
+     ],
+     [
+      -0.19306478698606835,
+      0.32076302567273596,
+      -0.9272739990894256,
+      18.564870081907408
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    "pose_graph_edges": 21,
+    "seconds": 321.2,
+    "map": {
+     "coverage_pct": 73.81696428571429,
+     "map_median_error_m": 0.07867632213491584,
+     "map_points": 2527497
+    }
+   }
+  },
+  "dense_maps": "Rebuilt by brain.dense_map on OpenCV 5 for unity_clear_seed7 and unity_clear, both robots: identical point counts (1535302, 885750, 2092635, 1459967), every point within 0.0011 mm of the Open3D map, colours within 1/255.",
+  "summary": "Merges happen at the same times; accepted matches 9/9 and 21/22; final transforms differ by 1.5 cm and 3.7 cm (0.11 deg); map error 0.0752 vs 0.0761 m and 0.0787 vs 0.0774 m. Not identical: Open3D used coloured ICP, the port uses point-to-plane ICP (numpy, OpenCV 5 has no ICP from an initial estimate in Python). The port is 5 to 12 times slower offline (measured while Unity was recording)."
+ }
+}

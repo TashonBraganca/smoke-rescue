@@ -29,10 +29,12 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-import open3d as o3d
+from scipy.optimize import least_squares
+from scipy.sparse import lil_matrix
 from scipy.spatial.transform import Rotation
 
 from brain.io import RecordingReader
+from brain.pointcloud import PointCloud, read_cloud, register_rgbd, voxel_downsample, write_cloud
 from brain.trajectory import read_tum
 
 INLIER_MIN = 60
@@ -136,16 +138,6 @@ def lift(kp, depth_m: np.ndarray, cam) -> tuple[np.ndarray, np.ndarray]:
     return np.asarray(pts, float).reshape(-1, 3), np.asarray(ok, int)
 
 
-def cloud(frame, cam) -> o3d.geometry.PointCloud:
-    rgb = o3d.geometry.Image(np.ascontiguousarray(frame.rgb))
-    dep = o3d.geometry.Image(np.ascontiguousarray(frame.depth_m.astype(np.float32)))
-    rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(rgb, dep, depth_scale=1.0, depth_trunc=6.0, convert_rgb_to_intensity=False)
-    intr = o3d.camera.PinholeCameraIntrinsic(cam.width, cam.height, cam.fx, cam.fy, cam.cx, cam.cy)
-    pc = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd, intr).voxel_down_sample(ICP_VOXEL_M)
-    pc.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=ICP_VOXEL_M * 3, max_nn=30))
-    return pc
-
-
 def verify(query: RobotMap, q_id: int, ref: RobotMap, r_id: int, rng: np.random.Generator) -> dict:
     """Estimate T (query camera -> reference camera). Returns a result dict with 'accepted' and 'reason'."""
     fq, fr = query.frame(q_id), ref.frame(r_id)
@@ -183,15 +175,9 @@ def verify(query: RobotMap, q_id: int, ref: RobotMap, r_id: int, rng: np.random.
         res["reason"] = f"RANSAC found no consistent transform ({int(best_in.sum())} inliers)"
         return res
     T0 = kabsch(A[best_in], B[best_in])
-    src, dst = cloud(fq, query.reader.camera), cloud(fr, ref.reader.camera)
-    try:
-        icp = o3d.pipelines.registration.registration_colored_icp(
-            src, dst, ICP_VOXEL_M * 1.5, T0,
-            o3d.pipelines.registration.TransformationEstimationForColoredICP(),
-            o3d.pipelines.registration.ICPConvergenceCriteria(relative_fitness=1e-6, relative_rmse=1e-6, max_iteration=40))
-        T, fitness, rmse = icp.transformation, icp.fitness, icp.inlier_rmse
-    except RuntimeError:
-        T, fitness, rmse = T0, 0.0, float("nan")
+    # Point-to-plane ICP on the two frames' 3 cm clouds (brain.pointcloud: OpenCV 5 back-projection and normals).
+    icp = register_rgbd(fq, fr, query.reader.camera, ref.reader.camera, T0, voxel_m=ICP_VOXEL_M, max_distance_m=ICP_VOXEL_M * 1.5)
+    T, fitness, rmse = icp.transformation, icp.fitness, icp.inlier_rmse
     res.update(fitness=float(fitness), icp_rmse=float(rmse), T_ref_query=np.asarray(T).tolist())
     if res["inliers"] <= INLIER_MIN:
         res["reason"] = f"inliers {res['inliers']} <= {INLIER_MIN}"
@@ -288,42 +274,110 @@ def run(recording: Path, run_dir: Path, robots: tuple[str, str] = ("robot_A", "r
     return result
 
 
+def _relative_error(Z: np.ndarray, Pt: np.ndarray, Ps: np.ndarray) -> np.ndarray:
+    """Edge error as [rotation vector, translation] of inv(Z) inv(Pt) Ps (Open3D's edge convention: Z maps the source
+    node's frame into the target node's frame)."""
+    E = np.linalg.inv(Z) @ np.linalg.inv(Pt) @ Ps
+    return np.r_[Rotation.from_matrix(E[:3, :3]).as_rotvec(), E[:3, 3]]
+
+
+def optimise_pose_graph(poses: list[np.ndarray], edges: list[tuple], fixed: int = 0, max_correspondence_m: float = 0.05,
+                        prune_below: float = 0.25, rounds: int = 10) -> tuple[list[np.ndarray], list[bool]]:
+    """Levenberg-Marquardt pose graph (SciPy least_squares, sparse Jacobian). Edges are (source, target, Z, info, uncertain).
+    Uncertain edges carry a line-process weight l = (mu / (mu + e' info e))^2 with mu = max_correspondence_m^2, updated
+    between rounds, and are dropped when l < prune_below, as in Open3D's global_optimization (OpenCV 5's pose graph,
+    cv2.detail.PoseGraph, has no Python methods). Residuals are computed for all edges at once. Returns the optimised
+    poses and which edges were kept."""
+    n = len(poses)
+    free = np.array([i for i in range(n) if i != fixed])
+    slot = np.full(n, -1); slot[free] = np.arange(len(free))
+    P = np.array(poses, np.float64)
+    x0 = np.concatenate([Rotation.from_matrix(P[free, :3, :3]).as_rotvec(), P[free, :3, 3]], axis=1).ravel()
+    src = np.array([e[0] for e in edges]); dst = np.array([e[1] for e in edges])
+    Zi = np.linalg.inv(np.array([e[2] for e in edges], np.float64))
+    sqrt_info = np.sqrt(np.array([np.diag(e[3]) for e in edges], np.float64))
+    uncertain = np.array([bool(e[4]) for e in edges])
+    mu = max_correspondence_m ** 2
+    weight = np.ones(len(edges))
+    keep = np.ones(len(edges), bool)
+
+    def unpack(x):
+        v = x.reshape(-1, 6)
+        R = P[:, :3, :3].copy(); t = P[:, :3, 3].copy()
+        R[free] = Rotation.from_rotvec(v[:, :3]).as_matrix(); t[free] = v[:, 3:]
+        return R, t
+
+    def errors(x, active):
+        R, t = unpack(x)
+        Rs, ts, Rt, tt = R[src[active]], t[src[active]], R[dst[active]], t[dst[active]]
+        M = np.einsum("nji,njk->nik", Rt, Rs)                          # Rt' Rs
+        m = np.einsum("nji,nj->ni", Rt, ts - tt)                         # Rt' (ts - tt)
+        ER = np.einsum("nij,njk->nik", Zi[active, :3, :3], M)
+        Et = np.einsum("nij,nj->ni", Zi[active, :3, :3], m) + Zi[active, :3, 3]
+        return np.concatenate([Rotation.from_matrix(ER).as_rotvec(), Et], axis=1)
+
+    def residuals(x, active):
+        return (errors(x, active) * sqrt_info[active] * np.sqrt(weight[active])[:, None]).ravel()
+
+    def sparsity(active):
+        J = lil_matrix((6 * len(active), len(x0)), dtype=int)
+        for row, e in enumerate(active):
+            for node in (src[e], dst[e]):
+                if slot[node] >= 0:
+                    J[6 * row: 6 * row + 6, 6 * slot[node]: 6 * slot[node] + 6] = 1
+        return J
+
+    x = x0
+    for _ in range(rounds):
+        active = np.flatnonzero(keep)
+        x = least_squares(residuals, x, args=(active,), jac_sparsity=sparsity(active), method="trf", x_scale="jac").x
+        before = weight.copy()
+        err = errors(x, np.arange(len(edges)))
+        chi = np.einsum("ni,ni->n", err * sqrt_info ** 2, err)
+        weight = np.where(uncertain, (mu / (mu + chi)) ** 2, 1.0)
+        if np.allclose(weight, before, atol=1e-4):
+            break
+    keep &= ~(uncertain & (weight < prune_below))
+    active = np.flatnonzero(keep)
+    x = least_squares(residuals, x, args=(active,), jac_sparsity=sparsity(active), method="trf", x_scale="jac").x
+    R, t = unpack(x)
+    out = []
+    for i in range(n):
+        T = np.eye(4); T[:3, :3] = R[i]; T[:3, 3] = t[i]; out.append(T)
+    return out, keep.tolist()
+
+
 def pose_graph(a: RobotMap, b: RobotMap, matches: list[dict], T_init: np.ndarray) -> np.ndarray:
     """Optimise A and B keyframe poses in A's frame; returns the refined T_A_B (B map -> A map)."""
-    reg = o3d.pipelines.registration
-    graph = reg.PoseGraph()
     ids_a = sorted(a.poses, key=lambda k: a.keyframe(k)["timestamp"])
     ids_b = sorted(b.poses, key=lambda k: b.keyframe(k)["timestamp"])
-    index = {}
+    index, poses, edges = {}, [], []
     for k in ids_a:
-        index[("a", k)] = len(graph.nodes)
-        graph.nodes.append(reg.PoseGraphNode(a.poses[k]))
+        index[("a", k)] = len(poses); poses.append(a.poses[k])
     for k in ids_b:
-        index[("b", k)] = len(graph.nodes)
-        graph.nodes.append(reg.PoseGraphNode(T_init @ b.poses[k]))
+        index[("b", k)] = len(poses); poses.append(T_init @ b.poses[k])
     info_odom = np.eye(6) * 1000.0
     for side, ids, m in (("a", ids_a, a), ("b", ids_b, b)):
         for k0, k1 in zip(ids, ids[1:]):
-            rel = np.linalg.inv(m.poses[k1]) @ m.poses[k0]   # Open3D edge: T maps target-node frame... source->target
-            graph.edges.append(reg.PoseGraphEdge(index[(side, k0)], index[(side, k1)], rel, info_odom, uncertain=False))
+            rel = np.linalg.inv(m.poses[k1]) @ m.poses[k0]   # maps the source node's frame into the target node's frame
+            edges.append((index[(side, k0)], index[(side, k1)], rel, info_odom, False))
     for e in matches:
         # Loop edge between B keyframe (source) and A keyframe (target): relative pose implied by this match.
         Ta = a.poses[e["a_kf"]]
         Tb = np.asarray(e["T_A_B"]) @ b.poses[e["b_kf"]]
-        rel = np.linalg.inv(Ta) @ Tb
-        graph.edges.append(reg.PoseGraphEdge(index[("b", e["b_kf"])], index[("a", e["a_kf"])], rel, np.eye(6) * 100.0, uncertain=True))
-    option = reg.GlobalOptimizationOption(max_correspondence_distance=0.05, edge_prune_threshold=0.25, reference_node=0)
-    reg.global_optimization(graph, reg.GlobalOptimizationLevenbergMarquardt(), reg.GlobalOptimizationConvergenceCriteria(), option)
+        edges.append((index[("b", e["b_kf"])], index[("a", e["a_kf"])], np.linalg.inv(Ta) @ Tb, np.eye(6) * 100.0, True))
+    optimised, _ = optimise_pose_graph(poses, edges, fixed=0, max_correspondence_m=0.05, prune_below=0.25)
     # Refined T_A_B from B's first keyframe node: optimised pose times the inverse of its own-map pose.
     k0 = ids_b[0]
-    return np.asarray(graph.nodes[index[("b", k0)]].pose) @ np.linalg.inv(b.poses[k0])
+    return optimised[index[("b", k0)]] @ np.linalg.inv(b.poses[k0])
 
 
 def merged_map(run_dir: Path, a_name: str, b_name: str, T_A_B: np.ndarray, out: Path) -> None:
-    pa = o3d.io.read_point_cloud(str(run_dir / a_name / "map.ply"))
-    pb = o3d.io.read_point_cloud(str(run_dir / b_name / "map.ply"))
-    pb.transform(T_A_B)
-    o3d.io.write_point_cloud(str(out / "merged_map.ply"), (pa + pb).voxel_down_sample(0.03))
+    pa = read_cloud(run_dir / a_name / "map.ply")
+    pb = read_cloud(run_dir / b_name / "map.ply")
+    points_b = pb.points @ T_A_B[:3, :3].T + T_A_B[:3, 3]
+    colors = None if pa.colors is None or pb.colors is None else np.vstack([pa.colors, pb.colors])
+    write_cloud(out / "merged_map.ply", voxel_downsample(PointCloud(np.vstack([pa.points, points_b]), colors), 0.03))
 
 
 def main() -> None:
