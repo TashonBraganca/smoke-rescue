@@ -56,3 +56,19 @@ data/evidence/*.mp4
 data/evidence/showcase_frames/
 data/models/
 data/codex_jobs/
+
+# Internal notes kept on the workstation, not in the public repo
+the project notes
+CREDITS.md
+KICKOFF_PROMPT.md
+MASTER_PROMPT.md
+STATUS.md
+brain/C8_HANDOFF.md
+docs/BUILD_ORDER.md
+docs/GAME_FEATURES_LATER.md
+docs/INTERFACES.md
+docs/SETUP_MAC.md
+docs/SIMULATION_SPEC.md
+handoff/shreya.md
+handoff/vishnu.md
+handoff/vishnu_aws.md
