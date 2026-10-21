@@ -8,7 +8,8 @@ namespace SmokeRescue.Brain
     /// <summary>
     /// Linking two robots' maps without a shared frame. Each robot maps in its own frame, starting at its own origin.
     /// Every keyframe_spacing_m it keeps a keyframe (pose in its frame, a 360 beam LiDAR sweep, a Scan Context
-    /// fingerprint) and radios keyframes with its map. A receiver compares each partner keyframe with its own; a
+    /// fingerprint) and radios keyframes with its map. Camera RANSAC poses seed the same own-map fit and uniqueness
+    /// checks using a nearby partner LiDAR sweep. A receiver compares each partner keyframe with its own; a
     /// close fingerprint gives a candidate place and turn, which is checked by placing the partner's sweep into the
     /// receiver's own LiDAR map with the scan matcher. The verified pose gives the transform from the partner's frame
     /// to this one. Two candidates from places at least link_min_separation_m apart must agree before the link is
@@ -181,38 +182,65 @@ namespace SmokeRescue.Brain
         // ---- visual keyframes: ORB features with body-frame positions, made by this robot's own OpenCV 5 place service
         sealed class VisualKeyframe { public int id; public BrainPose pose; public byte[] payload; }
         readonly List<VisualKeyframe> visualKeyframes = new List<VisualKeyframe>();
-        readonly Dictionary<string, HashSet<int>> partnerVisualSeen = new Dictionary<string, HashSet<int>>(StringComparer.Ordinal);
+        readonly Dictionary<string, SortedDictionary<int, BrainVisualKeyframe>> partnerVisualFrames = new Dictionary<string, SortedDictionary<int, BrainVisualKeyframe>>(StringComparer.Ordinal);
         readonly Dictionary<string, Dictionary<int, BrainPose>> partnerVisualPoses = new Dictionary<string, Dictionary<int, BrainPose>>(StringComparer.Ordinal);
         readonly List<(string sender, BrainVisualKeyframe keyframe)> partnerVisualPending = new List<(string, BrainVisualKeyframe)>();
         int newestSentVisual = -1, visualRoundRobin;
 
+        public bool VisualPlacesEnabled => c.visual_place_linking && !c.frames_shared_at_start;
+        public int VisualKeyframeCapacity => c.visual_keyframe_max;
         public float VisualKeyframePeriodS => c.visual_keyframe_period_s;
-        /// <summary>A camera keyframe from this robot's own place service: the id it gave, the pose at capture, the payload.</summary>
+        /// <summary>A camera keyframe from this robot's own place service. The caller assigns a stable radio id even if
+        /// the service restarts and reuses its own ids; pose is the brain's estimate at capture.</summary>
         public void AddVisualKeyframe(int keyframeId, BrainPose pose, byte[] payload)
         {
-            if (payload == null || payload.Length == 0 || payload.Length > BrainMessage.MaxVisualPayloadBytes) throw new ArgumentException("Invalid visual keyframe payload.");
-            visualKeyframes.Add(new VisualKeyframe { id = keyframeId, pose = pose, payload = payload });
+            if (keyframeId < 0 || !Finite(pose.position) || !BrainMath.Finite(pose.yawRad) || payload == null || payload.Length == 0 || payload.Length > c.visual_keyframe_max_payload_bytes) throw new ArgumentException("Invalid visual keyframe payload.");
+            if (!VisualPlacesEnabled || visualKeyframes.Exists(k => k.id == keyframeId)) return;
+            visualKeyframes.Add(new VisualKeyframe { id = keyframeId, pose = pose, payload = (byte[])payload.Clone() });
             if (visualKeyframes.Count > c.visual_keyframe_max) visualKeyframes.RemoveAt(0);
+            foreach (var pair in partnerVisualFrames)
+                if (!links.ContainsKey(pair.Key)) foreach (var k in pair.Value.Values) QueueVisual(pair.Key, k);
         }
 
-        /// <summary>Partner camera keyframes received since the last call, for this robot's place service to match against
-        /// its own (only while the frames are not linked yet).</summary>
+        /// <summary>A restarted place worker cannot keep the old service ids. Radio ids remain monotone in the caller.</summary>
+        public void ResetVisualKeyframes()
+        {
+            visualKeyframes.Clear(); newestSentVisual = -1; visualRoundRobin = 0;
+        }
+
+        /// <summary>Partner camera keyframes queued for matching, including retries when an own view arrives.
+        /// Only unlinked frames need matching. The returned payloads are detached from the retained fingerprints.</summary>
         public List<(string sender, BrainVisualKeyframe keyframe)> DrainPartnerVisualKeyframes()
         {
-            var list = new List<(string, BrainVisualKeyframe)>(partnerVisualPending); partnerVisualPending.Clear();
-            return list;
+            var list = new List<(string, BrainVisualKeyframe)>();
+            foreach (var item in partnerVisualPending)
+            {
+                var k = item.keyframe; k.payload = (byte[])k.payload.Clone(); list.Add((item.sender, k));
+            }
+            partnerVisualPending.Clear(); return list;
         }
 
+        void QueueVisual(string sender, BrainVisualKeyframe k)
+        {
+            if (partnerVisualPending.Exists(x => x.sender == sender && x.keyframe.id == k.id)) return;
+            partnerVisualPending.Add((sender, k));
+            if (partnerVisualPending.Count > c.visual_keyframe_max) partnerVisualPending.RemoveAt(0);
+        }
         void ReceiveVisualKeyframes(string sender, BrainMessage m)
         {
-            if (c.frames_shared_at_start || links.ContainsKey(sender) || m.VisualKeyframes.Length == 0) return;
-            if (!partnerVisualSeen.TryGetValue(sender, out var seen)) partnerVisualSeen[sender] = seen = new HashSet<int>();
+            if (!VisualPlacesEnabled || links.ContainsKey(sender) || m.VisualKeyframes.Length == 0) return;
+            if (!partnerVisualFrames.TryGetValue(sender, out var frames)) partnerVisualFrames[sender] = frames = new SortedDictionary<int, BrainVisualKeyframe>();
             if (!partnerVisualPoses.TryGetValue(sender, out var poses)) partnerVisualPoses[sender] = poses = new Dictionary<int, BrainPose>();
             foreach (var v in m.VisualKeyframes)
             {
-                if (!seen.Add(v.id)) continue;
-                poses[v.id] = v.pose;
-                partnerVisualPending.Add((sender, v));
+                if (frames.ContainsKey(v.id)) continue;
+                frames[v.id] = v; poses[v.id] = v.pose; QueueVisual(sender, v);
+                while (frames.Count > c.visual_keyframe_max)
+                {
+                    int oldest = -1; foreach (int key in frames.Keys) { oldest = key; break; }
+                    frames.Remove(oldest); poses.Remove(oldest);
+                    partnerVisualPending.RemoveAll(x => x.sender == sender && x.keyframe.id == oldest);
+                }
             }
         }
 
@@ -225,16 +253,54 @@ namespace SmokeRescue.Brain
         {
             BrainMath.Time(t);
             if (!BrainMath.Finite(dxM) || !BrainMath.Finite(dyM) || !BrainMath.Finite(dyawDeg)) throw new ArgumentException("Nonfinite visual match.");
-            if (inliers < c.visual_link_min_inliers) return;
+            if (!VisualPlacesEnabled || links.ContainsKey(sender) || inliers < c.visual_link_min_inliers) return;
             var mine = visualKeyframes.Find(k => k.id == mineId);
             if (mine == null || !partnerVisualPoses.TryGetValue(sender, out var poses) || !poses.TryGetValue(theirsId, out var theirsPose)) return;
             var placed = new BrainPose { position = mine.pose.Transform(dxM, dyM), yawRad = mine.pose.yawRad + dyawDeg * Mathf.Deg2Rad };
+            if (!VerifyVisualPlacement(sender, theirsPose, placed, t)) return;
             AddLinkCandidate(sender, placed, theirsPose, mine.pose, mineId, theirsId, inliers, "camera", t, "inliers", inliers);
+        }
+
+        // RANSAC measures a body-to-body pose. A nearby partner LiDAR sweep must also fit this robot's own map at that
+        // pose, without moving farther than the same agreement limits used by LiDAR candidates. The uniqueness check
+        // rejects the repeated-corridor case even when ORB produces enough inliers (place_eval database negatives).
+        bool VerifyVisualPlacement(string sender, BrainPose cameraThere, BrainPose cameraHere, double t)
+        {
+            Keyframe nearest = null; float distance = c.keyframe_spacing_m;
+            if (partnerKeyframes.TryGetValue(sender, out var scans)) foreach (var k in scans)
+            {
+                float d = Vector2.Distance(k.pose.position, cameraThere.position);
+                if (d <= distance && k.context.ReturnShare >= c.keyframe_min_return_share) { nearest = k; distance = d; }
+            }
+            if (nearest == null) return RejectVisual(t, "No nearby partner LiDAR sweep can verify the camera pose.");
+            if (verifyBudgetAt != t) { verifyBudgetAt = t; verificationsLeft = c.link_verifications_per_step; }
+            if (verificationsLeft <= 0) return RejectVisual(t, "Map verification budget is exhausted for this step.");
+            verificationsLeft--;
+            float yaw = cameraHere.yawRad - cameraThere.yawRad;
+            Vector2 d0 = nearest.pose.position - cameraThere.position;
+            float cos = Mathf.Cos(yaw), sin = Mathf.Sin(yaw);
+            var prior = new BrainPose { position = cameraHere.position + new Vector2(cos * d0.x - sin * d0.y, sin * d0.x + cos * d0.y),
+                yawRad = nearest.pose.yawRad + yaw };
+            var wide = matcher.Match(nearest.scan, prior, c.link_window_m, c.link_step_m, c.link_window_deg, c.link_step_deg);
+            if (!wide.applied || wide.fit < c.link_coarse_min_fit) return RejectVisual(t, "Camera pose did not fit the own LiDAR map.");
+            var fine = matcher.Match(nearest.scan, wide.pose);
+            var placed = fine.applied && fine.fit >= wide.fit ? fine : wide;
+            if (placed.fit < c.link_min_fit) return RejectVisual(t, "Camera pose did not reach the LiDAR link fit threshold.");
+            if (Vector2.Distance(placed.pose.position, prior.position) > c.link_agree_m ||
+                Mathf.Abs(BrainMath.Angle(placed.pose.yawRad, prior.yawRad)) > c.link_agree_deg)
+                return RejectVisual(t, "Camera RANSAC pose disagrees with its LiDAR map placement.");
+            if (!Unique(nearest.scan, placed)) return RejectVisual(t, "Camera placement is not unique in the LiDAR map.");
+            return true;
+        }
+        bool RejectVisual(double t, string reason)
+        {
+            if (LinkDiagnostics) Emit(t, "place_rejected", reason);
+            return false;
         }
 
         BrainVisualKeyframe[] VisualKeyframesToSend()
         {
-            if (c.frames_shared_at_start || visualKeyframes.Count == 0 || c.visual_keyframes_per_message < 1) return Array.Empty<BrainVisualKeyframe>();
+            if (!VisualPlacesEnabled || visualKeyframes.Count == 0 || c.visual_keyframes_per_message < 1) return Array.Empty<BrainVisualKeyframe>();
             var chosen = new List<VisualKeyframe>();
             var newest = visualKeyframes[visualKeyframes.Count - 1];
             if (newest.id > newestSentVisual) { chosen.Add(newest); newestSentVisual = newest.id; }
@@ -244,7 +310,7 @@ namespace SmokeRescue.Brain
                 if (!chosen.Contains(k)) chosen.Add(k);
             }
             var result = new BrainVisualKeyframe[chosen.Count];
-            for (int i = 0; i < chosen.Count; i++) result[i] = new BrainVisualKeyframe { id = chosen[i].id, pose = chosen[i].pose, payload = chosen[i].payload };
+            for (int i = 0; i < chosen.Count; i++) result[i] = new BrainVisualKeyframe { id = chosen[i].id, pose = chosen[i].pose, payload = (byte[])chosen[i].payload.Clone() };
             return result;
         }
 
@@ -264,14 +330,26 @@ namespace SmokeRescue.Brain
 
         /// <summary>Keyframes for the next packet: the newest not yet sent, then older ones in turn, so a lost packet's
         /// keyframes are sent again later.</summary>
-        BrainKeyframe[] KeyframesToSend()
+        BrainKeyframe[] KeyframesToSend(int maximum, BrainVisualKeyframe[] visual)
         {
             if (c.frames_shared_at_start || keyframes.Count == 0) return Array.Empty<BrainKeyframe>();
             var chosen = new List<Keyframe>();
-            for (int i = keyframes.Count - 1; i >= 0 && chosen.Count < c.keyframes_per_message - 1; i--)
-                if (keyframes[i].id > newestSentKeyframe) chosen.Add(keyframes[i]);
-            if (chosen.Count > 0) newestSentKeyframe = Math.Max(newestSentKeyframe, chosen[0].id);
-            for (int tries = 0; tries < keyframes.Count && chosen.Count < c.keyframes_per_message; tries++)
+            // A delayed camera reply may describe an older capture. Carry a sweep near that capture pose, so the
+            // receiver can verify it even while the robot keeps moving. The same keyframe_spacing_m bounds pairing.
+            foreach (var v in visual)
+            {
+                Keyframe nearest = null; float distance = c.keyframe_spacing_m;
+                foreach (var k in keyframes)
+                {
+                    float d = Vector2.Distance(k.pose.position, v.pose.position);
+                    if (d <= distance) { distance = d; nearest = k; }
+                }
+                if (nearest != null && !chosen.Contains(nearest) && chosen.Count < maximum) chosen.Add(nearest);
+            }
+            var newest = keyframes[keyframes.Count - 1];
+            if (chosen.Count < maximum && newest.id > newestSentKeyframe) chosen.Add(newest);
+            foreach (var k in chosen) newestSentKeyframe = Math.Max(newestSentKeyframe, k.id);
+            for (int tries = 0; tries < keyframes.Count && chosen.Count < maximum; tries++)
             {
                 var k = keyframes[keyframeRoundRobin++ % keyframes.Count];
                 if (!chosen.Contains(k)) chosen.Add(k);

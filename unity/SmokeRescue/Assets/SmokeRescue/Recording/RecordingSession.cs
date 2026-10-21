@@ -88,6 +88,7 @@ namespace SmokeRescue.Recording
             var scenario = Scenario.Load(scenarioFile);
             var sensorCfg = SensorConfig.Load();
             PeoplePeriodS = BrainConfig.Load().person_rgb_scan_period_s;
+            PlaceHttpTimeoutS = JObject.Parse(File.ReadAllText(Path.Combine(SensorConfig.ConfigDir, "perception.json"))).Value<float>("place_http_timeout_s");
             string root = Path.GetFullPath(Path.Combine(FloorPlan.ConfigDir, "..", "data", "recordings", runId));
             if (Directory.Exists(root))
             {
@@ -285,8 +286,7 @@ namespace SmokeRescue.Recording
                     // The receiver hears it at this tick (the brain contract), decoded from the frozen wire bytes.
                     foreach (var p in inFlight.Where(p => p.at <= t).OrderBy(p => p.at).ToList())
                     {
-                        p.to.brain.OnPeerMessage(BrainMessage.FromBytes(p.bytes), t);
-                        MatchPartnerPlaces(p.to, t);
+                        p.to.brain.OnPeerPacket(p.bytes, t);
                     }
                     inFlight.RemoveAll(p => p.at <= t);
                 }
@@ -295,6 +295,7 @@ namespace SmokeRescue.Recording
                     foreach (var rig in rigs)
                     {
                         if (rig.brain == null) continue;
+                        rig.visualPlaces?.Step(t);
                         if (rig.actions != null && rig.actions.IsRunning) continue;   // the arm is working; legs hold
                         // After an arm action the brain resumes with the time that really passed (run 17: the first agent arm
                         // action stopped the recording with "dt must equal elapsed simulation time").
@@ -375,11 +376,13 @@ namespace SmokeRescue.Recording
                     }
                     rig.frames++;
                 }
+                foreach (var rig in rigs) VisualKeyframe(rig, t, pending, sensorCfg);
                 using (perf.Time("people")) PeopleScan(rigs, t, pending, sensorCfg);
                 using (perf.Time("pending_io")) while (pending.Count > 48) pending.Dequeue().Wait();
                 if (rigs[0].frames % 150 == 0)
                     progress?.Invoke($"t={t:0.0}s frames={rigs[0].frames} wall={wall.Elapsed.TotalSeconds:0}s");
             }
+            foreach (var rig in rigs) rig.visualPlaces?.Dispose();
             while (pending.Count > 0) pending.Dequeue().Wait();
             result.simSeconds = rigs.Count > 0 ? (rigs[0].frames - 1) / (double)sensorCfg.camera.rate_hz : 0;
 
@@ -576,7 +579,7 @@ namespace SmokeRescue.Recording
             });
         }
 
-        static string Fmt(double t) => t.ToString("F6", CultureInfo.InvariantCulture);
+        internal static string Fmt(double t) => t.ToString("F6", CultureInfo.InvariantCulture);
         static string F(float v) => v.ToString("F6", CultureInfo.InvariantCulture);
         static string V(Vector3 v) => $"{F(v.x)} {F(v.y)} {F(v.z)}";
     }
