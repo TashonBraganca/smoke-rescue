@@ -11,6 +11,112 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import showcase
 
 
+def test_readme_action_evidence_scope():
+    readme = (Path(__file__).parents[1] / 'README.md').read_text()
+    agents = next(line for line in readme.splitlines() if line.startswith('- **Agents**'))
+    for action in ('confirm_survivor', 'reject_candidate', 'avoid_area', 'set_torch',
+                   'open_door', 'clear_debris', 'spray_water', 'extract_survivor',
+                   'go_to', 'approach_candidate', 'turn_to_face', 'explore_frontier',
+                   'send_team_message', 'request_human_approval'):
+        assert f'`{action}`' in agents
+    for disclosure in ('indoors', 'offered id', 'arm', 'facing', 'below', 'Unity', 'own spot'):
+        assert disclosure in agents
+    assert 'Every action' not in agents
+
+
+def test_readme_discloses_training_overlap():
+    readme = (Path(__file__).parents[1] / 'README.md').read_text()
+    paragraph = readme.split('## Evaluation\n', 1)[1].split('\n## ', 1)[0]
+    for disclosure in ('config/brain.json', 'fixed spots', 'same frames', 'held-out layout', 'separately'):
+        assert disclosure in paragraph
+
+
+@pytest.fixture
+def review_recording(tmp_path):
+    (tmp_path / 'meta.json').write_text(json.dumps({'robots': ['robot_A', 'robot_B']}))
+    oracle = tmp_path / 'oracle'
+    oracle.mkdir()
+    (oracle / 'survivors.json').write_text(json.dumps([
+        {'id': 'person1', 'position_house': [2, 0, 3]},
+        {'id': 'person2', 'position_house': [8, 0, 9]}]))
+    for r in ('robot_A', 'robot_B'):
+        (tmp_path / r).mkdir()
+        (tmp_path / r / 'brain_state.jsonl').write_text('')
+        (oracle / f'{r}_groundtruth.txt').write_text('0 0 0 0 0 0 0 1\n20 0 0 0 0 0 0 1\n')
+    # B confirms first even though metadata lists A first.
+    events = {'robot_A': [(4, 2, 3), (6, 12, 13), (8, 2, 3), (10, 8, 9)],
+              'robot_B': [(2, 2, 3), (3, 12, 13), (7, 20, 20)]}
+    for r, rows in events.items():
+        (tmp_path / r / 'decisions.jsonl').write_text(''.join(json.dumps(dict(
+            t=t, kind='survivor_confirmed', numbers=dict(x_m=x, y_m=y))) + '\n'
+            for t, x, y in rows))
+    (tmp_path / 'rescues.jsonl').write_text(json.dumps(dict(
+        t=5, event='released', person='person1', x=12, z=13, outside_building=True)) + '\n')
+    return tmp_path
+
+
+def test_scoring_counts_duplicates_moved_people_and_false_confirmations(review_recording):
+    from brain.compare_runs import score
+    result = score(review_recording)
+    assert result['survivors_found'] == result['distinct_people_confirmed'] == 2
+    assert result['confirmations'] == 7
+    assert result['duplicate_confirmations'] == 2
+    assert result['moved_confirmations'] == 1
+    assert result['false_confirmations'] == 3
+    assert result['confirmation_precision'] == pytest.approx(2 / 7)
+    assert result['first_found_s'] == 2
+    assert result['people_carried_out'] == 1
+    details = result['confirmation_details']
+    assert [d['t'] for d in details] == [2, 3, 4, 6, 7, 8, 10]
+    assert not details[0]['duplicate'] and details[2]['duplicate']
+    assert details[3]['matched_after_rescue'] and details[3]['survivor'] == 'person1'
+    assert details[1]['survivor'] is None and details[5]['survivor'] is None
+
+
+def test_survivor_matching_reads_evaluation_config(review_recording, monkeypatch):
+    from brain import compare_runs
+    original = Path.read_text
+    def configured(path, *args, **kwargs):
+        text = original(path, *args, **kwargs)
+        if path.name == 'evaluation.json':
+            config = json.loads(text)
+            config['survivor_match_m'] = .1
+            return json.dumps(config)
+        return text
+    path = review_recording / 'robot_A/decisions.jsonl'
+    path.write_text(json.dumps(dict(t=1, kind='survivor_confirmed', numbers=dict(x_m=2.5, y_m=3))) + '\n')
+    (review_recording / 'robot_B/decisions.jsonl').write_text('')
+    assert compare_runs.score(review_recording)['survivors_found'] == 1
+    with monkeypatch.context() as patch:
+        patch.setattr(Path, 'read_text', configured)
+        assert compare_runs.score(review_recording)['survivors_found'] == 0
+
+
+def test_video_counter_uses_evaluator_matches_at_display_time(review_recording):
+    # The video needs only confirmation truth, not trajectory/coverage evaluation.
+    for path in (review_recording / 'oracle').glob('*groundtruth.txt'):
+        path.unlink()
+    counts = showcase.score_confirmations(review_recording)
+    assert showcase.confirmation_label(counts, 'robot_A', 1) == 'confirmations 0; distinct people 0'
+    assert showcase.confirmation_label(counts, 'robot_A', 4) == 'confirmations 1; distinct people 1'
+    assert showcase.confirmation_label(counts, 'robot_A', 8) == 'confirmations 3; distinct people 1'
+    assert showcase.confirmation_label(counts, 'robot_A', 10) == 'confirmations 4; distinct people 2'
+
+
+def test_video_labels_true_floor_plan(monkeypatch):
+    from PIL import Image, ImageDraw
+    rendered = []
+    original = ImageDraw.ImageDraw.text
+    def capture(draw, xy, text, *args, **kwargs):
+        rendered.append(text)
+        return original(draw, xy, text, *args, **kwargs)
+    monkeypatch.setattr(ImageDraw.ImageDraw, 'text', capture)
+    draw = ImageDraw.Draw(Image.new('RGB', (1920, 1080)))
+    showcase.evaluator_plan_panel(draw, (672, 568, 1312, 1064), 'Shared context')
+    assert any("evaluator's view of the true floor plan" in text for text in rendered)
+    assert any('robots never see it' in text for text in rendered)
+
+
 @pytest.fixture
 def live(tmp_path):
     for robot in ('robot_A', 'robot_B'):
@@ -203,3 +309,114 @@ def test_display_wrong_sign_and_missing_transform_controls(local_live):
     np.testing.assert_array_equal(wrong.base(5, (600, 600))[y, x], showcase.PANEL)
     p.frames['robot_A'] = (np.zeros(3), 'local')
     np.testing.assert_array_equal(p.base(5, (600, 600))[y, x], showcase.PANEL)
+
+
+@pytest.fixture
+def placed_scored_recording(tmp_path):
+    rec = tmp_path / 'scored'
+    rec.mkdir()
+    scenario = tmp_path / 'scenario.json'
+    scenario.write_text(json.dumps(dict(robots=[
+        dict(id='robot_A', spawn=dict(at=[10, 20], yaw=90)),
+        dict(id='robot_B', spawn=dict(at=[10, 20], yaw=90))])))
+    (rec / 'meta.json').write_text(json.dumps(dict(
+        robots=['robot_A', 'robot_B'], scenario=str(scenario))))
+    (rec / 'oracle').mkdir()
+    (rec / 'oracle/survivors.json').write_text(json.dumps([
+        dict(id='person_1', position_house=[10, 0, 20]),
+        dict(id='person_2', position_house=[20, 0, 20])]))
+    # Local [0, x] rotates into house [10 + x, 20]. B logs first in time.
+    events = {'robot_A': [(2, 0), (4, 10), (6, 30), (8, 20), (9, 0)],
+              'robot_B': [(1, 0), (7, 20)]}
+    for robot, rows in events.items():
+        rd = rec / robot
+        rd.mkdir()
+        (rd / 'brain_state.jsonl').write_text(
+            json.dumps(dict(t=0, x=0, y=0, yaw_rad=0)) + '\n')
+        (rd / 'decisions.jsonl').write_text(''.join(json.dumps(dict(
+            t=t, kind='survivor_confirmed', numbers=dict(x_m=0, y_m=x))) + '\n'
+            for t, x in rows))
+        np.savetxt(rec / 'oracle' / f'{robot}_groundtruth.txt',
+                   [[0, 10, 0, 20, 0, 0, 0, 1], [10, 10, 0, 20, 0, 0, 0, 1]])
+    # A release in the house frame, followed by a second move of the same person.
+    (rec / 'rescues.jsonl').write_text(''.join(json.dumps(e) + '\n' for e in [
+        dict(t=5, event='released', person='person_1', x=30, z=20, outside_building=True),
+        dict(t=8.5, event='released', person='person_1', x=40, z=20, outside_building=True)]))
+    return rec
+
+
+def test_scoring_counts_duplicates_and_released_positions(placed_scored_recording):
+    from brain.compare_runs import score
+    report = score(placed_scored_recording)
+    assert report['survivors_found'] == 2
+    assert report['confirmations'] == 7
+    assert report['false_confirmations'] == 2
+    assert report['duplicate_confirmations'] == 3
+    assert report['moved_confirmations'] == 2
+    assert report['confirmation_precision'] == pytest.approx(2 / 7)
+    assert report['first_found_s'] == 1
+    assert report['people_carried_out'] == 1
+    rows = report['confirmation_details']
+    assert [r['t'] for r in rows] == [1, 2, 4, 6, 7, 8, 9]
+    assert [r['duplicate'] for r in rows] == [False, True, False, False, True, True, False]
+    assert [r['matched_after_rescue'] for r in rows] == [False, False, False, False, True, True, False]
+    assert rows[-1]['survivor'] is None  # The original spot is empty after release.
+
+
+def test_scoring_uses_configured_match_radius(placed_scored_recording, monkeypatch):
+    import brain.compare_runs as scoring
+    config_path = Path(__file__).parents[1] / 'config/evaluation.json'
+    config = json.loads(config_path.read_text())
+    assert config['survivor_match_m_reason'].strip()
+    rd = placed_scored_recording / 'robot_A'
+    (rd / 'decisions.jsonl').write_text(json.dumps(dict(
+        t=2, kind='survivor_confirmed', numbers=dict(x_m=0, y_m=1.2))) + '\n')
+    (placed_scored_recording / 'robot_B/decisions.jsonl').write_text('')
+    assert scoring.score(placed_scored_recording)['survivors_found'] == 0
+    original = Path.read_text
+    def changed(path, *args, **kwargs):
+        if path.resolve() == config_path.resolve():
+            return json.dumps(config | dict(survivor_match_m=1.3))
+        return original(path, *args, **kwargs)
+    monkeypatch.setattr(Path, 'read_text', changed)
+    assert scoring.score(placed_scored_recording)['survivors_found'] == 1
+
+
+def test_scoring_reads_complete_release_without_final_newline(placed_scored_recording):
+    from brain.compare_runs import score
+    path = placed_scored_recording / 'rescues.jsonl'
+    path.write_text(path.read_text().rstrip())
+    path = placed_scored_recording / 'robot_A/decisions.jsonl'
+    rows = [json.loads(line) for line in path.read_text().splitlines()]
+    rows[-1]['numbers']['y_m'] = 30
+    path.write_text(''.join(json.dumps(row) + '\n' for row in rows))
+    last = score(placed_scored_recording)['confirmation_details'][-1]
+    assert last['survivor'] == 'person_1'
+    assert last['matched_after_rescue']
+
+
+def test_video_counter_separates_events_from_distinct_people(placed_scored_recording):
+    report = showcase.score_confirmations(placed_scored_recording)
+    assert showcase.confirmation_label(report, 'robot_A', 1) == 'confirmations 0; distinct people 0'
+    assert showcase.confirmation_label(report, 'robot_A', 6) == 'confirmations 3; distinct people 2'
+    assert showcase.confirmation_label(report, 'robot_A', 9) == 'confirmations 5; distinct people 2'
+    assert showcase.confirmation_label(report, 'robot_B', 9) == 'confirmations 2; distinct people 1'
+    assert showcase.confirmation_label(report, None, 9) == 'confirmations 7; distinct people 2'
+
+
+def test_video_labels_true_plan_as_evaluator_only():
+    from PIL import Image, ImageDraw
+    image = Image.new('RGB', (640, 500), showcase.BG)
+    class RecordingDraw:
+        def __init__(self):
+            self.draw = ImageDraw.Draw(image)
+            self.texts = []
+        def text(self, xy, text, **kwargs):
+            self.texts.append(text)
+            return self.draw.text(xy, text, **kwargs)
+        def __getattr__(self, name):
+            return getattr(self.draw, name)
+    for title in ['Shared context', 'SLAM map']:
+        draw = RecordingDraw()
+        showcase.evaluator_plan_panel(draw, (0, 0, 640, 500), title)
+        assert "evaluator's view of the true floor plan; robots never see it" in draw.texts

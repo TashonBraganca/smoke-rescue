@@ -27,6 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'brain'))
 from brain.nav_io import (load_scenario, recording_frame, transform_xy, transform_poses,
                           map_geometry, rotation, sample_grid, frame_peer)
+from brain.compare_runs import score_confirmations
 from make_walkthrough import frames, ironbow, narration, thermal_frames  # noqa: E402
 
 W, H = 1920, 1080
@@ -60,6 +61,19 @@ def panel(d: ImageDraw.ImageDraw, box, title: str | None = None, note: str | Non
         if note:
             tw = d.textlength(title.upper(), font=F["h"])
             d.text((box[0] + 28 + tw, box[1] + 15), note, font=F["small"], fill=FAINT)
+
+
+def evaluator_plan_panel(d, box, title):
+    panel(d, box, title)
+    d.text((box[0] + 16, box[1] + 38),
+           "evaluator's view of the true floor plan; robots never see it", font=F['small'], fill=DIM)
+
+
+def confirmation_label(report, robot, t):
+    rows = [c for c in report['confirmation_details']
+            if c['t'] <= t and (robot is None or c['robot'] == robot)]
+    people = {c['survivor'] for c in rows if c['survivor'] is not None}
+    return f'confirmations {len(rows)}; distinct people {len(people)}'
 
 
 def pill(d, xy, text, fill, fg=(14, 15, 18), f="chip"):
@@ -389,6 +403,7 @@ def main() -> None:
     torch = {r: [(e["t"], e["reason"]) for e in jsonl(rec / r / "decisions.jsonl") if e["kind"] == "agent_order" and "torch set to" in e["reason"]] for r in robots}
     captions = {r: narration(a.run, r) for r in robots} if a.run else {r: [] for r in robots}
     radio = Radio(rec, a.run, robots)
+    confirmation_report = score_confirmations(rec)
     from contextpanel import ContextPanel
     context = ContextPanel(rec)
     minimap = None
@@ -470,30 +485,32 @@ def main() -> None:
             im.paste(m, (mbox[0] + (mbox[2] - mbox[0] - m.width) // 2,
                          mbox[1] + 62 + (mbox[3] - mbox[1] - 112 - m.height) // 2))
         else:
-            panel(d, mbox, "SLAM map", "what the robots built, merged when they meet")
+            evaluator_plan_panel(d, mbox, "SLAM map")
         if live_maps is None and minimap is not None:
             m = minimap.render(t)[44:640 - 150, :, ::-1]
             mh, mw = m.shape[:2]
-            s = min((mbox[2] - mbox[0] - 24) / mw, (mbox[3] - mbox[1] - 56) / mh)
+            s = min((mbox[2] - mbox[0] - 24) / mw, (mbox[3] - mbox[1] - 74) / mh)
             m = cv2.resize(np.ascontiguousarray(m), (int(mw * s), int(mh * s)), interpolation=cv2.INTER_AREA)
-            im.paste(Image.fromarray(m), (mbox[0] + (mbox[2] - mbox[0] - m.shape[1]) // 2, mbox[1] + 46))
+            im.paste(Image.fromarray(m), (mbox[0] + (mbox[2] - mbox[0] - m.shape[1]) // 2, mbox[1] + 62))
         elif live_maps is None:
             d.text((mbox[0] + 16, mbox[1] + 60), "SLAM pipeline not run for this recording", font=F["body"], fill=FAINT)
         if live_maps is not None:
             d.text((mbox[0] + 16, mbox[3] - 34), "placed on the plan with the known start pose for display;", font=F['tiny'], fill=DIM)
             d.text((mbox[0] + 16, mbox[3] - 18), "robots link frames from LiDAR fingerprints", font=F['tiny'], fill=DIM)
         cbox = (672, 568, 672 + 640, H - 16)
-        panel(d, cbox, "Shared context", "known start pose placement for display only")
+        evaluator_plan_panel(d, cbox, 'Shared context')
         c = context.render(t)[56:56 + context.mh + 4, 6:6 + context.mw + 8, ::-1]
-        s = min((cbox[2] - cbox[0] - 24) / c.shape[1], (cbox[3] - cbox[1] - 132) / c.shape[0])
+        s = min((cbox[2] - cbox[0] - 24) / c.shape[1], (cbox[3] - cbox[1] - 164) / c.shape[0])
         c = cv2.resize(np.ascontiguousarray(c), (int(c.shape[1] * s), int(c.shape[0] * s)), interpolation=cv2.INTER_AREA)
-        im.paste(Image.fromarray(c), (cbox[0] + (cbox[2] - cbox[0] - c.shape[1]) // 2, cbox[1] + 44))
-        yl = cbox[1] + 50 + c.shape[0]
+        im.paste(Image.fromarray(c), (cbox[0] + (cbox[2] - cbox[0] - c.shape[1]) // 2, cbox[1] + 62))
+        yl = cbox[1] + 68 + c.shape[0]
         for k, r in enumerate(robots):
             ev = [e for e in context.events[r] if e["t"] <= t]
             got = sum(1 for e in ev if e["kind"] == "peer_message_received")
-            found = sum(1 for e in ev if e["kind"] == "survivor_confirmed")
-            d.text((cbox[0] + 16 + k * 300, yl), f"{'AB'[k]}: partner maps {got}  ·  survivors {found}", font=F["small"], fill=ROBOT[k])
+            counts = confirmation_label(confirmation_report, r, t)
+            d.text((cbox[0] + 16, yl + k * 20), f"{'AB'[k]}: partner maps {got}; {counts}", font=F["small"], fill=ROBOT[k])
+        total = confirmation_label(confirmation_report, None, t)
+        d.text((cbox[0] + 16, yl + 40), f'Team: {total}', font=F['small'], fill=TEXT)
         d.text((cbox[0] + 16, cbox[3] - 34), "placed on the plan with the known start pose for display;", font=F['tiny'], fill=DIM)
         d.text((cbox[0] + 16, cbox[3] - 18), "robots link frames from LiDAR fingerprints", font=F['tiny'], fill=DIM)
         radio.draw(d, (1328, 72, W - 16, H - 16), t)
