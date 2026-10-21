@@ -88,6 +88,9 @@ namespace SmokeRescue.Editor
             RecordingSession.PeopleUrl = up ? vision : null;
             Debug.Log(up ? $"[SmokeRescue] colour person detector at {vision}" : $"[SmokeRescue] WARNING: vision service {vision} not reachable; colour person detection is off");
             SmokeRescue.Robots.Robot.BodyPrefab = UseQuadruped ? FurnitureBuilder.RobotBodyPrefab() : null;
+            // People are placed clear of the furniture actually in the scene (Props layer), with a body-sized box.
+            int props = 1 << LayerMask.NameToLayer("Props");
+            Scenario.PlacementBlocked = q => Physics.CheckBox(new Vector3(q.x, .35f, q.y), new Vector3(.9f, .3f, .9f), Quaternion.identity, props, QueryTriggerInteraction.Ignore);
             var sc = Scenario.Load(scenario);
             FurnitureBuilder.PlaceScenarioObstacles(sc);
             int warm = FurnitureBuilder.ApplyWarmObjects(scenario);

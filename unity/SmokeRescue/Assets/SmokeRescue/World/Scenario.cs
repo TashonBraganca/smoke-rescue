@@ -123,6 +123,10 @@ namespace SmokeRescue.World
         bool InSearchArea(Rect room) => search_area == null || search_area.Length < 4 ||
             (room.xMin >= search_area[0] - 1e-3f && room.yMin >= search_area[1] - 1e-3f &&
              room.xMax <= search_area[2] + 1e-3f && room.yMax <= search_area[3] + 1e-3f);
+        /// <summary>Set by the editor before a recording: true where a body lying at this floor point would overlap scene
+        /// furniture. The floor plan only lists landmarks; filler props (an ottoman, armchairs) are placed by the house
+        /// builder, and held-out seed 914 put s6 inside the foyer ottoman with only head and legs outside it.</summary>
+        public static System.Func<Vector2, bool> PlacementBlocked;
         void PlaceSurvivorsRandomly(FloorPlan plan)
         {
             var rng = new System.Random(seed * 7919 + 101);
@@ -145,6 +149,7 @@ namespace SmokeRescue.World
                     var p = new Vector2(rect.xMin + 0.6f + (float)rng.NextDouble() * (rect.width - 1.2f),
                                         rect.yMin + 0.6f + (float)rng.NextDouble() * (rect.height - 1.2f));
                     if (avoid.Any(a => Vector2.Distance(a.p, p) < a.r) || taken.Any(q => Vector2.Distance(q, p) < 3f)) continue;
+                    if (PlacementBlocked != null && PlacementBlocked(p)) continue;
                     s.at = new[] { p.x, p.y };
                     s.room = room.id;
                     s.yaw = (float)(rng.NextDouble() * 360.0);
