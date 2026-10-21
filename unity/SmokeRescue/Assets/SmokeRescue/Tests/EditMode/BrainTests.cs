@@ -832,6 +832,81 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void AnAgentCannotKeepARobotInOnceNoFrontierIsLeftAndTheAirIsHeating()
+        {
+            // Held-out run 2, robot A: no reachable frontier at 89.8 s; its agent ordered it on twice while its air rose from
+            // 24 to 39 C, its way out then closed and it spent 77 s above 60 C. With no frontier left, heat building ends
+            // the agent's order to stay and the robot leaves; a new order is then refused with the reason. Control: the
+            // same order in steady 21 C air keeps the robot in.
+            (List<BrainEvent> events, string state, string next) Run(bool heating)
+            {
+                var c = Settings(); c.grid_size_m = 12;
+                var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -6, 6, -6, 6);   // all searched: nothing left to explore
+                var all = new List<BrainEvent>(); var command = new BrainCommand(); double orderedAt = double.NaN;
+                for (int tick = 0; tick <= 240; tick++)
+                {
+                    double t = tick / 20.0;
+                    float air = heating && t > orderedAt + 2 ? Mathf.Min(45, 21 + 1.2f * (float)(t - orderedAt - 2)) : 21;   // 72 C/min
+                    Motion(b, t, command.forwardMps, command.yawRateDeg * Mathf.Deg2Rad);
+                    b.OnRgbd(Image(t, true, 0)); b.OnAirTemperature(t, air); command = b.Step(t, .05f);
+                    all.AddRange(b.DrainEvents());
+                    if (double.IsNaN(orderedAt) && all.Any(e => e.kind == "no_frontier"))
+                    { b.AgentGoTo(new Vector2(4.5f, 4.5f), t, 60, "closer look at a warm shape"); orderedAt = t; all.AddRange(b.DrainEvents()); }
+                }
+                b.AgentGoTo(new Vector2(-2, -2), 12.05, 30, "another look");
+                var next = b.DrainEvents().Last(e => e.kind == "agent_order").reason;
+                Assert.That(orderedAt, Is.LessThan(2), "no frontier was found and the agent's order went in");
+                return (all, b.Snapshot().state, next);
+            }
+            var hot = Run(true);
+            Assert.That(hot.events.Count(e => e.kind == "stay_overridden"), Is.EqualTo(1), "the order to stay is overridden once");
+            Assert.That(hot.state, Is.EqualTo("return").Or.EqualTo("complete"), "it leaves");
+            Assert.That(hot.next, Does.StartWith("Refused go_to: the robot is leaving"));
+            var cool = Run(false);
+            Assert.That(cool.events.Any(e => e.kind == "stay_overridden"), Is.False, "control: steady air");
+            Assert.That(cool.state, Is.EqualTo("explore"), "control: the agent keeps it in");
+            Assert.That(cool.next, Does.StartWith("go_to: another look"));
+        }
+
+        [Test]
+        public void CutOffWithTheAirHeatingTheRobotLeavesByTheEmergencyRouteAtOnce()
+        {
+            // Held-out run 2, robot A: its way out closed at 114 s with the air at 39 C and rising; it retreated "to search on
+            // while it is cool", the hot gas reached it 9 s later, and it left only with its heat budget spent (299 C).
+            // Cut off with heat building, the robot now takes the emergency route (past the fire at reduced clearance, never
+            // through it) at once. Controls: in steady 20 C air the cut is a retreat, as before; when the air then warms
+            // during the retreat, it takes the emergency route at that point.
+            (int exits, int retreats, string state) Run(float airAtCut, float airLater)
+            {
+                var c = Settings(); c.grid_size_m = 12; c.robot_radius_m = .25f;
+                var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -5, 5, -2, 6);
+                var events = new List<BrainEvent>(); double cutAt = double.NaN;
+                for (int i = 0; i < 150; i++)
+                {
+                    double t = i / 15.0;
+                    if (double.IsNaN(cutAt) && events.Any(e => e.kind == "goal" && e.reason.StartsWith("The way out was closing"))) cutAt = t;
+                    float air = double.IsNaN(cutAt) ? 20 : t < cutAt + 3 ? airAtCut : airLater;
+                    Motion(b, t, t < 3 ? 1f : 0); b.OnRgbd(Image(t, true)); b.OnAirTemperature(t, air);
+                    var g = Map(b);
+                    if (t >= 3.2) for (float dx = -.3f; dx <= .3f; dx += .1f) for (float dy = -.3f; dy <= .3f; dy += .1f) g.ObserveHeat(g.Cell(new Vector2(1.9f + dx, .8f + dy)), 500, t);
+                    if (!double.IsNaN(cutAt))   // fire cuts the room, leaving a 1.4 m gap: shut at the normal clearance, open at the emergency one
+                        for (float x = -5; x <= 5; x += .1f) if (Mathf.Abs(x) >= .7f) g.ObserveHeat(g.Cell(new Vector2(x, 1.5f)), 500, t);
+                    b.Step(t, 1f / 15); events.AddRange(b.DrainEvents());
+                }
+                Assert.That(double.IsNaN(cutAt), Is.False, "the way out started closing");
+                return (events.Count(e => e.kind == "emergency_exit"), events.Count(e => e.kind == "escape_closing" && e.reason.StartsWith("The known way out is closed; retreat")),
+                    b.Snapshot().state);
+            }
+            var warm = Run(35, 35);
+            Assert.That((warm.exits, warm.retreats, warm.state), Is.EqualTo((1, 0, "return")), "warm air when cut off: emergency route at once");
+            var cool = Run(20, 20);
+            Assert.That((cool.exits, cool.retreats), Is.EqualTo((0, 1)), "control: steady cool air, a retreat as before");
+            Assert.That(cool.state, Is.Not.EqualTo("return"));
+            var later = Run(20, 35);
+            Assert.That((later.exits, later.retreats, later.state), Is.EqualTo((1, 1, "return")), "control: retreat, then the emergency route when the air warms");
+        }
+
+        [Test]
         public void ArrivingWhereTheAgentAskedTellsTheAgentWhy()
         {
             // Agent run 14: robot A reached its closer look 1.4 m from a person it had confirmed, within the arm's reach,
