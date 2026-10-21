@@ -40,7 +40,7 @@ Thresholds in `config/brain.json` were tuned on runs of the same house with peop
 
 | Asset or library | Source | License | Used for |
 |---|---|---|---|
-| OpenCV 5.0.0 | opencv.org | Apache 2.0 | perception tools, dnn person detector, odometry |
+| OpenCV 5.0.0 | opencv.org | Apache 2.0 | perception tools, dnn person detector, live TSDF 3D map (3d module), point clouds and normals, PLY files, odometry |
 | YOLO11m (exported to ONNX) | github.com/ultralytics/ultralytics | AGPL-3.0 | person detector run by OpenCV dnn |
 | Qwen2-VL-2B-Instruct | huggingface.co/Qwen/Qwen2-VL-2B-Instruct | Apache 2.0 | decision narrator (mlx-community 4-bit) |
 | WLRI HRC thermal sample | data/external/wlri_hrc_thermal_sample | CC-BY 4.0 | thermal detector checks |

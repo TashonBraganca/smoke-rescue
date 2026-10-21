@@ -1,9 +1,9 @@
 import cv2
 import numpy as np
-import open3d as o3d
 from scipy.spatial.transform import Rotation
 
 from brain.dense_map import build_dense_map
+from brain.pointcloud import read_cloud
 
 
 def test_map_uses_yaml_depth_intrinsics_and_estimated_camera_to_world(tmp_path):
@@ -22,10 +22,10 @@ def test_map_uses_yaml_depth_intrinsics_and_estimated_camera_to_world(tmp_path):
     np.savetxt(trajectory, [[0, 1, 2, 3, *rotation.as_quat()]])
     output = tmp_path / "map.ply"
     build_dense_map(robot, trajectory, output)
-    cloud = o3d.io.read_point_cloud(str(output))
+    cloud = read_cloud(output)
     expected = rotation.apply([[0, 0, 2], [1, 0, 2], [1, .5, 2]]) + [1, 2, 3]
-    actual = np.asarray(cloud.points)
+    actual = cloud.points
     assert len(actual) == 3
     for point in expected:
         assert np.min(np.linalg.norm(actual - point, axis=1)) < 1e-6
-    np.testing.assert_allclose(np.asarray(cloud.colors), [[1, 0, 0]] * 3)
+    np.testing.assert_allclose(cloud.colors, [[1, 0, 0]] * 3, atol=1 / 255)

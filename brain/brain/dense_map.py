@@ -5,11 +5,11 @@ import json
 from pathlib import Path
 
 import numpy as np
-import open3d as o3d
 import rerun as rr
 from scipy.spatial.transform import Rotation
 
 from brain.io import RecordingReader
+from brain.pointcloud import PointCloud, write_cloud
 from brain.trajectory import match_timestamps, read_tum
 
 
@@ -48,13 +48,8 @@ def build_dense_map(robot_dir: Path | str, keyframe_path: Path | str,
     if not len(cells):
         raise ValueError("keyframe depth contains no valid points")
     averages = sums / counts[:, None]
-    cloud = o3d.geometry.PointCloud()
-    cloud.points = o3d.utility.Vector3dVector(averages[:, :3])
-    cloud.colors = o3d.utility.Vector3dVector(averages[:, 3:])
     output_path = Path(output_path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    if not o3d.io.write_point_cloud(str(output_path), cloud):
-        raise OSError(f"failed to write map: {output_path}")
+    write_cloud(output_path, PointCloud(averages[:, :3], averages[:, 3:]))
     meta = {"voxel_size_m": .03, "points": len(cells), "keyframes": len(keyframes),
             "pose_source": str(Path(keyframe_path).resolve()),
             "camera_source": str((Path(robot_dir) / "camera.yaml").resolve()),
