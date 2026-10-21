@@ -168,7 +168,7 @@
   "escape_time_factor": 1.5,
   "escape_time_factor_reason": "Leave when the fire, at the rate it is closing on the route home, would reach the route's planning clearance before the robot could walk out with this much spare: walking time is route length over open_speed_mps, and turns, doors and slowing near heat make the real walk up to about half as long again. Run 21: the fixed 2 m margin fired 2.4 s before robot B's hallway route closed; it was trapped for 137 s, 89 s above 60 C, 592 C peak.",
   "escape_rate_window_s": 4.0,
-  "escape_rate_window_s_reason": "The closing rate is the change in fire distance to the route over at least this long (two checks), so one newly observed hot cell does not read as a fast fire front.",
+  "escape_rate_window_s_reason": "The closing rate needs the last three way-out checks spanning at least this long, and is the smaller of their two intervals' rates, so fire seen for the first time nearer the route (one jump) does not read as a fast front (run 22: robot A left at 10 s with fire 6 m from its route before this).",
   "escape_recheck_s": 10.0,
   "escape_recheck_s_reason": "After the way out is lost, wait this long before checking it again, so a route that reopens next to the fire does not start a return that is cut again at once.",
   "escape_ignore_m": 2.0,

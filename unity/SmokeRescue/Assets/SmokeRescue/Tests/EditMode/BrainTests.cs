@@ -744,7 +744,7 @@ namespace SmokeRescue.Tests.EditMode
             // Run 21: the fixed 2 m margin fired 2.4 s before robot B's hallway route closed, and it was trapped for 137 s.
             // A fire front moving toward the route at 0.3 m/s must start the return while it is still beyond 2 m, from the
             // closing rate the robot measures on its own map. Control: escape_time_factor 0 leaves only the 2 m margin.
-            float FireDistanceAtLeave(float factor)
+            float FireDistanceAtLeave(float factor, bool jump = false)
             {
                 var c = Settings(); c.grid_size_m = 12; c.robot_radius_m = .25f; c.escape_time_factor = factor;
                 var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -5, 5, -2, 6);
@@ -753,7 +753,7 @@ namespace SmokeRescue.Tests.EditMode
                     double t = i / 15.0; Motion(b, t, t < 3 ? 1f : 0); b.OnRgbd(Image(t, true)); b.OnAirTemperature(t, 20);
                     if (t >= 3.2)
                     {
-                        var g = Map(b); float x = 5.0f - .3f * (float)(t - 3.2);
+                        var g = Map(b); float x = jump ? (t < 6 ? 4.8f : 3.8f) : 5.0f - .3f * (float)(t - 3.2);
                         for (float dx = -.3f; dx <= .3f; dx += .1f) for (float dy = -.3f; dy <= .3f; dy += .1f) g.ObserveHeat(g.Cell(new Vector2(x + dx, .8f + dy)), 500, t);
                     }
                     b.Step(t, 1f / 15);
@@ -763,6 +763,7 @@ namespace SmokeRescue.Tests.EditMode
                 return -1;
             }
             float early = FireDistanceAtLeave(1.5f), late = FireDistanceAtLeave(0f);
+            Assert.That(FireDistanceAtLeave(1.5f, jump: true), Is.EqualTo(-1f), "control: a nearer fire seen once (one 1 m jump), then static");
             Assert.That(early, Is.GreaterThan(2.3f), "left on the closing rate, well before the 2 m margin");
             Assert.That(late, Is.InRange(0f, 2.0f), "control: without the rate only the 2 m margin acts");
         }
