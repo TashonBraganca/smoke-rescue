@@ -50,7 +50,14 @@
   "headlight": {
     "cone_deg": 40.0,
     "intensity_lumen": 900,
-    "range_m": 10.0
+    "range_m": 10.0,
+    "cone_deg_reason": "Wide beam: outer cone of a firefighter's helmet or hand torch (about 40 deg spill around a bright centre). It had been widened to a 100 deg floodlight only because the beam edge disturbed the offline ORB-SLAM3 tracker; live localisation is LiDAR scan matching, so the realistic beam is back (the offline visual SLAM may track worse at the beam edge, which is reported).",
+    "inner_cone_deg": 12.0,
+    "inner_cone_deg_reason": "Bright centre of the beam; the light falls off smoothly from here to the outer cone, as a reflector torch does.",
+    "narrow_cone_deg": 20.0,
+    "narrow_cone_deg_reason": "Focused (throw) setting: the same light in a 20 deg cone, for seeing further down a corridor through haze.",
+    "narrow_inner_deg": 6.0,
+    "narrow_inner_deg_reason": "Bright centre of the focused beam."
   },
   "limits": {
     "max_forward_mps": 0.8,

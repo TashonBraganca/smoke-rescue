@@ -57,7 +57,9 @@ namespace SmokeRescue.Editor
         {
             var root = GameObject.Find(ScenePreview.SurvivorsRoot);
             if (root == null) return;
-            foreach (Transform s in root.transform) ThermalBody.Add(s.gameObject, 34f);
+            var cfg = Newtonsoft.Json.Linq.JObject.Parse(File.ReadAllText(Path.Combine(FloorPlan.ConfigDir, "props.json")))["survivor_thermal"] as Newtonsoft.Json.Linq.JObject;
+            foreach (Transform s in root.transform)
+                if (cfg != null) ThermalBody.AddPerson(s.gameObject, cfg); else ThermalBody.Add(s.gameObject, 34f);
         }
 
         /// <summary>FLIR-style ironbow false colour with histogram-equalised gain (as thermal cameras use, so a 34 C body

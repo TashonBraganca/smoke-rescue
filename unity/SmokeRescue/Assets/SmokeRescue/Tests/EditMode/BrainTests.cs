@@ -1781,6 +1781,29 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void FloorSeenFromBeyondTheSearchRangeIsMappedButNotSearched()
+        {
+            // Hidden-corner runs: the depth camera marked floor searched out to 8 m, so a glance through a doorway counted a
+            // room as done. Floor 2 m ahead counts as searched; floor 6 m ahead is mapped free but stays a search target.
+            // Control: with a 10 m search range it counts as searched again.
+            (bool near, bool farSearched, bool farFree) Look(float range)
+            {
+                var c = Settings(); c.search_max_range_m = range;
+                var b = new RobotBrain(Calibration(), c, "A", 0);
+                Motion(b, 0); b.OnAirTemperature(0, 20); b.Step(0, 1f / 60);
+                Motion(b, .1); b.OnAirTemperature(.1, 20); b.OnRgbd(RoomImage(.1, 9f)); b.Step(.1, .1f);
+                var g = Map(b);
+                int near = g.Cell(new Vector2(0, 2f)), far = g.Cell(new Vector2(0, 6f));
+                return (g.OwnObserved(near), g.OwnObserved(far), g.Occupancy(far) == 1);
+            }
+            var limited = Look(4f);
+            Assert.That(limited.near, Is.True, "2 m ahead is searched");
+            Assert.That(limited.farSearched, Is.False, "6 m ahead is not searched");
+            Assert.That(limited.farFree, Is.True, "but it is mapped free");
+            Assert.That(Look(10f).farSearched, Is.True, "control: within a 10 m range it counts");
+        }
+
+        [Test]
         public void AHighCeilingCountsAsCeiling()
         {
             // Review: ceiling returns counted only between 2.5 and 3.5 m, so a higher lobby or hall never looked indoors.

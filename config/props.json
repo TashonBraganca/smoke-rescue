@@ -854,5 +854,47 @@
       "mass_kg": 80,
       "movable": false
     }
+  },
+  "survivor_thermal": {
+    "_reason": "Apparent surface temperature of a person by material, for the thermal camera. Thermography of clothed adults indoors at about 20 C: exposed skin of face and hands about 32 to 35 C, clothing surface about 26 to 31 C depending on layers (it insulates), hair about 28 to 32 C, shoes near the floor temperature. A person was one uniform 34 C body before, which made them stand out more than a real person does.",
+    "skin_c": 33.5,
+    "clothing_c": 29.0,
+    "hair_c": 30.0,
+    "footwear_c": 24.0,
+    "default_c": 31.0,
+    "default_c_reason": "Materials not named as skin, clothing, hair or footwear: an average of skin and clothing.",
+    "skin_names": [
+      "skin",
+      "body",
+      "face",
+      "head",
+      "arm",
+      "leg",
+      "hand",
+      "young_caucasian"
+    ],
+    "clothing_names": [
+      "shirt",
+      "jean",
+      "top",
+      "dress",
+      "jacket",
+      "coat",
+      "beret",
+      "hat",
+      "glove",
+      "trouser",
+      "pant",
+      "material"
+    ],
+    "hair_names": [
+      "hair",
+      "braid",
+      "eyelash"
+    ],
+    "footwear_names": [
+      "boot",
+      "shoe"
+    ]
   }
 }

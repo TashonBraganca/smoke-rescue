@@ -14,6 +14,19 @@ namespace SmokeRescue.Tests.EditMode
         const float Dt = 1f / 60f;
 
         [Test]
+        public void RandomlyPlacedPeopleStayInsideTheScenarioSearchArea()
+        {
+            // Held-out run 1: four of five randomly placed people landed in the apartment, office and workshop of the larger
+            // building, beyond the house the robots search. Every random person must be inside search_area.
+            var scenario = Scenario.Load("scenario_house_heldout.json");
+            Assert.That(scenario.survivor_placement, Is.EqualTo("random"));
+            var a = scenario.search_area;
+            foreach (var s in scenario.survivors)
+                Assert.That(s.at[0] >= a[0] && s.at[0] <= a[2] && s.at[1] >= a[1] && s.at[1] <= a[3], Is.True,
+                    $"{s.id} at ({s.at[0]:F2}, {s.at[1]:F2}) in {s.room}");
+        }
+
+        [Test]
         public void BothRobotsDriveTheirRoutesWithinLimitsWithoutCollisions() => DriveRoutes(withFurniture: false);
 
         /// <summary>Same routes with every landmark and survivor in place (needs assets_cache/ from tools/fetch_*.py).</summary>

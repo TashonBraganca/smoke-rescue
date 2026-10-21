@@ -120,6 +120,9 @@ namespace SmokeRescue.World
 
         /// <summary>Seeded random survivor spots: any room, at least 0.6 m from its walls, 0.9 m from landmarks and
         /// obstacles, 1.2 m from doors and spawn points, and 3 m from each other.</summary>
+        bool InSearchArea(Rect room) => search_area == null || search_area.Length < 4 ||
+            (room.xMin >= search_area[0] - 1e-3f && room.yMin >= search_area[1] - 1e-3f &&
+             room.xMax <= search_area[2] + 1e-3f && room.yMax <= search_area[3] + 1e-3f);
         void PlaceSurvivorsRandomly(FloorPlan plan)
         {
             var rng = new System.Random(seed * 7919 + 101);
@@ -129,7 +132,9 @@ namespace SmokeRescue.World
             foreach (var o in obstacles) avoid.Add((new Vector2(o.at[0], o.at[1]), 0.9f));
             foreach (var d in plan.doors) avoid.Add((new Vector2(d.at[0], d.at[1]), 1.2f));
             foreach (var r in robots) avoid.Add((new Vector2(r.spawn.at[0], r.spawn.at[1]), 1.2f));
-            var rooms = plan.rooms.Where(r => r.id != "hallway").ToList();
+            // Only rooms inside the scenario's search area (held-out run 1: four of five people landed in the apartment,
+            // office and workshop of the larger building, beyond the house the robots search).
+            var rooms = plan.rooms.Where(r => r.id != "hallway" && InSearchArea(r.Rect)).ToList();
             foreach (var s in survivors)
             {
                 for (int attempt = 0; attempt < 2000; attempt++)
