@@ -503,12 +503,21 @@ def inspect_candidate(frame: Frame, bearing_deg: float, range_m: float, *, outpu
         # not_person verdict from planarity, a window recess or impossible size.
         hits = [p for p in detect_people_rgb(frame) if abs(p["bearing_deg"] - bearing_deg) <= bearing_tolerance_deg
                 and (p["range_m"] is None or abs(p["range_m"] - range_m) <= range_tolerance_m)]
-        result["cues"]["rgb_dnn"] = {"model": PERSON_ONNX.name, "hits": hits}
-        if hits and max(h["confidence"] for h in hits) >= 0.5:
-            best = max(hits, key=lambda h: h["confidence"])
+        # A box cut by the left or right side of the image shows only part of whatever it is, as the thermal mask rule
+        # above says for warm components: it cannot confirm a body (held-out seed 914 run 3: a 22 px sliver at the left
+        # border beside a burning sofa, confidence 0.58, confirmed a person 2.6 m from anyone). A box cut at the bottom
+        # stays usable: that is a person lying close, below the lower edge of the view.
+        width = frame.rgb.shape[1]
+        whole = [h for h in hits if h["bbox_rgb"][0] > 0 and h["bbox_rgb"][0] + h["bbox_rgb"][2] < width]
+        result["cues"]["rgb_dnn"] = {"model": PERSON_ONNX.name, "hits": hits, "clipped_by_side": len(hits) - len(whole)}
+        if whole and max(h["confidence"] for h in whole) >= 0.5:
+            best = max(whole, key=lambda h: h["confidence"])
             result["verdict"] = "person"
             result["reasons"] = result["reasons"] + [f"OpenCV dnn person detector (YOLO11m) confidence {best['confidence']:.2f} "
                                                      f"at bearing {best['bearing_deg']:.1f} deg, range {best['range_m']} m."]
+        elif any(h["confidence"] >= 0.5 for h in hits):
+            result["reasons"] = result["reasons"] + ["A colour person detection touches the side of the image, so it shows "
+                                                     "only part of the object and cannot confirm a body; face it to look again."]
     path = Path(output_dir)/f"{result['id']}.png"
     _debug(frame,mask,aligned,path)
     result["debug_crop"] = str(path)

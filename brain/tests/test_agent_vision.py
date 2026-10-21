@@ -116,3 +116,18 @@ def test_evaluation_counts_misses_and_bootstraps():
     assert r['inspect']['precision'] == 1.
     assert r['inspect']['recall'] == .5
     assert r == summarize(rows)
+
+
+@pytest.mark.parametrize("bbox,verdict", [([0, 50, 22, 64], "uncertain"), ([138, 50, 22, 64], "uncertain"),
+                                          ([60, 30, 30, 70], "person"), ([60, 60, 30, 60], "person")])
+def test_colour_detection_cut_by_the_image_side_cannot_confirm(bbox, verdict, tmp_path, monkeypatch):
+    # Held-out seed 914 run 3: with no warm body at the bearing, a 22 px colour box cut by the left border (confidence
+    # 0.58) confirmed a person 2.6 m from anyone. Cut by either side it stays uncertain; whole, or cut only at the
+    # bottom (a person lying close), it still confirms.
+    f = scene()
+    f.thermal[:] = 2932                                   # 20 C everywhere: no warm component
+    hit = {"confidence": 0.58, "bbox_rgb": bbox, "bearing_deg": 0.0, "range_m": 3.0}
+    monkeypatch.setattr(v, "detect_people_rgb", lambda frame, **k: [hit])
+    r = v.inspect_candidate(f, 0.0, 3.0, output_dir=tmp_path)
+    assert r["verdict"] == verdict
+    assert r["cues"]["rgb_dnn"]["clipped_by_side"] == (1 if verdict == "uncertain" else 0)
