@@ -60,9 +60,20 @@ namespace SmokeRescue.Brain
         }
         public Vector2 Centre(int index) => Origin + new Vector2(index % Size + .5f, index / Size + .5f) * CellM;
         public bool Inside(int x, int y) => x >= 0 && y >= 0 && x < Size && y < Size;
+        bool[] placed;
+        /// <summary>An obstacle this robot put down itself (a person it carried out): blocked for the rest of the run, whatever
+        /// the sensors later say, because a person lying on the floor is below the LiDAR plane and the camera does not see
+        /// the floor within about 2 m.</summary>
+        public void PlaceObstacle(Vector2 centre, float radiusM)
+        {
+            if (placed == null) placed = new bool[Count];
+            for (int i = 0; i < Count; i++) if (Vector2.Distance(Centre(i), centre) <= radiusM) placed[i] = true;
+            dirty = true;
+        }
         public byte OwnOccupancy(int index)
         {
             if (index < 0 || index >= Count) return 0;
+            if (placed != null && placed[index]) return 255;
             if (odds[index] >= c.occupied_threshold || lidarOdds[index] >= c.occupied_threshold) return 255;
             return odds[index] <= c.free_threshold || lidarOdds[index] <= c.free_threshold ? (byte)1 : (byte)0;
         }
