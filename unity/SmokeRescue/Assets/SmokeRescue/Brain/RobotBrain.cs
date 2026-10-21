@@ -53,7 +53,7 @@ namespace SmokeRescue.Brain
             id = robotId; scanSign = (seed & 1) == 0 ? 1 : -1; LinkDiagnostics = c.link_diagnostics;
             var entry = entryPose.HasValue ? entryPose.Value.pose : new BrainPose();
             home = entry.position;
-            airC = c.ambient_c; motion = new DeadReckoning(c.motion_stale_s, c.frame_max_age_s + c.frame_pair_tolerance_s, entry); grid = new OccupancyGrid(c);
+            airC = c.ambient_c; motion = new DeadReckoning(c.motion_stale_s, c.frame_max_age_s + c.frame_pair_tolerance_s, entry); grid = new OccupancyGrid(c) { SeeOverMaxM = cfg.camera.mount.height_m - c.see_over_clearance_m };
             if (grid.Cell(home) < 0) throw new ArgumentException("Entry door is outside the configured building grid.");
             planner = new GridPlanner(grid, c) { Home = home }; health = new CameraHealth(c); matcher = new ScanMatcher(grid, c);
             grid.MarkFootprint(home);
@@ -940,6 +940,8 @@ namespace SmokeRescue.Brain
         }
         /// <summary>Where this robot may search. With search_requires_ceiling, only floor its own camera has seen a
         /// ceiling over (OccupancyGrid.Indoors): no building outline, floor plan or operator map is given to any robot.</summary>
+        /// <summary>The live 3D map's top-height layer (centimetres per cell, this brain's grid), from the agent service.</summary>
+        public void OnTopHeights(ushort[] cm) => grid.SetTopHeights(cm);
         public bool InSearchArea(Vector2 p) => !c.search_requires_ceiling || grid.Indoors(p);
         /// <summary>The indoor layer (OccupancyGrid.CopyIndoors), written beside each map snapshot.</summary>
         public byte[] IndoorMask() => grid.CopyIndoors();

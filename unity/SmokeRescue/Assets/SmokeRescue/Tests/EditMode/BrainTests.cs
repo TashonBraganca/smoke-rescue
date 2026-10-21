@@ -888,6 +888,33 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void FloorBehindALowDeskIsAFrontierByTheLive3DMapButNotBehindATallCabinet()
+        {
+            // The live 3D map (OpenCV 5 TSDF) gives each cell's top height; the camera at 1.6 m can look over a 0.75 m desk
+            // but not over a 2 m cabinet. A corner closed off completely by furniture (no gap): with the desk's height
+            // known, the floor behind it is a frontier to look at; with a cabinet's height it is not; with no height
+            // known (no 3D map yet) it is not either.
+            bool Offered(ushort? topCm)
+            {
+                var b = new RobotBrain(Calibration(), Settings(), "A", 0); var g = Map(b);
+                bool Pocket(Vector2 p) => p.x > 2.05f && p.y > 2.05f;
+                WalledRoom(g, 3f, null, Pocket);
+                var heights = new ushort[g.Count];
+                for (int i = 0; i < g.Count; i++)
+                {
+                    var p = g.Centre(i);
+                    bool bar = (Mathf.Abs(p.y - 2.0f) <= .05f && p.x >= 1.95f && p.x <= 3.05f) || (Mathf.Abs(p.x - 2.0f) <= .05f && p.y >= 1.95f && p.y <= 3.05f);
+                    if (bar) { g.ObserveOccupied(i); if (topCm.HasValue) heights[i] = topCm.Value; }
+                }
+                b.OnTopHeights(heights);
+                return b.FrontierOptions(0, 6).Any(f => Vector2.Distance(f.position, new Vector2(1.6f, 1.6f)) <= 1.0f);
+            }
+            Assert.That(Offered(75), Is.True, "a 0.75 m desk: look over it");
+            Assert.That(Offered(200), Is.False, "control: a 2 m cabinet blocks the view");
+            Assert.That(Offered(null), Is.False, "control: no height known");
+        }
+
+        [Test]
         public void UnsearchedFloorBehindFurnitureThroughAGapTooTightToStandInIsAFrontier()
         {
             // Hidden-corner run: a woman behind a desk across a kitchen corner; no standable cell touched her floor, so no
