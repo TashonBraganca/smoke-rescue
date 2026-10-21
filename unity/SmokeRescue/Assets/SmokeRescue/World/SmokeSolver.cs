@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Collections.Generic;
 using System.IO;
 using Newtonsoft.Json;
@@ -255,11 +256,23 @@ namespace SmokeRescue.World
 
         /// <summary>Accepts absolute fire time. Backward queries restore a checkpoint or rebuild from zero.</summary>
         public void AdvanceTo(double t) { lock (gate) Advance(t); }
+        // Seqlock for lock-free reads at the current step: odd while Advance changes the state, even when stable. The RGB-D
+        // noise model samples density per pixel from parallel rows, all at one instant; with a lock per sample those
+        // threads queued on it (hidden-corner run 2: depth noise 62 s per 10 simulated seconds instead of 8.5 s).
+        long version; long publishedTick = -1;
         void Advance(double t)
         {
             if (!Finite(t) || t < 0 || t / config.step_s > int.MaxValue)
                 throw new ArgumentOutOfRangeException(nameof(t));
             long goal = (long)Math.Floor(t / config.step_s + 1e-9);
+            if (goal == tick && Volatile.Read(ref publishedTick) == tick) return;
+            Interlocked.Increment(ref version);
+            try { AdvanceLocked(t, goal); }
+            finally { Volatile.Write(ref publishedTick, tick); Interlocked.Increment(ref version); }
+        }
+
+        void AdvanceLocked(double t, long goal)
+        {
             bool rewind = goal < tick; lastReplaySteps = 0;
             if (rewind)
             {
@@ -523,15 +536,25 @@ namespace SmokeRescue.World
             if (p.y < 0 || p.y > ceiling) return 0;
             int x = (int)Math.Floor((p.x - originX) / h), z = (int)Math.Floor((p.z - originZ) / h);
             if (x < 0 || x >= Width || z < 0 || z >= Height || room[z * Width + x] == null) return 0;
+            int i = z * Width + x;
+            double rt = RobotTime(t);
+            long goal = (long)Math.Floor(rt / config.step_s + 1e-9);
+            // Fast path: the state is already at this step and nothing is advancing it (seqlock, see Advance).
+            long before = Volatile.Read(ref version);
+            if ((before & 1) == 0 && Volatile.Read(ref publishedTick) == goal)
+            {
+                double c = Sample(i, p.y);
+                if (Volatile.Read(ref version) == before) return (float)(3 * config.extinction_m2_kg * c);
+            }
             lock (gate)
             {
-                Advance(RobotTime(t));
-                int i = z * Width + x;
-                double concentration = p.y >= ceiling - volume[i] / area && volume[i] > 0 ?
-                    upper[i] / volume[i] : lower[i] / (area * ceiling - volume[i]);
-                return (float)(3 * config.extinction_m2_kg * concentration);
+                Advance(rt);
+                return (float)(3 * config.extinction_m2_kg * Sample(i, p.y));
             }
         }
+
+        double Sample(int i, float y) => y >= ceiling - volume[i] / area && volume[i] > 0 ?
+            upper[i] / volume[i] : lower[i] / (area * ceiling - volume[i]);
 
         double RobotTime(float t)
         {
@@ -606,7 +629,10 @@ namespace SmokeRescue.World
                 var replacement = FireSim.Load(plan, firePath, seed);
                 foreach (var old in sprays) old.Apply(replacement);
                 spray.Apply(replacement); // Validate before changing retained history.
-                sprays.Add(spray); Reset(replacement);
+                sprays.Add(spray);
+                // State changes outside Advance: lock-free readers must not use the old step (seqlock, see Advance).
+                Interlocked.Increment(ref version); Volatile.Write(ref publishedTick, -1);
+                try { Reset(replacement); } finally { Interlocked.Increment(ref version); }
             }
         }
 
