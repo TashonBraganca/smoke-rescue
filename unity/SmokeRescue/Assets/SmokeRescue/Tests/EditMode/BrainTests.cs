@@ -2379,6 +2379,169 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void SweepsSkipSearchedWallSectorsInACorridorButKeepAllThreeLooksInAnOpenRoom()
+        {
+            // In the 2 m corridor, the side sectors hit walls or searched floor before they can see the unsearched
+            // strip ahead. Old code spends a full +60, -60, 0 sweep here, so its angular travel fails the first assertion.
+            (float turned, int looks, double seconds) Sweep(bool corridor, bool sideOpening = false, bool allSearched = false)
+            {
+                var c = Settings(); c.grid_size_m = 14;
+                var b = new RobotBrain(Calibration(), c, "A", 0); var g = Map(b);
+                var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+                var lidar = (float[])typeof(OccupancyGrid).GetField("lidarOdds", flags).GetValue(g);
+                for (int i = 0; i < g.Count; i++)
+                {
+                    var p = g.Centre(i); float halfWidth = corridor ? 1f : 5f;
+                    if (Mathf.Abs(p.y) >= 6) continue;
+                    if (Mathf.Abs(p.x) >= halfWidth && Mathf.Abs(p.x) < halfWidth + .2f)
+                    {
+                        if (!(sideOpening && p.x < 0 && Mathf.Abs(p.y) < .7f)) g.ObserveOccupied(i);
+                    }
+                    else if (Mathf.Abs(p.x) < halfWidth)
+                    {
+                        if (allSearched || (corridor && p.y < 2.7f)) g.ObserveFree(i);
+                        else lidar[i] = -c.log_odds_cap;
+                    }
+                }
+                typeof(OccupancyGrid).GetField("dirty", flags).SetValue(g, true);
+                typeof(RobotBrain).GetMethod("OnFrontierReached", flags).Invoke(b, new object[] { Vector2.zero, 0.0 });
+                BrainCommand cmd = default; float turned = 0; int looks = 0; double seconds = 0;
+                for (int k = 0; k <= 16 * 15; k++)
+                {
+                    double t = k / 15.0; Motion(b, t, cmd.forwardMps, cmd.yawRateDeg * Mathf.Deg2Rad);
+                    b.OnAirTemperature(t, 20); b.OnRgbd(Image(t, true, 0)); cmd = b.Step(t, 1f / 15);
+                    turned += Mathf.Abs(cmd.yawRateDeg) / 15;
+                    var events = b.DrainEvents(); looks += events.Count(e => e.kind == "sweep_look");
+                    if (events.Any(e => e.kind == "area_searched")) { seconds = t; break; }
+                }
+                return (turned, looks, seconds);
+            }
+            var hall = Sweep(true);
+            Assert.That(hall.turned, Is.LessThan(6), "searched walls do not justify either side turn");
+            Assert.That(hall.looks, Is.EqualTo(1), "only the forward sector contains unsearched floor");
+            Assert.That(hall.seconds, Is.LessThan(1.5), "one short dwell replaces the corridor sweep");
+            TestContext.WriteLine($"corridor: {hall.looks} look, {hall.turned:0.0} degrees, {hall.seconds:0.00} s");
+            var room = Sweep(false);
+            TestContext.WriteLine($"open room: {room.looks} looks, {room.turned:0.0} degrees, {room.seconds:0.00} s");
+            Assert.That(room.looks, Is.EqualTo(3), "all three camera sectors in an open unsearched room are kept");
+            Assert.That(room.turned, Is.GreaterThan(200), "the room still receives the complete sweep");
+            Assert.That(room.seconds, Is.LessThan(12), "all three holds finish before the sweep time limit");
+            var door = Sweep(true, sideOpening: true);
+            Assert.That(door.looks, Is.EqualTo(2), "an opening in the side wall keeps that side look as well as the forward look");
+            Assert.That(Sweep(false, allSearched: true).looks, Is.Zero, "a searched room needs no look");
+        }
+
+        // Known floor and a wall with an opening, as if mapped by LiDAR. Only the approach side is
+        // camera-searched. A ceiling observation retained behind the camera is the robot's earlier indoor evidence.
+        static RobotBrain DoorwayBrain(float bodyY, float yawDeg = 0)
+        {
+            var c = Settings(); c.grid_size_m = 24; c.search_requires_ceiling = true;
+            float angle = yawDeg * Mathf.Deg2Rad, co = Mathf.Cos(angle), si = Mathf.Sin(angle);
+            var b = new RobotBrain(Calibration(), c, "A", 0, new EntryPose(-si * bodyY, co * bodyY, -yawDeg)); var g = Map(b);
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var lidar = (float[])typeof(OccupancyGrid).GetField("lidarOdds", flags).GetValue(g);
+            var roof = (byte[])typeof(OccupancyGrid).GetField("roofHits", flags).GetValue(g);
+            for (int i = 0; i < g.Count; i++)
+            {
+                var world = g.Centre(i); var p = new Vector2(co * world.x + si * world.y, -si * world.x + co * world.y);
+                if (Mathf.Abs(p.x) >= 8 || p.y <= -3 || p.y >= 9) continue;
+                if (Mathf.Abs(p.y) < .15f && Mathf.Abs(p.x) >= .6f) g.ObserveOccupied(i);
+                else if (p.y < -.3f) g.ObserveFree(i);
+                else lidar[i] = -c.log_odds_cap;
+            }
+            roof[g.Cell(new Vector2(si * 1.1f, -co * 1.1f))] = 255;
+            typeof(OccupancyGrid).GetField("roofDirty", flags).SetValue(g, true);
+            typeof(OccupancyGrid).GetField("dirty", flags).SetValue(g, true);
+            return b;
+        }
+
+        [Test]
+        public void ACeilingSeenFromAnUnprovenDoorwayProvesTheFloorUnderItsSightLine()
+        {
+            // The old cameraIndoors gate returns here, even though the camera is at an opening with proven floor behind
+            // it and its own camera sees a real ceiling beyond it. It leaves the probe at y=2 outside the search area.
+            foreach (float yaw in new[] { 0f, 37f, 90f, 193f })
+            {
+                var b = DoorwayBrain(-.25f, yaw); var g = Map(b); var sensor = Calibration(); var pose = b.Snapshot().pose;
+                Assert.That(g.Indoors(pose.Transform(0, .25f)), Is.False, "the camera at the opening has no indoor proof yet");
+                Assert.That(g.Indoors(pose.Transform(0, -.85f)), Is.True, "earlier ceiling evidence behind it");
+                g.IntegrateDepth(RoomImage(.1, 7, 2.8f), sensor, pose);
+                g.IntegrateDepth(RoomImage(.2, 7, 2.8f), sensor, pose);
+                Assert.That(g.UnderCeiling(pose.Transform(0, 2.25f)), Is.True, $"fresh ceiling sight lines through an opening rotated {yaw} degrees");
+                Assert.That(g.UnderCeiling(pose.Transform(0, -2.25f)), Is.False, "no flood into floor behind the camera");
+                var outside = DoorwayBrain(-.25f, yaw); var h = Map(outside);
+                var backwards = outside.Snapshot().pose;
+                backwards.position += backwards.Forward * .5f; backwards.yawRad += Mathf.PI;
+                h.IntegrateDepth(RoomImage(.1, 7, 2.8f), sensor, backwards);
+                h.IntegrateDepth(RoomImage(.2, 7, 2.8f), sensor, backwards);
+                Assert.That(h.UnderCeiling(pose.Transform(0, .55f)), Is.False,
+                    "looking back through an exterior door at an indoor ceiling does not prove the ground outside");
+            }
+        }
+
+        [Test]
+        public void AnExteriorDoorGetsOnlyABoundedEvidenceMoveAndOpenGroundStaysUnproven()
+        {
+            // Old code never starts an evidence move. The control then checks that moving to the opening gives no
+            // indoor label without overhead evidence, even when the RGB-D camera sees a tall facade ahead.
+            var b = DoorwayBrain(-1.1f); var g = Map(b); BrainCommand cmd = default;
+            var logged = new List<BrainEvent>(); float farthest = 0;
+            for (int k = 0; k <= 16 * 15; k++)
+            {
+                double t = k / 15.0;
+                Motion(b, t, cmd.forwardMps, cmd.yawRateDeg * Mathf.Deg2Rad);
+                b.OnAirTemperature(t, 20); b.OnRgbd(Image(t, true, 0)); cmd = b.Step(t, 1f / 15);
+                farthest = Mathf.Max(farthest, Vector2.Distance(new Vector2(0, -1.1f), b.Snapshot().pose.position));
+                logged.AddRange(b.DrainEvents());
+                if (logged.Any(e => e.kind == "doorway_probe_done")) break;
+            }
+            Assert.That(logged.Any(e => e.kind == "doorway_probe_started"), Is.True, "a mapped opening gets a reflex evidence move");
+            Assert.That(logged.Any(e => e.kind == "doorway_probe_done"), Is.True, "the probe ends within the sweep time limit");
+            Assert.That(farthest, Is.LessThanOrEqualTo(1.2f), "motion is bounded near the doorway");
+            Assert.That(b.Snapshot().pose.position.y, Is.LessThanOrEqualTo(.15f), "the probe ends on the inside of the wall line");
+            var pose = b.Snapshot().pose;
+            g.IntegrateDepth(RoomImage(17, 7, 60), Calibration(), pose);
+            Assert.That(g.Indoors(new Vector2(0, 2)), Is.False, "open ground beyond an exterior door stays unproven");
+        }
+
+        [Test]
+        public void AReflexDoorwayLookGathersCeilingEvidenceBeforeItExploresBeyondTheWall()
+        {
+            // Simulate depth dropout until the camera reaches the mapped wall opening. The robot must move there
+            // itself, face through it, and prove indoor floor from its own fresh depth frames. Old code never probes.
+            var b = DoorwayBrain(-1.1f); var g = Map(b); BrainCommand cmd = default;
+            var logged = new List<BrainEvent>(); bool suppliedCeiling = false;
+            for (int k = 0; k <= 16 * 15; k++)
+            {
+                double t = k / 15.0;
+                Motion(b, t, cmd.forwardMps, cmd.yawRateDeg * Mathf.Deg2Rad);
+                b.OnAirTemperature(t, 20);
+                var pose = b.Snapshot().pose;
+                bool atOpening = Mathf.Abs(pose.Transform(0, .25f).y) < .15f && Mathf.Abs(pose.yawRad) < .15f;
+                b.OnRgbd(atOpening ? RoomImage(t, 7, 2.8f) : Image(t, true, 0)); suppliedCeiling |= atOpening;
+                cmd = b.Step(t, 1f / 15); logged.AddRange(b.DrainEvents());
+                if (logged.Any(e => e.kind == "doorway_probe_done")) break;
+            }
+            Assert.That(logged.Any(e => e.kind == "doorway_probe_started"), Is.True, "the reflex starts the evidence approach");
+            Assert.That(suppliedCeiling, Is.True, "it brings the camera to the opening");
+            Assert.That(logged.Any(e => e.kind == "doorway_probe_done" && e.reason.StartsWith("One doorway look")), Is.True, "the look finishes before its timeout");
+            Assert.That(g.UnderCeiling(new Vector2(0, 2)), Is.True, "the new sensor view proves floor beyond the wall");
+            Assert.That(b.Snapshot().pose.position.y, Is.LessThan(0), "the evidence move keeps the body on the indoor side");
+        }
+
+        [Test]
+        public void HeatStillCancelsADoorwayEvidenceMove()
+        {
+            var b = DoorwayBrain(-1.1f);
+            Motion(b, 0); b.OnAirTemperature(0, 20); b.OnRgbd(Image(0, true, 0)); b.Step(0, 1f / 15);
+            Assert.That(b.DrainEvents().Any(e => e.kind == "doorway_probe_started"), Is.True, "control: a probe was active");
+            Motion(b, .1); b.OnAirTemperature(.1, 100); b.OnRgbd(Image(.1, true, 0)); b.Step(.1, .1f);
+            var events = b.DrainEvents();
+            Assert.That(events.Any(e => e.kind == "doorway_probe_done"), Is.True, "heat cancels the probe");
+            Assert.That(b.Snapshot().state == "retreat" || b.Snapshot().state == "return", Is.True, "the heat reflex owns motion");
+        }
+
+        [Test]
         public void TheTopOfAWallFaceDrawsNoCeilingSightLines()
         {
             // Held-out run 2: from the yard, 98 % of robot B's ceiling-height depth points (2.5 to 2.9 m) lay within 0.4 m of
@@ -2593,6 +2756,53 @@ namespace SmokeRescue.Tests.EditMode
             }
             var wide = Offer(3);
             Assert.That(wide.doorway, Is.True, "the doorway onto the corridor is offered");
+            Assert.That(wide.pockets, Is.GreaterThanOrEqualTo(5), "nearby pockets are still offered too");
+            var nearest = Offer(0);
+            Assert.That(nearest.doorway, Is.False, "control: nearest first offers only pockets");
+        }
+
+        [Test]
+        public void WideSlotsIncludeAnUnprovenDoorwayEvenWhenProvenPocketsFillTheList()
+        {
+            // Regression: the old proven-only wide pass omits this doorway with wide slots enabled.
+            // Held-out seed 914 runs 3 and 4: 102 of 162 options were in the robot's current room; in the foyer all six were
+            // corners with under 2.5 m2 beyond them while the doors to three unsearched rooms were not offered. A searched
+            // 12 x 12 m room with twelve small unsearched pockets 2 to 3.3 m from the robot and a doorway 6 m away onto a
+            // 12 x 1.8 m corridor the LiDAR mapped. Control: with no wide slots the eight nearest options are all pockets.
+            (bool doorway, int pockets, double unprovenWide) Offer(int wide)
+            {
+                // The shipped gain weight (config/brain.json 0.01, a 1.5 m bonus at the cap); the C# default 0.04 gives a 6 m
+                // bonus that ranks the doorway first on its own and hides what the robots actually run with.
+                var c = Settings(); c.grid_size_m = 26; c.frontier_wide_options = wide; c.frontier_gain_weight = .01f;
+                c.search_requires_ceiling = true; c.enclosure_min_closed_share = 1f;
+                var b = new RobotBrain(Calibration(), c, "A", 0); var g = Map(b);
+                var lidar = (float[])typeof(OccupancyGrid).GetField("lidarOdds", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(g);
+                var indoor = (bool[])typeof(OccupancyGrid).GetField("sightIndoors", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(g);
+                var pockets = new List<Vector2>();
+                for (int k = 0; k < 12; k++) { float a = (k * 30 + 15) * Mathf.Deg2Rad; pockets.Add(new Vector2(Mathf.Sin(a), Mathf.Cos(a)) * (2f + .12f * k)); }
+                for (int i = 0; i < g.Count; i++)
+                {
+                    var p = g.Centre(i); float ax = Mathf.Abs(p.x), ay = Mathf.Abs(p.y);
+                    bool room = ax < 6f && ay < 6f, wall = !room && ax < 6.2f && ay < 6.2f, door = wall && p.y > 0 && ax < .5f;
+                    bool corridor = ax < 6f && p.y >= 6.2f && p.y < 8f;
+                    bool pocket = pockets.Exists(q => Mathf.Abs(p.x - q.x) < .3f && Mathf.Abs(p.y - q.y) < .3f);
+                    indoor[i] = room && !(ax < 1f && p.y > 4.5f);
+                    if (wall && !door) g.ObserveOccupied(i);
+                    else if (room && !pocket) g.ObserveFree(i);
+                    else if (room || door || corridor) lidar[i] = -c.log_odds_cap;   // mapped free by LiDAR, not searched
+                }
+                typeof(OccupancyGrid).GetField("dirty", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).SetValue(g, true);
+                Motion(b, 0);
+                var options = b.FrontierOptions(0, 8);
+                var counts = b.DrainEvents().Single(e => e.kind == "frontier_options").numbers;
+                counts.TryGetValue("wide_unproven_options", out double unprovenWide);
+                TestContext.WriteLine($"wide {wide}: " + string.Join("; ", options.Select(f => $"({f.position.x:0.0},{f.position.y:0.0}) cost {f.pathM:0.00} beyond {f.mappedUnsearchedM2:0.0} proven {f.provenIndoors}")));
+                return (options.Any(f => Mathf.Abs(f.position.x) < 1f && f.position.y > 4.5f && !f.provenIndoors),
+                        options.Count(f => pockets.Exists(q => Vector2.Distance(q, f.position) < .9f)), unprovenWide);
+            }
+            var wide = Offer(3);
+            Assert.That(wide.doorway, Is.True, "the doorway onto the corridor is offered");
+            Assert.That(wide.unprovenWide, Is.EqualTo(1), "unproven wide slots are logged");
             Assert.That(wide.pockets, Is.GreaterThanOrEqualTo(5), "nearby pockets are still offered too");
             var nearest = Offer(0);
             Assert.That(nearest.doorway, Is.False, "control: nearest first offers only pockets");

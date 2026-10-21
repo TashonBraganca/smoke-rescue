@@ -7,8 +7,8 @@ namespace SmokeRescue.Brain
     /// <summary>
     /// Search behaviour on top of frontier exploration, from the robot's own map only, so it works for any floor plan
     /// and any start pose:
-    ///  - Sweep: on reaching a frontier in an area not swept recently, turn left, right, then back to the arrival
-    ///    heading, holding briefly at each, so the cameras see the whole area and thermal can raise candidates.
+    ///  - Sweep: on reaching a frontier in an area not swept recently, check the left, right and arrival-heading
+    ///    camera sectors. Turn and hold only where unsearched floor remains visible within search range.
     ///  - Visited: a reached frontier is not chosen again for a while. Spots the cameras cannot resolve (under beds,
     ///    behind furniture) otherwise pull the robot back to the same place, which looked like spinning in one room.
     ///  - Progress watchdog: if the map stops growing while exploring, frontiers near the robot are set aside and it
@@ -23,7 +23,7 @@ namespace SmokeRescue.Brain
         readonly List<(Vector2 position, double t)> sweeps = new List<(Vector2, double)>();
         bool sweeping;
         float sweepBase;
-        int sweepIndex;
+        int sweepIndex, sweepCheckedIndex = -1;
         double sweepHoldUntil = double.NaN;
         static readonly float[] SweepOffsetsDeg = { 60f, -60f, 0f };   // left, right, back to the arrival heading
         int knownCells, knownAtMark;
@@ -42,8 +42,8 @@ namespace SmokeRescue.Brain
             sweeps.RemoveAll(s => t - s.t > c.sweep_repeat_s);
             if (sweeps.Exists(s => Vector2.Distance(s.position, motion.Pose.position) < c.sweep_spacing_m)) return;
             sweeps.Add((motion.Pose.position, t));
-            sweeping = true; sweepIndex = 0; sweepBase = motion.Pose.yawRad; sweepHoldUntil = double.NaN; sweepStarted = t;
-            Emit(t, "sweep_started", "New area: look left, right and ahead before choosing where to go next.",
+            sweeping = true; sweepIndex = 0; sweepCheckedIndex = -1; sweepBase = motion.Pose.yawRad; sweepHoldUntil = double.NaN; sweepStarted = t;
+            Emit(t, "sweep_started", "New area: inspect the left, right and forward camera sectors that still contain unsearched floor.",
                 "x_m", motion.Pose.position.x, "y_m", motion.Pose.position.y);
         }
 
@@ -67,15 +67,127 @@ namespace SmokeRescue.Brain
         BrainCommand SweepStep(double t, float dt)
         {
             if (t - sweepStarted > c.sweep_max_s) { EndSweep(t, "time limit"); return Command(0, 0, dt, true); }
+            while (sweeping && sweepCheckedIndex != sweepIndex)
+            {
+                float heading = sweepBase + SweepOffsetsDeg[sweepIndex] * Mathf.Deg2Rad;
+                var forward = new Vector2(-Mathf.Sin(heading), Mathf.Cos(heading));
+                Vector2 eye = motion.Pose.position + forward * sensors.camera.mount.forward_offset_m;
+                var camera = sensors.camera;
+                float left = Mathf.Atan((camera.cx + .5f) / camera.fx);
+                float right = Mathf.Atan((camera.width - .5f - camera.cx) / camera.fx);
+                if (!grid.HasUnsearchedFloorInView(eye, heading, left, right, c.search_max_range_m))
+                {
+                    Emit(t, "sweep_look_skipped", "This camera sector contains only searched floor or mapped opaque obstacles within search range.",
+                        "look_index", sweepIndex, "offset_deg", SweepOffsetsDeg[sweepIndex]);
+                    SkipSweepLook(t, "remaining sectors already searched or walled off");
+                    continue;
+                }
+                sweepCheckedIndex = sweepIndex;
+            }
+            if (!sweeping) return Command(0, 0, dt, true);
             float target = sweepBase + SweepOffsetsDeg[sweepIndex] * Mathf.Deg2Rad;
             float error = BrainMath.Angle(motion.Pose.yawRad, target);
             if (Mathf.Abs(error) > c.sweep_tolerance_deg)
                 return Command(0, Mathf.Clamp(error * c.heading_gain, -c.sweep_yaw_dps, c.sweep_yaw_dps), dt, true);
-            if (double.IsNaN(sweepHoldUntil)) sweepHoldUntil = t + c.sweep_hold_s;
+            if (double.IsNaN(sweepHoldUntil))
+            {
+                sweepHoldUntil = t + c.sweep_hold_s;
+                Emit(t, "sweep_look", "Hold a camera sector that contains unsearched floor.",
+                    "look_index", sweepIndex, "offset_deg", SweepOffsetsDeg[sweepIndex]);
+            }
             if (t < sweepHoldUntil) return Command(0, 0, dt, true);
             sweepHoldUntil = double.NaN;
             if (++sweepIndex < SweepOffsetsDeg.Length) return Command(0, 0, dt, true);
             EndSweep(t, "all looks done");
+            return Command(0, 0, dt, true);
+        }
+
+        Vector2? doorwayProbeGoal;
+        Vector2 doorwayProbeForward;
+        double doorwayProbeStarted, doorwayProbeHoldUntil = double.NaN;
+        readonly List<(Vector2 position, double t)> doorwayProbes = new List<(Vector2, double)>();
+
+        /// <summary>Take one bounded look at a nearby mapped wall opening before walking past it. The camera goes
+        /// only to the wall line; the body stays its calibrated camera offset behind it. A doorway is never labelled
+        /// indoors just because it exists. Depth frames from the look still have to supply valid ceiling evidence.</summary>
+        bool TryStartDoorwayProbe(double t)
+        {
+            if (!c.search_requires_ceiling || !c.ceiling_sight_lines || c.frontier_peek_m <= 0 || nearFire ||
+                AgentMoveRefusal(t) != null || !InSearchArea(motion.Pose.position)) return false;
+            doorwayProbes.RemoveAll(p => t - p.t > c.sweep_repeat_s);
+            grid.PrepareNavigation();
+            int start = grid.Cell(motion.Pose.position), reach = Mathf.CeilToInt(c.frontier_peek_m / grid.CellM);
+            var candidates = new List<(Vector2 openingCentre, Vector2 forward, Vector2 target, float distance)>();
+            for (int dy = -reach; dy <= reach; dy++) for (int dx = -reach; dx <= reach; dx++)
+            {
+                int x = start % grid.Size + dx, y = start / grid.Size + dy;
+                if (!grid.Inside(x, y)) continue;
+                Vector2 camera = grid.Centre(y * grid.Size + x);
+                if (Vector2.Distance(camera, motion.Pose.position) > c.frontier_peek_m ||
+                    doorwayProbes.Exists(p => Vector2.Distance(p.position, camera) <= 2 * c.robot_radius_m)) continue;
+                for (int r = 0; r < c.enclosure_rays; r++)
+                {
+                    float a = r * 2 * Mathf.PI / c.enclosure_rays; var forward = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
+                    Vector2 beyond = camera + forward * c.frontier_peek_m; int cell = grid.Cell(beyond);
+                    if (grid.OwnOccupancy(cell) != 1 || !grid.Unsearched(cell) ||
+                        !grid.DoorwayFromInside(camera, forward, out var openingCentre) || !grid.OwnFreeLine(camera, beyond) || InSearchArea(beyond) ||
+                        doorwayProbes.Exists(p => Vector2.Distance(p.position, openingCentre) <= 2 * c.robot_radius_m)) continue;
+                    Vector2 target = camera - forward * sensors.camera.mount.forward_offset_m;
+                    float distance = Vector2.Distance(motion.Pose.position, target);
+                    if (distance > c.frontier_peek_m || !grid.Walkable(grid.Cell(target)) ||
+                        ClaimBlocks(target, t) || GoalBlacklisted(target, t) || VisitedGoal(target, t)) continue;
+                    candidates.Add((openingCentre, forward, target, distance));
+                }
+            }
+            candidates.Sort((a, b) => a.distance.CompareTo(b.distance));
+            foreach (var candidate in candidates)
+            {
+                var route = planner.Plan(motion.Pose.position, candidate.target);
+                if (route.Count == 0 || Vector2.Distance(route[route.Count - 1], candidate.target) > c.goal_tolerance_m) continue;
+                float walked = 0; Vector2 previous = motion.Pose.position; bool ownFloor = true;
+                foreach (var p in route)
+                {
+                    walked += Vector2.Distance(previous, p); previous = p;
+                    if (grid.OwnOccupancy(grid.Cell(p)) != 1) ownFloor = false;
+                }
+                if (!ownFloor || walked > c.frontier_peek_m || !planner.PathSafe(route)) continue;
+                SetPath(route); lastPlan = t; doorwayProbeGoal = goal;
+                doorwayProbeForward = candidate.forward; doorwayProbeStarted = t; doorwayProbeHoldUntil = double.NaN;
+                doorwayProbes.Add((candidate.openingCentre, t));
+                Emit(t, "doorway_probe_started", "Move the camera to a mapped opening for one ceiling-evidence look; the opening alone proves no indoor floor.",
+                    "x_m", goal.Value.x, "y_m", goal.Value.y, "path_m", walked, "max_m", c.frontier_peek_m);
+                return true;
+            }
+            return false;
+        }
+
+        void EndDoorwayProbe(double t, string why)
+        {
+            Emit(t, "doorway_probe_done", why, "elapsed_s", t - doorwayProbeStarted,
+                "x_m", motion.Pose.position.x, "y_m", motion.Pose.position.y);
+            doorwayProbeGoal = null; doorwayProbeHoldUntil = double.NaN; ClearPath();
+            progressMark = t; knownAtMark = knownCells;
+        }
+
+        BrainCommand? DoorwayProbeStep(double t, float dt)
+        {
+            if (!doorwayProbeGoal.HasValue) return null;
+            if (t - doorwayProbeStarted >= c.sweep_max_s)
+            { EndDoorwayProbe(t, "Evidence look reached its time limit."); return Command(0, 0, dt, true); }
+            // Ordinary frontier arrival can stop short of the jamb plane. Place the camera within half a map cell
+            // for this evidence look, while keeping the same body clearance and swept-path checks.
+            float arriveM = Mathf.Min(c.goal_tolerance_m, grid.CellM * .5f);
+            if (Vector2.Distance(motion.Pose.position, doorwayProbeGoal.Value) > arriveM)
+            {
+                if (path.Count == 0 || !planner.PathSafe(path, cursor))
+                { EndDoorwayProbe(t, "The evidence approach is no longer safe."); return Command(0, 0, dt, true); }
+                return FollowOrHold(t, dt, arriveM);
+            }
+            float error = BrainMath.Angle(motion.Pose.yawRad, BrainMath.Heading(doorwayProbeForward));
+            if (Mathf.Abs(error) > c.sweep_tolerance_deg)
+                return Command(0, Mathf.Clamp(error * c.heading_gain, -c.sweep_yaw_dps, c.sweep_yaw_dps), dt, true);
+            if (double.IsNaN(doorwayProbeHoldUntil)) doorwayProbeHoldUntil = t + c.sweep_hold_s;
+            if (t >= doorwayProbeHoldUntil) EndDoorwayProbe(t, "One doorway look completed; only sensed ceiling evidence can admit the floor ahead.");
             return Command(0, 0, dt, true);
         }
 
