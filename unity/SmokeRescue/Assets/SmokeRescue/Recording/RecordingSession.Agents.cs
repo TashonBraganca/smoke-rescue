@@ -33,6 +33,9 @@ namespace SmokeRescue.Recording
         /// the language model, so it runs with or without agents. Null skips it (logged at the start of a run).</summary>
         public static string PeopleUrl;
         public static float PeoplePeriodS = 1f;
+        /// <summary>How often the brain takes the live 3D map's height layer, and how often the map is saved as a point
+        /// cloud in the recording (for the replay and the video).</summary>
+        const double Map3dLayersPeriodS = 5, Map3dExportPeriodS = 30;
         // The agent server bounds a step at about 75 s plus one 45 s call; past 120 s the reflex layer carries on alone.
         static readonly HttpClient Http = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
         static readonly HashSet<string> AgentTriggers = new HashSet<string>
@@ -54,7 +57,7 @@ namespace SmokeRescue.Recording
             public readonly List<Outgoing> outbox = new List<Outgoing>();  // texts not yet heard by every listener
             public readonly List<double> thermalTimes = new List<double>();
             public readonly StringBuilder agentLog = new StringBuilder();
-            public double lastPeople = double.NegativeInfinity;
+            public double lastPeople = double.NegativeInfinity, lastMap3dLayers = double.NegativeInfinity, lastMap3dExport = double.NegativeInfinity;
         }
 
         /// <summary>A team text and who has heard it. Delivery is tracked per listener: clearing the whole outbox when
@@ -383,6 +386,39 @@ namespace SmokeRescue.Recording
                     if (p["range_m"] == null || p["range_m"].Type == JTokenType.Null) continue;
                     rig.brain.OnPersonSighting(Math.Min(seen, t), p.Value<float>("bearing_deg"), p.Value<float>("range_m"), p.Value<float>("confidence"));
                 }
+                Map3d(rig, t);
+            }
+        }
+
+        /// <summary>The robot's live 3D map: its latest depth frame fused at its own estimated pose into an OpenCV 5 TSDF
+        /// volume (agent service), the top-height layer handed back to the brain, and the map saved now and then.</summary>
+        static void Map3d(RobotRig rig, double t)
+        {
+            var s = rig.brain.Snapshot();
+            string id = rig.robot.RobotId;
+            var pose = new JObject { ["x"] = s.pose.position.x, ["y"] = s.pose.position.y, ["heading_deg"] = -s.pose.yawRad * Mathf.Rad2Deg };
+            if (Post($"/map3d/{id}/integrate", new JObject { ["robot_dir"] = Path.GetFullPath(rig.dir), ["t"] = t, ["pose"] = pose }, PeopleUrl) == null) return;
+            if (t - rig.lastMap3dLayers >= Map3dLayersPeriodS - 1e-9)
+            {
+                rig.lastMap3dLayers = t;
+                var layers = Post($"/map3d/{id}/layers", new JObject { ["cell_m"] = s.cellM, ["origin"] = new JArray(s.gridOrigin.x, s.gridOrigin.y), ["size"] = s.gridSize }, PeopleUrl);
+                string top = layers?.Value<string>("top_cm");
+                if (top != null)
+                {
+                    var bytes = Convert.FromBase64String(top);
+                    if (bytes.Length == s.gridSize * s.gridSize * 2)
+                    {
+                        var cm = new ushort[s.gridSize * s.gridSize];
+                        Buffer.BlockCopy(bytes, 0, cm, 0, bytes.Length);
+                        rig.brain.OnTopHeights(cm);
+                    }
+                    else rig.brain.Log(t, "map3d", $"height layer size {bytes.Length} does not match the grid; ignored");
+                }
+            }
+            if (t - rig.lastMap3dExport >= Map3dExportPeriodS - 1e-9)
+            {
+                rig.lastMap3dExport = t;
+                Post($"/map3d/{id}/export", new JObject { ["path"] = Path.GetFullPath(Path.Combine(rig.dir, "map3d.ply")) }, PeopleUrl);
             }
         }
 
