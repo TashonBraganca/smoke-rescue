@@ -273,6 +273,8 @@ class ToolRegistry:
                 ev = self.evidence[str(args["evidence_id"])]
                 if ev.get("x") is not None:
                     self._lifted.setdefault(self.ctx.robot, []).append((float(ev["x"]), float(ev["y"])))
+                    # The arm straps on the person at this position only (review: it used to take whoever was nearest).
+                    args = {**args, "target_x": round(float(ev["x"]), 2), "target_y": round(float(ev["y"]), 2)}
         elif name == "spray_water":
             aim, reach = float(_NOZZLE["aim_tolerance_deg"]), float(_NOZZLE["range_m"])
             bearing = float(args.get("bearing_deg", 0))
