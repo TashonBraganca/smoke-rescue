@@ -1,0 +1,27 @@
+                                   unity_house_hidden_v1
+duration_s                                         200.0
+survivors_total                                        5
+survivors_found                                        1
+first_found_s                                       12.0
+confirmations                                          2
+false_confirmations                                    1
+area_searched_m2                                   169.0
+double_coverage_share                              0.216
+people_carried_out                                     0
+collision_s                   {'robot_A': 15.55666666666
+unity_house_hidden_v1 heat {'robot_A': {'max_air_c': 21.5, 's_air_over_60c': 0.0, 'max_surface_within_1m_c': 22.6}, 'robot_B': {'max_air_c': 116.4, 's_air_over_60c': 30.8, 'max_surface_within_1m_c': 237.8}} agent {'steps': 50, 'orders': 58, 'refusals': 3, 'errors': 0, 'orders_by_type': {'send_team_message': 23, 'explore_frontier': 6, 'confirm_survivor': 2, 'go_to': 17, 'extract_survivor': 1, 'broadcast': 6, 'set_torch': 1, 'reject_candidate': 3, 'avoid_area': 3, 'spray_water': 2}}
+
+robot_A frame check {"t": 0.0, "body_xy": [10.0, -1.2], "yaw_deg": -0.0, "spawn_xy": [10.0, -1.2], "spawn_yaw_deg": 0, "position_error_m": 0.0, "yaw_error_deg": 0.0, "passed": true, "scenario_file": "scenario_house_hidden_corner.json", "recorded_frame": "local", "transformed_brain_position_error_m": 0.0, "transformed_brain_yaw_error_deg": 0.0}; optical +z projected to house x/z, subtract 0.25 m forward; yaw=atan2(-forward_x, forward_z)
+robot_B frame check {"t": 0.0, "body_xy": [-1.2, 7.0], "yaw_deg": -90.0, "spawn_xy": [-1.2, 7.0], "spawn_yaw_deg": -90, "position_error_m": 0.0, "yaw_error_deg": 0.0, "passed": true, "scenario_file": "scenario_house_hidden_corner.json", "recorded_frame": "local", "transformed_brain_position_error_m": 0.0, "transformed_brain_yaw_error_deg": 0.0}; optical +z projected to house x/z, subtract 0.25 m forward; yaw=atan2(-forward_x, forward_z)
+team searched floor share 0.704 of 21545 floor cells
+robot        pos median/p95/max/final (m)   yaw median/max (deg)   lidar true/brain median (m)   map P/R   stalls   collision s
+robot_A      0.149/0.157/0.163/0.152       0.127/0.946   0.009/0.026   0.840/0.892   1 (1 unexplained)   15.557
+robot_A frame_link: linked at 54.07s from robot_B {'dx_m': -11.12664794921875, 'dy_m': 8.267812728881836, 'dyaw_deg': -89.9067611694336}; error 0.100 m / 0.093 deg
+robot_B      0.052/0.083/0.090/0.043       0.075/0.587   0.013/0.034   0.940/0.855   3 (2 unexplained)   0.000
+robot_B frame_link: linked at 52.62s from robot_A {'dx_m': 8.297917366027832, 'dy_m': 11.114801406860352, 'dyaw_deg': -270.154296875}; error 0.130 m / 0.154 deg
+
+== hidden woman (s6) visibility, ground truth
+robot_A: nearest approach 9.38 m; s6 inside the camera frame within 8 m in 7 frames; visible (depth agrees) 0, blocked by something nearer 1
+   blocked e.g. [(127.7, 7.84, 5.95)]
+robot_B: nearest approach 7.67 m; s6 inside the camera frame within 8 m in 406 frames; visible (depth agrees) 0, blocked by something nearer 284
+   blocked e.g. [(44.5, 7.97, 1.62), (45.1, 7.82, 1.41), (45.2, 7.53, 1.34)]
