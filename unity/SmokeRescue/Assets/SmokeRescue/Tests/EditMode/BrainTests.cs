@@ -1002,6 +1002,49 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void APersonThisRobotCarriedOutIsNotANewSurvivor()
+        {
+            // Held-out run 2: robot B carried a person out and set them down in the yard; at 98.9 s its colour detector raised
+            // a candidate 0.09 m from that spot and its agent confirmed it as a new survivor (the run's one false
+            // confirmation). Sightings within survivor_merge_m of a set-down point make no candidate, and an agent
+            // confirmation there is refused with its reason. Control: the same sightings and confirmation at a spot inside,
+            // 2 m and more from the set-down point, still count.
+            var c = Settings();
+            var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -6, 6, -6, 6);
+            b.AgentGoTo(new Vector2(0, 2.0f), 0, 30, "person");
+            var command = new BrainCommand(); bool carrying = false; Vector2? body = null; double end = -1;
+            for (int tick = 0; tick < 1600 && end < 0; tick++)
+            {
+                command = DriveTick(b, tick, command.forwardMps, command.yawRateDeg);
+                var events = b.DrainEvents();
+                if (!carrying && events.Any(e => e.kind == "agent_goal_reached")) { b.BeginCarry(tick / 20.0, .25f, "p", .9f); carrying = true; }
+                var released = events.FirstOrDefault(e => e.kind == "person_carried_out" && e.numbers.ContainsKey("person_x_m"));
+                if (released != null) body = new Vector2((float)released.numbers["person_x_m"], (float)released.numbers["person_y_m"]);
+                if (events.Any(e => e.kind == "mission_complete")) end = tick / 20.0;
+            }
+            Assert.That(body.HasValue && end >= 0, Is.True, "carried out and set down");
+            int Candidates(Vector2 at, double t0)
+            {
+                var pose = b.Snapshot().pose; Vector2 camera = pose.Transform(0, .25f), d = at - camera;
+                float bearing = (pose.yawRad - Mathf.Atan2(-d.x, d.y)) * Mathf.Rad2Deg;
+                Assert.That(d.magnitude, Is.LessThan(c.person_rgb_max_range_m), "within the detector's range");
+                b.OnPersonSighting(t0, bearing, d.magnitude, .9f); b.OnPersonSighting(t0 + .5, bearing, d.magnitude, .9f);
+                return b.DrainEvents().Count(e => e.kind == "survivor_candidate");
+            }
+            var spot = body.Value + new Vector2(.3f, .2f);                          // 0.36 m from where they lie
+            Assert.That(Candidates(spot, end + 1), Is.Zero, "no candidate where this robot set someone down");
+            b.AgentConfirmSurvivor(spot, end + 2, "ev_inspect");
+            Assert.That(b.DrainEvents().Any(e => e.kind == "agent_order" && e.reason.StartsWith("Refused confirm_survivor")), Is.True,
+                "the confirmation is refused with its reason");
+            Assert.That(b.Snapshot().confirmedSurvivors, Is.Empty, "nobody new is confirmed");
+            var inside = new Vector2(1.5f, .5f);
+            Assert.That(Vector2.Distance(inside, body.Value), Is.GreaterThan(2f));
+            Assert.That(Candidates(inside, end + 3), Is.EqualTo(1), "control: a person elsewhere still makes a candidate");
+            b.AgentConfirmSurvivor(inside, end + 4, "ev_inspect");
+            Assert.That(b.Snapshot().confirmedSurvivors, Has.Length.EqualTo(1), "control: and is confirmed");
+        }
+
+        [Test]
         public void AfterArrivingWhereTheAgentAskedTheRobotWaitsForItsNextOrder()
         {
             // Run 21: robot A arrived facing a confirmed person within 9 deg and drove toward a frontier in the same tick;

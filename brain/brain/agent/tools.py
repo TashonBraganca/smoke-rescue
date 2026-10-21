@@ -22,6 +22,8 @@ CONFIRM_MAX_RANGE_M = float(_CONFIG["person_confirm_max_range_m"])
 # The brain's own survivor standoff: inside the arm's reach (actuators.json rescue.reach_m), so a closer look can end
 # in a lift (agent run 14 stopped 1.5 m short, at the edge of the 1.6 m reach).
 APPROACH_STANDOFF_M = float(_CONFIG["survivor_standoff_m"])
+# The same-person distance the brain uses everywhere (merging sightings, confirmations, carried-out reports).
+SURVIVOR_MERGE_M = float(_CONFIG["survivor_merge_m"])
 _ACTUATORS = json.loads((_Path(__file__).resolve().parents[3] / "config" / "actuators.json").read_text())
 _NOZZLE, _RESCUE = _ACTUATORS["nozzle"], _ACTUATORS["rescue"]
 _PERCEPTION = json.loads((_Path(__file__).resolve().parents[3] / "config" / "perception.json").read_text())
@@ -249,6 +251,27 @@ class ToolRegistry:
     def _near(self, ev: dict, args: dict, tol: float = 1.0) -> bool:
         return ev.get("x") is None or math.hypot(ev["x"] - float(args["x"]), ev["y"] - float(args["y"])) <= tol
 
+    def _set_down_near(self, x: float, y: float) -> tuple[float, float, float] | None:
+        """Where this robot set down a person it carried out, if (x, y) is within SURVIVOR_MERGE_M of it, else None. From the
+        robot's own decision log (person_carried_out, own frame), which the recorder writes out before every agent call.
+        Held-out run 2: robot B's agent confirmed the person B had set down in the yard as a new survivor."""
+        path = self.robot_dir / "decisions.jsonl"
+        if not path.exists():
+            return None
+        for line in path.read_text().splitlines():
+            if '"person_carried_out"' not in line:
+                continue
+            try:
+                event = json.loads(line)
+            except ValueError:
+                continue
+            n = event.get("numbers") or {}
+            if "person_x_m" not in n or float(event.get("t", 0)) > self.ctx.t + 1e-6:
+                continue
+            if math.hypot(float(n["person_x_m"]) - x, float(n["person_y_m"]) - y) <= SURVIVOR_MERGE_M:
+                return float(n["person_x_m"]), float(n["person_y_m"]), float(event["t"])
+        return None
+
     def _action(self, name: str, args: dict) -> dict:
         refusal = None
         if name == "confirm_survivor":
@@ -259,6 +282,12 @@ class ToolRegistry:
                 if looked is not None and looked > CONFIRM_MAX_RANGE_M:
                     refusal = {"refused": True, "reason": f"the inspection looked from {looked:.1f} m; confirm only within "
                                f"{CONFIRM_MAX_RANGE_M:.1f} m: approach_candidate citing it, then inspect again"}
+            if refusal is None:
+                spot = self._set_down_near(float(args["x"]), float(args["y"]))
+                if spot is not None:
+                    refusal = {"refused": True, "reason": f"this robot set down a person it carried out at ({spot[0]:.1f}, "
+                               f"{spot[1]:.1f}) at {spot[2]:.0f} s; that is the person already rescued, not a new survivor. "
+                               "Search the building for others."}
         elif name == "reject_candidate":
             refusal = self._need(args, ("inspect_candidate",), lambda ev: ev.get("verdict") == "not_person" and self._near(ev, args),
                                  "the cited inspection is not a not_person verdict at that position")

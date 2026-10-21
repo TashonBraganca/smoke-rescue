@@ -388,3 +388,21 @@ def test_an_approach_to_an_uncertain_candidate_is_finished_before_exploring(tmp_
                                                  [ToolCall("explore_frontier", {"frontier_id": 0, "reason": "next"})]],
                     verdict="not_person")
     assert [o["type"] for o in rejected["orders"]] == ["reject_candidate", "explore_frontier"], "resolved by a reject"
+
+
+def test_a_person_this_robot_carried_out_is_not_confirmed_again(tmp_path, monkeypatch):
+    # Held-out run 2: robot B's agent confirmed the person B had set down in the yard as a new survivor. A confirmation
+    # within survivor_merge_m of a set-down point in the robot's own decision log is refused with the reason. Controls:
+    # a set-down point 7 m away, and one logged after the step's time, do not block it.
+    fake_vision(monkeypatch, "person")
+    def confirm(set_down_x, set_down_y, at_t):
+        line = {"t": at_t, "robot": "robot_A", "kind": "person_carried_out", "reason": "Set the person down.",
+                "numbers": {"distance_to_exit_m": 2.2, "person_x_m": set_down_x, "person_y_m": set_down_y}}
+        (tmp_path / "decisions.jsonl").write_text(json.dumps({"t": 1.0, "kind": "replan", "numbers": {}}) + "\n" + json.dumps(line) + "\n")
+        out, _ = run(tmp_path, [[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": 3})],
+                                [ToolCall("confirm_survivor", {"x": 5, "y": 8, "evidence_id": "ev1"})]])
+        return out
+    near = confirm(5.2, 8.3, 5.0)
+    assert near["orders"] == [] and "already rescued" in near["refusals"][0]["reason"]
+    assert [o["type"] for o in confirm(5.0, 1.0, 5.0)["orders"]] == ["confirm_survivor"], "control: set down 7 m away"
+    assert [o["type"] for o in confirm(5.2, 8.3, 50.0)["orders"]] == ["confirm_survivor"], "control: logged after this step"
