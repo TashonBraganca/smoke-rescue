@@ -103,6 +103,7 @@ namespace SmokeRescue.Brain
         public int enclosure_rays = 36;
         public float enclosure_range_m = 10f, enclosure_min_closed_share = 0.6f, enclosure_max_open_share = 0.1f;
         public float frontier_peek_m = 1.2f, see_over_clearance_m = 0.5f;
+        public bool thermal_lidar_range_fallback = true;
         public bool frames_shared_at_start = true;
         public float keyframe_spacing_m = 1.0f, keyframe_turn_deg = 45f;
         public int keyframe_beams = 360, keyframe_max = 400, keyframes_per_message = 2;

@@ -11,7 +11,7 @@ from brain.agent import tools as T
 from brain.agent import vision as v
 
 ROOT = Path(__file__).resolve().parents[2]
-RECORDING = ROOT / 'data/recordings/unity_house_hidden_v1'
+RECORDING = ROOT / 'data/recordings/unity_house_hidden_run1'
 
 
 def room_frame(kind='room', ceiling=3., t=0., back_m=7., side_m=2.):

@@ -18,15 +18,42 @@ namespace SmokeRescue.Brain
             z = rgb.Depth[v * rgb.Width + u] * .001f;
             return z >= s.depth.min_m && z <= s.depth.max_m;
         }
-        public static List<PersonDetection> Detect(ThermalFrame thermal, RgbdFrame rgb, SensorConfig s, BrainConfig c, BrainPose pose)
+        /// <summary>
+        /// Range for a thermal pixel with no depth return, from the LiDAR beam at the same bearing. Dense smoke removes
+        /// the depth camera's returns (hidden-corner run 2: 1 % valid depth at times), and without range a warm blob
+        /// cannot be sized, so thermal confirmed nobody exactly when the colour camera was blind too. The planar LiDAR
+        /// (0.45 m up) hits a sitting or slumped person; over someone lying flat it reads the wall behind, which makes the
+        /// blob too large and it is rejected (no false person, but no detection either).
+        /// </summary>
+        internal static bool LidarDepth(int u, int v, SensorConfig s, LidarScan lidar, out float z)
+        {
+            z = 0;
+            var p1 = OccupancyGrid.BackProject(u, v, 1f, s);
+            var d = new Vector3(p1.x, p1.y - s.camera.mount.forward_offset_m, p1.z - s.camera.mount.height_m);
+            float dh = Mathf.Sqrt(d.x * d.x + d.y * d.y); if (dh < 1e-4f) return false;
+            float bearing = Mathf.Atan2(-d.x, d.y);   // left positive, as the LiDAR beams and the robot heading
+            int n = lidar.RangesM.Length;
+            int beam = ((Mathf.RoundToInt((bearing - lidar.AngleMinRad) / lidar.AngleIncrementRad) % n) + n) % n;
+            float r = lidar.RangesM[beam];
+            if (!(r >= lidar.MinM) || r > lidar.MaxM) return false;
+            // The camera sits ahead of the LiDAR by the difference of their forward offsets.
+            float horizontal = r - (s.camera.mount.forward_offset_m - lidar.MountForwardM) * Mathf.Cos(bearing);
+            if (!(horizontal > 0)) return false;
+            z = horizontal / dh;
+            return true;
+        }
+
+        public static List<PersonDetection> Detect(ThermalFrame thermal, RgbdFrame rgb, SensorConfig s, BrainConfig c, BrainPose pose, LidarScan lidar = null)
         {
             int count = thermal.Width * thermal.Height;
             var depth = new float[count]; var seen = new bool[count]; var queue = new Queue<int>();
             for (int y = 0; y < thermal.Height; y++) for (int x = 0; x < thermal.Width; x++)
             {
                 float temperature = thermal.Celsius(x, y);
-                if (temperature >= c.person_min_c && temperature <= c.person_max_c && Match(x, y, rgb, s, out _, out _, out float z))
-                    depth[y * thermal.Width + x] = z;
+                if (temperature < c.person_min_c || temperature > c.person_max_c) continue;
+                if (Match(x, y, rgb, s, out int u, out int v, out float z)) depth[y * thermal.Width + x] = z;
+                else if (lidar != null && u >= 0 && v >= 0 && u < rgb.Width && v < rgb.Height && LidarDepth(u, v, s, lidar, out float lz))
+                    depth[y * thermal.Width + x] = lz;
             }
             var result = new List<PersonDetection>(); var heights = new List<float>();
             for (int start = 0; start < count; start++)

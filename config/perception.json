@@ -1,4 +1,8 @@
 {
+  "frame_tolerance_s": 0.5,
+  "frame_tolerance_s_reason": "Preserve the camera loader's existing half-second tolerance for matching recorded frames and reject LiDAR scans farther than this from the thermal frame.",
+  "inspection_min_depth_fraction": 0.6,
+  "inspection_min_depth_fraction_reason": "Preserve inspect_candidate's existing 60 percent valid registered-depth gate. Below it, fill only missing warm-component pixels from a matching LiDAR scan before applying the same inspection checks.",
   "bearing_tolerance_deg": 5.0,
   "bearing_tolerance_deg_reason": "A 10 degree column band spans about 73 centre pixels at sensors.json camera.fx=415.692. Recorded A/B t=0 at bearing 0 contain doorway ceilings while bands at +/-30 and +/-35 contain facade walls. The same half-width limits frontier evidence reuse.",
   "wall_side_offset_deg": 10.0,
