@@ -34,6 +34,8 @@ BG, PANEL, EDGE = (14, 15, 18), (22, 24, 29), (40, 44, 52)
 TEXT, DIM, FAINT = (236, 238, 242), (150, 156, 168), (98, 104, 116)
 ROBOT = [(245, 165, 36), (46, 168, 230)]        # RGB: A amber, B cyan
 GOOD, WARN, CV = (74, 222, 128), (239, 68, 68), (110, 231, 183)
+WATER = (96, 140, 255)
+NOZZLE = json.loads((Path(__file__).resolve().parents[1] / "config" / "actuators.json").read_text())["nozzle"]
 SF = "/System/Library/Fonts/SFNS.ttf"
 
 
@@ -93,6 +95,9 @@ class LiveMaps:
 
     def __init__(self, rec, meta, robots, states):
         self.rec, self.robots, self.states = rec, robots, states
+        # Sprays as the recorder logged them: nozzle position and heading in house coordinates (heading 0 = north,
+        # positive toward east), drawn as the nozzle's cone while the water flows.
+        self.water = jsonl(rec / "water.jsonl")
         scenario = load_scenario(meta)
         self.frames = {r: recording_frame(states[r], scenario, r) for r in robots}
         x0, y0, x1, y1 = scenario['search_area']
@@ -226,6 +231,14 @@ class LiveMaps:
                 cv2.polylines(img, list(segments[::4]), False, ray_colour, 1, cv2.LINE_AA)
                 inside = (ends[:, 0] >= 0) & (ends[:, 0] < size[0]) & (ends[:, 1] >= 0) & (ends[:, 1] < size[1])
                 img[ends[inside, 1], ends[inside, 0]] = colour
+        for w in self.water:
+            if not (w["t"] <= t < w["t"] + w["seconds"]):
+                continue
+            h, half, reach = np.radians(w["heading_deg"]), np.radians(NOZZLE["half_angle_deg"]), NOZZLE["range_m"]
+            fan = [[w["x"], w["z"]]] + [[w["x"] + reach * np.sin(a), w["z"] + reach * np.cos(a)] for a in np.linspace(h - half, h + half, 7)]
+            layer = img.copy()
+            cv2.fillPoly(layer, [self.pixels(fan, size)], WATER, cv2.LINE_AA)
+            img = cv2.addWeighted(layer, .45, img, .55, 0)
         labels = []
         for k, r in enumerate(self.robots):
             colour = ROBOT[k]
@@ -296,6 +309,17 @@ class Radio:
                     self.items.append((t, -1, "good", f"{'AB'[side[r]]} now holds its partner's map: no double search", []))
                 elif k == "stuck":
                     self.items.append((t, side[r], "warn", "Legs not moving: backing off and replanning", []))
+        for e in jsonl(rec / "water.jsonl"):
+            who = side.get(e["robot"], 0)
+            self.items.append((e["t"], who, "agent", f"{'AB'[who]} sprays water at the fire for {e['seconds']:.0f} s "
+                               f"({e['flow_lps']:.1f} L/s) to open the way", [("water spray", WATER)]))
+        for e in jsonl(rec / "rescues.jsonl"):
+            who = side.get(e["robot"], 0)
+            if e["event"] == "gripped":
+                self.items.append((e["t"], -1, "good", f"{'AB'[who]} lifts a trapped person and tows them to the way out", []))
+            elif e["event"] == "released":
+                where = "out of the building" if e.get("outside_building") else "inside the building (not yet out)"
+                self.items.append((e["t"], -1, "good" if e.get("outside_building") else "warn", f"{'AB'[who]} sets the person down {where}", []))
         last = {}
         rp = rec / "brain_radio.txt"
         if rp.exists():
