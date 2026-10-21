@@ -1,0 +1,34 @@
+                                unity_house_heldout_run2
+duration_s                                         200.0
+survivors_total                                        5
+survivors_found                                        1
+first_found_s                                        4.0
+confirmations                                          2
+duplicate_confirmations                                0
+moved_confirmations                                    0
+false_confirmations                                    1
+confirmation_precision                               0.5
+area_searched_m2                                   195.5
+double_coverage_share                                0.0
+people_carried_out                                     1
+collision_s                   {'robot_A': 0.0, 'robot_B'
+unity_house_heldout_run2 heat {'robot_A': {'max_air_c': 381.1, 's_air_over_60c': 77.4, 'max_surface_within_1m_c': 1051.7}, 'robot_B': {'max_air_c': 20.0, 's_air_over_60c': 0.0, 'max_surface_within_1m_c': 91.9}} agent {'steps': 48, 'orders': 62, 'refusals': 6, 'errors': 0, 'orders_by_type': {'send_team_message': 20, 'go_to': 24, 'confirm_survivor': 3, 'set_torch': 2, 'explore_frontier': 4, 'extract_survivor': 2, 'broadcast': 1, 'reject_candidate': 2, 'avoid_area': 5}}
+robot_B frame check {"t": 0.0, "body_xy": [10.0, -1.2], "yaw_deg": -0.0, "spawn_xy": [10.0, -1.2], "spawn_yaw_deg": 0, "position_error_m": 0.0, "yaw_error_deg": 0.0, "passed": true, "scenario_file": "scenario_house_heldout.json", "recorded_frame": "local", "transformed_brain_position_error_m": 0.0, "transformed_brain_yaw_error_deg": 0.0}; optical +z projected to house x/z, subtract 0.25 m forward; yaw=atan2(-forward_x, forward_z)
+team searched floor share 0.370 of 21545 floor cells
+robot        pos median/p95/max/final (m)   yaw median/max (deg)   lidar true/brain median (m)   map P/R   stalls   collision s
+robot_A      0.027/0.035/0.073/0.032       0.123/0.703   0.007/0.024   0.950/0.694   4 (3 unexplained)   0.000
+robot_A frame_link: not linked
+robot_B      0.931/1.954/2.177/1.941       1.235/2.678   0.009/0.064   0.476/0.500   3 (0 unexplained)   0.000
+robot_B frame_link: not linked
+== people
+s1 living [6.37, 0.0, 2.47]
+s2 laundry [16.71, 0.0, 9.28]
+s3 foyer [10.11, 0.0, 1.33]
+s4 bathroom [6.01, 0.0, 9.4]
+s6 bedroom_2 [15.03, 0.0, 13.1]
+== rescues
+{"t":22.817,"robot":"robot_B","event":"gripped","person":"Survivor_s3_collapsed_at_desk"}
+{"t":41.883,"robot":"robot_B","event":"released","person":"Survivor_s3_collapsed_at_desk","x":10.22,"z":-2.55,"outside_building":true}
+== outside
+../data/recordings/unity_house_heldout_run2 robot_A outside 4 of 200 s: [(0, 4, -0.0, 7.0)]
+../data/recordings/unity_house_heldout_run2 robot_B outside 177 of 200 s: [(0, 5, 10.0, -0.0), (28, 200, 20.9, -0.9)]
