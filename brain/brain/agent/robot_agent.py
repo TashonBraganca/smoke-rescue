@@ -129,8 +129,26 @@ class RobotAgent:
         near = None not in here and None not in lpos and ((here[0] - lpos[0]) ** 2 + (here[1] - lpos[1]) ** 2) ** 0.5 < 1.5
         return float(req["t"]) - lt < REPEAT_WINDOW_S and (near or ev.get("kind") != "survivor_candidate")
 
+    _run: str | None = None
+    _last_t: dict = {}
+
+    @classmethod
+    def _new_run(cls, req: dict) -> None:
+        """Memory kept across steps (recent events, close looks per spot, people lifted) belongs to one recording. The
+        server outlives recordings: in run 24 robot A's approach to a person it had just confirmed was refused as "already
+        looked closer 2 times at this spot", counting looks from runs 21 to 23 at the same place."""
+        # Every recording is written to the same folder and renamed afterwards, so a new one is also recognised by its
+        # clock starting again: a robot's time going backwards.
+        run, robot, t = str(Path(req.get("robot_dir") or ".").resolve().parent), req.get("robot"), float(req["t"])
+        restarted = t < cls._last_t.get(robot, float("-inf")) - 1.0
+        cls._last_t[robot] = t
+        if run != cls._run or restarted:
+            cls._run = run; cls._last_t = {robot: t}
+            cls._recent.clear(); ToolRegistry._looks.clear(); ToolRegistry._lifted.clear()
+
     def step(self, req: dict) -> dict:
         start = time.perf_counter()
+        self._new_run(req)
         if self._repeat(req):
             out = {"step": f"{req['robot']}@{float(req['t']):.3f}", "orders": [], "refusals": [], "rounds": 0,
                    "summary": None, "evidence_ids": [], "latency_s": 0.0, "repeat_of_recent_event": True}

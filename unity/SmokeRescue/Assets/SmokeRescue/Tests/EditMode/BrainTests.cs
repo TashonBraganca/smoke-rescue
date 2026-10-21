@@ -769,6 +769,26 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void WalkingTowardAStillFireIsNotAClosingFront()
+        {
+            // Codex review: comparing fire distance on routes that change as the robot moves made a robot walking nearer a
+            // still fire read the shrinking distance as a closing front. The rate is now measured at fixed route points.
+            // The robot walks 4 m up a room past a fire that never moves (closest approach 2.5 m beyond the 2 m margin) and
+            // must not leave. The control is the moving-front test above, which must still leave early.
+            var c = Settings(); c.grid_size_m = 12; c.robot_radius_m = .25f;
+            var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -5, 5, -2, 6);
+            int closing = 0;
+            for (int i = 0; i < 180; i++)
+            {
+                double t = i / 15.0; Motion(b, t, t < 8 ? .5f : 0); b.OnRgbd(Image(t, true)); b.OnAirTemperature(t, 20);
+                var g = Map(b);
+                for (float dx = -.3f; dx <= .3f; dx += .1f) for (float dy = -.3f; dy <= .3f; dy += .1f) g.ObserveHeat(g.Cell(new Vector2(2.8f + dx, 4.5f + dy)), 500, t);
+                b.Step(t, 1f / 15); closing += b.DrainEvents().Count(e => e.kind == "escape_closing");
+            }
+            Assert.That(closing, Is.Zero);
+        }
+
+        [Test]
         public void AReturnCutByFireBecomesARetreatNotAStandstill()
         {
             // Agent run 12: robot A started home as fire closed on its route, the route was cut a moment later, and it
