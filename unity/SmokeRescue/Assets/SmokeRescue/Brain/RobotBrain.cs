@@ -641,13 +641,16 @@ namespace SmokeRescue.Brain
             // How fast is the fire closing on the route? Measured from this robot's own fire map over escape_rate_window_s.
             float routeM = 0; for (int i = 1; i < route.Count; i++) routeM += Vector2.Distance(route[i - 1], route[i]);
             float walkS = routeM / c.open_speed_mps, closeS = float.PositiveInfinity;
-            if (float.IsInfinity(closest)) wayOutFire.Clear(); else wayOutFire.Add((t, closest));
-            // Keep as the first entry the latest reading at least escape_rate_window_s old.
-            while (wayOutFire.Count > 2 && t - wayOutFire[1].t >= c.escape_rate_window_s) wayOutFire.RemoveAt(0);
-            var first = wayOutFire.Count > 0 ? wayOutFire[0] : (t: t, fire: closest);
-            if (t - first.t >= c.escape_rate_window_s)
+            // No fire on the map reads as 1e4 m (the distance transform's empty value), not infinity: no front to track.
+            if (closest > c.grid_size_m) wayOutFire.Clear(); else wayOutFire.Add((t, closest));
+            while (wayOutFire.Count > 3) wayOutFire.RemoveAt(0);
+            if (wayOutFire.Count == 3 && t - wayOutFire[0].t >= c.escape_rate_window_s)
             {
-                float rate = (first.fire - closest) / (float)(t - first.t);
+                // The smaller of the last two intervals' closing rates: an advancing front closes in both, while fire
+                // seen for the first time nearer the route (run 22, robot A at 10 s) moves the distance in one jump.
+                float r1 = (wayOutFire[0].fire - wayOutFire[1].fire) / (float)(wayOutFire[1].t - wayOutFire[0].t);
+                float r2 = (wayOutFire[1].fire - wayOutFire[2].fire) / (float)(wayOutFire[2].t - wayOutFire[1].t);
+                float rate = Mathf.Min(r1, r2);
                 if (rate > 0) closeS = Mathf.Max(0, closest - c.fire_clearance_m) / rate;
             }
             if (closest < c.escape_fire_margin_m || closeS < walkS * c.escape_time_factor)
