@@ -293,8 +293,6 @@
   "search_requires_ceiling_reason": "Robots get no building outline or map. They search only floor where their own camera has seen a ceiling overhead, which keeps them out of the yard and rejects warm shapes seen through windows (Tashon, 2026-10-20: no prior layout knowledge).",
   "ceiling_min_height_m": 2.5,
   "ceiling_min_height_m_reason": "Depth points this high and up count as ceiling: above door lintels (about 2.1 m) and every obstacle the brain maps (up to 1.9 m).",
-  "ceiling_max_height_m": 3.5,
-  "ceiling_max_height_m_reason": "Ceilings of ordinary rooms are below this; higher returns are ignored.",
   "ceiling_sight_lines": true,
   "ceiling_sight_lines_reason": "Floor on a known-free straight line from an indoor camera to ceiling it saw is under that ceiling, so it is indoors. The camera sees ceiling only about 4.7 m away, and the 0.6 m ceiling radius alone hid most of small rooms (agent run 14: 454 study cells, where a person lay). A camera in the yard marks nothing, and lines stop at walls and unmapped floor.",
   "ceiling_radius_m": 0.6,

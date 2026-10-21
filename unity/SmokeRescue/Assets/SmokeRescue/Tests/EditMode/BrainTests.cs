@@ -1706,18 +1706,41 @@ namespace SmokeRescue.Tests.EditMode
 
         /// <summary>A room seen from the test camera: ceiling at 2.8 m, floor, and a far wall wallM ahead; each pixel's depth
         /// is its ray's first hit (optical z, mm).</summary>
-        static RgbdFrame RoomImage(double t, float wallM)
+        static RgbdFrame RoomImage(double t, float wallM) => RoomImage(t, wallM, 2.8f);
+        static RgbdFrame RoomImage(double t, float wallM, float ceilingM)
         {
             var frame = Image(t, true, 0); float p = 10 * Mathf.Deg2Rad, sp = Mathf.Sin(p), cp = Mathf.Cos(p);
             for (int v = 0; v < 60; v++) for (int u = 0; u < 80; u++)
             {
                 float dn = (v - 29.5f) / 52f, up = -(sp + dn * cp), forward = cp - dn * sp, z = float.PositiveInfinity;
-                if (up > 1e-4f) z = Mathf.Min(z, (2.8f - 1.6f) / up);            // ceiling
+                if (up > 1e-4f) z = Mathf.Min(z, (ceilingM - 1.6f) / up);        // ceiling
                 if (up < -1e-4f) z = Mathf.Min(z, 1.6f / -up);                   // floor
                 if (forward > 1e-4f) z = Mathf.Min(z, (wallM - .25f) / forward); // far wall
                 frame.Depth[v * 80 + u] = (ushort)Mathf.Clamp(Mathf.RoundToInt(z * 1000), 0, 65535);
             }
             return frame;
+        }
+
+        [Test]
+        public void AHighCeilingCountsAsCeiling()
+        {
+            // Review: ceiling returns counted only between 2.5 and 3.5 m, so a higher lobby or hall never looked indoors.
+            // The cap is now the camera's own reach. Physically the camera (1.6 m up, top edge 20 deg above horizontal,
+            // depth to 8 m) sees ceilings up to about 4.3 m, so a 4.0 m ceiling (rejected by the old cap) now counts.
+            // Control: with the ceiling at 2.0 m (below the lower bound) nothing counts.
+            bool Seen(float ceilingM)
+            {
+                var c = Settings(); c.search_requires_ceiling = true; c.ceiling_min_hits = 1;
+                var a = new RobotBrain(Calibration(), c, "A", 0);
+                Motion(a, 0); a.OnAirTemperature(0, 20); a.OnLidar(RoomScan(0, Vector2.zero, 0, 9f, 720)); a.Step(0, 1f / 60);
+                Motion(a, .1); a.OnAirTemperature(.1, 20); a.OnRgbd(RoomImage(.1, 9f, ceilingM)); a.OnLidar(RoomScan(.1, Vector2.zero, 0, 9f, 720)); a.Step(.1, .1f);
+                var g = Map(a);
+                for (float y = 1; y <= 8.5f; y += .25f) if (g.UnderCeiling(new Vector2(0, y))) return true;
+                return false;
+            }
+            Assert.That(Seen(4f), Is.True, "a 4.0 m ceiling");
+            Assert.That(Seen(2.8f), Is.True, "a house ceiling still counts");
+            Assert.That(Seen(2.0f), Is.False, "control: below the lower bound");
         }
 
         [Test]

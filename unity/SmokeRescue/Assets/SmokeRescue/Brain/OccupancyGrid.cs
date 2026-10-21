@@ -238,7 +238,10 @@ namespace SmokeRescue.Brain
                 float z = frame.Depth[v * frame.Width + u] * .001f;
                 if (z < s.depth.min_m || z > s.depth.max_m) continue;
                 var p = BackProject(u, v, z, s);
-                if (p.z >= c.ceiling_min_height_m && p.z <= c.ceiling_max_height_m)
+                // No upper height band: a lobby, gym or warehouse ceiling is higher than a house's. The camera's own reach
+                // (mount height plus the depth sensor's maximum range) is the only upper limit; wall faces cannot fake a
+                // ceiling because cells near mapped walls are excluded (ceiling_wall_margin_m).
+                if (p.z >= c.ceiling_min_height_m && p.z <= s.camera.mount.height_m + s.depth.max_m)
                 {
                     // A ceiling seen overhead: this floor is indoors. Walls are excluded when the roof is used.
                     int roof = Cell(pose.Transform(p.x, p.y));
