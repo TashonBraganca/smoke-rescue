@@ -93,8 +93,13 @@ ACTIONS = [
         "way is not passable.", {"evidence_id": EVIDENCE}, ["evidence_id"]),
     _fn("clear_debris", "Use the arm to push light debris ahead out of the way. Needs a measure_opening result showing "
         "the way is not passable.", {"evidence_id": EVIDENCE}, ["evidence_id"]),
+    # Held-out seed 914 run 5: this description named only a fresh person verdict taken within the reach; a lying person
+    # that close is below the colour camera's view, so both agents re-inspected confirmed people for 70 s and never lifted
+    # anyone. It now states both ways the check below accepts.
     _fn("extract_survivor", "Strap the person directly ahead onto the rescue sled and take them out to the nearest known "
-        "way out, slowly. Needs an inspect_candidate result with verdict person, taken within the rescue reach.",
+        f"way out, slowly. Cite the evidence that confirmed a person in survivors_to_rescue while that person is within the "
+        f"rescue reach ({float(_RESCUE['reach_m']):.1f} m) and within {float(_RESCUE['grip_cone_deg']):.0f} deg of the "
+        "heading; or cite an inspect_candidate result with verdict person taken within that reach.",
         {"evidence_id": EVIDENCE}, ["evidence_id"]),
     _fn("spray_water", "Spray water from the robot's nozzle toward a fire to knock it down. Needs a scan_thermal result "
         "with a hot spot near that bearing and within the nozzle's range. Water is limited (context water_l); the "
@@ -284,6 +289,13 @@ class ToolRegistry:
                     "blocks the view, so the spot was not seen"}
         return None
 
+    def _confirmed_near(self, ev: dict) -> bool:
+        """This robot confirmed a person within SURVIVOR_MERGE_M of the inspected spot."""
+        if ev.get("x") is None:
+            return False
+        return any(math.hypot(c["x"] - float(ev["x"]), c["y"] - float(ev["y"])) <= SURVIVOR_MERGE_M
+                   for c in self._confirmed.get(self.ctx.robot, []))
+
     @staticmethod
     def _inspection_range(ev: dict) -> float | None:
         """Measured range of the inspected person, else the requested range."""
@@ -422,11 +434,12 @@ class ToolRegistry:
         elif name == "approach_candidate":
             refusal = self._need(args, ("inspect_candidate",), lambda ev: ev.get("x") is not None,
                                  "the cited inspection has no position")
-            if refusal is None and self.evidence[args["evidence_id"]].get("verdict") == "person":
+            if refusal is None and (self.evidence[args["evidence_id"]].get("verdict") == "person" or self._confirmed_near(self.evidence[args["evidence_id"]])):
                 # Walking to a person the cited inspection saw is the way to the arm's reach, not another uncertain look, so
                 # the close-look limit does not apply and nothing is left pending (held-out seed 914 run 4: robot B confirmed
                 # a woman 3 m away, confirm_survivor said "approach_candidate, then extract", and approach_candidate refused
-                # after two earlier looks at that spot; B never came within reach in the 145 s left).
+                # after two earlier looks at that spot; B never came within reach in the 145 s left). Run 5: robot A cited a
+                # newer uncertain look at the person it had confirmed and was refused the same way.
                 ev = self.evidence[args["evidence_id"]]
                 dx, dy = ev["x"] - self.ctx.x, ev["y"] - self.ctx.y
                 dist = max(1e-6, (dx * dx + dy * dy) ** 0.5)
