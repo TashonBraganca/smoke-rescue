@@ -263,3 +263,17 @@ def test_a_confirmation_says_how_to_get_the_person_out(tmp_path, monkeypatch):
         return [m for m in backend.seen[-1] if m.get("role") == "tool" and m.get("name") == "confirm_survivor"][-1]["content"]
     assert "approach_candidate" in told(2.7) and "extract_survivor" not in told(2.7)
     assert "extract_survivor" in told(1.2)
+
+
+def test_confirmed_people_not_yet_lifted_are_listed_with_bearing_and_approach():
+    # Run 19: robot A confirmed a person, a heat alarm interrupted the approach, and nothing brought it back.
+    T.ToolRegistry._lifted.clear()
+    pose = {"x": 0.0, "y": 0.0, "heading_deg": 90.0}          # facing +x
+    out = T.survivors_to_rescue("robot_A", pose, [[3.0, 0.0], [0.0, -5.0]])
+    assert [s["x"] for s in out] == [3.0, 0.0]                 # nearest first
+    assert out[0]["bearing_deg"] == pytest.approx(0.0) and out[0]["distance_m"] == pytest.approx(3.0)
+    assert out[0]["approach"]["x"] == pytest.approx(3.0 - T.APPROACH_STANDOFF_M)
+    assert out[1]["bearing_deg"] == pytest.approx(90.0)        # -y is to the right of a robot facing +x
+    T.ToolRegistry._lifted["robot_A"] = [(3.1, 0.1)]
+    assert [s["x"] for s in T.survivors_to_rescue("robot_A", pose, [[3.0, 0.0], [0.0, -5.0]])] == [0.0]
+    T.ToolRegistry._lifted.clear()

@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 
 from brain.agent.llm import Reply, append_jsonl, request_key
-from brain.agent.tools import ALL_TOOLS, AgentContext, ToolRegistry
+from brain.agent.tools import ALL_TOOLS, AgentContext, ToolRegistry, survivors_to_rescue
 
 MAX_ROUNDS = 4
 STEP_DEADLINE_S = 75.0     # past this the step ends with what it has; the reflex layer keeps the robot safe meanwhile
@@ -66,6 +66,11 @@ Playbook by event kind:
 - after confirm_survivor: get them out. If that inspection was within the arm's reach, extract_survivor citing it;
   otherwise approach_candidate citing it and finish. The robot tows the person to the nearest way out and may come
   back in. If fire spreads toward unexplored rooms, tell your partner and the commander.
+- survivors_to_rescue lists people already confirmed that you have not lifted, with bearing and distance from you.
+  Getting them out comes before searching on. Whenever you are not towing anyone and the event is not a heat event:
+  if the nearest is within 4 m, scan_thermal, inspect_candidate at its bearing_deg and distance_m, then
+  extract_survivor (within the arm's reach) or approach_candidate citing that inspection; if it is farther, go_to its
+  approach point and finish (agent_goal_reached follows on arrival).
 - agent_goal_reached: the robot is where you sent it; the event's reason says why. After a closer look or an approach
   to a person: scan_thermal, inspect_candidate on the warm region (bearing and range from the scan), then confirm,
   reject, or, for a person within the arm's reach, extract_survivor citing that inspection. After going to a
@@ -140,6 +145,7 @@ class RobotAgent:
         context = {k: req[k] for k in ("robot", "t", "pose", "torch", "mode", "state", "goal", "heat_budget", "air_c", "event",
                                        "inbox", "orders", "survivors", "frontiers", "lidar", "partners", "blocked_unsearched", "fire_blocks_frontier",
                                        "water_l", "carrying_person") if k in req}
+        context["survivors_to_rescue"] = survivors_to_rescue(req["robot"], pose, req.get("survivors") or [])
         messages = [{"role": "system", "content": SYSTEM},
                     {"role": "user", "content": "Decision needed. Context:\n" + json.dumps(context, default=str)}]
         step_id = f"{req['robot']}@{float(req['t']):.3f}"
