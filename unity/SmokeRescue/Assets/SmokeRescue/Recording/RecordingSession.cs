@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using SmokeRescue.Brain;
 using SmokeRescue.Oracle;
 using SmokeRescue.Radio;
@@ -164,6 +165,19 @@ namespace SmokeRescue.Recording
                                                "# t_send from to sequence bytes full status t_deliver\n");
             var pending = new Queue<Task>();
             var world = AgentSetup(plan, scenario, rigs);
+            // Water from a robot's nozzle reaches the fire simulation at the moment it starts to flow.
+            foreach (var rig in rigs)
+            {
+                var id = rig.robot.RobotId;
+                rig.actions.SprayStarted += (nozzleAt, headingRad, flow, seconds) =>
+                {
+                    atmosphere.FireSpread?.ScheduleWater(atmosphere.FireSpread.FireTime((float)SimNow), new Vector2(nozzleAt.x, nozzleAt.z),
+                        headingRad, world.nozzle.range_m, world.nozzle.half_angle_deg, flow, seconds);
+                    world.waterLog.Append(new JObject { ["t"] = Math.Round(SimNow, 3), ["robot"] = id, ["x"] = Math.Round(nozzleAt.x, 2),
+                        ["z"] = Math.Round(nozzleAt.z, 2), ["heading_deg"] = Math.Round(headingRad * Mathf.Rad2Deg, 1),
+                        ["flow_lps"] = flow, ["seconds"] = Math.Round(seconds, 2), ["fire"] = atmosphere.FireSpread != null }.ToString(Formatting.None)).Append('\n');
+                };
+            }
             int camEvery = Mathf.RoundToInt(ClockHz / sensorCfg.camera.rate_hz);
             int radioEvery = Mathf.RoundToInt(ClockHz * scenario.radio.broadcast_period_s);
             int brainEvery = Mathf.RoundToInt(ClockHz / 60f), stateEvery = Mathf.RoundToInt(ClockHz / 2f);
@@ -182,6 +196,7 @@ namespace SmokeRescue.Recording
             {
                 double t = k / (double)ClockHz;
                 if (t > duration + 1e-9) break;
+                SimNow = t;
                 // Every reader of the smoke field sees this tick's time. It was set only at camera frames, so the LiDAR
                 // asked the fire simulation for a time older than the thermocouple had, and each such request reloaded
                 // the fire and replayed it from t = 0 (perf.txt: LiDAR smoke lookups 15 to 32 s per 10 sim s, growing).
@@ -427,6 +442,7 @@ namespace SmokeRescue.Recording
             File.WriteAllText(Path.Combine(root, "oracle", $"{robotId}_orientation_probe.json"), JsonConvert.SerializeObject(rows, Formatting.Indented));
         }
 
+        static double SimNow;
         const int MapEveryS = 5;
         const int CheckpointS = 30;   // sim seconds between scoring checkpoints (Checkpoint in Record)
         /// <summary>The brain's own occupancy grid every 5 s, for the watcher and the evaluator (not read by any robot).

@@ -22,6 +22,8 @@ namespace SmokeRescue.Brain
         int[] enclosureGeneration; bool[] enclosureValue; int generation;
         readonly double[] localTime, ownHeatTime;
         readonly float[] ownHeat;
+        // Heat from partners and agent keep-out orders, kept apart so this robot's own cooler readings never erase it.
+        readonly float[] externalHeat; readonly double[] externalTime;
         readonly SortedDictionary<string, byte[]> peerLayers = new SortedDictionary<string, byte[]>(StringComparer.Ordinal);
         readonly byte[] peer;
         double localObservationTime;
@@ -40,8 +42,12 @@ namespace SmokeRescue.Brain
             odds = new float[Count]; lidarOdds = new float[Count]; heat = new float[Count]; rise = new float[Count]; heatTime = new double[Count];
             hits = new bool[Count]; frees = new bool[Count]; observed = new bool[Count];
             localTime = new double[Count]; peer = new byte[Count]; roofHits = new byte[Count];
-            ownHeat = new float[Count]; ownHeatTime = new double[Count];
-            for (int i = 0; i < Count; i++) { heat[i] = c.ambient_c; heatTime[i] = double.NegativeInfinity; ownHeat[i] = c.ambient_c; ownHeatTime[i] = double.NegativeInfinity; }
+            ownHeat = new float[Count]; ownHeatTime = new double[Count]; externalHeat = new float[Count]; externalTime = new double[Count];
+            for (int i = 0; i < Count; i++)
+            {
+                heat[i] = c.ambient_c; heatTime[i] = double.NegativeInfinity; ownHeat[i] = c.ambient_c; ownHeatTime[i] = double.NegativeInfinity;
+                externalHeat[i] = c.ambient_c; externalTime[i] = double.NegativeInfinity;
+            }
         }
         public int Cell(Vector2 p)
         {
@@ -140,11 +146,14 @@ namespace SmokeRescue.Brain
         }
         internal float LocalHeat(int i) => ownHeat[i];
         internal double LocalHeatTime(int i) => ownHeatTime[i];
+        float ExternalHeatAt(int i, double t) => double.IsNegativeInfinity(externalTime[i]) ? c.ambient_c :
+            Mathf.Max(c.ambient_c, externalHeat[i] - c.heat_decay_c_per_s * (float)(t - externalTime[i]));
         internal void ObservePeerHeat(int i, float temperatureC, double observedAt, double receivedAt)
         {
             if (i < 0 || i >= Count || observedAt < heatTime[i]) return;
             float decayed = Mathf.Max(c.ambient_c, temperatureC - c.heat_decay_c_per_s * (float)(receivedAt - observedAt));
             bool before = Dangerous(i);
+            externalHeat[i] = Mathf.Max(ExternalHeatAt(i, receivedAt), decayed); externalTime[i] = receivedAt;
             heat[i] = Mathf.Max(heat[i], decayed); heatTime[i] = observedAt;
             // A packet contains one historical sample, so it cannot establish a local temperature slope.
             rise[i] = 0; dirty |= before != Dangerous(i);
@@ -155,6 +164,17 @@ namespace SmokeRescue.Brain
             float ownDecayed = double.IsNegativeInfinity(ownHeatTime[i]) ? c.ambient_c :
                 Mathf.Max(c.ambient_c, ownHeat[i] - c.heat_decay_c_per_s * (float)(t - ownHeatTime[i]));
             if (t >= ownHeatTime[i] && temperatureC >= ownDecayed) { ownHeat[i] = temperatureC; ownHeatTime[i] = t; }
+            else if (t - ownHeatTime[i] >= c.heat_cool_after_s)
+            {
+                // Seen cooler, with no hot reading for heat_cool_after_s: the fire there is out (water, burnt out). Flames
+                // flicker, but a burning cell keeps refreshing its hot reading, so it stays hot. Without this a 500 C
+                // reading stayed "fire" for over 30 minutes (0.2 C/s decay) and sprayed water never opened a route.
+                bool before = Dangerous(i);
+                ownHeat[i] = temperatureC; ownHeatTime[i] = t;
+                heat[i] = Mathf.Max(temperatureC, ExternalHeatAt(i, t)); heatTime[i] = t; rise[i] = 0;
+                dirty |= before != Dangerous(i);
+                return;
+            }
             bool wasDangerous = Dangerous(i);
             if (t > heatTime[i] && t - heatTime[i] <= c.heat_rise_memory_s)
                 rise[i] = Mathf.Max(0, (temperatureC - heat[i]) / (float)(t - heatTime[i]));

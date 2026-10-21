@@ -922,6 +922,29 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void AFireSeenOutForTwoSecondsIsNoLongerFireButFlickerAndPartnerHeatStay()
+        {
+            // A 500 C reading stayed "fire" for over 30 minutes (0.2 C/s decay), so water could never open a route in the
+            // robot's own map. Seen cool with no hot reading for heat_cool_after_s, a cell takes the cool value. Controls:
+            // a flickering flame (hot every 0.3 s) stays fire; heat from a partner or a keep-out order stays.
+            var c = Settings(); c.grid_size_m = 6;
+            var g = OpenGrid(c); int i = g.Cell(new Vector2(1, 1));
+            g.ObserveHeat(i, 500, 0);
+            for (double t = .1; t <= 1.5; t += .1) g.ObserveHeat(i, 30, t);
+            Assert.That(g.Dangerous(i), Is.True, "1.5 s after the last hot reading: still fire");
+            for (double t = 1.6; t <= 2.5; t += .1) g.ObserveHeat(i, 30, t);
+            Assert.That(g.Dangerous(i), Is.False, "2 s and more of cool readings: out");
+            var f = OpenGrid(c); int j = f.Cell(new Vector2(1, 1));
+            for (int k = 0; k < 20; k++) f.ObserveHeat(j, k % 3 == 0 ? 500 : 30, k * .1);
+            Assert.That(f.Dangerous(j), Is.True, "flicker: hot every 0.3 s");
+            var p = OpenGrid(c); int q = p.Cell(new Vector2(1, 1));
+            typeof(OccupancyGrid).GetMethod("ObservePeerHeat", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                .Invoke(p, new object[] { q, 500f, 0.0, 0.0 });
+            for (double t = .1; t <= 3; t += .1) p.ObserveHeat(q, 30, t);
+            Assert.That(p.Dangerous(q), Is.True, "a partner's or an agent's fire is not erased by this robot's cool readings");
+        }
+
+        [Test]
         public void AReturnEndsWithinHalfAMetreOfADoorwayStart()
         {
             // House reflex check: robot B stopped 0.3 m from its doorway start, where the return path ended, and replanned

@@ -125,6 +125,7 @@ namespace SmokeRescue.Brain
         public float goal_tolerance_m = 0.18f, return_arrive_m = 0.5f;
         public float escape_check_s = 2f, escape_fire_margin_m = 2f, escape_ignore_m = 2f, escape_recheck_s = 10f;
         public float heat_emergency_fraction = 0.15f, emergency_fire_clearance_m = 0.5f;
+        public float heat_cool_after_s = 2f;
         public float open_speed_mps = 0.6f;
         public float near_speed_mps = 0.3f;
         public float near_obstacle_m = 1.0f;

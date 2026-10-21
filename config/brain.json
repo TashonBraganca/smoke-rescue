@@ -157,6 +157,8 @@
   "escape_check_s_reason": "How often a searching robot plans its route home to check that the way out is still open.",
   "escape_fire_margin_m": 2.0,
   "escape_fire_margin_m_reason": "Fire this close to the route home means it is about to close: planned routes already keep fire_clearance_m (1.2 m) away, and the house fire spreads at about 1 m2 per second (agent run 11), so the robot returns while it still can.",
+  "heat_cool_after_s": 2.0,
+  "heat_cool_after_s_reason": "A cell this robot's own thermal camera sees cooler, with no hot reading for this long, takes the cooler value (fire put out or burnt out). Flames flicker within a fraction of a second and keep refreshing their hot reading, so a burning cell stays hot.",
   "heat_emergency_fraction": 0.15,
   "heat_emergency_fraction_reason": "Below this heat budget, with no exit reachable at the normal fire clearance, the robot takes an emergency exit (2x2 building run: robot A sat beside its entry with the budget at 0).",
   "emergency_fire_clearance_m": 0.5,

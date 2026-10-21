@@ -197,3 +197,25 @@ def test_blocked_unsearched_floor_reaches_the_model(tmp_path, monkeypatch):
     req = {**request(tmp_path), "event": {"kind": "no_frontier"}, "frontiers": [], "blocked_unsearched": blocked}
     RobotAgent(Capture([]), tmp_path / "t.jsonl").step(req)
     assert seen and '"blocked_unsearched": {"bearing_deg": 4.0' in seen[0]
+
+
+def test_spray_water_needs_a_measured_hot_spot_on_that_bearing_and_water(tmp_path, monkeypatch):
+    # The nozzle may only be aimed at a fire the robot's own thermal scan measured, within aim tolerance and range,
+    # and only while there is water. A long request is clipped to max_spray_s.
+    fake_vision(monkeypatch)
+    monkeypatch.setattr(T.vision, "scan_thermal", lambda f: {"id": "scan1", "tool": "scan_thermal",
+                        "hotspots": [{"bearing_deg": 5.0, "range_m": 3.2}], "people": []})
+
+    def spray(bearing, water, seconds=4):
+        agent = RobotAgent(Scripted([[ToolCall("scan_thermal", {})],
+                                     [ToolCall("spray_water", {"bearing_deg": bearing, "seconds": seconds, "evidence_id": "scan1"})]]),
+                           tmp_path / f"t{bearing}{water}.jsonl")
+        spray.t += 30   # a fresh event each call; the agent skips a repeat of a recent one
+        return agent.step({**request(tmp_path), "t": spray.t, "event": {"kind": "avoid_fire"}, "water_l": water})
+    spray.t = 0
+
+    ok = spray(0, 12)
+    assert [o["type"] for o in ok["orders"]] == ["spray_water"] and ok["orders"][0]["seconds"] == 4
+    assert spray(40, 12)["refusals"][0]["tool"] == "spray_water", "40 deg off the measured fire"
+    assert "empty" in spray(0, 0)["refusals"][0]["reason"]
+    assert spray(0, 12, seconds=60)["orders"][0]["seconds"] == 6.0, "clipped to max_spray_s"

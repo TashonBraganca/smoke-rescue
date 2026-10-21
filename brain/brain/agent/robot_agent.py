@@ -61,7 +61,8 @@ Playbook by event kind:
   yourself). If the colour image is dark, set the torch first so the second look can use both sensors. Tell your
   partner.
 - avoid_fire or retreat: track_fire_spread, then avoid_area around the hot area citing that evidence. Never go_to
-  toward heat. If fire spreads toward unexplored rooms, tell your partner and the commander.
+  toward heat. If fire blocks the way to unsearched floor or to a person and water_l is above 0, scan_thermal and
+  spray_water at the hot spot's bearing citing that scan (a few seconds at a time), then look again. If fire spreads toward unexplored rooms, tell your partner and the commander.
 - sensor_switch (colour camera poor): assess_visibility, then set_torch citing it. Dark image (low brightness,
   low contrast, little haze) or torch off: wide. Thick smoke with glare: low. Long corridor: narrow. Clear: wide.
   After changing the torch, call assess_visibility again; if the colour image is now usable, scan_thermal to look
@@ -119,11 +120,12 @@ class RobotAgent:
         ctx = AgentContext(robot=req["robot"], t=float(req["t"]), x=float(pose["x"]), y=float(pose["y"]),
                            heading_deg=float(pose["heading_deg"]),
                            frame_times=[float(s) for s in req.get("frame_times", [])],
+                           water_l=float(req.get("water_l") or 0.0),
                            event_kind=(req.get("event") or {}).get("kind", ""), torch=req.get("torch", "wide"))
         ctx.frontiers = list(req.get("frontiers") or [])
         tools = ToolRegistry(Path(req["robot_dir"]), ctx, Path(req.get("debug_dir") or Path(self.trace_path).parent / "agent_debug"))
         context = {k: req[k] for k in ("robot", "t", "pose", "torch", "mode", "state", "goal", "heat_budget", "air_c", "event",
-                                       "inbox", "orders", "survivors", "frontiers", "lidar", "partners", "blocked_unsearched") if k in req}
+                                       "inbox", "orders", "survivors", "frontiers", "lidar", "partners", "blocked_unsearched", "water_l") if k in req}
         messages = [{"role": "system", "content": SYSTEM},
                     {"role": "user", "content": "Decision needed. Context:\n" + json.dumps(context, default=str)}]
         step_id = f"{req['robot']}@{float(req['t']):.3f}"
