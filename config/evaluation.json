@@ -1,0 +1,12 @@
+{
+  "survivor_match_m": 1.05,
+  "survivor_match_m_reason": "Half a roughly 1.7 m adult lying body is 0.85 m; add 0.20 m for localisation. In data/runs/unity_house_agents_run19/nav_eval/robot_A/report.json, localization.position_m.max is 0.1976420443 m and p95 is 0.1939051631 m. Robot B's maximum is 0.0556493854 m. This fixed 1.05 m radius uses that measured pose allowance, not a guarantee for other runs; older runs with greater drift can miss matches. Releases replace the initial position at their recorded time.",
+  "search_radius_m": 2.5,
+  "search_radius_m_reason": "Preserve the existing coverage proxy, counting cells within 2.5 m of the true robot path.",
+  "coverage_cell_m": 0.5,
+  "coverage_cell_m_reason": "Preserve the existing half-metre coverage grid used for comparisons.",
+  "coverage_pose_stride": 5,
+  "coverage_pose_stride_reason": "Preserve the existing coverage sampling of every fifth recorded true pose.",
+  "heat_exposure_c": 60,
+  "heat_exposure_c_reason": "Preserve the existing report of time spent above 60 degrees Celsius. This reporting threshold does not establish safe operating conditions."
+}
