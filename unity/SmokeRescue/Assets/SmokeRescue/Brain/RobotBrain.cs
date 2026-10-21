@@ -342,7 +342,12 @@ namespace SmokeRescue.Brain
                 var match = matcher.Match(scan, prior);
                 if (match.applied)
                 {
-                    motion.ApplyCorrection(ScanMatcher.Delta(prior, match.pose));
+                    // Heading follows the gyro and takes only scan_yaw_gain of each match's turn: the gyro alone stays within
+                    // 0.55 deg over 200 s and 3669 deg of turning (run 13, robot A, against truth), while full scan-matched turns
+                    // pulled the heading toward a map that had itself turned, up to 2.4 deg. Position takes the full match.
+                    var corrected = new BrainPose { position = match.pose.position,
+                        yawRad = prior.yawRad + c.scan_yaw_gain * BrainMath.Angle(prior.yawRad, match.pose.yawRad) * Mathf.Deg2Rad };
+                    motion.ApplyCorrection(ScanMatcher.Delta(prior, corrected));
                     matched++; fitSum += match.fit; correctionSum += new Vector3(match.dx, match.dy, match.dyawRad * Mathf.Rad2Deg);
                 }
                 else unmatched++;
