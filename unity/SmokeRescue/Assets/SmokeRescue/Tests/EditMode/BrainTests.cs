@@ -943,6 +943,28 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void ARobotCutOffIsToldWhereTheFireBlocksItsWayOut()
+        {
+            // Held-out seed 914 run 5, robot A: fire cut the hallway to its only known way out, its emergency route shut even at
+            // the last-resort clearance, and it held at the coolest floor while its air rose from 40 to 185 C. Its agent was
+            // told where fire blocks routes to unsearched floor, never where it blocks the way out, though the robot carries
+            // a hose. Now the brain plans the way out ignoring the fire margin and reports where that route first enters it.
+            // Control: with the way out open there is nothing to report.
+            var c = Settings(); c.grid_size_m = 12; c.robot_radius_m = .25f;
+            var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -5, 5, -2, 6);
+            for (int i = 0; i <= 45; i++) { double t = i / 15.0; Motion(b, t, 1f); b.OnRgbd(Image(t, true)); b.OnAirTemperature(t, 20); b.Step(t, 1f / 15); b.DrainEvents(); }
+            var g = Map(b); var prepare = typeof(OccupancyGrid).GetMethod("PrepareNavigation", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            prepare.Invoke(g, null);
+            Assert.That(b.FireBlockedExit(3.0).HasValue, Is.False, "control: the way out is open");
+            for (float x = -5; x <= 5; x += .05f) for (float y = 1.4f; y <= 1.6f; y += .05f) g.ObserveHeat(g.Cell(new Vector2(x, y)), 500, 3.0);
+            prepare.Invoke(g, null);
+            var block = b.FireBlockedExit(3.0);
+            Assert.That(block.HasValue, Is.True, "the fire line cuts the only way out");
+            Assert.That(Mathf.Abs(block.Value.bearingDegRight), Is.GreaterThan(135f), "behind the robot, toward its entry");
+            Assert.That(block.Value.distanceM, Is.LessThan(3f));
+        }
+
+        [Test]
         public void OnAnEmergencyExitOnlyMeasuredFireShutsTheDoorNotAFastRisingReading()
         {
             // Held-out seed 914, robot B: in the hot gas filling the foyer its thermal camera read the floor of the only door

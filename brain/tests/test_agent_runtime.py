@@ -463,3 +463,19 @@ def test_an_event_at_a_new_place_is_not_dropped_as_a_repeat(tmp_path):
     assert agent._repeat(ev(10, "agent_goal_reached", 4.5)), "the same place within the window repeats"
     assert not agent._repeat(ev(0, "sensor_switch"))
     assert agent._repeat(ev(5, "sensor_switch")), "events without a position repeat by time"
+
+
+def test_where_fire_blocks_the_way_out_reaches_the_model(tmp_path):
+    # Held-out seed 914 run 5: robot A held at its coolest floor while its air rose to 185 C; its agent was never told where
+    # fire cut its way out. The context whitelist drops unknown fields, so the new one must be passed through.
+    seen = {}
+
+    class Model:
+        model = "m"
+
+        def chat(self, messages, tools):
+            seen["ctx"] = json.dumps(messages)
+            return Reply("", [ToolCall("finish", {"summary": "x"})], 0.0, "m")
+
+    RobotAgent(Model(), tmp_path / "t.jsonl").step(request(tmp_path) | {"fire_blocks_exit": {"bearing_deg": 170.5, "distance_m": 2.1, "exit_path_m": 9.5}})
+    assert "fire_blocks_exit" in seen["ctx"] and "170.5" in seen["ctx"]

@@ -68,7 +68,9 @@ Facts about your robot and the context:
   evidence that confirmed them. Getting a person out means extract_survivor within the rescue reach.
   A confirmation stays until that person is lifted or withdraw_survivor removes it; the robot's own reflexes never drop it.
 - no_frontier: your map has no reachable unsearched floor; the robot returns after a short scan unless you act.
-  fire_blocks_frontier, when present, is where the fire margin cuts the route to unsearched floor. blocked_unsearched
+  fire_blocks_frontier, when present, is where the fire margin cuts the route to unsearched floor. fire_blocks_exit,
+  when present: no route to a known way out is open, and this is where the fire margin first cuts the shortest one
+  (bearing, distance, exit_path_m). blocked_unsearched
   is unsearched floor your planner cannot reach, with its bearing, distance and the nearest reachable approach point.
   water_l is the water left for spray_water.
 - go_to, approach_candidate and turn_to_face end with an agent_goal_reached event when done.
@@ -147,7 +149,7 @@ class RobotAgent:
         ctx.survivors = [list(p) for p in req.get("survivors") or []]
         tools = ToolRegistry(Path(req["robot_dir"]), ctx, Path(req.get("debug_dir") or Path(self.trace_path).parent / "agent_debug"))
         context = {k: req[k] for k in ("robot", "t", "pose", "torch", "mode", "state", "goal", "heat_budget", "air_c", "event",
-                                       "inbox", "orders", "survivors", "frontiers", "lidar", "partners", "blocked_unsearched", "fire_blocks_frontier", "mission_time_left_s",
+                                       "inbox", "orders", "survivors", "frontiers", "lidar", "partners", "blocked_unsearched", "fire_blocks_frontier", "fire_blocks_exit", "mission_time_left_s",
                                        "water_l", "carrying_person") if k in req}
         context["survivors_to_rescue"] = survivors_to_rescue(req["robot"], pose, req.get("survivors") or [])
         pending = tools.pending()

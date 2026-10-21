@@ -160,6 +160,29 @@ namespace SmokeRescue.Brain
         /// run 16: a burning wood pile closed the 2 m hallway, every frontier vanished, and the agent, told only of floor
         /// it could not reach, measured for a door instead of using the hose it carried.
         /// </summary>
+        /// <summary>
+        /// For the agent, when no route to a known way out is open at the current fire clearance: the way out planned as
+        /// if there were no fire margin (never driven), and where that route first enters the margin, which is where water
+        /// would open it. Null when a way out is open or none exists even past the fire. Held-out seed 914 run 5: robot A
+        /// held at the coolest floor while its air rose from 40 to 185 C; its agent heard only where fire blocks frontiers.
+        /// </summary>
+        public BrainFireBlock? FireBlockedExit(double t)
+        {
+            if (PlanOut().Count > 0) return null;
+            float saved = grid.FireClearance; List<Vector2> route;
+            try { grid.FireClearance = -1; route = PlanOut(); }
+            finally { grid.FireClearance = saved; }
+            float margin = c.fire_clearance_m + grid.CellM * .707107f, routeM = 0;
+            for (int i = 1; i < route.Count; i++) routeM += Vector2.Distance(route[i - 1], route[i]);
+            foreach (var p in route)
+            {
+                if (grid.FireDistance(grid.Cell(p)) > margin) continue;
+                Vector2 d = p - motion.Pose.position;
+                return new BrainFireBlock { blockAt = p, frontier = route[route.Count - 1], bearingDegRight = -BrainMath.Angle(motion.Pose.yawRad, Mathf.Atan2(-d.x, d.y)),
+                    distanceM = d.magnitude, frontierPathM = routeM, unsearchedM2 = 0 };
+            }
+            return null;
+        }
         public BrainFireBlock? FireBlockedFrontier(double t)
         {
             float saved = grid.FireClearance;
