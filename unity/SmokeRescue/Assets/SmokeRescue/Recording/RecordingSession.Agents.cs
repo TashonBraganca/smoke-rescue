@@ -109,6 +109,7 @@ namespace SmokeRescue.Recording
         static void AgentWorldStep(AgentWorld w, List<RobotRig> rigs, float dt)
         {
             foreach (var rig in rigs) rig.actions?.Tow();   // a person on the sled follows the robot every tick
+            foreach (var rig in rigs) rig.actions?.StepVisuals(dt);   // water in flight lands after the nozzle closes
             w.doors?.Step(dt);
             w.obstacles?.Step(dt);
             foreach (var rig in rigs)

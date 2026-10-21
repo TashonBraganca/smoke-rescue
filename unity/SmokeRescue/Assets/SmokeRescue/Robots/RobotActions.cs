@@ -54,7 +54,7 @@ namespace SmokeRescue.Robots
         readonly NozzleConfig nozzle;
         float sprayHeadingDeg, spraySeconds;
         readonly RescueConfig rescue;
-        LineRenderer jet;   // the visible stream while water flows (cameras and the showcase view see it)
+        WaterSprayVisual water;   // the visible spray while water flows (cameras and the showcase view see it)
         Transform carried; Collider[] carriedColliders;
         /// <summary>Where the robot walked while towing, starting where the person lay: the sled follows this trail.</summary>
         readonly List<Vector3> trail = new List<Vector3>();
@@ -283,24 +283,18 @@ namespace SmokeRescue.Robots
 
         void ShowJet(bool on)
         {
-            if (jet == null)
-            {
-                var go = new GameObject("WaterJet"); go.transform.SetParent(robot.transform, false);
-                jet = go.AddComponent<LineRenderer>(); jet.positionCount = 8; jet.useWorldSpace = true;
-                jet.widthCurve = AnimationCurve.Linear(0f, .06f, 1f, .5f);
-                var shader = Shader.Find("HDRP/Unlit") ?? Shader.Find("Unlit/Color");
-                if (shader != null) { jet.material = new Material(shader); jet.material.color = new Color(.75f, .88f, 1f); }
-            }
-            jet.enabled = on;
-            if (!on) return;
-            // A shallow arc: the stream leaves the gripper level and drops about half a metre over its range.
-            var from = robot.Arm.GripperPosition; float yaw = sprayHeadingDeg * Mathf.Deg2Rad;
-            var dir = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw));
-            for (int k = 0; k < jet.positionCount; k++)
-            {
-                float s = k / (float)(jet.positionCount - 1);
-                jet.SetPosition(k, from + dir * (nozzle.range_m * s) + Vector3.down * (.5f * s * s));
-            }
+            if (!on) { water?.End(); return; }
+            if (water == null) water = new WaterSprayVisual(robot.transform, nozzle.half_angle_deg, nozzle.range_m, robot.name.GetHashCode() & 0x7fff);
+            water.Begin(robot.Arm.GripperPosition, sprayHeadingDeg * Mathf.Deg2Rad);
+        }
+
+        /// <summary>Advance the water visual on simulation time. Called every tick, not only while an action runs, so drops
+        /// still in flight when the nozzle closes land instead of hanging in the air.</summary>
+        public void StepVisuals(float dt)
+        {
+            if (water == null || !water.Visible) return;
+            if (Action == "spray_water" && IsRunning) water.Aim(robot.Arm.GripperPosition, sprayHeadingDeg * Mathf.Deg2Rad);
+            water.Step(dt);
         }
 
         void Enter(Phase next) { phase = next; phaseTime = 0; phaseStart = robot.Arm.GripperPosition; }

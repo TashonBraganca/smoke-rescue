@@ -103,6 +103,9 @@ namespace SmokeRescue.Brain
         public int enclosure_rays = 36;
         public float enclosure_range_m = 10f, enclosure_min_closed_share = 0.6f, enclosure_max_open_share = 0.1f;
         public float lidar_open_span_deg = 30f;
+        public float fire_cut_blacklist_s = 20f;
+        public float candidate_wall_extent_m = 2f, candidate_wall_disc_m = .3f, candidate_wall_window_m = 3f;
+        public float last_resort_fire_clearance_m = .25f;
         public float air_warm_c = 30f, air_rise_c_per_min = 8.3f, air_rise_window_s = 10f, air_rise_min_delta_c = 5f, air_rise_baseline_s = 60f;
         public float frontier_peek_m = 1.2f, see_over_clearance_m = 0.5f;
         public bool thermal_lidar_range_fallback = true;
@@ -193,7 +196,7 @@ namespace SmokeRescue.Brain
                 stuck_repeat_radius_m < cell_m || stuck_repeat_count < 2 || stuck_blacklist_s <= stuck_window_s)
                 throw new ArgumentException("Invalid stuck detection or recovery configuration.");
             if (scan_yaw_gain < 0 || scan_yaw_gain > 1 || collision_margin_m < 0 || lead_max_m < cell_m || agent_avoid_min_radius_m < cell_m || agent_avoid_max_radius_m < agent_avoid_min_radius_m || frontier_cluster_max_m < cell_m * 2 || ceiling_min_height_m <= obstacle_max_height_m || ceiling_radius_m < 0 || ceiling_min_hits < 1 || ceiling_wall_margin_m < 0 ||
-                enclosure_rays < 8 || enclosure_range_m <= cell_m || enclosure_min_closed_share <= 0 || enclosure_min_closed_share > 1 || enclosure_max_open_share < 0 || enclosure_max_open_share >= 1 || lidar_open_span_deg <= 0 || air_warm_c <= ambient_c || air_rise_c_per_min <= 0 || air_rise_window_s <= 0 || air_rise_min_delta_c < 0 || air_rise_baseline_s < air_rise_window_s || frontier_peek_m < 0 || see_over_clearance_m < 0 || carried_person_radius_m <= 0 || search_max_range_m <= 0 ||
+                enclosure_rays < 8 || enclosure_range_m <= cell_m || enclosure_min_closed_share <= 0 || enclosure_min_closed_share > 1 || enclosure_max_open_share < 0 || enclosure_max_open_share >= 1 || lidar_open_span_deg <= 0 || fire_cut_blacklist_s < 0 || candidate_wall_extent_m <= 0 || candidate_wall_disc_m <= 0 || candidate_wall_window_m < candidate_wall_disc_m || last_resort_fire_clearance_m <= 0 || last_resort_fire_clearance_m > emergency_fire_clearance_m || air_warm_c <= ambient_c || air_rise_c_per_min <= 0 || air_rise_window_s <= 0 || air_rise_min_delta_c < 0 || air_rise_baseline_s < air_rise_window_s || frontier_peek_m < 0 || see_over_clearance_m < 0 || carried_person_radius_m <= 0 || search_max_range_m <= 0 ||
                 keyframe_spacing_m <= 0 || keyframe_turn_deg <= 0 || keyframe_beams < 36 || keyframe_max < 2 || keyframes_per_message < 1 || keyframes_per_message > 16 ||
                 link_shortlist < 1 || link_max_candidates < 2 || link_turn_candidates < 1 || link_verifications_per_step < 1 || link_max_descriptor_distance <= 0 || link_window_m < 0 || link_step_m <= 0 ||
                 link_window_deg < 0 || link_step_deg <= 0 || link_min_fit <= 0 || link_min_fit > 1 || link_agree_m <= 0 || link_agree_deg <= 0 || link_min_separation_m < 0 ||

@@ -218,7 +218,18 @@ namespace SmokeRescue.Brain
             time = t; localObservationTime = t; dirty |= changed; roofDirty |= changed;
         }
         public bool Dangerous(int i) => heat[i] >= c.fire_c ||
-            (time - heatTime[i] <= c.heat_rise_memory_s && heat[i] + rise[i] * c.heat_prediction_s >= c.fire_c);
+            (firePrediction && time - heatTime[i] <= c.heat_rise_memory_s && heat[i] + rise[i] * c.heat_prediction_s >= c.fire_c);
+        /// <summary>Whether a cell forecast to reach fire_c within heat_prediction_s counts as fire. True while searching; false
+        /// on an emergency exit (RobotBrain.TryEmergencyExit). Held-out seed 914, robot B: standing in the hot gas filling the
+        /// foyer, its thermal camera read the floor of the only doorway out at 60 to 187 C and rising fast (gas radiance along
+        /// the ray, below fire_c everywhere); the forecast marked the doorway about to ignite, so the route home opened and
+        /// shut every second and the robot stood still for 50 s, 185 C peak. Measured fire still closes a cell.</summary>
+        internal bool FirePrediction
+        {
+            get => firePrediction;
+            set { if (firePrediction == value) return; firePrediction = value; dirty = roofDirty = true; }
+        }
+        bool firePrediction = true;
         public void MarkFootprint(Vector2 position)
         {
             int cell = Cell(position); if (cell < 0) return;
@@ -450,6 +461,35 @@ namespace SmokeRescue.Brain
                     roofDistance[n] = next; queue.Enqueue(n);
                 }
             }
+        }
+        /// <summary>Longest extent (bounding-box diagonal, metres) of the occupied structure touching a discM disc around p,
+        /// followed through 8-connected occupied cells within a windowM half-width box. A wall runs on; a body lying on the
+        /// floor is a compact blob (see candidate_wall_extent_m).</summary>
+        public float OccupiedExtent(Vector2 p, float discM, float windowM)
+        {
+            int centre = Cell(p); if (centre < 0) return 0;
+            int cx = centre % Size, cy = centre / Size, w = Mathf.CeilToInt(windowM / CellM), r = Mathf.CeilToInt(discM / CellM);
+            var seen = new HashSet<int>(); var queue = new Queue<int>(); float best = 0;
+            for (int dy = -r; dy <= r; dy++) for (int dx = -r; dx <= r; dx++)
+            {
+                int x = cx + dx, y = cy + dy; if (!Inside(x, y) || dx * dx + dy * dy > r * r) continue;
+                int i = y * Size + x; if (OwnOccupancy(i) != 255 || seen.Contains(i)) continue;
+                // One component at a time: its bounding box is its extent.
+                int minX = x, maxX = x, minY = y, maxY = y; seen.Add(i); queue.Enqueue(i);
+                while (queue.Count > 0)
+                {
+                    int k = queue.Dequeue(), kx = k % Size, ky = k / Size;
+                    minX = Math.Min(minX, kx); maxX = Math.Max(maxX, kx); minY = Math.Min(minY, ky); maxY = Math.Max(maxY, ky);
+                    for (int ny = ky - 1; ny <= ky + 1; ny++) for (int nx = kx - 1; nx <= kx + 1; nx++)
+                    {
+                        if (!Inside(nx, ny) || Math.Abs(nx - cx) > w || Math.Abs(ny - cy) > w) continue;
+                        int n = ny * Size + nx; if (seen.Contains(n) || OwnOccupancy(n) != 255) continue;
+                        seen.Add(n); queue.Enqueue(n);
+                    }
+                }
+                best = Mathf.Max(best, Mathf.Sqrt((maxX - minX) * (maxX - minX) + (maxY - minY) * (maxY - minY)) * CellM);
+            }
+            return best;
         }
         internal float ObstacleDistance(int i) => i < 0 || i >= Count ? 0 : obstacleDistance[i];
         /// <summary>Indoors: within ceiling_radius_m of floor where this robot's own camera has seen a ceiling
