@@ -296,4 +296,15 @@ class ToolRegistry:
             if name == "request_human_approval":
                 order["evidence"] = {k: v for k, v in self.evidence[args["evidence_id"]].items() if k not in ("intrinsics", "rgb_to_thermal")}
         self.orders.append(order)
+        if name == "confirm_survivor":
+            # Run 15: robot A confirmed a person from 2.7 m and searched on; the next step to get them out was only in the
+            # prompt. The result says it, from the same inspection.
+            looked, reach = self._inspection_range(self.evidence[str(args["evidence_id"])]), float(_RESCUE["reach_m"])
+            if self.ctx.carrying_person:
+                hint = "you are already towing a person; report this one to your partner and the commander"
+            elif looked is not None and looked <= reach:
+                hint = f"within the arm's {reach:.1f} m reach: extract_survivor citing {args['evidence_id']}"
+            else:
+                hint = f"beyond the arm's {reach:.1f} m reach: approach_candidate citing {args['evidence_id']}, then extract on arrival"
+            return {"ok": True, "queued": name, "next": hint}
         return {"ok": True, "queued": name}

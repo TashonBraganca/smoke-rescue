@@ -61,10 +61,12 @@ namespace SmokeRescue.Editor
         [MenuItem("Tools/Smoke Rescue/Record/House reflex run (no agents)")]
         public static void HouseReflex() => Run("scenario_house_agents.json", "unity_house_reflex_v1");
 
+        // The recording runs over many editor updates (see RecordingSession.RecordSteps), so the agent URL is cleared when
+        // the recording ends, not when the menu call returns.
         static void WithAgents(System.Action run)
         {
             RecordingSession.AgentUrl = System.Environment.GetEnvironmentVariable("SMOKE_AGENT_URL") ?? "http://localhost:8080";
-            try { run(); } finally { RecordingSession.AgentUrl = null; }
+            try { run(); } catch { RecordingSession.AgentUrl = null; throw; }
         }
 
         static void Run(string scenario, string runId, float maxSeconds = float.PositiveInfinity, bool noise = true)
@@ -81,8 +83,19 @@ namespace SmokeRescue.Editor
             FurnitureBuilder.PlaceScenarioObstacles(sc);
             ScenePreview.PlaceSurvivors(sc);
             ThermalPreview.TagSurvivors();
-            var r = RecordingSession.Record(scenario, runId, maxSeconds, noise, msg => Debug.Log($"[SmokeRescue] {runId} {msg}"));
-            Debug.Log($"[SmokeRescue] Recording done: {r.dir}");
+            if (running != null) { RecordingSession.AgentUrl = null; throw new System.InvalidOperationException("A recording is already running."); }
+            var steps = RecordingSession.RecordSteps(scenario, runId, maxSeconds, noise, msg => Debug.Log($"[SmokeRescue] {runId} {msg}")).GetEnumerator();
+            running = () =>
+            {
+                bool more; RecordingSession.Result done = null;
+                try { more = steps.MoveNext(); done = more ? steps.Current : null; }
+                catch (System.Exception e) { Debug.LogException(e); more = false; }
+                if (more && done == null) return;
+                UnityEditor.EditorApplication.update -= running; running = null; RecordingSession.AgentUrl = null; steps.Dispose();
+                Debug.Log(done != null ? $"[SmokeRescue] Recording done: {done.dir}" : $"[SmokeRescue] Recording {runId} stopped without a result");
+            };
+            UnityEditor.EditorApplication.update += running;
         }
+        static UnityEditor.EditorApplication.CallbackFunction running;
     }
 }
