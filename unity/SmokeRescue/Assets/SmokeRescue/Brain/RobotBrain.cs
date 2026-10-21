@@ -185,6 +185,14 @@ namespace SmokeRescue.Brain
                 if (NeedPlan(t))
                 {
                     SetPath(PlanOut()); lastPlan = t;
+                    if (path.Count == 0 && returnReason == EmergencyExit && grid.FireClearance > c.emergency_fire_clearance_m)
+                    {
+                        // The exit route at normal clearance was cut on the way out (2x2 attempt 5: robot A held still with its
+                        // budget spent): leave at the emergency clearance instead, still never through a burning cell.
+                        grid.FireClearance = c.emergency_fire_clearance_m; SetPath(PlanOut());
+                        Emit(t, "emergency_exit", "The way out was cut on the way: leave past the fire at reduced clearance.",
+                            "clearance_m", c.emergency_fire_clearance_m, "route_points", path.Count);
+                    }
                     if (path.Count == 0 && returnReason == WayOutClosing)
                     {
                         // Fire cut the way home while the robot was on it (agent run 12: robot A held still for the rest
@@ -281,6 +289,11 @@ namespace SmokeRescue.Brain
             if (agentGoal.HasValue && Vector2.Distance(agentGoal.Value, motion.Pose.position) <= c.goal_tolerance_m)
             {
                 Emit(t, "goal", "Reached the agent's goal.", "x_m", agentGoal.Value.x, "y_m", agentGoal.Value.y);
+                // The agent asked to be here for a reason (a closer look, a person to lift, a blocked opening to measure):
+                // tell it, or the next look waits for an unrelated event (agent run 14: robot A stood 1.4 m from the person
+                // it had confirmed, within the arm's reach, and walked on because nothing asked the agent to act).
+                if (!agentGoalIsFrontier)
+                    Emit(t, "agent_goal_reached", "Arrived where the agent asked: " + agentGoalReason, "x_m", agentGoal.Value.x, "y_m", agentGoal.Value.y);
                 var reached = agentGoal.Value; bool frontier = agentGoalIsFrontier; agentGoal = null; agentGoalIsFrontier = false;
                 if (frontier) { ClearPath(); OnFrontierReached(reached, t); if (sweeping) return SweepStep(t, dt); }
             }

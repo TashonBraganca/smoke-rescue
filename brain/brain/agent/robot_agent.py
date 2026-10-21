@@ -63,19 +63,25 @@ Playbook by event kind:
 - avoid_fire or retreat: track_fire_spread, then avoid_area around the hot area citing that evidence. Never go_to
   toward heat. If fire blocks the way to unsearched floor or to a person and water_l is above 0, scan_thermal and
   spray_water at the hot spot's bearing citing that scan (a few seconds at a time), then look again.
-- after confirm_survivor: if the person is within reach (inspect from close, approach_candidate first if needed),
-  extract_survivor citing that inspection; the robot tows them out to the nearest way out and may come back in. If fire spreads toward unexplored rooms, tell your partner and the commander.
+- after confirm_survivor: get them out. If that inspection was within the arm's reach, extract_survivor citing it;
+  otherwise approach_candidate citing it and finish. The robot tows the person to the nearest way out and may come
+  back in. If fire spreads toward unexplored rooms, tell your partner and the commander.
+- agent_goal_reached: the robot is where you sent it; the event's reason says why. After a closer look or an approach
+  to a person: scan_thermal, inspect_candidate on the warm region (bearing and range from the scan), then confirm,
+  reject, or, for a person within the arm's reach, extract_survivor citing that inspection. After going to a
+  blocked_unsearched approach point: measure_opening at blocked_unsearched.bearing_deg and act on it as in no_frontier.
 - sensor_switch (colour camera poor): assess_visibility, then set_torch citing it. Dark image (low brightness,
   low contrast, little haze) or torch off: wide. Thick smoke with glare: low. Long corridor: narrow. Clear: wide.
   After changing the torch, call assess_visibility again; if the colour image is now usable, scan_thermal to look
   for people with both sensors.
 - stuck: measure_opening straight ahead (bearing 0); if not passable, open_door or clear_debris citing it.
 - no_frontier (your map has no reachable unsearched floor; the robot returns after a short scan unless you act):
-  if blocked_unsearched is given, your map shows unsearched floor you cannot reach at that bearing and distance:
-  go_to its approach point, then measure_opening at bearing 0; if not passable because of light debris or a closed
-  door, clear_debris or open_door citing it. Otherwise read the LiDAR summary and your camera. If a closed door or
-  light debris blocks the way on, measure_opening toward it and open_door or clear_debris citing that. If fire blocks it, tell your partner and the commander and
-  let the robot return. Never invent a target. Apply this whenever the context's frontiers list is empty, whatever
+  if blocked_unsearched is given, your map shows unsearched floor you cannot reach at that bearing and distance.
+  If its approach point is more than a metre away, go_to it and finish: you get agent_goal_reached on arrival.
+  At the approach point, measure_opening at blocked_unsearched.bearing_deg; if not passable because of light debris
+  or a closed door, clear_debris or open_door citing it. If fire is what blocks it, scan_thermal: while water_l is
+  above 0, spray_water at the hot spot's bearing citing that scan, then tell your partner. Only when nothing you
+  carry can open it, tell your partner and the commander and let the robot return. Never invent a target. Apply this whenever the context's frontiers list is empty, whatever
   the event: another event (a warm shape, say) may have arrived at the same moment.
 - Every step: if the context says the torch is off or the event is periodic, call assess_visibility first; if the
   colour image is not usable and the torch is off, set_torch wide citing it.

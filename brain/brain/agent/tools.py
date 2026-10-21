@@ -19,6 +19,9 @@ from pathlib import Path as _Path
 # Thresholds come from config/brain.json, each with its reason there.
 _CONFIG = json.loads((_Path(__file__).resolve().parents[3] / "config" / "brain.json").read_text())
 CONFIRM_MAX_RANGE_M = float(_CONFIG["person_confirm_max_range_m"])
+# The brain's own survivor standoff: inside the arm's reach (actuators.json rescue.reach_m), so a closer look can end
+# in a lift (agent run 14 stopped 1.5 m short, at the edge of the 1.6 m reach).
+APPROACH_STANDOFF_M = float(_CONFIG["survivor_standoff_m"])
 _ACTUATORS = json.loads((_Path(__file__).resolve().parents[3] / "config" / "actuators.json").read_text())
 _NOZZLE, _RESCUE = _ACTUATORS["nozzle"], _ACTUATORS["rescue"]
 from pathlib import Path
@@ -56,8 +59,9 @@ ACTIONS = [
         {"frontier_id": {"type": "integer"}, "reason": STR}, ["frontier_id", "reason"]),
     _fn("go_to", "Drive to a building position (x, y in metres) by the robot's own planner.",
         {"x": NUM, "y": NUM, "reason": STR}, ["x", "y", "reason"]),
-    _fn("approach_candidate", "Walk to a viewpoint 1.5 m short of an inspected warm region, on the line from the robot, "
-        "computed from the inspection itself. Use when inspect_candidate says uncertain.", {"evidence_id": EVIDENCE},
+    _fn("approach_candidate", f"Walk to a viewpoint {APPROACH_STANDOFF_M:.1f} m short of an inspected warm region, on the line from the robot, "
+        "computed from the inspection itself. Use when inspect_candidate says uncertain, or to get within the arm's reach "
+        "of a confirmed person. You get an agent_goal_reached event on arrival.", {"evidence_id": EVIDENCE},
         ["evidence_id"]),
     _fn("confirm_survivor", "Report a survivor at a building position. Needs an inspect_candidate result with verdict "
         "person.", {"x": NUM, "y": NUM, "evidence_id": EVIDENCE}, ["x", "y", "evidence_id"]),
@@ -274,7 +278,7 @@ class ToolRegistry:
                 self._looks[key] = looks + [self.ctx.t]
                 dx, dy = ev["x"] - self.ctx.x, ev["y"] - self.ctx.y
                 dist = max(1e-6, (dx * dx + dy * dy) ** 0.5)
-                k = max(0.0, dist - 1.5) / dist
+                k = max(0.0, dist - APPROACH_STANDOFF_M) / dist
                 args = {**args, "x": round(self.ctx.x + dx * k, 2), "y": round(self.ctx.y + dy * k, 2),
                         "reason": f"closer look at an uncertain warm region ({ev['x']}, {ev['y']})"}
                 name = "go_to"

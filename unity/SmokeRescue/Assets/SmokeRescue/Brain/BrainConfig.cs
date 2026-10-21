@@ -95,7 +95,7 @@ namespace SmokeRescue.Brain
         public float scan_yaw_gain = 0.05f;
         public float agent_avoid_min_radius_m = 0.3f, agent_avoid_max_radius_m = 4f;
         public float frontier_cluster_max_m = 2.5f;
-        public bool search_requires_ceiling = false;
+        public bool search_requires_ceiling = false, ceiling_sight_lines = true;
         public float ceiling_min_height_m = 2.5f, ceiling_max_height_m = 3.5f, ceiling_radius_m = 0.6f, ceiling_wall_margin_m = 0.4f;
         public int ceiling_min_hits = 2;
         public int enclosure_rays = 36;
