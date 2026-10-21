@@ -20,5 +20,7 @@
   "min_lower_return_fraction": 0.5,
   "min_lower_return_fraction_reason": "Recorded A/B t=0 doorway lower return shares are 0.685/0.686. Requiring a majority retains these entry views but leaves total sensor dropout unknown instead of calling it sky.",
   "min_upward_void_fraction": 0.9,
-  "min_upward_void_fraction_reason": "Recorded indoor B t=60 upward dropout is 0.486, and doorway B t=0 is 0.495. Requiring 0.9 prevents those measured dropout levels from being called outdoors. Open-sky analytic rays have share 1.0. Wall evidence keeps a range-limited high-ceiling view unknown even above this threshold."
+  "min_upward_void_fraction_reason": "Recorded indoor B t=60 upward dropout is 0.486, and doorway B t=0 is 0.495. Requiring 0.9 prevents those measured dropout levels from being called outdoors. Open-sky analytic rays have share 1.0. Wall evidence keeps a range-limited high-ceiling view unknown even above this threshold.",
+  "pending_candidate_s": 60.0,
+  "pending_candidate_s_reason": "While an agent is approaching an uncertain warm candidate, explore_frontier is refused for up to this long, so the robot finishes the approach and inspects again before searching on. Hidden-corner run 3: both agents ordered an approach and dropped it for a frontier on the next area_searched event 4 to 18 s later, and nobody was confirmed. The farthest inspection seen was 10.2 m; at the 0.3 m/s doorway speed that walk takes about 34 s, plus about 20 s for an agent step and a close inspection."
 }

@@ -349,3 +349,42 @@ def test_lift_may_cite_the_confirming_inspection_once_within_reach_and_facing(tm
     T.ToolRegistry._lifted.clear()
     assert lift(5.0, 4.0, 0.0, 30.0)["refusals"], "control: 4 m away"
     assert lift(5.0, 6.8, 180.0, 40.0)["refusals"], "control: facing away"
+
+
+def test_an_approach_to_an_uncertain_candidate_is_finished_before_exploring(tmp_path, monkeypatch):
+    # Hidden-corner run 3: both agents ordered an approach and dropped it for a frontier on the next area_searched event,
+    # so nobody was confirmed. explore_frontier is refused while the approach is open; the context shows it. It opens
+    # again when the approach fails (goal_blacklisted), times out (pending_candidate_s), or the spot is rejected.
+    frontier = {"id": 0, "x": 0.0, "y": 0.0, "path_m": 5.0, "unsearched_m2": 4.0, "proven_indoors": True}
+    explore = [[ToolCall("explore_frontier", {"frontier_id": 0, "reason": "more area"})]]
+
+    def step(t, kind, turns, verdict="uncertain"):
+        fake_vision(monkeypatch, verdict)
+        req = request(tmp_path) | {"t": t, "event": {"kind": kind}, "frontiers": [frontier]}
+        return RobotAgent(Scripted(turns), tmp_path / "t.jsonl").step(req)
+
+    def open_approach(t):
+        T.ToolRegistry._pending.clear(); T.ToolRegistry._looks.clear()
+        out = step(t, "survivor_candidate", [[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": 5})],
+                                             [ToolCall("approach_candidate", {"evidence_id": "ev1"})]])
+        assert [o["type"] for o in out["orders"]] == ["go_to"]
+
+    open_approach(10.0)
+    held = step(14.0, "area_searched", explore)
+    assert held["orders"] == [] and "unresolved warm candidate" in held["refusals"][0]["reason"]
+    last = [json.loads(l) for l in (tmp_path / "t.jsonl").read_text().splitlines() if '"step_start"' in l][-1]
+    assert last["context"]["pending_candidate"]["distance_m"] == pytest.approx(5.0)
+
+    open_approach(10.0)
+    assert [o["type"] for o in step(14.0, "goal_blacklisted", explore)["orders"]] == ["explore_frontier"], "failed approach"
+
+    open_approach(10.0)
+    late = 10.0 + float(T._PERCEPTION["pending_candidate_s"]) + 1
+    assert [o["type"] for o in step(late, "area_searched", explore)["orders"]] == ["explore_frontier"], "timed out"
+
+    open_approach(10.0)
+    rejected = step(20.0, "agent_goal_reached", [[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": 5})],
+                                                 [ToolCall("reject_candidate", {"x": 5.0, "y": 10.0, "evidence_id": "ev1"})],
+                                                 [ToolCall("explore_frontier", {"frontier_id": 0, "reason": "next"})]],
+                    verdict="not_person")
+    assert [o["type"] for o in rejected["orders"]] == ["reject_candidate", "explore_frontier"], "resolved by a reject"

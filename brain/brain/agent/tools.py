@@ -24,6 +24,7 @@ CONFIRM_MAX_RANGE_M = float(_CONFIG["person_confirm_max_range_m"])
 APPROACH_STANDOFF_M = float(_CONFIG["survivor_standoff_m"])
 _ACTUATORS = json.loads((_Path(__file__).resolve().parents[3] / "config" / "actuators.json").read_text())
 _NOZZLE, _RESCUE = _ACTUATORS["nozzle"], _ACTUATORS["rescue"]
+_PERCEPTION = json.loads((_Path(__file__).resolve().parents[3] / "config" / "perception.json").read_text())
 _CAMERA = json.loads((_Path(__file__).resolve().parents[3] / "config" / "sensors.json").read_text())["camera"]
 # Half the colour camera's horizontal view (atan of half the width over fx: 37.6 deg). A person further off the heading
 # than this is outside the picture, so an inspection there cannot see them (run 20: looks at 106 and 148 deg).
@@ -131,6 +132,12 @@ class ToolRegistry:
     # the arm's reach is below the colour camera's view (1.6 m up, pitched 10 deg down, 60 deg vertical view: floor visible
     # from about 1.9 m), so a lift cites the inspection that confirmed them (run 25: re-inspection at 1.34 m, uncertain).
     _confirmed: dict = {}
+    # The uncertain candidate each robot is walking to look at closer: robot -> {"x", "y", "t", "evidence_id"}. Until it is
+    # confirmed or rejected, or the approach fails, explore_frontier is refused (hidden-corner run 3: both agents ordered
+    # an approach and dropped it on the next area_searched event, and nobody was confirmed).
+    _pending: dict = {}
+    # Events that mean the approach failed: the robot could not get there, or must leave for heat.
+    APPROACH_FAILED = ("goal_blacklisted", "no_progress", "collision_hold", "stuck", "avoid_fire", "retreat", "escape_closing")
     MAX_LOOKS, LOOK_CELL_M, LOOK_MEMORY_S = 2, 1.5, 90.0
 
     def __init__(self, robot_dir: Path, ctx: AgentContext, debug_dir: Path | None = None):
@@ -142,6 +149,20 @@ class ToolRegistry:
         self.refusals: list[dict] = []
         self.finished: str | None = None
         self._cache: dict = {}
+
+    def pending(self) -> dict | None:
+        """This robot's unresolved approach, with distance and bearing from where it stands now; None when there is
+        none, it has timed out (pending_candidate_s), or this step's event says the approach failed."""
+        p = self._pending.get(self.ctx.robot)
+        if p is None:
+            return None
+        if self.ctx.event_kind in self.APPROACH_FAILED or self.ctx.t - p["t"] > float(_PERCEPTION["pending_candidate_s"]):
+            self._pending.pop(self.ctx.robot, None)
+            return None
+        dx, dy = p["x"] - self.ctx.x, p["y"] - self.ctx.y
+        bearing = (math.degrees(math.atan2(dx, dy)) - self.ctx.heading_deg + 180) % 360 - 180
+        return {"x": p["x"], "y": p["y"], "distance_m": round(math.hypot(dx, dy), 2), "bearing_deg": round(bearing, 1),
+                "since_s": round(self.ctx.t - p["t"], 1), "evidence_id": p["evidence_id"]}
 
     # ----- geometry --------------------------------------------------------------------------------------------
     def world(self, bearing_deg: float, range_m: float) -> tuple[float, float]:
@@ -293,7 +314,13 @@ class ToolRegistry:
                                  "the cited measurement says the way is passable; just drive")
         elif name == "explore_frontier":
             match = [f for f in self.ctx.frontiers if f.get("id") == args.get("frontier_id")]
-            if not match:
+            pending = self.pending()
+            if pending is not None:
+                refusal = {"refused": True, "reason": f"you are walking to look closer at an unresolved warm candidate "
+                           f"{pending['distance_m']:.1f} m away at bearing {pending['bearing_deg']:.0f} deg; finish that first: "
+                           "once there, inspect_candidate at it, then confirm_survivor or reject_candidate (or finish this "
+                           "step without a new order to keep walking)"}
+            elif not match:
                 refusal = {"refused": True, "reason": "frontier_id is not one of the frontiers in this step's context; "
                            "choose an id from the list (coordinates are never invented)"}
             elif self.ctx.event_kind in ("avoid_fire", "retreat"):
@@ -324,6 +351,7 @@ class ToolRegistry:
                 key = (self.ctx.robot, round(ev["x"] / self.LOOK_CELL_M), round(ev["y"] / self.LOOK_CELL_M))
                 looks = [s for s in self._looks.get(key, []) if self.ctx.t - s < self.LOOK_MEMORY_S]
                 if len(looks) >= self.MAX_LOOKS:
+                    self._pending.pop(self.ctx.robot, None)
                     refusal = {"refused": True, "reason": f"already looked closer {len(looks)} times at this spot; leave it, "
                                "tell your partner it is unconfirmed, and continue exploring"}
                     self.refusals.append({"tool": name, "args": args, **refusal})
@@ -336,6 +364,8 @@ class ToolRegistry:
                         "face_x": ev["x"], "face_y": ev["y"],
                         "reason": f"closer look at an uncertain warm region ({ev['x']}, {ev['y']})"}
                 name = "go_to"
+                self._pending[self.ctx.robot] = {"x": float(ev["x"]), "y": float(ev["y"]), "t": self.ctx.t,
+                                                 "evidence_id": str(args["evidence_id"])}
         elif name == "turn_to_face":
             # A go_to where the robot stands, with a point to face: the brain arrives at once, turns, then reports.
             if self.ctx.event_kind in ("avoid_fire", "retreat"):
@@ -358,6 +388,10 @@ class ToolRegistry:
             if name == "request_human_approval":
                 order["evidence"] = {k: v for k, v in self.evidence[args["evidence_id"]].items() if k not in ("intrinsics", "rgb_to_thermal")}
         self.orders.append(order)
+        if name in ("confirm_survivor", "reject_candidate"):
+            p = self._pending.get(self.ctx.robot)
+            if p is not None and math.hypot(p["x"] - float(args["x"]), p["y"] - float(args["y"])) <= self.LOOK_CELL_M:
+                self._pending.pop(self.ctx.robot, None)
         if name == "confirm_survivor":
             self._confirmed.setdefault(self.ctx.robot, []).append(
                 {"id": str(args["evidence_id"]), "x": float(args["x"]), "y": float(args["y"])})
