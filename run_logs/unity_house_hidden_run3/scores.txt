@@ -1,0 +1,32 @@
+                                 unity_house_hidden_run3
+duration_s                                         200.0
+survivors_total                                        5
+survivors_found                                        0
+first_found_s                                       None
+confirmations                                          0
+duplicate_confirmations                                0
+moved_confirmations                                    0
+false_confirmations                                    0
+confirmation_precision                              None
+area_searched_m2                                   246.0
+double_coverage_share                              0.171
+people_carried_out                                     0
+collision_s                   {'robot_A': 0.0, 'robot_B'
+unity_house_hidden_run3 heat {'robot_A': {'max_air_c': 44.0, 's_air_over_60c': 0.0, 'max_surface_within_1m_c': 92.2}, 'robot_B': {'max_air_c': 169.4, 's_air_over_60c': 28.4, 'max_surface_within_1m_c': 442.2}} agent {'steps': 54, 'orders': 55, 'refusals': 4, 'errors': 0, 'orders_by_type': {'set_torch': 2, 'send_team_message': 20, 'explore_frontier': 13, 'go_to': 14, 'broadcast': 2, 'avoid_area': 3, 'reject_candidate': 3}}
+robot_B frame check {"t": 0.0, "body_xy": [-1.2, 7.0], "yaw_deg": -90.0, "spawn_xy": [-1.2, 7.0], "spawn_yaw_deg": -90, "position_error_m": 0.0, "yaw_error_deg": 0.0, "passed": true, "scenario_file": "scenario_house_hidden_corner.json", "recorded_frame": "local", "transformed_brain_position_error_m": 0.0, "transformed_brain_yaw_error_deg": 0.0}; optical +z projected to house x/z, subtract 0.25 m forward; yaw=atan2(-forward_x, forward_z)
+team searched floor share 0.834 of 21545 floor cells
+robot        pos median/p95/max/final (m)   yaw median/max (deg)   lidar true/brain median (m)   map P/R   stalls   collision s
+robot_A      0.172/0.280/0.283/0.280       0.159/0.688   0.009/0.067   0.818/0.790   4 (0 unexplained)   0.000
+robot_A frame_link: not linked
+robot_B      0.060/0.132/0.137/0.121       0.082/1.036   0.008/0.025   0.935/0.722   5 (1 unexplained)   0.000
+robot_B frame_link: not linked
+== s6
+robot_A: nearest approach 5.96 m; s6 inside the camera frame within 8 m in 141 frames; visible (depth agrees) 65, blocked by something nearer 19
+   first visible (43.7, 6.22) closest visible range 6.02
+   blocked e.g. [(23.5, 7.98, 0.96), (23.5, 7.7, 0.93), (23.6, 7.38, 0.9)]
+robot_B: nearest approach 7.62 m; s6 inside the camera frame within 8 m in 59 frames; visible (depth agrees) 24, blocked by something nearer 35
+   first visible (174.1, 6.8) closest visible range 6.16
+   blocked e.g. [(109.0, 7.99, 0.87), (109.1, 7.98, 0.87), (109.1, 7.97, 0.86)]
+== outside
+../data/recordings/unity_house_hidden_run3 robot_A outside 17 of 200 s: [(0, 4, 10.0, -0.0), (187, 200, 19.2, 14.9)]
+../data/recordings/unity_house_hidden_run3 robot_B outside 4 of 200 s: [(0, 4, -0.0, 6.9)]
