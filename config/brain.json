@@ -289,6 +289,8 @@
   "ceiling_min_height_m_reason": "Depth points this high and up count as ceiling: above door lintels (about 2.1 m) and every obstacle the brain maps (up to 1.9 m).",
   "ceiling_max_height_m": 3.5,
   "ceiling_max_height_m_reason": "Ceilings of ordinary rooms are below this; higher returns are ignored.",
+  "ceiling_sight_lines": true,
+  "ceiling_sight_lines_reason": "Floor on a known-free straight line from an indoor camera to ceiling it saw is under that ceiling, so it is indoors. The camera sees ceiling only about 4.7 m away, and the 0.6 m ceiling radius alone hid most of small rooms (agent run 14: 454 study cells, where a person lay). A camera in the yard marks nothing, and lines stop at walls and unmapped floor.",
   "ceiling_radius_m": 0.6,
   "ceiling_radius_m_reason": "Floor within 0.6 m (walked across free floor) of ceiling evidence is indoors. Evidence sits at least ceiling_wall_margin_m inside the walls, so 0.6 m reaches the floor along inner walls but not yard floor beyond a doorway (run 8: robot B targeted 0.65 m outside its door with 1.5 m).",
   "ceiling_min_hits": 2,

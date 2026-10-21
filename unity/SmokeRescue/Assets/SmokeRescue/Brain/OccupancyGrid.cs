@@ -18,6 +18,9 @@ namespace SmokeRescue.Brain
         readonly double[] heatTime;
         readonly bool[] hits, frees, observed;
         readonly byte[] roofHits;
+        // Floor on a clear sight line from an indoor camera to ceiling it saw (see MarkCeilingSightLines).
+        readonly bool[] sightIndoors;
+        readonly List<int> frameRoof = new List<int>(); readonly int[] roofFrame; int depthFrames;
         float[] roofDistance; bool roofDirty = true;
         int[] enclosureGeneration; bool[] enclosureValue; int generation;
         readonly double[] localTime, ownHeatTime;
@@ -42,6 +45,7 @@ namespace SmokeRescue.Brain
             odds = new float[Count]; lidarOdds = new float[Count]; heat = new float[Count]; rise = new float[Count]; heatTime = new double[Count];
             hits = new bool[Count]; frees = new bool[Count]; observed = new bool[Count];
             localTime = new double[Count]; peer = new byte[Count]; roofHits = new byte[Count];
+            sightIndoors = new bool[Count]; roofFrame = new int[Count];
             ownHeat = new float[Count]; ownHeatTime = new double[Count]; externalHeat = new float[Count]; externalTime = new double[Count];
             for (int i = 0; i < Count; i++)
             {
@@ -228,6 +232,7 @@ namespace SmokeRescue.Brain
             Array.Clear(hits, 0, Count); Array.Clear(frees, 0, Count);
             Vector2 camera = pose.Transform(0, s.camera.mount.forward_offset_m);
             int start = Cell(camera); if (start < 0) { localObservationTime = time; return; }
+            depthFrames++; frameRoof.Clear();
             for (int v = 0; v < frame.Height; v += c.depth_stride) for (int u = 0; u < frame.Width; u += c.depth_stride)
             {
                 float z = frame.Depth[v * frame.Width + u] * .001f;
@@ -238,6 +243,7 @@ namespace SmokeRescue.Brain
                     // A ceiling seen overhead: this floor is indoors. Walls are excluded when the roof is used.
                     int roof = Cell(pose.Transform(p.x, p.y));
                     if (roof >= 0 && roofHits[roof] < 255) { roofHits[roof]++; roofDirty = true; }
+                    if (roof >= 0 && roofFrame[roof] != depthFrames) { roofFrame[roof] = depthFrames; frameRoof.Add(roof); }
                 }
                 if (p.z > c.obstacle_max_height_m) continue;
                 Vector2 end = pose.Transform(p.x, p.y);
@@ -247,6 +253,7 @@ namespace SmokeRescue.Brain
             // Aggregate a frame before updating odds. A floor ray cannot erase a wall hit in this frame.
             for (int i = 0; i < Count; i++)
                 if (hits[i]) ObserveOccupied(i); else if (frees[i] && frame.Timestamp >= localTime[i]) ObserveFree(i);
+            MarkCeilingSightLines(start);
             localObservationTime = time;
         }
         /// <summary>One LiDAR sweep at its capture pose: free along each beam, occupied at its end. A beam with no
@@ -377,14 +384,42 @@ namespace SmokeRescue.Brain
         /// (ceiling_min_hits returns in the ceiling height band on a cell that is not a wall). No outline or floor plan
         /// is involved: the yard has no ceiling, and a warm shape seen through a window lies outside.</summary>
         /// <summary>The indoor layer for map snapshots: 2 where this robot's camera saw a ceiling away from walls, 1 within
-        /// ceiling_radius_m of that across known free floor, 0 elsewhere.</summary>
+        /// ceiling_radius_m of that across known free floor or on a ceiling sight line, 3 walled in, 0 elsewhere.</summary>
         public byte[] CopyIndoors()
         {
             if (roofDirty || roofDistance == null) { RoofDistances(); roofDirty = false; generation++; }
             var copy = new byte[Count];
             for (int i = 0; i < Count; i++)
-                copy[i] = roofDistance[i] == 0 ? (byte)2 : roofDistance[i] <= c.ceiling_radius_m ? (byte)1 : OwnOccupancy(i) == 1 && Enclosed(i) ? (byte)3 : (byte)0;
+                copy[i] = roofDistance[i] == 0 ? (byte)2 : roofDistance[i] <= c.ceiling_radius_m || sightIndoors[i] ? (byte)1 : OwnOccupancy(i) == 1 && Enclosed(i) ? (byte)3 : (byte)0;
             return copy;
+        }
+        /// <summary>
+        /// A camera that stands indoors and sees a ceiling looks up at it across the floor in between. When that floor is
+        /// known free all the way (no wall, nothing unmapped), it lies under the same roof, so it is indoors. This needs no
+        /// outline: the camera position must already be indoors by the robot's own evidence, so a camera in the yard
+        /// marks nothing, and a line that meets a wall or unmapped floor stops there. The ceiling radius alone left most
+        /// of small rooms outside the search area, because the camera sees ceiling only about 4.7 m away (agent run 14:
+        /// 530 of robot A's frontier cells inside the house were hidden as not indoors, 454 of them in the study, where a
+        /// person lay). Sight-line floor does not seed the ceiling radius, so it never reaches past a doorway.
+        /// </summary>
+        void MarkCeilingSightLines(int camera)
+        {
+            if (!c.ceiling_sight_lines || frameRoof.Count == 0) return;
+            bool cameraIndoors = sightIndoors[camera] || (roofDistance != null && roofDistance[camera] <= c.ceiling_radius_m) ||
+                (OwnOccupancy(camera) == 1 && Enclosed(camera));
+            if (!cameraIndoors) return;
+            Vector2 from = Centre(camera); float step = CellM * .5f;
+            foreach (int roof in frameRoof)
+            {
+                if (roofHits[roof] < c.ceiling_min_hits) continue;
+                Vector2 to = Centre(roof); int steps = Mathf.CeilToInt(Vector2.Distance(from, to) / step);
+                for (int k = 0; k <= steps; k++)
+                {
+                    int cell = Cell(Vector2.Lerp(from, to, steps == 0 ? 0 : k / (float)steps));
+                    if (cell < 0 || OwnOccupancy(cell) != 1) break;
+                    if (!sightIndoors[cell]) { sightIndoors[cell] = true; roofDirty = true; }
+                }
+            }
         }
         public bool Indoors(Vector2 p) => UnderCeiling(p) || (OwnOccupancy(Cell(p)) == 1 && Enclosed(Cell(p)));
         /// <summary>The ceiling half of Indoors: within ceiling_radius_m of wall-clear ceiling evidence, walked across known
@@ -393,7 +428,7 @@ namespace SmokeRescue.Brain
         {
             int i = Cell(p); if (i < 0) return false;
             if (roofDirty || roofDistance == null) { RoofDistances(); roofDirty = false; generation++; }
-            return roofDistance[i] <= c.ceiling_radius_m;
+            return roofDistance[i] <= c.ceiling_radius_m || sightIndoors[i];
         }
 
         /// <summary>

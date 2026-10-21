@@ -729,6 +729,34 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void ArrivingWhereTheAgentAskedTellsTheAgentWhy()
+        {
+            // Agent run 14: robot A reached its closer look 1.4 m from a person it had confirmed, within the arm's reach,
+            // and walked on, because no event asked the agent to act there. Arrival at a go_to raises agent_goal_reached
+            // with the agent's reason. Control: reaching a frontier the agent picked is routine and raises none.
+            List<BrainEvent> Drive(bool frontier)
+            {
+                var b = new RobotBrain(Calibration(), Settings(), "A", 0); Room(b, -4, 4, -4, 4);
+                if (frontier) b.AgentExplore(new Vector2(0, 1.5f), 0, 30, "frontier 2");
+                else b.AgentGoTo(new Vector2(0, 1.5f), 0, 30, "closer look at a person to lift");
+                var all = new List<BrainEvent>(); var command = new BrainCommand();
+                for (int tick = 0; tick < 300; tick++)
+                {
+                    command = DriveTick(b, tick, command.forwardMps, command.yawRateDeg); all.AddRange(b.DrainEvents());
+                }
+                return all;
+            }
+            var goTo = Drive(false);
+            Assert.That(goTo.Count(e => e.reason == "Reached the agent's goal."), Is.EqualTo(1), "the robot got there");
+            var arrived = goTo.Where(e => e.kind == "agent_goal_reached").ToList();
+            Assert.That(arrived, Has.Count.EqualTo(1));
+            Assert.That(arrived[0].reason, Does.EndWith("closer look at a person to lift"));
+            var explore = Drive(true);
+            Assert.That(explore.Count(e => e.reason == "Reached the agent's goal."), Is.EqualTo(1), "control: the robot got there too");
+            Assert.That(explore.Count(e => e.kind == "agent_goal_reached"), Is.Zero);
+        }
+
+        [Test]
         public void AnAgentGoToNeverSendsAnEmptyClaimAndABadPacketIsDropped()
         {
             // Slow-fire run: an agent go_to was refreshed as a frontier and sent a claim with radius 0; the partner threw
@@ -889,6 +917,25 @@ namespace SmokeRescue.Tests.EditMode
             }
             Assert.That(left, Is.EqualTo(1));
             Assert.That(hot.Snapshot().state, Is.EqualTo("return"));
+            // Then fire closes that route to a 1.4 m gap on the way out (2x2 attempt 5): it re-plans at the emergency
+            // clearance instead of holding still.
+            var cut = new RobotBrain(Calibration(), c2, "A", 0); Room(cut, -3, 3, -2, 6); var cutEvents = new List<BrainEvent>();
+            for (int i = 0; i < 180; i++)
+            {
+                double t = i / 15.0; Motion(cut, t, t < 3 ? 1f : 0); cut.OnRgbd(Image(t, true)); cut.OnAirTemperature(t, t < 3.2 ? 20 : 150);
+                if (cutEvents.Any(e => e.kind == "emergency_exit"))
+                {
+                    var g = Map(cut);
+                    for (float y = 1.3f; y <= 1.7f; y += .1f)
+                    {
+                        for (float x = -3f; x <= -.7f; x += .1f) g.ObserveHeat(g.Cell(new Vector2(x, y)), 500, t);
+                        for (float x = .7f; x <= 3f; x += .1f) g.ObserveHeat(g.Cell(new Vector2(x, y)), 500, t);
+                    }
+                }
+                cut.Step(t, 1f / 15); cutEvents.AddRange(cut.DrainEvents());
+            }
+            Assert.That(cutEvents.Count(e => e.kind == "emergency_exit"), Is.EqualTo(2), "normal route first, then the reduced clearance");
+            Assert.That(cutEvents.Last(e => e.kind == "emergency_exit").numbers["route_points"], Is.GreaterThan(0));
         }
 
         [Test]
@@ -1510,6 +1557,43 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(orders, Has.Count.EqualTo(2));
             Assert.That(orders[0], Does.StartWith("Refused go_to"));
             Assert.That(orders[1], Does.StartWith("go_to: ahead"));
+        }
+
+        [Test]
+        public void FloorBetweenAnIndoorCameraAndTheCeilingItSeesIsIndoors()
+        {
+            // Agent run 14: the camera sees ceiling only about 4.7 m away, so the 0.6 m ceiling radius left most of a small
+            // room outside the search area. Floor on a known-free line from an indoor camera to ceiling it saw is indoors.
+            // An 18 m hall mapped by LiDAR is not walled in within 10 m, so only the ceiling rules can make (0, 2.5) indoors.
+            string Run(bool sightLines, bool cameraIndoors)
+            {
+                var c = Settings(); c.search_requires_ceiling = true; c.ceiling_min_hits = 1; c.ceiling_sight_lines = sightLines;
+                var a = new RobotBrain(Calibration(), c, "A", 0);
+                Motion(a, 0); a.OnAirTemperature(0, 20); a.OnLidar(RoomScan(0, Vector2.zero, 0, 9f, 720)); a.Step(0, 1f / 60);
+                var g = Map(a);
+                if (cameraIndoors)
+                {
+                    // Ceiling seen earlier over where the robot now stands.
+                    var roof = (byte[])typeof(OccupancyGrid).GetField("roofHits", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(g);
+                    for (float y = -.5f; y <= .5f; y += .1f) roof[g.Cell(new Vector2(0, y))] = 255;
+                    typeof(OccupancyGrid).GetField("roofDirty", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).SetValue(g, true);
+                }
+                bool standsIndoors = g.UnderCeiling(new Vector2(0, .25f));
+                Motion(a, .1); a.OnAirTemperature(.1, 20); a.OnRgbd(RoomImage(.1, 7f)); a.OnLidar(RoomScan(.1, Vector2.zero, 0, 9f, 720)); a.Step(.1, .1f);
+                // Sight lines must stop at the far wall the camera mapped at 7 m. (Floor past it can still be walled in
+                // between that wall and the LiDAR's at 9 m, so Indoors there is not the probe; the sight-line layer is.)
+                var sight = (bool[])typeof(OccupancyGrid).GetField("sightIndoors", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(g);
+                bool pastWall = false;
+                for (float x = -4; x <= 4; x += .1f) for (float y = 7.15f; y <= 9; y += .1f) pastWall |= sight[g.Cell(new Vector2(x, y))];
+                return $"{standsIndoors} {g.Indoors(new Vector2(0, 2.5f))} {pastWall} {g.Indoors(new Vector2(0, -3f))}";
+            }
+            // Camera indoors: the floor 2.5 m ahead, under the line to the ceiling seen 4.7 m on, is indoors. No sight line
+            // passes the far wall, and the floor behind the robot (-3 m) is not indoors: the lines never point back.
+            Assert.That(Run(true, true), Is.EqualTo("True True False False"));
+            // Controls: without sight lines the same floor stays outside the search area, and a camera that is not known
+            // to stand indoors (in the yard, looking through a door) marks nothing.
+            Assert.That(Run(false, true), Is.EqualTo("True False False False"));
+            Assert.That(Run(true, false), Is.EqualTo("False False False False"));
         }
 
         [Test]

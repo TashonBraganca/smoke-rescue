@@ -113,7 +113,9 @@ def test_approach_candidate_stops_short_of_the_inspected_spot(tmp_path, monkeypa
     out, _ = run(tmp_path, [[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": 5})],
                             [ToolCall("approach_candidate", {"evidence_id": "ev1"})]])
     (o,) = out["orders"]
-    assert o["type"] == "go_to" and o["x"] == pytest.approx(5.0) and o["y"] == pytest.approx(8.5)   # 5 m ahead, 1.5 m short
+    # 5 m ahead, stopping the brain's standoff short of it, which must be inside the arm's reach so a lift can follow.
+    assert o["type"] == "go_to" and o["x"] == pytest.approx(5.0) and o["y"] == pytest.approx(10.0 - T.APPROACH_STANDOFF_M)
+    assert T.APPROACH_STANDOFF_M < float(T._RESCUE["reach_m"])
 
 
 def test_no_go_to_during_a_heat_event(tmp_path, monkeypatch):
