@@ -785,6 +785,50 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void UnsearchedFloorBehindAnObstacleIsReportedWithItsBearing()
+        {
+            // Run 13: robot B gave up 2 m short of the hallway debris without looking at it. The brain reports the nearest
+            // unsearched floor it cannot reach, so the agent can measure and clear what blocks it. Here the LiDAR sees
+            // through a 0.3 m gap in a line of debris that the body does not fit through. Control: the line is closed.
+            var c = Settings(); c.grid_size_m = 12; c.robot_radius_m = .25f;
+            BrainBlockedFloor? Report(bool gap)
+            {
+                var walls = Box(-3, -3, 3, 4).Concat(gap
+                    ? new[] { (new Vector2(-3, 1.6f), new Vector2(-.15f, 1.6f)), (new Vector2(.15f, 1.6f), new Vector2(3, 1.6f)) }
+                    : new[] { (new Vector2(-3, 1.6f), new Vector2(3, 1.6f)) }).ToArray();
+                var b = new RobotBrain(Calibration(), c, "A", 0);
+                Motion(b, 0); b.OnAirTemperature(0, 20); b.OnLidar(SegmentScan(0, Vector2.zero, 0, walls)); b.Step(0, .05f);
+                return b.BlockedUnsearched();
+            }
+            var found = Report(true);
+            Assert.That(found.HasValue, Is.True, "free floor mapped through the gap, never searched");
+            Assert.That(found.Value.bearingDegRight, Is.InRange(-20f, 20f), "straight ahead");
+            Assert.That(found.Value.distanceM, Is.InRange(1.6f, 2.4f));
+            Assert.That(found.Value.approach.y, Is.InRange(.8f, 1.4f), "the approach is on this side, before the line");
+            Assert.That(Report(false).HasValue, Is.False, "control: nothing seen beyond a closed line");
+        }
+
+        [Test]
+        public void ARobotInAHeatMarginFollowsItsPathWithoutALoop()
+        {
+            // 2x2 building run: robot B cleared and rebuilt the same path 185 times in 20 s. Not reproduced here (this passes
+            // without the fix too); it guards that a robot beside a heat margin keeps following its path.
+            var c = Settings(); c.grid_size_m = 12; c.robot_radius_m = .25f;
+            var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -4, 4, -4, 4);
+            int loops = 0; float moved = 0;
+            for (int i = 0; i < 90; i++)
+            {
+                double t = i / 15.0; Motion(b, t, t < .5 ? .1f : 0); b.OnRgbd(Image(t, true)); b.OnAirTemperature(t, 20);
+                var g = Map(b);
+                for (float x = -1.6f; x <= -.4f; x += .1f) for (float y = -.6f; y <= .6f; y += .1f) g.ObserveHeat(g.Cell(new Vector2(x, y)), 500, t);
+                var cmd = b.Step(t, 1f / 15); moved = Mathf.Max(moved, Mathf.Abs(cmd.forwardMps) + Mathf.Abs(cmd.yawRateDeg));
+                loops += b.DrainEvents().Count(e => e.reason.StartsWith("Pursuit chord crosses"));
+            }
+            Assert.That(loops, Is.LessThan(3), "no clear-and-rebuild loop");
+            Assert.That(moved, Is.GreaterThan(0));
+        }
+
+        [Test]
         public void AReturnEndsWithinHalfAMetreOfADoorwayStart()
         {
             // House reflex check: robot B stopped 0.3 m from its doorway start, where the return path ended, and replanned

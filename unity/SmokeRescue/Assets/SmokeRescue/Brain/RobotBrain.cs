@@ -657,8 +657,17 @@ namespace SmokeRescue.Brain
             if (!planner.SegmentSafe(position, target)) target = path[cursor];
             if (!planner.SegmentSafe(position, target))
             {
-                Emit(t, "replan", "Pursuit chord crosses an inflated obstacle or heat margin; stop and refresh.");
-                ClearPath(); return Command(0, 0, dt, true);
+                // The planned cells are checked by PathSafe; when they are still safe, only the straight line from the exact
+                // position grazes a margin cell on the way to the next waypoint, about one cell away: steer to it. Clearing the
+                // path here rebuilt the same path 185 times in 20 s (2x2 building run, robot B, cause not reproduced).
+                int here = grid.Cell(position);
+                if (!planner.PathSafe(path, cursor))
+                {
+                    Emit(t, "replan", "Pursuit chord crosses an inflated obstacle or heat margin; stop and refresh.",
+                        "fire_distance_m", grid.FireDistance(here), "obstacle_distance_m", grid.ObstacleDistance(here));
+                    ClearPath(); return Command(0, 0, dt, true);
+                }
+                target = path[cursor];
             }
             float error = BrainMath.Angle(motion.Pose.yawRad, BrainMath.Heading(target - position));
             float near = ObstacleAhead(c.near_cone_deg, out _);

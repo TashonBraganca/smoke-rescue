@@ -149,6 +149,12 @@ namespace SmokeRescue.Recording
                         ["path_m"] = Math.Round(f.pathM, 1), ["unsearched_m2"] = Math.Round(f.unsearchedM2, 1),
                     })),
                     ["lidar"] = LidarSummary(rig.lastScan),
+                    ["blocked_unsearched"] = rig.brain.BlockedUnsearched() is Brain.BrainBlockedFloor blocked ? new JObject
+                    {
+                        ["bearing_deg"] = Math.Round(blocked.bearingDegRight, 1), ["distance_m"] = Math.Round(blocked.distanceM, 2),
+                        ["unsearched_m2"] = Math.Round(blocked.areaM2, 1),
+                        ["approach"] = new JObject { ["x"] = Math.Round(blocked.approach.x, 2), ["y"] = Math.Round(blocked.approach.y, 2) },
+                    } : null,
                     ["partners"] = new JArray(s.peers.Select(p => (object)new JObject { ["robot"] = p.robot, ["maps_linked"] = p.linked,
                         ["position"] = p.linked ? new JArray(Math.Round(p.pose.position.x, 2), Math.Round(p.pose.position.y, 2)) : null })),
                 };

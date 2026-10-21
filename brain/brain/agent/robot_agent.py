@@ -68,8 +68,10 @@ Playbook by event kind:
   for people with both sensors.
 - stuck: measure_opening straight ahead (bearing 0); if not passable, open_door or clear_debris citing it.
 - no_frontier (your map has no reachable unsearched floor; the robot returns after a short scan unless you act):
-  read the LiDAR summary and your camera. If a closed door or light debris blocks the way on, measure_opening
-  toward it and open_door or clear_debris citing that. If fire blocks it, tell your partner and the commander and
+  if blocked_unsearched is given, your map shows unsearched floor you cannot reach at that bearing and distance:
+  go_to its approach point, then measure_opening at bearing 0; if not passable because of light debris or a closed
+  door, clear_debris or open_door citing it. Otherwise read the LiDAR summary and your camera. If a closed door or
+  light debris blocks the way on, measure_opening toward it and open_door or clear_debris citing that. If fire blocks it, tell your partner and the commander and
   let the robot return. Never invent a target. Apply this whenever the context's frontiers list is empty, whatever
   the event: another event (a warm shape, say) may have arrived at the same moment.
 - Every step: if the context says the torch is off or the event is periodic, call assess_visibility first; if the
@@ -121,7 +123,7 @@ class RobotAgent:
         ctx.frontiers = list(req.get("frontiers") or [])
         tools = ToolRegistry(Path(req["robot_dir"]), ctx, Path(req.get("debug_dir") or Path(self.trace_path).parent / "agent_debug"))
         context = {k: req[k] for k in ("robot", "t", "pose", "torch", "mode", "state", "goal", "heat_budget", "air_c", "event",
-                                       "inbox", "orders", "survivors", "frontiers", "lidar", "partners") if k in req}
+                                       "inbox", "orders", "survivors", "frontiers", "lidar", "partners", "blocked_unsearched") if k in req}
         messages = [{"role": "system", "content": SYSTEM},
                     {"role": "user", "content": "Decision needed. Context:\n" + json.dumps(context, default=str)}]
         step_id = f"{req['robot']}@{float(req['t']):.3f}"
