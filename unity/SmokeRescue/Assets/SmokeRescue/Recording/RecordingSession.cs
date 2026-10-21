@@ -68,6 +68,20 @@ namespace SmokeRescue.Recording
 
         public static Result Record(string scenarioFile, string runId, float maxSeconds = float.PositiveInfinity, bool noise = true, Action<string> progress = null)
         {
+            Result last = null;
+            foreach (var step in RecordSteps(scenarioFile, runId, maxSeconds, noise, progress)) if (step != null) last = step;
+            return last;
+        }
+
+        /// <summary>
+        /// The recording as steps: null after each simulated second, then the result. The editor menu runs one step per
+        /// editor update, so the editor completes a frame every simulated second. Run as one call, a 200 s recording was a
+        /// single 20-minute editor frame, and macOS frees each render's Metal objects only when a frame ends: the editor's
+        /// footprint grew about 1 GB a minute (13 GB to 21 GB in 10 minutes of run 15) until the system killed it
+        /// (OS_REASON_JETSAM at 11:17:42 in run 14, with about 40 other processes). The simulation is the same either way.
+        /// </summary>
+        public static IEnumerable<Result> RecordSteps(string scenarioFile, string runId, float maxSeconds = float.PositiveInfinity, bool noise = true, Action<string> progress = null)
+        {
             var wall = Stopwatch.StartNew();
             var plan = FloorPlan.Load();
             var scenario = Scenario.Load(scenarioFile);
@@ -201,6 +215,7 @@ namespace SmokeRescue.Recording
             {
                 double t = k / (double)ClockHz;
                 if (t > duration + 1e-9) break;
+                if (k > 0 && k % ClockHz == 0) yield return null;   // let the editor finish a frame (see RecordSteps)
                 SimNow = t;
                 // Every reader of the smoke field sees this tick's time. It was set only at camera frames, so the LiDAR
                 // asked the fire simulation for a time older than the thermocouple had, and each such request reloaded
@@ -359,7 +374,7 @@ namespace SmokeRescue.Recording
             result.wallSeconds = wall.Elapsed.TotalSeconds;
             Debug.Log($"[SmokeRescue] Recorded {runId}: {string.Join(", ", result.frames.Select(kv => $"{kv.Key} {kv.Value} frames"))}, " +
                       $"sim {result.simSeconds:0.0} s in {result.wallSeconds:0} s wall, {result.radioLines} radio lines, {result.truthPoints} truth points -> {root}");
-            return result;
+            yield return result;
             // Everything a scorer needs, written at the end and every checkpoint_s during the run, so a run that stops
             // early (run 12: the editor quit at 163 s with no crash report and nothing could be scored) is still scored.
             void Checkpoint(double tNow, bool final)

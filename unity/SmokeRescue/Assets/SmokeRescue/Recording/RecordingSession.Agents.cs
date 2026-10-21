@@ -113,7 +113,8 @@ namespace SmokeRescue.Recording
                 rig.actions.Step(dt);
                 if (!rig.actions.IsRunning)
                     rig.brain?.LogAgentAction(LastT, $"{rig.actions.Action} {rig.actions.Status}" +
-                        (rig.actions.FailureReason != null ? ": " + rig.actions.FailureReason : ""), "target", rig.actions.TargetId ?? "");
+                        (rig.actions.FailureReason != null ? ": " + rig.actions.FailureReason : "") +
+                        (rig.actions.TargetId != null ? $" (target {rig.actions.TargetId})" : ""));   // numbers only in the values
             }
         }
 
@@ -250,8 +251,8 @@ namespace SmokeRescue.Recording
                 case "request_human_approval":
                     var ans = Post("/approval", o);
                     brain.Log(t, "approval", ans == null ? "approval service unreachable; treated as refused"
-                        : $"{(ans.Value<bool?>("approved") == true ? "approved" : "refused")} by {ans.Value<string>("by")}: {ans.Value<string>("reason")}",
-                        "question", o.Value<string>("question") ?? "");
+                        : $"{(ans.Value<bool?>("approved") == true ? "approved" : "refused")} by {ans.Value<string>("by")}: {ans.Value<string>("reason")}" +
+                          $" (question: {o.Value<string>("question") ?? ""})");
                     break;
             }
         }

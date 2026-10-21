@@ -237,3 +237,29 @@ def test_extract_survivor_needs_a_close_person_verdict_and_a_free_sled(tmp_path,
     assert [o["type"] for o in extract(1.2)["orders"]] == ["extract_survivor"]
     assert extract(3.0)["refusals"][0]["tool"] == "extract_survivor", "too far: approach first"
     assert "already towing" in extract(1.2, carrying=True)["refusals"][0]["reason"]
+
+
+
+class Recording(Scripted):
+    """Scripted backend that keeps the messages it was sent, so a test can read what the model was told."""
+    def __init__(self, turns):
+        super().__init__(turns); self.seen = []
+
+    def chat(self, messages, tools):
+        self.seen.append([dict(m) for m in messages]); return super().chat(messages, tools)
+
+
+def test_a_confirmation_says_how_to_get_the_person_out(tmp_path, monkeypatch):
+    # Run 15: robot A confirmed a person 2.7 m away and searched on. The confirm result names the next step: an approach
+    # when the inspection was beyond the arm's reach, a lift when it was within it.
+    def told(range_m):
+        monkeypatch.setattr(T.vision, "load_frame", lambda d, t: object())
+        monkeypatch.setattr(T.vision, "inspect_candidate", lambda f, b, r, output_dir: {
+            "id": "ev1", "tool": "inspect_candidate", "verdict": "person", "candidate": {"range_m": range_m}})
+        backend = Recording([[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": range_m})],
+                             [ToolCall("confirm_survivor", {"x": 5, "y": 5 + range_m, "evidence_id": "ev1"})]])
+        out = RobotAgent(backend, tmp_path / f"{range_m}.jsonl").step(request(tmp_path))
+        assert [o["type"] for o in out["orders"]] == ["confirm_survivor"]
+        return [m for m in backend.seen[-1] if m.get("role") == "tool" and m.get("name") == "confirm_survivor"][-1]["content"]
+    assert "approach_candidate" in told(2.7) and "extract_survivor" not in told(2.7)
+    assert "extract_survivor" in told(1.2)
