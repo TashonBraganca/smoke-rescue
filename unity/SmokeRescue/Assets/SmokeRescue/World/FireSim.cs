@@ -26,12 +26,15 @@ namespace SmokeRescue.World
             public float FuelRemainingKg { get; }
             public float SurfaceTemperatureC { get; }
             public float FlameIntensity { get; }
+            /// <summary>Mean retained heat release during the last fixed step, in kW, after water cooling.</summary>
+            public double HeatReleaseKw { get; }
             public float BurntFraction { get; }
             public bool Collapsed { get; }
             internal CellState(string room, Cell c)
             {
                 Room = room; InitialFuelKg = (float)c.initialFuel; FuelRemainingKg = (float)c.fuel;
                 SurfaceTemperatureC = (float)c.temperature; FlameIntensity = (float)c.flame;
+                HeatReleaseKw = c.heatReleaseKw;
                 BurntFraction = c.initialFuel > 0 ? (float)Clamp(1 - c.fuel / c.initialFuel, 0, 1) : 0;
                 Collapsed = c.collapsed;
             }
@@ -124,7 +127,7 @@ namespace SmokeRescue.World
         internal sealed class Cell
         {
             public int room = -1;
-            public double initialFuel, fuel, temperature, flame, wetUntil, ignition = double.MaxValue;
+            public double initialFuel, fuel, temperature, flame, wetUntil, heatReleaseKw, ignition = double.MaxValue;
             public bool burning, collapsed, protectedApproach;
         }
         internal sealed class Gas
@@ -174,6 +177,8 @@ namespace SmokeRescue.World
         public float CellSize => (float)config.cell_size_m;
         public Vector2 Origin => new Vector2((float)originX, (float)originZ);
         public double Time => tick * config.step_s;
+        internal double StepSeconds => config.step_s;
+        internal double HeatOfCombustionKjKg => config.spread.heat_of_combustion_kj_kg;
         public IReadOnlyList<CollapseEvent> Collapses => collapseView;
         // A snapshot prevents a caller from modifying live room state.
         public IReadOnlyList<RoomState> RoomStates
@@ -421,7 +426,7 @@ namespace SmokeRescue.World
             // Every neighbour read comes from the previous tick, never a partly updated row.
             for (int i = 0; i < cells.Length; i++)
             {
-                var c = cells[i]; nextTemperature[i] = c.temperature; nextFlame[i] = 0;
+                var c = cells[i]; nextTemperature[i] = c.temperature; nextFlame[i] = 0; c.heatReleaseKw = 0;
                 if (c.room < 0) continue;
                 var room = rooms[c.room];
                 double warming = 0;
@@ -452,7 +457,8 @@ namespace SmokeRescue.World
                     nextFlame[i] = flame * retained;
                     double flameC = s.flame_min_c + (s.flame_max_c - s.flame_min_c) * flame;
                     temperature += (flameC - temperature) * Math.Min(1, dt / s.flame_relaxation_s) * retained;
-                    heatKw[c.room] += (release - absorbed) / dt;
+                    c.heatReleaseKw = (release - absorbed) / dt;
+                    heatKw[c.room] += c.heatReleaseKw;
                     smokeProduction[c.room] += g.smoke_production_per_cell_s * g.smoke_reference_volume_m3 *
                         consumed * retained / (dt * s.fuel_burn_kg_m2_s * area);
                 }

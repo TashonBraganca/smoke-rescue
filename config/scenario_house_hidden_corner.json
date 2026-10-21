@@ -16,6 +16,7 @@
   "sim_rate_hz": 15,
   "yaw_convention": "degrees about Unity +y. 0 faces +z (north), 90 faces +x (east).",
   "smoke": {
+    "model": "fluid",
     "global_haze": 0.15,
     "rooms": {
       "kitchen": 0.35,

@@ -5,7 +5,7 @@ using UnityEngine.Rendering.HighDefinition;
 
 namespace SmokeRescue.World
 {
-    /// <summary>Smoke density (0 to 1) at a Unity world point: the room's scenario density, 0 outside the house.</summary>
+    /// <summary>Smoke density at a world point, equal to three times extinction per metre in fluid mode.</summary>
     public sealed class SmokeField
     {
         readonly FloorPlan plan;
@@ -27,6 +27,7 @@ namespace SmokeRescue.World
         {
             var room = RoomAt(p);
             if (room == null || p.y < 0f || p.y > plan.wall_height) return 0f;
+            if (smoke.model == "fluid") return Override == null ? 0f : Mathf.Max(0f, Override(p, Time));
             float d = smoke.Density(room, Time);
             return Override == null ? d : Mathf.Max(d, Mathf.Clamp01(Override(p, Time)));
         }
@@ -34,6 +35,9 @@ namespace SmokeRescue.World
         /// <summary>Density to HDRP mean free path (metres of fog before light is attenuated to 1/e).
         /// 0.15 gives about 20 m (light haze), 0.35 about 8.6 m, 0.6 about 5 m, 1.0 gives 3 m.</summary>
         public static float MeanFreePath(float density) => Mathf.Clamp(3f / Mathf.Max(density, 1e-3f), 1f, 400f);
+        public static float MeanFreePath(float density, bool physical) => physical
+            ? 3f / Mathf.Max(density, 1e-6f)
+            : MeanFreePath(density);
     }
 
     /// <summary>
@@ -65,6 +69,7 @@ namespace SmokeRescue.World
         FireVisuals fireVisuals;
         FlameBodies flameBodies;
         FireSimHeat fireSim;
+        SmokeSolver smokeSolver;
         BurnDamage burn;
         /// <summary>The spreading fire, or null when the scenario uses static fires.</summary>
         public FireSimHeat FireSpread => fireSim;
@@ -98,10 +103,10 @@ namespace SmokeRescue.World
             exposure.mode.Override(ExposureMode.UsePhysicalCamera);
             exposure.compensation.Override(0f);
             a.fog = profile.Add<Fog>(true);
-            float haze = scenario.smoke.global_haze;
-            a.fog.enabled.Override(haze > 0f);
+            float haze = scenario.smoke.model == "fluid" ? 0f : scenario.smoke.global_haze;
+            a.fog.enabled.Override(scenario.smoke.model == "fluid" || haze > 0f);
             a.fog.enableVolumetricFog.Override(true);
-            a.fog.meanFreePath.Override(SmokeField.MeanFreePath(haze));
+            a.fog.meanFreePath.Override(SmokeField.MeanFreePath(haze, scenario.smoke.model == "fluid"));
             a.fog.baseHeight.Override(plan.wall_height);     // uniform density below the ceiling
             a.fog.maximumHeight.Override(plan.wall_height + 2f);
             a.fog.albedo.Override(new Color(0.78f, 0.76f, 0.72f));
@@ -173,10 +178,23 @@ namespace SmokeRescue.World
                 var spread = new FireSimHeat(firePlan, scenario.seed, scenario.fire.head_start_s);
                 a.fireSim = spread;
                 a.thermal = new ThermalField(plan, spread);
-                a.field.Override = spread.SmokeDensity;
+                if (scenario.smoke.model == "fluid")
+                {
+                    a.smokeSolver = SmokeSolver.Load(firePlan,
+                        System.IO.Path.Combine(FloorPlan.ConfigDir, "fire.json"),
+                        System.IO.Path.Combine(FloorPlan.ConfigDir, "smoke.json"), scenario.seed, spread.HeadStart);
+                    spread.FluidSmoke = a.smokeSolver;
+                    a.field.Override = a.smokeSolver.Density;
+                }
+                else a.field.Override = spread.SmokeDensity;
                 a.burn = new BurnDamage(spread, go.transform, Soot());
             }
-            else a.thermal = new ThermalField(plan, new StaticFireHeat(plan));
+            else
+            {
+                a.thermal = new ThermalField(plan, new StaticFireHeat(plan));
+                if (scenario.smoke.model == "fluid")
+                    throw new System.InvalidOperationException("Fluid smoke requires the spreading fire model.");
+            }
             a.fireVisuals = new FireVisuals(go.transform, plan.wall_height, scenario.seed);
             a.flameBodies = new FlameBodies(go.transform);
             foreach (var f in plan.fires)
@@ -199,9 +217,31 @@ namespace SmokeRescue.World
                 bool isLayer = key.EndsWith("#layer");
                 string room = isLayer ? key.Substring(0, key.Length - 6) : key;
                 float d = scenario.smoke.Density(room, t);
-                if (isLayer) d = Mathf.Clamp01(d * 2.5f + (d > 0f ? 0.1f : 0f));
-                if (fireSim != null)
+                if (smokeSolver != null)
                 {
+                    // The renderer averages each room's masses and carrier volume once per solver tick.
+                    var rs = smokeSolver.GetRoomState(room, t);
+                    float depth = rs.UpperDepthM;
+                    var size = volume.parameters.size;
+                    var position = volume.transform.position;
+                    if (isLayer)
+                    {
+                        volume.parameters.size = new Vector3(size.x, Mathf.Max(.001f, depth), size.z);
+                        volume.transform.position = new Vector3(position.x, plan.wall_height - depth / 2f, position.z);
+                        volume.parameters.albedo = new Color(.2f, .19f, .18f);
+                        d = rs.UpperDensity;
+                    }
+                    else
+                    {
+                        float height = plan.wall_height - depth;
+                        volume.parameters.size = new Vector3(size.x, height, size.z);
+                        volume.transform.position = new Vector3(position.x, height / 2f, position.z);
+                        d = rs.LowerDensity;
+                    }
+                }
+                else if (fireSim != null)
+                {
+                    if (isLayer) d = Mathf.Clamp01(d * 2.5f + (d > 0f ? 0.1f : 0f));
                     // Smoke from the fire simulation: a dense hot layer from the ceiling down to the layer height,
                     // thinner smoke below it. Layer volumes resize as the layer sinks.
                     var rs = fireSim.Room(room, t);
@@ -217,8 +257,9 @@ namespace SmokeRescue.World
                     }
                     else d = Mathf.Max(d, Mathf.Clamp01(fireSim.SmokeDensity(new Vector3(volume.transform.position.x, 0.5f, volume.transform.position.z), t)));
                 }
+                else if (isLayer) d = Mathf.Clamp01(d * 2.5f + (d > 0f ? 0.1f : 0f));
                 volume.gameObject.SetActive(d > 1e-3f);
-                volume.parameters.meanFreePath = SmokeField.MeanFreePath(d);
+                volume.parameters.meanFreePath = SmokeField.MeanFreePath(d, smokeSolver != null);
                 volume.parameters.textureOffset = new Vector3(0.011f * t, -0.017f * t, 0.007f * t);   // slow rising drift
             }
             if (thermal != null)
@@ -229,7 +270,7 @@ namespace SmokeRescue.World
                 flameBodies.Apply(t, burning);
                 burn?.Apply(t, burning);
             }
-            if (fog != null && scenario.smoke.ramp_per_minute > 0f)
+            if (smokeSolver == null && fog != null && scenario.smoke.ramp_per_minute > 0f)
                 fog.meanFreePath.value = SmokeField.MeanFreePath(Mathf.Clamp01(scenario.smoke.global_haze + scenario.smoke.ramp_per_minute * t / 60f));
         }
 

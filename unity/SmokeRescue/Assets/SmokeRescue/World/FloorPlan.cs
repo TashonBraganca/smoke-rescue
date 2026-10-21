@@ -19,6 +19,8 @@ namespace SmokeRescue.World
         public float door_height;
         public List<Room> rooms = new List<Room>();
         public List<Door> doors = new List<Door>();
+        // Optional ventilation openings, with the same wall, at, width, between and state fields as doors.
+        public List<Door> windows = new List<Door>();
         public List<Landmark> landmarks = new List<Landmark>();
         public List<Fire> fires = new List<Fire>();
         public List<EmergencyLight> emergency_lights = new List<EmergencyLight>();
@@ -32,7 +34,8 @@ namespace SmokeRescue.World
             public string floor;
             public string walls;
             public string ceiling;
-            public Rect Rect => Rect.MinMaxRect(rect[0], rect[1], rect[2], rect[3]);
+            // Derived from rect; not serialised (UnityEngine.Rect loops through Vector2.normalized in JSON).
+            [Newtonsoft.Json.JsonIgnore] public Rect Rect => Rect.MinMaxRect(rect[0], rect[1], rect[2], rect[3]);
         }
 
         [Serializable]
