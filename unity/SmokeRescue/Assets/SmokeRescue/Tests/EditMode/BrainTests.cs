@@ -878,6 +878,47 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(taken, Is.EqualTo(1));
             Assert.That(Final(1.2f, out int none), Is.Not.EqualTo("return"), "control: no route at the normal clearance");
             Assert.That(none, Is.Zero);
+            // Hot air but no fire on the way: with the budget spent it leaves by the normal route instead of sitting in the
+            // heat at the nearest "coolest" cell (2x2 attempt 4).
+            var c2 = Settings(); c2.grid_size_m = 12; c2.robot_radius_m = .25f;
+            var hot = new RobotBrain(Calibration(), c2, "A", 0); Room(hot, -3, 3, -2, 6); int left = 0;
+            for (int i = 0; i < 150; i++)
+            {
+                double t = i / 15.0; Motion(hot, t, t < 3 ? 1f : 0); hot.OnRgbd(Image(t, true)); hot.OnAirTemperature(t, t < 3.2 ? 20 : 150);
+                hot.Step(t, 1f / 15); left += hot.DrainEvents().Count(e => e.kind == "emergency_exit");
+            }
+            Assert.That(left, Is.EqualTo(1));
+            Assert.That(hot.Snapshot().state, Is.EqualTo("return"));
+        }
+
+        [Test]
+        public void ARobotThatLeftEarlyGoesBackInWhenTheWayIsClear()
+        {
+            // Slow-fire run: robot A left at 74 s because fire neared its route and stood outside for the last two minutes.
+            // Left early and the way in is clear: it re-enters. Controls: a normal finish stays finished; still-hot air
+            // (heat budget not recovered) keeps it out.
+            string After(bool leftEarly, bool hotAir, out int reentries)
+            {
+                var c = Settings(); c.grid_size_m = 12; c.robot_radius_m = .25f;
+                var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -5, 5, -2, 6);
+                var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+                typeof(RobotBrain).GetField("completed", flags).SetValue(b, true);
+                typeof(RobotBrain).GetField("canReenter", flags).SetValue(b, leftEarly);
+                if (hotAir) typeof(RobotBrain).GetField("budget", flags).SetValue(b, .2f);   // spent, and the air keeps it low
+                reentries = 0;
+                for (int i = 0; i < 60; i++)
+                {
+                    double t = i / 15.0; Motion(b, t); b.OnRgbd(Image(t, true)); b.OnAirTemperature(t, hotAir ? 60 : 20);
+                    b.Step(t, 1f / 15); reentries += b.DrainEvents().Count(e => e.kind == "reenter");
+                }
+                return b.Snapshot().state;
+            }
+            Assert.That(After(true, false, out int back), Is.Not.EqualTo("complete"), "goes back in");
+            Assert.That(back, Is.EqualTo(1));
+            Assert.That(After(false, false, out int none), Is.EqualTo("complete"), "control: a normal finish stays finished");
+            Assert.That(none, Is.Zero);
+            Assert.That(After(true, true, out int hot), Is.Not.EqualTo("explore"), "control: hot air, budget not recovered");
+            Assert.That(hot, Is.Zero);
         }
 
         [Test]
