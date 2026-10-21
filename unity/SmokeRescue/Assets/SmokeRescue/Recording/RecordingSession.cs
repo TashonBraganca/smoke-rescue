@@ -284,7 +284,10 @@ namespace SmokeRescue.Recording
                     // Packets whose radio delay has elapsed reach their receiver before its next Step, oldest first.
                     // The receiver hears it at this tick (the brain contract), decoded from the frozen wire bytes.
                     foreach (var p in inFlight.Where(p => p.at <= t).OrderBy(p => p.at).ToList())
+                    {
                         p.to.brain.OnPeerMessage(BrainMessage.FromBytes(p.bytes), t);
+                        MatchPartnerPlaces(p.to, t);
+                    }
                     inFlight.RemoveAll(p => p.at <= t);
                 }
 

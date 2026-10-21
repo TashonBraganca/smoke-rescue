@@ -2105,6 +2105,69 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void TwoAgreeingCameraPlaceMatchesLinkTheFramesAndOneOrAConflictDoesNot()
+        {
+            // Visual place recognition: robot A's camera keyframes reach robot B, B's place service recognises them among
+            // its own, and the matches become link candidates like verified LiDAR matches. True transform from A's frame to
+            // B's: turn 90 deg left, then move (3, -2). Two matches from places 3 m apart agree: linked, recovering the
+            // transform. Controls: one match alone, and a second match that disagrees by 1 m, do not link.
+            var truth = new BrainPose { position = new Vector2(3, -2), yawRad = Mathf.PI / 2 };
+            BrainPose Compose(BrainPose a, BrainPose b) => new BrainPose { position = a.Transform(b.position.x, b.position.y), yawRad = a.yawRad + b.yawRad };
+            (float dx, float dy, float dyawDeg) Relative(BrainPose frame, BrainPose p)
+            {
+                Vector2 d = p.position - frame.position; float c0 = Mathf.Cos(-frame.yawRad), s0 = Mathf.Sin(-frame.yawRad);
+                return (c0 * d.x - s0 * d.y, s0 * d.x + c0 * d.y, (p.yawRad - frame.yawRad) * Mathf.Rad2Deg);
+            }
+            var theirs = new[] { new BrainPose { position = new Vector2(1, 2), yawRad = .3f }, new BrainPose { position = new Vector2(4, 2), yawRad = -.5f } };
+            var mine = new[] { new BrainPose { position = new Vector2(.5f, -1), yawRad = 2f }, new BrainPose { position = new Vector2(.8f, 2.2f), yawRad = 1.1f } };
+
+            (bool linked, BrainPose link, List<BrainEvent> events) Run(int matches, float conflictM)
+            {
+                var c = Settings(); c.frames_shared_at_start = false;
+                var b = new RobotBrain(Calibration(), c, "B", 0);
+                var payload = new byte[] { 1, 2, 3 };
+                for (int i = 0; i < 2; i++) b.AddVisualKeyframe(10 + i, mine[i], payload);
+                var m = new RobotBrain(Calibration(), c, "A", 0).BuildMessage(0);
+                m.VisualKeyframes = new[] { new BrainVisualKeyframe { id = 1, pose = theirs[0], payload = payload },
+                                            new BrainVisualKeyframe { id = 2, pose = theirs[1], payload = payload } };
+                b.OnPeerMessage(Wire(m), .5);
+                var pending = b.DrainPartnerVisualKeyframes();
+                Assert.That(pending.Select(x => x.keyframe.id), Is.EquivalentTo(new[] { 1, 2 }), "both camera keyframes reach the matcher");
+                for (int i = 0; i < matches; i++)
+                {
+                    var inB = Compose(truth, theirs[i]);
+                    if (i == 1) inB.position += new Vector2(conflictM, 0);
+                    var r = Relative(mine[i], inB);
+                    b.OnVisualPlaceMatch("A", i + 1, 10 + i, r.dx, r.dy, r.dyawDeg, 30, 1 + i);
+                }
+                bool ok = b.TryPartnerLink("A", out var link);
+                return (ok, link, b.DrainEvents().ToList());
+            }
+            var two = Run(2, 0);
+            Assert.That(two.linked, Is.True, "two agreeing camera matches link the frames");
+            Assert.That(Vector2.Distance(two.link.position, truth.position), Is.LessThan(.01f));
+            Assert.That(Mathf.Abs(Mathf.DeltaAngle(two.link.yawRad * Mathf.Rad2Deg, truth.yawRad * Mathf.Rad2Deg)), Is.LessThan(.1f));
+            Assert.That(two.events.Single(e => e.kind == "frame_linked").reason, Does.Contain("camera"));
+            Assert.That(Run(0, 0).linked, Is.False, "control: no camera matches keep separate frames");
+            Assert.That(Run(1, 0).linked, Is.False, "control: one match waits for a second");
+            Assert.That(Run(2, 1f).linked, Is.False, "control: a disagreeing match does not link");
+        }
+
+        [Test]
+        public void CameraKeyframesSurviveTheRadioFormat()
+        {
+            var m = new RobotBrain(Calibration(), Settings(), "A", 0).BuildMessage(0);
+            Assert.That(Wire(m).VisualKeyframes, Is.Empty, "control: no camera keyframes added");
+            var payload = Enumerable.Range(0, 1900).Select(i => (byte)(i * 7)).ToArray();
+            m.VisualKeyframes = new[] { new BrainVisualKeyframe { id = 7, pose = new BrainPose { position = new Vector2(1.5f, -2), yawRad = .4f }, payload = payload } };
+            var back = Wire(m).VisualKeyframes.Single();
+            Assert.That(back.id, Is.EqualTo(7));
+            Assert.That(back.pose.position, Is.EqualTo(new Vector2(1.5f, -2)));
+            Assert.That(back.pose.yawRad, Is.EqualTo(.4f));
+            CollectionAssert.AreEqual(payload, back.payload);
+        }
+
+        [Test]
         public void PeerSurvivorCancelsInspectionAndLogsOnlyOnce()
         {
             var b = new RobotBrain(Calibration(), Settings(), "B", 0);

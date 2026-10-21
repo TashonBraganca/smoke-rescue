@@ -396,5 +396,13 @@
   "route_watch_dwell_s": 4.5,
   "route_watch_dwell_s_reason": "The closing-rate rule needs two intervals of escape_check_s=2 s after seeing fire. A 4.5 s dwell provides both plus 0.5 s for image delivery.",
   "route_watch_max_s": 12.0,
-  "route_watch_max_s_reason": "At sweep_yaw_dps=45 a half turn needs 4 s, plus the 4.5 s dwell. A 12 s cap leaves 3.5 s for heading convergence and delayed images without an unbounded stop."
+  "route_watch_max_s_reason": "At sweep_yaw_dps=45 a half turn needs 4 s, plus the 4.5 s dwell. A 12 s cap leaves 3.5 s for heading convergence and delayed images without an unbounded stop.",
+  "visual_keyframe_period_s": 2.0,
+  "visual_keyframe_period_s_reason": "How often a robot asks its own OpenCV 5 place service for a camera keyframe (ORB features with positions). One per radio broadcast (2 s): at 0.3 to 0.5 m/s that is a keyframe every 0.6 to 1 m, closer than the 1.5 m within which two cameras still share most of a view.",
+  "visual_keyframe_max": 200,
+  "visual_keyframe_max_reason": "Own camera keyframes kept for sending (400 s of keyframes at one per 2 s, longer than a run).",
+  "visual_keyframes_per_message": 1,
+  "visual_keyframes_per_message_reason": "Camera keyframes per radio broadcast: the newest, else one older in turn. About 1.9 KB each (48 ORB features of 38 bytes); brain messages are already about 5.4 KB every 2 s (held-out run 1), so one keeps the added load near 35 %.",
+  "visual_link_min_inliers": 12,
+  "visual_link_min_inliers_reason": "A camera match becomes a link candidate only with at least this many RANSAC inliers; the place service applies its own measured threshold first (config/perception.json place_min_inliers), this is the brain's floor. The frame link still needs two agreeing candidates from places at least link_min_separation_m apart."
 }
