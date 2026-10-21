@@ -1,0 +1,11 @@
+{
+  "head_start_s": 0.0,
+  "note": "times are on the robots' clock (fire time minus head start)",
+  "collapses": [],
+  "flashover": [
+    {
+      "Room": "living",
+      "t": 181.20000000000002
+    }
+  ]
+}
