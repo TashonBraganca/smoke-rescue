@@ -23,6 +23,7 @@ import multiprocessing
 from pathlib import Path
 import struct
 import threading
+import uuid
 
 import cv2
 import numpy as np
@@ -300,11 +301,13 @@ class PlaceDatabase:
         self.settings = settings if settings is not None else load_settings()
         self.keyframes: list[tuple[int, Keyframe]] = []
         self.next_id = 0
+        self.database_id = uuid.uuid4().hex
         self.parent = None
         self.last_t = -math.inf
 
     def reset(self):
         self.keyframes, self.next_id = [], 0
+        self.database_id = uuid.uuid4().hex
 
     def _check_run(self, robot_dir, t):
         t = float(t)
@@ -320,12 +323,12 @@ class PlaceDatabase:
         frame = vision.load_frame(str(robot_dir), float(t))
         kf, usable = make_keyframe(frame.rgb, frame.depth_m, frame.K, self.settings)
         if kf is None:
-            return {"ok": False, "reason": f"{usable} usable features, need {self.settings['place_min_features']}"}
+            return {"ok": False, "database_id": self.database_id, "reason": f"{usable} usable features, need {self.settings['place_min_features']}"}
         ident = self.next_id
         self.next_id += 1
         self.keyframes.append((ident, kf))
         del self.keyframes[:max(0, len(self.keyframes) - int(self.settings["place_keyframes_kept"]))]
-        return {"ok": True, "id": ident, "features": len(kf),
+        return {"ok": True, "id": ident, "database_id": self.database_id, "t": float(frame["stamps"]["rgb"]), "features": len(kf),
                 "payload_b64": encode_b64(kf.desc, kf.xyh)}
 
     def match(self, payload_b64, robot_dir=None, t=None) -> dict:
@@ -334,8 +337,10 @@ class PlaceDatabase:
         try:
             partner = decode_b64(payload_b64)
         except ValueError as exc:
-            return {"matched": False, "reason": f"invalid payload: {exc}"}
-        return match_keyframes(partner, self.keyframes, self.settings)
+            return {"matched": False, "database_id": self.database_id, "reason": f"invalid payload: {exc}"}
+        result = match_keyframes(partner, self.keyframes, self.settings)
+        result["database_id"] = self.database_id
+        return result
 
 
 def _worker(connection, settings):
@@ -429,7 +434,7 @@ def _robot(robot):
 
 
 def keyframe(robot, robot_dir, t) -> dict:
-    """Store a keyframe from this robot's frame at t. Returns {"ok", "id", "features", "payload_b64"} or {"ok": False, "reason"}."""
+    """Store an own RGB-D view. Success includes its image stamp, database_id, service id and binary radio payload."""
     return _robot(robot).keyframe(robot_dir, t)
 
 

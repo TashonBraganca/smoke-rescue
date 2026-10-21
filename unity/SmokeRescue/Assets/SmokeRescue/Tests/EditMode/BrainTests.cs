@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace SmokeRescue.Tests.EditMode
 {
-    public sealed class BrainTests
+    public sealed partial class BrainTests
     {
         static BrainConfig Settings() => new BrainConfig
         {
@@ -2355,6 +2355,42 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void TwoAgreeingCameraPlaceMatchesLinkTheFramesAndOneOrAConflictDoesNot()
+        {
+            var two = CameraScene();
+            Assert.That(two.brain.Snapshot().survivors, Is.Empty, "partner content stays withheld before linking");
+            Assert.That(two.brain.Snapshot().peerExplored.All(x => x == 0), Is.True);
+            two.Match(0); two.Match(1);
+            Assert.That(two.brain.TryPartnerLink("A", out var link), Is.True, "two map-verified camera candidates agree");
+            Assert.That(Vector2.Distance(link.position, two.truth.position), Is.LessThan(.01f));
+            var shared = two.brain.Snapshot();
+            Assert.That(Vector2.Distance(shared.survivors.Single().position, two.truth.position), Is.LessThan(.01f));
+            Assert.That(shared.peerExplored.Any(x => x != 0), Is.True, "the verified camera link applies the waiting partner map");
+            Assert.That(Mathf.Abs(Mathf.DeltaAngle(link.yawRad * Mathf.Rad2Deg, two.truth.yawRad * Mathf.Rad2Deg)), Is.LessThan(.1f));
+            Assert.That(two.brain.DrainEvents().Single(e => e.kind == "frame_linked").reason, Does.Contain("camera"));
+            var one = CameraScene(); one.Match(0);
+            Assert.That(one.brain.TryPartnerLink("A", out _), Is.False, "control: one match waits");
+            var conflict = CameraScene(); conflict.Match(0); conflict.Match(1, 1f);
+            Assert.That(conflict.brain.TryPartnerLink("A", out _), Is.False, "a camera pose displaced by 1 m cannot link");
+            var off = CameraScene(enabled: false); off.Match(0); off.Match(1);
+            Assert.That(off.brain.TryPartnerLink("A", out _), Is.False, "control: camera linking disabled");
+        }
+
+        [Test]
+        public void CameraKeyframesSurviveTheRadioFormat()
+        {
+            var m = new RobotBrain(Calibration(), Settings(), "A", 0).BuildMessage(0);
+            Assert.That(Wire(m).VisualKeyframes, Is.Empty, "control: no camera keyframes added");
+            var payload = Enumerable.Range(0, 1900).Select(i => (byte)(i * 7)).ToArray();
+            m.VisualKeyframes = new[] { new BrainVisualKeyframe { id = 7, pose = new BrainPose { position = new Vector2(1.5f, -2), yawRad = .4f }, payload = payload } };
+            var back = Wire(m).VisualKeyframes.Single();
+            Assert.That(back.id, Is.EqualTo(7));
+            Assert.That(back.pose.position, Is.EqualTo(new Vector2(1.5f, -2)));
+            Assert.That(back.pose.yawRad, Is.EqualTo(.4f));
+            CollectionAssert.AreEqual(payload, back.payload);
+        }
+
+        [Test]
         public void PeerSurvivorCancelsInspectionAndLogsOnlyOnce()
         {
             var b = new RobotBrain(Calibration(), Settings(), "B", 0);
@@ -2483,8 +2519,17 @@ namespace SmokeRescue.Tests.EditMode
                     { position = new Vector2(i, 3), confirmedAt = 0, sourceRobot = "robot_A" }).ToArray();
                 m.Acknowledgements = new[] { new BrainAck { sender = "robot_B", sequence = 1 }, new BrainAck { sender = "robot_C", sequence = 2 } };
             }
+            int baselineFull = full.EstimatedBytes, baselineDelta = delta.EstimatedBytes;
+            foreach (var m in new[] { full, delta })
+            {
+                // The deployed packet carries one 360-beam sweep and one 96-feature ORB payload.
+                m.Keyframes = Enumerable.Range(0, Settings().visual_lidar_keyframes_per_message).Select(i => new BrainKeyframe { id = i, pose = new BrainPose(),
+                    angleMinRad = -Mathf.PI, incrementRad = 2 * Mathf.PI / 360, minM = .15f, maxM = 12,
+                    rangesCm = Enumerable.Repeat((ushort)200, 360).ToArray() }).ToArray();
+                m.VisualKeyframes = new[] { new BrainVisualKeyframe { id = 1, pose = new BrainPose(), payload = VisualPayload() } };
+            }
             full = Wire(full); delta = Wire(delta);
-            TestContext.WriteLine("House full = " + full.EstimatedBytes + " bytes; delta = " + delta.EstimatedBytes + " bytes.");
+            TestContext.WriteLine($"Without keyframes full = {baselineFull}, delta = {baselineDelta}; visual payload = {VisualPayload().Length} bytes. House full = " + full.EstimatedBytes + " bytes; delta = " + delta.EstimatedBytes + " bytes.");
             Assert.That(full.EstimatedBytes, Is.LessThan(40000)); Assert.That(delta.EstimatedBytes, Is.LessThan(8000));
             CollectionAssert.AreEqual(full.Occupied, delta.Occupied);
             var idle = new RobotBrain(Calibration(), Settings(), "idle", 0);
@@ -2503,6 +2548,12 @@ namespace SmokeRescue.Tests.EditMode
                 if (p.x > 10 && p.x < 30 && p.y > 7 && p.y < 21) g.ObserveHeat(i, 600 + i % 50, 0);
             }
             var full = Wire(a.BuildMessage(0));
+            int withoutCamera = full.EstimatedBytes;
+            full.Keyframes = new[] { new BrainKeyframe { id = 0, angleMinRad = -Mathf.PI, incrementRad = 2 * Mathf.PI / 360,
+                minM = .15f, maxM = 12, rangesCm = Enumerable.Repeat((ushort)200, 360).ToArray() } };
+            full.VisualKeyframes = new[] { new BrainVisualKeyframe { id = 0, payload = VisualPayload() } };
+            full = Wire(full);
+            TestContext.WriteLine("Dense fire without camera = " + withoutCamera + " bytes.");
             TestContext.WriteLine("Dense fire full = " + full.EstimatedBytes + " bytes for " + full.Hotspots.Length + " hot cells.");
             Assert.That(full.Hotspots.Length, Is.EqualTo(7000));
             Assert.That(full.EstimatedBytes, Is.LessThan(40000));

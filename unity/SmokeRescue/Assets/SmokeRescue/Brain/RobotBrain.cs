@@ -129,6 +129,8 @@ namespace SmokeRescue.Brain
                 Emit(t, "goal", "Cool air and a recovered heat budget permit travel again.", "air_c", airC, "heat_budget", budget);
             }
             CheckReenter(t);
+            if (routeLook.HasValue && (retreating || returning || completed || nearFire))
+                EndRouteLook(t, "Cancelled: a heat reflex or a return to the way out takes precedence over the route look.", true);
             if (completed && !retreating) return Command(0, 0, dt, true);
             bool sensorsHealthy = t - lastRgb <= c.frame_max_age_s && motion.Healthy(t) &&
                 t - lastAir <= c.frame_max_age_s && (!health.Thermal || t - lastThermal <= c.frame_max_age_s);
@@ -279,6 +281,10 @@ namespace SmokeRescue.Brain
                 }
                 return FollowOrHold(t, dt);
             }
+
+            // A route look turns in place and keeps the path; a survivor candidate is taken up when it ends.
+            var routeLookCommand = RouteLookStep(t, dt);
+            if (routeLookCommand.HasValue) return routeLookCommand.Value;
 
             if (active != null && (active.confirmed || t - active.lastSeen > c.survivor_lost_s))
             {
@@ -792,9 +798,74 @@ namespace SmokeRescue.Brain
                     "fire_distance_m", closest, "margin_m", c.escape_fire_margin_m, "closes_in_s", float.IsInfinity(closeS) ? -1 : closeS, "walk_out_s", walkS);
                 BeginReturn(t, WayOutClosing);
             }
+            else CheckRouteWatch(t, route, routeM);
         }
         readonly List<int> wayOutPoints = new List<int>(); readonly List<float> wayOutRates = new List<float>();
         float wayOutThen; double wayOutThenT;
+
+        Vector2? routeLook;
+        double routeLookSince, routeLookFacedAt = double.NaN, routeLookEnded = double.NaN;
+        /// <summary>
+        /// Route watch. The way-out check knows only fire this robot's thermal camera has seen, and a robot searching rooms
+        /// that face away from its route home never looks at that route. Held-out run 1: robot A's map held no fire cells
+        /// from 96 s to 116 s while the fire spread along its route; at 120 s it turned, 84 fire cells appeared 1.3 m from the
+        /// route and the way out closed 0.2 s later (8.6 s above 60 C). So, from the way-out check while searching: when more
+        /// than route_watch_max_stale_share of the route home beyond escape_ignore_m has had no thermal look for
+        /// route_watch_stale_s, and the last look ended route_watch_min_interval_s ago, turn in place to face the nearest
+        /// stale route point, hold for route_watch_dwell_s, then carry on along the same path. The way-out check keeps
+        /// running during the look, so fire seen then ends the search as usual.
+        /// </summary>
+        void CheckRouteWatch(double t, List<Vector2> route, float routeM)
+        {
+            // The first look comes no sooner than route_watch_min_interval_s after the first check.
+            if (double.IsNaN(routeLookEnded)) routeLookEnded = t;
+            // Returning, retreating and carrying (a return) are already excluded by the way-out check itself.
+            if (!c.route_watch || budget < c.heat_retreat_fraction || airC > c.heat_retreat_c || routeLook.HasValue || t - routeLookEnded < c.route_watch_min_interval_s || active != null || sweeping ||
+                nearFire || recoveryPhase != 0 || waitingSensors || facing.HasValue || t < agentHoldUntil) return;
+            Vector2 at = motion.Pose.position, nearest = at; int counted = 0, stale = 0; float nearestM = float.PositiveInfinity;
+            foreach (var p in route)
+            {
+                float d = Vector2.Distance(p, at);
+                if (d <= c.escape_ignore_m) continue;
+                counted++;
+                if (t - grid.HeatLookTime(grid.Cell(p)) <= c.route_watch_stale_s) continue;
+                stale++;
+                if (d < nearestM) { nearestM = d; nearest = p; }
+            }
+            if (counted == 0 || stale <= c.route_watch_max_stale_share * counted) return;
+            routeLook = nearest; routeLookSince = t; routeLookFacedAt = double.NaN;
+            Emit(t, "route_watch", "Most of the route home has had no thermal look recently; turn and look along it before searching on.",
+                "stale_share", stale / (float)counted, "x_m", nearest.x, "y_m", nearest.y, "route_m", routeM, "distance_m", nearestM);
+        }
+        /// <summary>Turning in place toward the route look point, then holding still; null when no look is running. Kept
+        /// apart from the agent's facing (FaceStep), so neither is ever taken for the other.</summary>
+        BrainCommand? RouteLookStep(double t, float dt)
+        {
+            if (!routeLook.HasValue) return null;
+            float error = BrainMath.Angle(motion.Pose.yawRad, BrainMath.Heading(routeLook.Value - motion.Pose.position));
+            bool faced = Mathf.Abs(error) <= c.survivor_face_tolerance_deg;
+            if (faced && double.IsNaN(routeLookFacedAt))
+            {
+                // Check the way out on this view now and then every escape_check_s while holding, so one look can give the
+                // closing-rate rule the two intervals with a fresh view of the route that it needs.
+                routeLookFacedAt = t; nextWayOutCheck = Math.Min(nextWayOutCheck, t);
+            }
+            bool held = !double.IsNaN(routeLookFacedAt) && t - routeLookFacedAt >= c.route_watch_dwell_s;
+            if (held || t - routeLookSince >= c.route_watch_max_s)
+            {
+                EndRouteLook(t, held ? "Looked along the route home; carry on along the same path." :
+                    "The route look reached its time limit; carry on along the same path.", false);
+                return null;
+            }
+            return Command(0, faced ? 0 : Mathf.Clamp(error * c.heading_gain, -c.sweep_yaw_dps, c.sweep_yaw_dps), dt, true);
+        }
+        void EndRouteLook(double t, string reason, bool cancelled)
+        {
+            Emit(t, "route_watch_done", reason, "duration_s", t - routeLookSince, "faced", double.IsNaN(routeLookFacedAt) ? 0 : 1,
+                "cancelled", cancelled ? 1 : 0);
+            routeLook = null; routeLookFacedAt = double.NaN; routeLookEnded = t;
+            progressMark = double.NaN;   // restart the progress window: standing to look maps nothing new
+        }
         /// <summary>Forget the way-out history and any pending agent arrival: on a return, a retreat or a lost route the
         /// next readings belong to another route and another situation (Codex review).</summary>
         void ResetWayOutAndArrival()

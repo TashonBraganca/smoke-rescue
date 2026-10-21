@@ -37,6 +37,7 @@ namespace SmokeRescue.Recording
         /// cloud in the recording (for the replay and the video).</summary>
         const double Map3dLayersPeriodS = 5, Map3dExportPeriodS = 30;
         // The agent server bounds a step at about 75 s plus one 45 s call; past 120 s the reflex layer carries on alone.
+        static float PlaceHttpTimeoutS;
         static readonly HttpClient Http = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
         static readonly HashSet<string> AgentTriggers = new HashSet<string>
             { "survivor_candidate", "survivor_view_ready", "sensor_switch", "avoid_fire", "retreat", "stuck",
@@ -58,6 +59,7 @@ namespace SmokeRescue.Recording
             public readonly List<double> thermalTimes = new List<double>();
             public readonly StringBuilder agentLog = new StringBuilder();
             public double lastPeople = double.NegativeInfinity, lastMap3dLayers = double.NegativeInfinity, lastMap3dExport = double.NegativeInfinity;
+            public VisualPlaceWorker visualPlaces;
         }
 
         /// <summary>A team text and who has heard it. Delivery is tracked per listener: clearing the whole outbox when
@@ -389,6 +391,16 @@ namespace SmokeRescue.Recording
                 }
                 Map3d(rig, t);
             }
+        }
+
+        static void VisualKeyframe(RobotRig rig, double t, Queue<Task> pending, SensorConfig cfg)
+        {
+            if (PeopleUrl == null || rig.brain == null || rig.missionDone || !rig.brain.VisualPlacesEnabled) return;
+            if (rig.visualPlaces == null) rig.visualPlaces = new VisualPlaceWorker(rig.brain, rig.robot.RobotId,
+                Path.GetFullPath(rig.dir), new VisualPlaceClient(PeopleUrl, PlaceHttpTimeoutS));
+            if (!rig.visualPlaces.CaptureDue(t)) return;
+            FlushForAgent(rig, pending, cfg);
+            rig.visualPlaces.TryCapture(t, rig.brain.Snapshot().pose);
         }
 
         /// <summary>The robot's live 3D map: its latest depth frame fused at its own estimated pose into an OpenCV 5 TSDF

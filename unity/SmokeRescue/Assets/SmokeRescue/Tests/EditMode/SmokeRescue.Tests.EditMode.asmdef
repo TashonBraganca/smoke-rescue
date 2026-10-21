@@ -11,7 +11,8 @@
     "SmokeRescue.Robots",
     "SmokeRescue.Sensors",
     "SmokeRescue.Brain",
-    "SmokeRescue.Radio"
+    "SmokeRescue.Radio",
+    "SmokeRescue.Recording"
   ],
   "includePlatforms": [
     "Editor"
