@@ -67,6 +67,14 @@ namespace SmokeRescue.Robots
         }
 
         /// <summary>Move the gripper tip to a world point. Returns false, leaving the arm as it was, if out of reach.</summary>
+        /// <summary>Whether the arm's two links can put the gripper on this world point, from its own geometry.</summary>
+        public bool CanReach(Vector3 world)
+        {
+            var p = Root.InverseTransformPoint(world);
+            float r = Mathf.Sqrt(p.x * p.x + p.z * p.z), h = p.y - ShoulderHeight, d = Mathf.Sqrt(r * r + h * h);
+            return d <= UpperLength + Lower - 1e-4f && d >= Mathf.Abs(UpperLength - Lower) + 1e-4f;
+        }
+
         public bool Reach(Vector3 world)
         {
             var p = Root.InverseTransformPoint(world);

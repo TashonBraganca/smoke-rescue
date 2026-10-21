@@ -115,6 +115,30 @@ namespace SmokeRescue.Tests.EditMode
             runtime.Step(10); Assert.That(crate.transform.position, Is.EqualTo(start));
         }
 
+        [Test] public void ExtractGripsTheNearestPartOfALyingPerson()
+        {
+            // Run 26: the arm aimed at the centre of a lying person's bounds, a metre past their near edge, and failed with
+            // "contact point is out of the arm's reach". It grips the nearest part of the body. Control: a person whose near
+            // edge is beyond reach_m is refused.
+            string Lift(float nearEdgeM)
+            {
+                var r = MakeRobot();
+                var people = new GameObject("Survivors"); people.transform.SetParent(root.transform);
+                var person = new GameObject("test_person"); person.transform.SetParent(people.transform);
+                var box = person.AddComponent<BoxCollider>(); box.size = new Vector3(.5f, .3f, 1.7f);   // lying along the heading
+                person.transform.position = r.transform.position + new Vector3(0, .15f, nearEdgeM + .85f);
+                Physics.SyncTransforms();
+                var actions = new RobotActions(r, null, null, null, new RescueConfig { reach_m = 1.6f, grip_s = 2f, tow_offset_m = .9f, carry_speed_mps = .25f });
+                if (!actions.BeginExtract()) { Object.DestroyImmediate(people); return "refused: " + actions.FailureReason; }
+                for (int i = 0; i < 60 && actions.IsRunning; i++) { r.Step(.1f); actions.Step(.1f); }
+                string result = actions.Status + (actions.FailureReason != null ? ": " + actions.FailureReason : "");
+                Object.DestroyImmediate(people);
+                return result;
+            }
+            Assert.That(Lift(.7f), Is.EqualTo("succeeded"), "near edge within the arm's links");
+            Assert.That(Lift(1.9f), Does.StartWith("refused"), "control: near edge beyond the arm");
+        }
+
         [Test] public void ClearDebrisHoldsDriverThenResumesAndSequenceRepeatsExactly()
         {
             var first = RunClear(); Object.DestroyImmediate(root); root = new GameObject("Repeated body action tests");
