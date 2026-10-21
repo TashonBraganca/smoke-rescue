@@ -78,6 +78,11 @@ ACTIONS = [
     _fn("reject_candidate", "Mark a warm region as not a person so nobody inspects it again. Needs an "
         "inspect_candidate result with verdict not_person.", {"x": NUM, "y": NUM, "evidence_id": EVIDENCE},
         ["x", "y", "evidence_id"]),
+    _fn("withdraw_survivor", "Withdraw a survivor confirmed earlier at a position, when a fresh look shows nobody there. Needs "
+        "an inspect_candidate result from this step aimed at that position, inside the camera's view and within the "
+        f"confirmation range ({CONFIRM_MAX_RANGE_M:.1f} m), with depth reaching the spot (nothing nearer blocking it), that "
+        "found no person: verdict not_person, or no warm body and no whole colour person detection.",
+        {"x": NUM, "y": NUM, "evidence_id": EVIDENCE}, ["x", "y", "evidence_id"]),
     _fn("avoid_area", "Keep out of a circle around a fire for some seconds. Needs a scan_thermal hotspot or a "
         "track_fire_spread result.", {"x": NUM, "y": NUM, "radius_m": NUM, "seconds": NUM, "evidence_id": EVIDENCE},
         ["x", "y", "radius_m", "seconds", "evidence_id"]),
@@ -120,6 +125,7 @@ class AgentContext:
     frontiers: list[dict] = field(default_factory=list)      # search targets offered by the robot's own map
     water_l: float = 0.0                                      # water left in the robot's tank
     carrying_person: bool = False                             # a person is already on the sled
+    survivors: list = field(default_factory=list)             # people confirmed so far, [x, y] in this robot's frame
 
 
 class ToolRegistry:
@@ -203,6 +209,7 @@ class ToolRegistry:
     def _p_inspect_candidate(self, bearing_deg: float, range_m: float):
         r = vision.inspect_candidate(self._frame(), float(bearing_deg), float(range_m), output_dir=self.debug_dir)
         r["x"], r["y"] = (round(v, 2) for v in self.world(float(bearing_deg), float(range_m)))
+        r["requested"] = {"bearing_deg": float(bearing_deg), "range_m": float(range_m)}
         return r
 
     def _p_check_indoors(self, bearing_deg: float):
@@ -236,13 +243,48 @@ class ToolRegistry:
             return {"refused": True, "reason": why}
         return None
 
+    def _withdraw_refusal(self, args: dict) -> dict | None:
+        """A confirmation is withdrawn only on a fresh, unblocked, close look at the spot that finds nobody (run 3: robot B
+        confirmed a person from a colour sliver at the image edge and spent over a minute trying to reach them)."""
+        x, y = float(args["x"]), float(args["y"])
+        if not any(math.hypot(float(p[0]) - x, float(p[1]) - y) <= SURVIVOR_MERGE_M for p in self.ctx.survivors):
+            return {"refused": True, "reason": "no confirmed survivor at that position"}
+        refusal = self._need(args, ("inspect_candidate",))
+        if refusal is not None:
+            return refusal
+        ev = self.evidence[str(args["evidence_id"])]
+        bearing, rng = float(ev["requested"]["bearing_deg"]), float(ev["requested"]["range_m"])
+        aim = self.world(bearing, rng)
+        if math.hypot(aim[0] - x, aim[1] - y) > 1.0:
+            return {"refused": True, "reason": "the cited inspection was not aimed within 1 m of that position"}
+        if abs(bearing) > CAMERA_HALF_HFOV_DEG - 3:
+            return {"refused": True, "reason": f"bearing {bearing:.0f} deg is at or outside the camera's view; turn_to_face the "
+                    "position, then inspect it"}
+        if rng > CONFIRM_MAX_RANGE_M:
+            return {"refused": True, "reason": f"looked from {rng:.1f} m; withdraw only on a look from within {CONFIRM_MAX_RANGE_M:.1f} m"}
+        dnn = (ev.get("cues") or {}).get("rgb_dnn") or {}
+        whole = len(dnn.get("hits", [])) - int(dnn.get("clipped_by_side", 0))
+        verdict = ev.get("verdict")
+        if not (verdict == "not_person" or (verdict == "uncertain" and ev.get("candidate") is None and whole == 0)):
+            return {"refused": True, "reason": f"the cited inspection does not show the spot empty (verdict {verdict}, "
+                    f"warm body {'found' if ev.get('candidate') else 'none'}, whole colour detections {whole})"}
+        frame = self._frame()
+        u = frame.K[0, 2] + frame.K[0, 0] * math.tan(math.radians(bearing))
+        col = frame.depth_m[:, max(0, int(u) - 3):int(u) + 4]
+        z = col[(col > 0) & (col < 1e3)]
+        reach = float(sorted(z.tolist())[int(.9 * (len(z) - 1))]) if len(z) >= 10 else 0.0
+        if reach < rng * math.cos(math.radians(bearing)) - .5:
+            return {"refused": True, "reason": f"depth along that bearing ends at {reach:.1f} m, before the spot: something nearer "
+                    "blocks the view, so the spot was not seen"}
+        return None
+
     @staticmethod
     def _inspection_range(ev: dict) -> float | None:
         """Measured range of the inspected person, else the requested range."""
         candidate = ev.get("candidate") or {}
         r = candidate.get("range_m")
         if r is None:
-            r = (ev.get("params") or {}).get("range_m")
+            r = (ev.get("requested") or {}).get("range_m")
         return None if r is None else float(r)
 
     def _near(self, ev: dict, args: dict, tol: float = 1.0) -> bool:
@@ -288,6 +330,8 @@ class ToolRegistry:
         elif name == "reject_candidate":
             refusal = self._need(args, ("inspect_candidate",), lambda ev: ev.get("verdict") == "not_person" and self._near(ev, args),
                                  "the cited inspection is not a not_person verdict at that position")
+        elif name == "withdraw_survivor":
+            refusal = self._withdraw_refusal(args)
         elif name == "avoid_area":
             refusal = self._need(args, ("scan_thermal", "track_fire_spread"),
                                  lambda ev: ev.get("tool") == "track_fire_spread" or bool(ev.get("hotspots")),
@@ -418,6 +462,9 @@ class ToolRegistry:
             p = self._pending.get(self.ctx.robot)
             if p is not None and math.hypot(p["x"] - float(args["x"]), p["y"] - float(args["y"])) <= self.LOOK_CELL_M:
                 self._pending.pop(self.ctx.robot, None)
+        if name == "withdraw_survivor":
+            self._confirmed[self.ctx.robot] = [c for c in self._confirmed.get(self.ctx.robot, [])
+                                               if math.hypot(c["x"] - float(args["x"]), c["y"] - float(args["y"])) > SURVIVOR_MERGE_M]
         if name == "confirm_survivor":
             self._confirmed.setdefault(self.ctx.robot, []).append(
                 {"id": str(args["evidence_id"]), "x": float(args["x"]), "y": float(args["y"])})

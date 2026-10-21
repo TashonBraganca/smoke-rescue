@@ -60,8 +60,11 @@ Facts about your robot and the context:
 - lidar gives the nearest obstacle in eight directions. The robot's body radius is 0.25 m.
 - A warm candidate with on_wall 1 is a thermal-only warm patch on a long mapped wall (the structure around it runs on
   for 2 m or more). Fire heats walls; people can also lie against them.
+- previously_rejected 1 on a warm candidate: you rejected a warm region at that spot before, and the robot now sees it
+  from a new viewpoint (at least 45 degrees round or half the distance) or the colour detector saw a person there.
 - survivors_to_rescue: people already confirmed whom nobody has lifted, with bearing, distance, in_view and the
   evidence that confirmed them. Getting a person out means extract_survivor within the rescue reach.
+  A confirmation stays until that person is lifted or withdraw_survivor removes it; the robot's own reflexes never drop it.
 - no_frontier: your map has no reachable unsearched floor; the robot returns after a short scan unless you act.
   fire_blocks_frontier, when present, is where the fire margin cuts the route to unsearched floor. blocked_unsearched
   is unsearched floor your planner cannot reach, with its bearing, distance and the nearest reachable approach point.
@@ -132,6 +135,7 @@ class RobotAgent:
                            water_l=float(req.get("water_l") or 0.0), carrying_person=bool(req.get("carrying_person")),
                            event_kind=(req.get("event") or {}).get("kind", ""), torch=req.get("torch", "wide"))
         ctx.frontiers = list(req.get("frontiers") or [])
+        ctx.survivors = [list(p) for p in req.get("survivors") or []]
         tools = ToolRegistry(Path(req["robot_dir"]), ctx, Path(req.get("debug_dir") or Path(self.trace_path).parent / "agent_debug"))
         context = {k: req[k] for k in ("robot", "t", "pose", "torch", "mode", "state", "goal", "heat_budget", "air_c", "event",
                                        "inbox", "orders", "survivors", "frontiers", "lidar", "partners", "blocked_unsearched", "fire_blocks_frontier",

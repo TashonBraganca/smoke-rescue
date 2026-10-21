@@ -208,6 +208,7 @@ namespace SmokeRescue.Brain
         void ReceiveSurvivor(BrainSurvivor survivor, string sender, double t)
         {
             foreach (var known in survivors) if (Vector2.Distance(known, survivor.position) <= c.survivor_merge_m) return;
+            foreach (var w in withdrawn) if (Vector2.Distance(w, survivor.position) <= c.survivor_merge_m) return;
             survivors.Add(survivor.position); confirmed.Add(survivor);
             foreach (var track in tracks)
                 if (Vector2.Distance(track.position, survivor.position) <= c.survivor_merge_m) track.confirmed = true;

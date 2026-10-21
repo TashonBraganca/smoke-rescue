@@ -2370,6 +2370,64 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(corridorM2, Is.LessThan(8f * 1.8f + 1f), "and not much more");
             Assert.That(yardM2, Is.LessThan(.5f), "the yard has no ceiling seen over it");
             Assert.That(g.UnsearchedFloorBeyond(new Vector2(0, 1.9f), 1f), Is.LessThan(corridorM2 / 3), "bounded by the radius");
+            // Run 3: frontiers stand on searched floor with the unsearched floor starting up to frontier_peek_m away.
+            Assert.That(g.UnsearchedFloorBeyond(new Vector2(0, 1f), 12f), Is.GreaterThan(.8f * 8f * 1.8f), "from 1 m back from the doorway too");
+        }
+
+        [Test]
+        public void ARejectedWarmShapeIsNotRaisedAgainUntilSeenFromANewViewpoint()
+        {
+            // Held-out seed 914 run 2: robot B rejected the 38 C fridge and the same track was raised again in the same
+            // second (the next thermal frames re-armed it), three times. A rejected track stays quiet until the robot sees
+            // the spot from reject_new_view_deg round or from half the distance. Control: 0 deg re-raises at once.
+            (int sameView, int newView) Run(float deg)
+            {
+                var c = Settings(); c.reject_new_view_deg = deg;
+                var b = new RobotBrain(Calibration(), c, "A", 0);
+                var observe = typeof(RobotBrain).GetMethod("ObservePeople", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                var spot = new Vector2(2, 2);
+                double t = 0;
+                void Tick(float v, bool see)
+                {
+                    t += 1 / 15.0; Motion(b, t, v); b.OnAirTemperature(t, 20); b.Step(t, 1f / 15);
+                    if (see) observe.Invoke(b, new object[] { t, new List<PersonDetection> { new PersonDetection(spot, 1.9f) } });
+                }
+                for (int k = 0; k < 5; k++) Tick(0, true);
+                Assert.That(b.DrainEvents().Count(e => e.kind == "survivor_candidate"), Is.EqualTo(1), "raised once");
+                b.AgentRejectCandidate(spot, t, "ev"); b.DrainEvents();
+                for (int k = 0; k < 15; k++) Tick(0, true);
+                int same = b.DrainEvents().Count(e => e.kind == "survivor_candidate");
+                for (int k = 0; k < 60; k++) Tick(1f, false);   // 4 m on: the spot is now 90 degrees round from the rejecting view
+                for (int k = 0; k < 5; k++) Tick(0, true);
+                var again = b.DrainEvents().Where(e => e.kind == "survivor_candidate").ToList();
+                Assert.That(again.All(e => e.numbers["previously_rejected"] == 1), Is.True, "the agent is told it rejected this spot before");
+                return (same, again.Count);
+            }
+            Assert.That(Run(45), Is.EqualTo((0, 1)), "quiet from the same view, raised again from a new one");
+            Assert.That(Run(0).sameView, Is.GreaterThanOrEqualTo(1), "control: the old behaviour re-raises at once");
+        }
+
+        [Test]
+        public void AWithdrawnConfirmationLeavesTheListAndAPartnerCannotPutItBack()
+        {
+            // Held-out seed 914 run 3: a false confirmation kept robot B in the living room for over a minute. Withdrawn, it
+            // leaves the to-rescue list, a partner's radioed copy does not restore it, and a fresh confirmation here does.
+            var b = new RobotBrain(Calibration(), Settings(), "A", 0);
+            Motion(b, 0); b.OnAirTemperature(0, 20); b.Step(0, 1f / 60);
+            var spot = new Vector2(0, 3);
+            b.AgentConfirmSurvivor(spot, .1, "ev1");
+            Assert.That(b.Snapshot().confirmedSurvivors, Has.Length.EqualTo(1));
+            b.DrainEvents();
+            b.AgentWithdrawSurvivor(spot, .2, "ev2");
+            Assert.That(b.Snapshot().confirmedSurvivors, Is.Empty, "off the list");
+            Assert.That(b.DrainEvents().Single(e => e.kind == "survivor_withdrawn").numbers["removed"], Is.EqualTo(1));
+            var receive = typeof(RobotBrain).GetMethod("ReceiveSurvivor", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            receive.Invoke(b, new object[] { new BrainSurvivor { position = spot + new Vector2(.3f, 0), sourceRobot = "B" }, "B", .3 });
+            Assert.That(b.Snapshot().confirmedSurvivors, Is.Empty, "a partner's copy does not bring it back");
+            receive.Invoke(b, new object[] { new BrainSurvivor { position = new Vector2(4, 4), sourceRobot = "B" }, "B", .4 });
+            Assert.That(b.Snapshot().confirmedSurvivors, Has.Length.EqualTo(1), "a partner's survivor elsewhere still counts");
+            b.AgentConfirmSurvivor(spot, .5, "ev3");
+            Assert.That(b.Snapshot().confirmedSurvivors, Has.Length.EqualTo(2), "a fresh confirmation here counts again");
         }
 
         [Test]

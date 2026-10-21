@@ -188,11 +188,35 @@ namespace SmokeRescue.Brain
                 return;
             }
             foreach (var known in survivors) if (Vector2.Distance(known, p) <= c.survivor_merge_m) return;
+            withdrawn.RemoveAll(w => Vector2.Distance(w, p) <= c.survivor_merge_m);
             survivors.Add(p);
             confirmed.Add(new BrainSurvivor { position = p, confirmedAt = t, sourceRobot = id });
             foreach (var track in tracks) if (Vector2.Distance(track.position, p) <= c.survivor_merge_m) track.confirmed = true;
             if (active != null && Vector2.Distance(active.position, p) <= c.survivor_merge_m) { active = null; dwell = 0; inspecting = false; ClearPath(); }
             Emit(t, "survivor_confirmed", "Agent confirmed a person with OpenCV evidence " + evidence + ".", "x_m", p.x, "y_m", p.y);
+        }
+
+        /// <summary>Spots this robot's agent withdrew a confirmation at; a partner's report of a survivor there is ignored
+        /// until this robot confirms someone there again. (The radio format carries no withdrawals, so a partner keeps its
+        /// copy until its own agent looks.)</summary>
+        readonly List<Vector2> withdrawn = new List<Vector2>();
+        /// <summary>Agent order: withdraw a confirmation. The tool layer allows it only on a fresh look aimed at the spot,
+        /// from within confirmation range, with depth reaching it, that found nobody (held-out seed 914 run 3: robot B
+        /// confirmed a person from a colour sliver at the image edge and spent over a minute trying to reach them). The track
+        /// is marked rejected from here, so the same view does not raise it again.</summary>
+        public void AgentWithdrawSurvivor(Vector2 p, double t, string evidence)
+        {
+            int before = survivors.Count; ForgetSurvivorNear(p); int removed = before - survivors.Count;
+            withdrawn.Add(p);
+            foreach (var track in tracks)
+            {
+                if (Vector2.Distance(track.position, p) > c.survivor_merge_m) continue;
+                track.confirmed = false; track.candidate = false; track.retryAfter = double.PositiveInfinity;
+                track.rejected = true; track.rejectedFrom = motion.Pose.position;
+                if (active == track) { active = null; dwell = 0; inspecting = false; ClearPath(); }
+            }
+            Emit(t, "survivor_withdrawn", "Agent withdrew a confirmation: a fresh close look found nobody there, OpenCV evidence " + evidence + ".",
+                "x_m", p.x, "y_m", p.y, "removed", removed);
         }
 
         public void AgentRejectCandidate(Vector2 p, double t, string evidence)
@@ -202,7 +226,7 @@ namespace SmokeRescue.Brain
             foreach (var track in tracks)
             {
                 if (track.confirmed || Vector2.Distance(track.position, p) > 1.0f) continue;
-                track.candidate = false; track.retryAfter = double.PositiveInfinity; n++;
+                track.candidate = false; track.retryAfter = double.PositiveInfinity; track.rejected = true; track.rejectedFrom = motion.Pose.position; n++;
                 if (active == track) { active = null; dwell = 0; inspecting = false; ClearPath(); }
             }
             Emit(t, "candidate_rejected", "Agent rejected a warm region as not a person, OpenCV evidence " + evidence + ".",

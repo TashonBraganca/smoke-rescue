@@ -14,7 +14,8 @@ namespace SmokeRescue.Brain
             public Vector2 position;
             public double lastSeen, retryAfter;
             public readonly Queue<double> observations = new Queue<double>();
-            public bool candidate, confirmed, rgb, onWall;
+            public bool candidate, confirmed, rgb, onWall, rejected;
+            public Vector2 rejectedFrom;   // where the robot stood when the agent rejected it
         }
         readonly struct AirSample
         { public readonly double t; public readonly float c; public AirSample(double time, float value) { t = time; c = value; } }
@@ -551,15 +552,27 @@ namespace SmokeRescue.Brain
                 while (nearest.observations.Count > 0 && t - nearest.observations.Peek() > c.candidate_window_s) nearest.observations.Dequeue();
                 if (!nearest.candidate && nearest.observations.Count >= c.candidate_frames)
                 {
+                    // A rejected track stays quiet until the robot sees it from a new viewpoint; from the same place a
+                    // second look adds nothing (held-out seed 914 run 2: the next thermal frames re-armed the rejected
+                    // 38 C fridge in the same second, three times).
+                    if (nearest.rejected && !NewView(nearest)) continue;
+                    bool again = nearest.rejected; nearest.rejected = false;
                     nearest.candidate = true;
                     // A thermal-only warm shape on a long mapped wall is almost always wall heated by the fire (15 runs: 150 of
                     // 151 such candidates); flagged for the agent and not approached by the robot on its own.
                     nearest.onWall = !nearest.rgb && grid.OccupiedExtent(nearest.position, c.candidate_wall_disc_m, c.candidate_wall_window_m) >= c.candidate_wall_extent_m;
                     Emit(t, "survivor_candidate", nearest.onWall ? "A human-temperature, person-sized depth blob on a long mapped wall persisted across independent frames (thermal only)."
                         : "A human-temperature, person-sized depth blob persisted across independent frames.",
-                        "x_m", nearest.position.x, "y_m", nearest.position.y, "area_m2", detection.areaM2, "frames", nearest.observations.Count, "on_wall", nearest.onWall ? 1 : 0);
+                        "x_m", nearest.position.x, "y_m", nearest.position.y, "area_m2", detection.areaM2, "frames", nearest.observations.Count, "on_wall", nearest.onWall ? 1 : 0,
+                        "previously_rejected", again ? 1 : 0);
                 }
             }
+        }
+        /// <summary>Seen from reject_new_view_deg round, or from half the distance, since the agent rejected it.</summary>
+        bool NewView(Track track)
+        {
+            Vector2 then = track.position - track.rejectedFrom, now = track.position - motion.Pose.position;
+            return Vector2.Angle(then, now) >= c.reject_new_view_deg || now.magnitude <= .5f * then.magnitude;
         }
         /// <summary>Colour sightings arrive once per scan period, thermal blobs every frame, so freshness depends on the source.</summary>
         double FreshS(Track track) => track.rgb ? c.person_rgb_fresh_s : c.survivor_fresh_s;
@@ -587,7 +600,8 @@ namespace SmokeRescue.Brain
             }
             if (nearest == null) { nearest = new Track { position = position, lastSeen = double.NegativeInfinity }; tracks.Add(nearest); }
             if (t <= nearest.lastSeen) return;
-            nearest.rgb = true; nearest.onWall = false; nearest.position = position; nearest.lastSeen = t; nearest.observations.Enqueue(t);
+            // The colour detector is independent evidence: it lifts an earlier thermal rejection.
+            nearest.rgb = true; nearest.onWall = false; nearest.rejected = false; nearest.position = position; nearest.lastSeen = t; nearest.observations.Enqueue(t);
             while (nearest.observations.Count > 0 && t - nearest.observations.Peek() > c.person_rgb_window_s) nearest.observations.Dequeue();
             if (!nearest.candidate && nearest.observations.Count >= c.person_rgb_sightings)
             {
