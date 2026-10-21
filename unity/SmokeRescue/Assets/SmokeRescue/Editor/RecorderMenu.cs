@@ -52,6 +52,9 @@ namespace SmokeRescue.Editor
         public static void HouseAgents() => WithAgents(() => Run("scenario_house_agents.json", "unity_house_agents_v1"));
 
         // Same house and rules, fire lit as the robots enter (Tashon approved it for measuring the live map link).
+        [MenuItem("Tools/Smoke Rescue/Record/House held-out run (agents, random people)")]
+        public static void HouseHeldOut() => WithAgents(() => Run("scenario_house_heldout.json", "unity_house_heldout_v1"));
+
         [MenuItem("Tools/Smoke Rescue/Record/House hidden corner run (agents)")]
         public static void HouseHiddenCorner() => WithAgents(() => Run("scenario_house_hidden_corner.json", "unity_house_hidden_v1"));
 

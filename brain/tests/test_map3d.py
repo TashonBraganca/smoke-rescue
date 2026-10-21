@@ -17,7 +17,7 @@ from scipy.spatial import cKDTree
 from scipy.spatial.transform import Rotation
 
 ROOT = Path(__file__).resolve().parents[2]
-RECORDING = ROOT / 'data/recordings/unity_house_hidden_v1'
+RECORDING = ROOT / 'data/recordings/unity_house_hidden_run1'
 SENSORS = json.loads((ROOT / 'config/sensors.json').read_text())
 
 

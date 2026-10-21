@@ -381,6 +381,7 @@ namespace SmokeRescue.Brain
 
         readonly List<LidarScan> lidarQueue = new List<LidarScan>();
         double lastLidar = double.NegativeInfinity, nextLocalizationReport;
+        LidarScan latestScan;
         int matched, unmatched; float fitSum; Vector3 correctionSum;
         /// <summary>LiDAR first, so the pose it corrects is the one the camera frames are then projected from.</summary>
         void ConsumeLidar(double t)
@@ -405,7 +406,7 @@ namespace SmokeRescue.Brain
                 var integrated = motion.At(scan.Timestamp);
                 grid.IntegrateLidar(scan, integrated);
                 KeepKeyframe(scan, integrated, t);
-                lastLidar = scan.Timestamp;
+                lastLidar = scan.Timestamp; latestScan = scan;
             }
             if (t >= nextLocalizationReport && matched + unmatched > 0)
             {
@@ -445,7 +446,9 @@ namespace SmokeRescue.Brain
                 if (thermal.Timestamp <= lastThermal || t - thermal.Timestamp > c.frame_max_age_s) continue;
                 var pose = motion.At(match.Timestamp);
                 ThermalPerception.ProjectHeat(thermal, match, sensors, c, pose, grid);
-                ObservePeople(thermal.Timestamp, ThermalPerception.Detect(thermal, match, sensors, c, pose));
+                var scanForRange = c.thermal_lidar_range_fallback && latestScan != null &&
+                    Math.Abs(latestScan.Timestamp - thermal.Timestamp) <= c.frame_max_age_s ? latestScan : null;
+                ObservePeople(thermal.Timestamp, ThermalPerception.Detect(thermal, match, sensors, c, pose, scanForRange));
                 lastThermal = thermal.Timestamp;
             }
             rgbHistory.RemoveAll(f => t - f.Timestamp > c.frame_max_age_s + c.frame_pair_tolerance_s);

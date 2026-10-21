@@ -8,6 +8,7 @@ replacing files. No tool infers world coordinates or reads scene metadata.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from functools import lru_cache
 import hashlib
 import json
@@ -22,6 +23,22 @@ from brain.io import load_opencv_yaml, read_camera, required_number
 
 cv2.setNumThreads(1)
 cv2.ocl.setUseOpenCL(False)
+
+
+def _perception():
+    return json.loads((Path(__file__).resolve().parents[3] / "config/perception.json").read_text())
+
+
+@dataclass(frozen=True)
+class LidarScan:
+    """One body-frame sweep. Angles turn left; ranges are metres from the scanner."""
+    t: float
+    angle_min_rad: float
+    increment_rad: float
+    mount_forward_m: float
+    min_m: float
+    max_m: float
+    ranges_m: np.ndarray
 
 
 def _number(x):
@@ -44,9 +61,10 @@ class Frame(dict):
     Synthetic callers may construct Frame directly. RGB uses RGB channel order.
     rgb_to_thermal maps RGB optical points into thermal optical coordinates.
     The default identity calibration is useful for synthetic registered frames.
+    lidar optionally holds a timestamped sweep; inspection leaves these sensor arrays unchanged.
     """
     def __init__(self, *, t, rgb, depth_m, thermal, K, thermal_K,
-                 rgb_to_thermal, stamps, source="synthetic", requested_t=None):
+                 rgb_to_thermal, stamps, source="synthetic", requested_t=None, lidar=None):
         if not math.isfinite(t) or not all(math.isfinite(x) for x in stamps.values()):
             raise ValueError("timestamps must be finite")
         self.rgb = np.asarray(rgb)
@@ -55,6 +73,7 @@ class Frame(dict):
         self.K = np.array(K, dtype=np.float64, copy=True)
         self.thermal_K = np.array(thermal_K, dtype=np.float64, copy=True)
         self.rgb_to_thermal = np.asarray(rgb_to_thermal, dtype=np.float64)
+        self.lidar = lidar
         if (self.rgb.dtype != np.uint8 or self.rgb.ndim != 3 or self.rgb.shape[2] != 3
                 or self.depth_m.shape != self.rgb.shape[:2]
                 or self.thermal.dtype != np.uint16 or self.thermal.ndim != 2):
@@ -68,6 +87,10 @@ class Frame(dict):
         digest = hashlib.sha256()
         for a in (self.rgb,self.depth_m,self.thermal,self.K,self.thermal_K,self.rgb_to_thermal):
             digest.update(a.tobytes())
+        if lidar is not None:
+            digest.update(lidar.ranges_m.tobytes())
+            digest.update(str((lidar.t, lidar.angle_min_rad, lidar.increment_rad,
+                               lidar.mount_forward_m, lidar.min_m, lidar.max_m)).encode())
         super().__init__(_result("load_frame", [stamps], {"source":source,"content":digest.hexdigest(),
             "requested_t":requested_t}, stamps=dict(stamps), source=source,
             intrinsics={"rgb":self.K.tolist(),"thermal":self.thermal_K.tolist()},
@@ -135,6 +158,44 @@ def _index_cached(folder, sensor, _mtime_ns, _size):
     return rows
 
 
+@lru_cache(maxsize=24)
+def _lidar_index(folder, _mtime_ns, _size):
+    header, rows = None, []
+    for line in _safe_file(folder, "lidar.txt").read_text().splitlines():
+        if line.startswith("# beams "):
+            fields = line[2:].split()
+            header = dict(zip(fields[::2], map(float, fields[1::2])))
+            if (not all(math.isfinite(value) for value in header.values())
+                    or header["beams"] < 1 or not header["beams"].is_integer()
+                    or header["increment_rad"] <= 0
+                    or not 0 < header["min_m"] < header["max_m"]):
+                raise ValueError("invalid LiDAR calibration")
+        elif line.strip() and not line.lstrip().startswith("#"):
+            if header is None:
+                raise ValueError("missing LiDAR calibration header")
+            values = np.asarray(line.split(), dtype=np.float64)
+            if (values.size != int(header["beams"]) + 1 or not np.isfinite(values).all()
+                    or (values[1:] < 0).any()):
+                raise ValueError("invalid LiDAR sweep")
+            ranges = values[1:] / 1000
+            ranges.flags.writeable = False
+            rows.append(LidarScan(float(values[0]), header["angle_min_rad"], header["increment_rad"],
+                                  header["mount_forward_m"], header["min_m"], header["max_m"], ranges))
+    if any(b.t <= a.t for a, b in zip(rows, rows[1:])):
+        raise ValueError("LiDAR timestamps must increase")
+    return rows
+
+
+def _load_lidar(folder, t, tolerance):
+    try:
+        stat = _safe_file(folder, "lidar.txt").stat()
+    except FileNotFoundError:
+        return None
+    scans = _lidar_index(folder, stat.st_mtime_ns, stat.st_size)
+    scan = min(scans, key=lambda scan: (abs(scan.t - t), scan.t), default=None)
+    return scan if scan is not None and abs(scan.t - t) <= tolerance else None
+
+
 @lru_cache(maxsize=16)
 def load_frame(robot_dir: str | Path, t: float) -> Frame:
     """Load nearest stamps, ties earlier. Cache 16 frames and 24 sensor indexes.
@@ -145,6 +206,7 @@ def load_frame(robot_dir: str | Path, t: float) -> Frame:
     """
     if not math.isfinite(t): raise ValueError("t must be finite")
     folder = Path(robot_dir).resolve()
+    tolerance = _perception()["frame_tolerance_s"]
     cam = read_camera(_safe_file(folder,"camera.yaml"))
     settings = load_opencv_yaml(_safe_file(folder,"thermal.yaml"))
     kt = np.array([[required_number(settings,"Camera1.fx","Camera.fx","fx"),0,required_number(settings,"Camera1.cx","Camera.cx","cx")],
@@ -159,8 +221,8 @@ def load_frame(robot_dir: str | Path, t: float) -> Frame:
     stamps,images = {},{}
     for sensor in ("rgb","depth","thermal"):
         stamp,path = min(_index(folder,sensor),key=lambda row:(abs(row[0]-t),row[0]))
-        if abs(stamp - t) > 0.5:
-            raise ValueError(f"no {sensor} frame within 0.5 s of t={t:.3f} (nearest {stamp:.3f}); the index is stale or incomplete")
+        if abs(stamp - t) > tolerance:
+            raise ValueError(f"no {sensor} frame within {tolerance} s of t={t:.3f} (nearest {stamp:.3f}); the index is stale or incomplete")
         image = cv2.imread(str(path),cv2.IMREAD_COLOR if sensor == "rgb" else cv2.IMREAD_UNCHANGED)
         if image is None: raise ValueError(f"cannot read {path}")
         stamps[sensor],images[sensor] = stamp,image
@@ -168,9 +230,12 @@ def load_frame(robot_dir: str | Path, t: float) -> Frame:
     if images["depth"].shape != (cam.height,cam.width): raise ValueError("depth size differs from calibration")
     if images["thermal"].shape != (int(required_number(settings,"Camera.height","height")),int(required_number(settings,"Camera.width","width"))):
         raise ValueError("thermal size differs from calibration")
+    lidar = _load_lidar(folder, stamps["thermal"], tolerance)
+    if lidar is not None:
+        stamps["lidar"] = lidar.t
     frame = Frame(t=stamps["thermal"],rgb=cv2.cvtColor(images["rgb"],cv2.COLOR_BGR2RGB),
         depth_m=images["depth"].astype(np.float32)/cam.depth_factor,thermal=images["thermal"],
-        K=k,thermal_K=kt,rgb_to_thermal=transform,stamps=stamps,source=str(folder),requested_t=t)
+        K=k,thermal_K=kt,rgb_to_thermal=transform,stamps=stamps,source=str(folder),requested_t=t,lidar=lidar)
     # Force registration during load and retain it for immutable cached recordings.
     frame._registered = frame.registered_depth_m
     for a in (frame.rgb,frame.depth_m,frame.thermal,frame.K,frame.thermal_K,frame._registered): a.flags.writeable = False
@@ -179,6 +244,38 @@ def load_frame(robot_dir: str | Path, t: float) -> Frame:
 
 def _depth(f):
     return f._registered if hasattr(f,"_registered") else f.registered_depth_m
+
+
+def _lidar_component_depth(frame, mask, depth, tolerance):
+    """Fill only missing warm pixels, using the pitched ray's horizontal bearing."""
+    scan = frame.lidar
+    if scan is None or abs(scan.t - frame["stamps"]["thermal"]) > tolerance:
+        return depth, None
+    yy, xx = np.nonzero(mask & ~(np.isfinite(depth) & (depth > 0)))
+    if not len(xx):
+        return depth, None
+    sensors = json.loads((Path(__file__).resolve().parents[3] / "config/sensors.json").read_text())
+    mount = sensors["camera"]["mount"]
+    pitch = math.radians(mount["pitch_down_deg"])
+    right = (xx - frame.thermal_K[0, 2]) / frame.thermal_K[0, 0]
+    down = (yy - frame.thermal_K[1, 2]) / frame.thermal_K[1, 1]
+    forward = math.cos(pitch) - down * math.sin(pitch)
+    horizontal_length = np.hypot(right, forward)
+    bearing = np.arctan2(-right, forward)
+    beams = np.rint((bearing - scan.angle_min_rad) / scan.increment_rad).astype(int) % len(scan.ranges_m)
+    ranges = scan.ranges_m[beams]
+    horizontal = ranges - (mount["forward_offset_m"] - scan.mount_forward_m) * np.cos(bearing)
+    valid = (np.isfinite(ranges) & (ranges >= scan.min_m) & (ranges <= scan.max_m)
+             & (horizontal > 0) & (horizontal_length > 0))
+    if not valid.any():
+        return depth, None
+    filled = depth.copy()
+    filled[yy[valid], xx[valid]] = horizontal[valid] / horizontal_length[valid]
+    # Keep each beam's actual return in the trace; the median alone could conceal a wall return.
+    used = np.unique(beams[valid])
+    return filled, {"t": scan.t, "beam_range_m": _number(np.median(ranges[valid])),
+                    "beams": used.tolist(), "beam_ranges_m": scan.ranges_m[used].tolist(),
+                    "filled_pixels": int(valid.sum())}
 
 
 def _components(mask, min_pixels):
@@ -304,6 +401,8 @@ def inspect_candidate(frame: Frame, bearing_deg: float, range_m: float, *, outpu
     """Inspect nearest warm component. Output directory is required for evidence.
 
     Person needs body dimensions, temperature structure and nonplanar depth.
+    Below the configured depth coverage, a matching LiDAR sweep fills missing
+    warm pixels before these checks. Measured depth always takes precedence.
     A large plane or >=0.8 m background recess is a negative cue. Uniform
     temperature alone is uncertain because clothing can hide skin structure.
     Body size accepts standing or recumbent components, 0.45 to 2.2 m long.
@@ -319,6 +418,8 @@ def inspect_candidate(frame: Frame, bearing_deg: float, range_m: float, *, outpu
               "depth_noise_mm_per_m2":depth_noise_mm_per_m2,
               "output_dir":str(Path(output_dir))}
     result = _base("inspect_candidate",frame,params,verdict="uncertain",reasons=[],cues={},candidate=None,debug_crop=None)
+    config = _perception()
+    min_depth_fraction = config["inspection_min_depth_fraction"]
     depth = _depth(frame); c = frame.thermal.astype(float)/10-273.15
     options = []
     for mask,stats in _components((frame.thermal>0)&(c>=human_band_c[0])&(c<=human_band_c[1]),8):
@@ -331,7 +432,15 @@ def inspect_candidate(frame: Frame, bearing_deg: float, range_m: float, *, outpu
         result["reasons"] = ["No warm component matches the requested bearing and depth."]
         mask = np.zeros(frame.thermal.shape,bool); aligned = np.zeros(frame.rgb.shape[:2],np.uint8)
     else:
-        _,mask,region = min(options,key=lambda o:o[0]); result["candidate"] = region
+        _,mask,region = min(options,key=lambda o:o[0])
+        registered_fraction = region["depth_fraction"]
+        lidar_cue = None
+        if registered_fraction < min_depth_fraction:
+            depth, lidar_cue = _lidar_component_depth(frame, mask, depth, config["frame_tolerance_s"])
+            if lidar_cue is not None:
+                x, y, w, h = region["bbox"]
+                region = _region(frame, mask, (x, y, w, h, region["pixels"]), depth)
+        result["candidate"] = region
         width,height = region["width_m"],region["height_m"]
         size_ok = _size_plausible(width,height)
         x0,y0,bw,bh = region["bbox"]
@@ -361,17 +470,21 @@ def inspect_candidate(frame: Frame, bearing_deg: float, range_m: float, *, outpu
         window = bool(recess is not None and recess>=.8)
         rgb,aligned = _rgb_cue(frame,mask,depth)
         nonplanar = bool(plane["residual_m"] is not None and plane["residual_m"]>=max(.012,1.5*sigma))
-        result["cues"] = {"size":{"plausible":size_ok,"height_m":height,"width_m":width,"aspect":region["aspect"],
+        result["cues"] = {"range_source": "lidar" if lidar_cue is not None else "depth",
+            "size":{"plausible":size_ok,"height_m":height,"width_m":width,"aspect":region["aspect"],
             "rotated_size_px":[_number(x) for x in rect[1]],"truncated_by_image_edge":truncated},
             "temperature":{"structured":temp_ok,"mean_c":region["mean_c"],"std_c":region["std_c"],"p90_p10_c":_number(spread),
                 "rim_hot_fraction":_number(rim_hot),"rim_cold_fraction":_number(rim_cold),"band_crossing_ramp":ramp},
             "plane":plane,"window":{"opening":window,"surrounding_z_m":_number(surround) if surround is not None else None,
                 "recess_m":_number(recess) if recess is not None else None},"rgb":rgb,
-            "depth":{"valid_fraction":region["depth_fraction"],"nonplanar":nonplanar,
+            "depth":{"valid_fraction":region["depth_fraction"],"registered_fraction":registered_fraction,"nonplanar":nonplanar,
                 "span_m":_number(depth_span) if depth_span is not None else None,"single_surface":single_surface}}
         reasons = []
+        if lidar_cue is not None:
+            result["cues"]["lidar"] = lidar_cue
+            reasons.append("Inspection uses LiDAR range for missing registered depth; the scan measures the horizontal plane, not vertical body shape.")
         size_negative = (not size_ok) and (not truncated or too_big)
-        if region["depth_fraction"]<.6: reasons.append("Too little registered depth to judge shape.")
+        if region["depth_fraction"]<min_depth_fraction: reasons.append("Too little registered depth to judge shape.")
         elif plane["large_plane"] or window or size_negative:
             result["verdict"] = "not_person"
             if plane["large_plane"]: reasons.append("Warm pixels lie on a plane larger than the warm component.")

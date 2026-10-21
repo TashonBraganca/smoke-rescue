@@ -452,6 +452,23 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void ThermalSizesAWarmBlobWithLidarRangeWhenSmokeRemovesDepth()
+        {
+            // Hidden-corner run 2: dense smoke removed nearly all depth returns, so warm blobs could not be sized and
+            // thermal confirmed nobody. With no depth at all, the LiDAR range at the blob's bearing sizes it. Controls:
+            // no LiDAR, no detection; LiDAR reading a wall 7 m behind (as over a person lying below the scan plane), no
+            // detection either.
+            var s = Calibration(); var c = Settings();
+            LidarScan Ring(float r) => new LidarScan(0, -Mathf.PI, 2 * Mathf.PI / 720, .15f, 12f, 0f, .45f, Enumerable.Repeat(r, 720).ToArray());
+            var smoky = Image(0, true, 0);
+            Assert.That(ThermalPerception.Detect(Person(0), smoky, s, c, new BrainPose()), Is.Empty, "control: no depth, no LiDAR");
+            var found = ThermalPerception.Detect(Person(0), smoky, s, c, new BrainPose(), Ring(2f));
+            Assert.That(found.Count, Is.EqualTo(1), "LiDAR range sizes the blob");
+            Assert.That(found[0].position.y, Is.InRange(1.6f, 2.6f), "at about the LiDAR's 2 m");
+            Assert.That(ThermalPerception.Detect(Person(0), smoky, s, c, new BrainPose(), Ring(7f)), Is.Empty, "control: a wall behind is too large a blob");
+        }
+
+        [Test]
         public void CameraSwitchRequiresContinuousHysteresisDurations()
         {
             var b = new RobotBrain(Calibration(), Settings(), "A", 0);
