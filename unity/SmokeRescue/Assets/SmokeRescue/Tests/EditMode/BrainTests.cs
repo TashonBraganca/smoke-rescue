@@ -405,6 +405,37 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void FireCuttingOffTheOnlyFrontierIsReportedWhereWaterWouldOpenIt()
+        {
+            // Agent run 16: a burning wood pile closed a 2 m hallway; every frontier vanished and the agent was never told
+            // fire was the cause, so it did not use its hose. A corridor 2 m wide, unmapped beyond y = 4, fire across it at
+            // y = 2: no frontier with the fire margin, and the fire-blocked check points straight ahead to where the route
+            // enters the margin. Control: a wall across the corridor instead is not a fire block.
+            BrainFireBlock? Check(bool fire, out int frontiers)
+            {
+                var b = new RobotBrain(Calibration(), Settings(), "A", 0); var g = Map(b);
+                for (float y = -1; y <= 4; y += .05f)
+                {
+                    for (float x = -.95f; x <= .95f; x += .05f) g.ObserveFree(g.Cell(new Vector2(x, y)));
+                    g.ObserveOccupied(g.Cell(new Vector2(-1.05f, y))); g.ObserveOccupied(g.Cell(new Vector2(1.05f, y)));
+                }
+                for (float x = -1; x <= 1; x += .05f) g.ObserveOccupied(g.Cell(new Vector2(x, -1.05f)));
+                for (float x = -.95f; x <= .95f; x += .1f)
+                    if (fire) g.ObserveHeat(g.Cell(new Vector2(x, 2)), 600, 0); else g.ObserveOccupied(g.Cell(new Vector2(x, 2)));
+                frontiers = b.FrontierOptions(0, 10).Count;
+                return b.FireBlockedFrontier(0);
+            }
+            var blocked = Check(true, out int withFire);
+            Assert.That(withFire, Is.Zero, "the fire margin cuts the corridor");
+            Assert.That(blocked.HasValue, Is.True);
+            Assert.That(Mathf.Abs(blocked.Value.bearingDegRight), Is.LessThan(20), "straight ahead");
+            Assert.That(blocked.Value.distanceM, Is.InRange(.3f, 1.2f), "where the route meets the 1.2 m margin before the fire at 2 m");
+            var walled = Check(false, out int withWall);
+            Assert.That(withWall, Is.Zero, "control: the wall cuts it too");
+            Assert.That(walled.HasValue, Is.False, "control: water does not open a wall");
+        }
+
+        [Test]
         public void ThermalBlobsRejectFireAndTwoPixelNoise()
         {
             var s = Calibration(); var c = Settings();

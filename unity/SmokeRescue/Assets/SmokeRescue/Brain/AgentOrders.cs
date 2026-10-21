@@ -69,6 +69,35 @@ namespace SmokeRescue.Brain
                 distanceM = d.magnitude, areaM2 = found.Value.cells * grid.CellM * grid.CellM };
         }
 
+        /// <summary>
+        /// For the agent, when no frontier is reachable: is fire what cuts them off? The frontiers are planned again as if
+        /// there were no fire (water is what would clear it; the robot never drives this plan); if one is reachable that
+        /// way, its route first enters the fire margin at the point returned, which is where to aim the water. Null when the fire margin is not the cause. Agent
+        /// run 16: a burning wood pile closed the 2 m hallway, every frontier vanished, and the agent, told only of floor
+        /// it could not reach, measured for a door instead of using the hose it carried.
+        /// </summary>
+        public BrainFireBlock? FireBlockedFrontier(double t)
+        {
+            float saved = grid.FireClearance;
+            List<GridPlanner.FrontierChoice> all;
+            try
+            {
+                grid.FireClearance = -1;   // fire distance is never below zero: every fire cell counts as clear
+                all = planner.Frontiers(motion.Pose.position, p => ClaimBlocks(p, t) || GoalBlacklisted(p, t) || VisitedGoal(p, t) || !InSearchArea(p));
+            }
+            finally { grid.FireClearance = saved; }
+            float margin = c.fire_clearance_m + grid.CellM * .707107f;
+            foreach (var f in all)
+                foreach (var p in f.path)
+                {
+                    if (grid.FireDistance(grid.Cell(p)) > margin) continue;
+                    Vector2 d = p - motion.Pose.position;
+                    return new BrainFireBlock { blockAt = p, frontier = f.position, bearingDegRight = -BrainMath.Angle(motion.Pose.yawRad, Mathf.Atan2(-d.x, d.y)),
+                        distanceM = d.magnitude, frontierPathM = f.cost, unsearchedM2 = f.information * grid.CellM * grid.CellM };
+                }
+            return null;
+        }
+
         /// <summary>Agent order: search this frontier next. It is driven like a go_to, and on arrival the robot sweeps
         /// and marks it visited exactly as for a frontier it chose itself.</summary>
         public void AgentExplore(Vector2 target, double t, double holdS, string reason)
