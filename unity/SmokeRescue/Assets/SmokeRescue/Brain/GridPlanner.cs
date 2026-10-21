@@ -171,7 +171,9 @@ namespace SmokeRescue.Brain
                     int nx = x + (k == 0 ? 1 : k == 1 ? -1 : 0), ny = y + (k == 2 ? 1 : k == 3 ? -1 : 0);
                     if (!grid.Inside(nx, ny)) continue;
                     int n = ny * grid.Size + nx;
-                    if (depth[n] >= 0 || grid.Occupancy(n) != 1) continue;   // known free floor only, never a wall
+                    // Known free floor, or an obstacle low enough to look over by the live 3D map (a desk, a bed); never a
+                    // wall or anything taller than the camera's line of sight.
+                    if (depth[n] >= 0 || (grid.Occupancy(n) != 1 && !(grid.Occupancy(n) == 255 && grid.SeeOver(n)))) continue;
                     depth[n] = depth[cell] + 1;
                     if (grid.Walkable(n)) { if (depth[cell] > 0) peek[n] = true; continue; }   // adjacent ones are frontiers already
                     queue.Enqueue(n);

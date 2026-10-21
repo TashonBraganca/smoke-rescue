@@ -424,6 +424,21 @@ namespace SmokeRescue.Brain
                 }
             }
         }
+        ushort[] topCm;
+        /// <summary>Heights above which an obstacle blocks the camera's view (camera mount height less
+        /// see_over_clearance_m); set by the brain from its calibration.</summary>
+        public float SeeOverMaxM { get; set; }
+        /// <summary>The live 3D map's top-surface height per cell, in centimetres (0: no surface), from the OpenCV 5 TSDF
+        /// volume the robot builds from its own depth frames (agent service /map3d). Same grid as this map.</summary>
+        public void SetTopHeights(ushort[] cm)
+        {
+            if (cm == null || cm.Length != Count) throw new ArgumentException("Top-height layer must match the grid.");
+            topCm = cm;
+        }
+        public float TopHeightM(int i) => topCm == null || i < 0 || i >= Count ? 0f : topCm[i] * .01f;
+        /// <summary>An obstacle low enough for the camera to look over (a desk, a bed), by the live 3D map. Unknown
+        /// height is not low.</summary>
+        public bool SeeOver(int i) => topCm != null && i >= 0 && i < Count && topCm[i] > 0 && topCm[i] * .01f <= SeeOverMaxM;
         public bool Indoors(Vector2 p) => UnderCeiling(p) || (OwnOccupancy(Cell(p)) == 1 && Enclosed(Cell(p)));
         /// <summary>The ceiling half of Indoors: within ceiling_radius_m of wall-clear ceiling evidence, walked across known
         /// free floor.</summary>

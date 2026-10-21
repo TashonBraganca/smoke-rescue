@@ -374,5 +374,7 @@
   "person_floor_clearance_m": 0.12,
   "person_floor_clearance_m_reason": "A thermal blob's median height must be at least this far above the floor: heated floor near a fire was a main source of false warm shapes (warm_eval).",
   "person_top_max_m": 2.0,
-  "person_top_max_m_reason": "A thermal blob's 95th-percentile height must be under a standing adult's height plus margin; taller warm patches are walls. Not tuned to this scenario's poses (lying, slumped), so a standing person still passes."
+  "person_top_max_m_reason": "A thermal blob's 95th-percentile height must be under a standing adult's height plus margin; taller warm patches are walls. Not tuned to this scenario's poses (lying, slumped), so a standing person still passes.",
+  "see_over_clearance_m": 0.5,
+  "see_over_clearance_m_reason": "An obstacle whose top (from the live 3D map) is at least this far below the camera can be looked over when choosing where to look from. From a camera at height h the floor behind an object of height o, seen from d metres, is hidden for d*o/(h-o): at h 1.6 m and o up to 1.1 m that is at most 2.2 d, so a person sitting or lying behind a desk (0.75 m) or bed is partly in view over it, while a wardrobe, fridge or wall (1.8 m and up) is not. Hidden-corner run: the desk across the corner counted as a wall."
 }
