@@ -55,7 +55,7 @@ PERCEPTION = [
         "planarity, window depth, RGB contour). Returns verdict person / not_person / uncertain and an evidence id.",
         {"bearing_deg": NUM, "range_m": NUM}, ["bearing_deg", "range_m"]),
     _fn("assess_visibility", "Measure smoke and image quality of the colour camera (sharpness, contrast, haze, valid "
-        "depth). Use before changing the torch."),
+        "depth)."),
     _fn("track_fire_spread", "Measure fire growth and the hot front's speed and direction over the last seconds of "
         "thermal video.", {"seconds": NUM}),
     _fn("measure_opening", "Measure the clear width of the opening at a bearing from depth, and whether the robot fits.",
@@ -64,17 +64,14 @@ PERCEPTION = [
 
 ACTIONS = [
     _fn("explore_frontier", "Search one of the frontiers listed in the context next (unsearched floor the robot can reach). "
-        "The robot's planner drives there, keeping clear of walls, and sweeps the area on arrival. Pick by more "
-        "unsearched area, shorter path, and away from where your partner is searching.",
+        "The robot's planner drives there, keeping clear of walls, and sweeps the area on arrival.",
         {"frontier_id": {"type": "integer"}, "reason": STR, "evidence_id": EVIDENCE}, ["frontier_id", "reason"]),
     _fn("go_to", "Drive to a building position (x, y in metres) by the robot's own planner.",
         {"x": NUM, "y": NUM, "reason": STR}, ["x", "y", "reason"]),
     _fn("approach_candidate", f"Walk to a viewpoint {APPROACH_STANDOFF_M:.1f} m short of an inspected warm region, on the line from the robot, "
-        "computed from the inspection itself. Use when inspect_candidate says uncertain, or to get within the arm's reach "
-        "of a confirmed person. You get an agent_goal_reached event on arrival.", {"evidence_id": EVIDENCE},
+        "computed from the inspection itself. You get an agent_goal_reached event on arrival.", {"evidence_id": EVIDENCE},
         ["evidence_id"]),
-    _fn("turn_to_face", "Turn in place to face a building position, such as a confirmed person in survivors_to_rescue "
-        "whose bearing is outside the camera's view (in_view false). You get agent_goal_reached when facing it.",
+    _fn("turn_to_face", "Turn in place to face a building position. You get agent_goal_reached when facing it.",
         {"x": NUM, "y": NUM, "reason": STR}, ["x", "y", "reason"]),
     _fn("confirm_survivor", "Report a survivor at a building position. Needs an inspect_candidate result with verdict "
         "person.", {"x": NUM, "y": NUM, "evidence_id": EVIDENCE}, ["x", "y", "evidence_id"]),
