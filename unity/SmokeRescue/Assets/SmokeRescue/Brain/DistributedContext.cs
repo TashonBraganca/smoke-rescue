@@ -76,9 +76,10 @@ namespace SmokeRescue.Brain
             foreach (var peer in peers.Values) baseline = Math.Min(baseline, peer.acknowledgedOurs);
             bool full = t - lastFull >= c.full_snapshot_s;
             int cells = SharedSize * SharedSize, bytes = (cells + 7) / 8;
+            var visual = VisualKeyframesToSend();
             var m = new BrainMessage { Sender = id, BaseSequence = full ? 0 : baseline, GridSize = SharedSize,
                 Origin = grid.Origin, Pose = motion.Pose, Goal = goal,
-                Explored = new byte[bytes], Occupied = new byte[bytes], Survivors = confirmed.ToArray(), Keyframes = KeyframesToSend(), CarriedOut = carriedOut.ToArray(), VisualKeyframes = VisualKeyframesToSend() };
+                Explored = new byte[bytes], Occupied = new byte[bytes], Survivors = confirmed.ToArray(), Keyframes = KeyframesToSend(visual.Length > 0 ? c.visual_lidar_keyframes_per_message : c.keyframes_per_message, visual), CarriedOut = carriedOut.ToArray(), VisualKeyframes = visual };
             if (frontierGoal && frontierRadius > 0 && goal.HasValue && !completed && !returning && !retreating && active == null)
                 m.Claim = new BrainClaim { centre = frontierCentre, radiusM = frontierRadius, expiresAt = t + c.peer_claim_s };
             for (int i = 0; i < grid.Count; i++)
@@ -98,11 +99,21 @@ namespace SmokeRescue.Brain
             // real send time here because dense heat encodes sample ages relative to it.
             if (m.Hotspots.Length > 0) m.SentAt = t;
             byte[] state = m.ToBytes();
-            if (!full && m.Claim == null && m.Hotspots.Length == 0 && m.Keyframes.Length == 0 && Equal(lastState, state)) return null;
+            if (!full && m.Claim == null && m.Hotspots.Length == 0 && m.Keyframes.Length == 0 && m.VisualKeyframes.Length == 0 && Equal(lastState, state)) return null;
             m.Sequence = sequence + 1; m.SentAt = t; m.FullSnapshot = full;
             m.ToBytes(); // Check the complete packet before advancing sender state.
             sequence = m.Sequence; lastState = state; if (full) lastFull = t;
             return m;
+        }
+
+        /// <summary>Radio decode boundary. Old or incomplete packets are logged and dropped before they touch peer state.</summary>
+        public void OnPeerPacket(byte[] packet, double tReceived)
+        {
+            BrainMath.Time(tReceived);
+            try { OnPeerMessage(BrainMessage.FromBytes(packet), tReceived); }
+            catch (InvalidDataException e) { Emit(tReceived, "peer_message_rejected", "Dropped radio packet: " + e.Message); }
+            catch (IOException e) { Emit(tReceived, "peer_message_rejected", "Dropped radio packet: " + e.Message); }
+            catch (ArgumentException e) { Emit(tReceived, "peer_message_rejected", "Dropped radio packet: " + e.Message); }
         }
 
         /// <summary>Call on the simulation thread when a RadioModel-approved packet's delay has elapsed,
@@ -140,7 +151,7 @@ namespace SmokeRescue.Brain
             ReceiveKeyframes(m.Sender, m, tReceived);
             ReceiveVisualKeyframes(m.Sender, m);
             Emit(tReceived, "peer_message_received", "Accepted sensor-derived state from " + m.Sender + (TryPartnerLink(m.Sender, out _) ? "." : "; frames not linked yet, so only its fingerprints are used."),
-                "sequence", m.Sequence, "age_s", Math.Max(0, tReceived - m.SentAt), "bytes", bytes.Length, "keyframes", m.Keyframes.Length);
+                "sequence", m.Sequence, "age_s", Math.Max(0, tReceived - m.SentAt), "bytes", bytes.Length, "keyframes", m.Keyframes.Length, "visual_keyframes", m.VisualKeyframes.Length);
             ApplyPeerContent(m.Sender, peer, tReceived);
         }
 
@@ -287,6 +298,16 @@ namespace SmokeRescue.Brain
                 if (!Finite(s.position) || !ValidTime(s.confirmedAt, m.SentAt) || string.IsNullOrWhiteSpace(s.sourceRobot)) throw new InvalidDataException("Invalid peer confirmation.");
             foreach (var h in m.Hotspots)
                 if (h.cell < 0 || h.cell >= SharedSize * SharedSize || !BrainMath.Finite(h.temperatureC) || h.temperatureC < c.fire_c || !ValidTime(h.observedAt, m.SentAt)) throw new InvalidDataException("Invalid peer hotspot.");
+            foreach (var v in m.VisualKeyframes)
+                if (v.id < 0 || !Finite(v.pose.position) || !BrainMath.Finite(v.pose.yawRad) || v.payload == null ||
+                    v.payload.Length == 0 || v.payload.Length > c.visual_keyframe_max_payload_bytes)
+                    throw new InvalidDataException("Invalid peer visual keyframe.");
+            foreach (var k in m.Keyframes)
+                if (k.id < 0 || !Finite(k.pose.position) || !BrainMath.Finite(k.pose.yawRad) ||
+                    !BrainMath.Finite(k.angleMinRad) || !BrainMath.Finite(k.incrementRad) || !(k.incrementRad > 0) ||
+                    !BrainMath.Finite(k.minM) || !BrainMath.Finite(k.maxM) || !(k.maxM > k.minM) || k.minM < 0 ||
+                    !BrainMath.Finite(k.mountForwardM) || k.rangesCm.Length < 8)
+                    throw new InvalidDataException("Invalid peer LiDAR keyframe.");
             foreach (var a in m.Acknowledgements)
                 if (string.IsNullOrWhiteSpace(a.sender) || a.sequence < 0) throw new InvalidDataException("Invalid peer acknowledgement.");
         }

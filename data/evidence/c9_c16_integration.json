@@ -1,0 +1,851 @@
+{
+  "checked_at_utc": "2026-10-21T19:13:24.069941+00:00",
+  "base_commit": "06adcfcc7ce0b877c59383ffb71b998c4391daba",
+  "commit_subjects": [
+    "C16 route watch: look along stale return routes while searching",
+    "C9 camera map linking: carry visual keyframes and share candidate agreement",
+    "C9 place recognition feeds frame linking: verify camera poses without blocking ticks"
+  ],
+  "git_metadata_status": "Shared worktree HEAD.lock and index.lock writes denied. Commits are preserved in a separate local Git database and exported as c9-c16-integration.bundle; the requested branch remains at 06adcfc.",
+  "merge_provenance": "Each staged full file was diffed against dcb6a61 and merged into current sources. BrainConfig validation combined both packages with lidar_open_span_deg. All 139 nonblank added lines from 06adcfc were checked verbatim in the final source.",
+  "new_config": {
+    "brain": {
+      "route_watch": {
+        "value": false,
+        "reason": "Keep the existing search behaviour unless enabled for comparison. Held-out run 1 saw no fire cells from 96 to 116 s while the route home burned; the robot turned at 120 s and the way out closed 0.2 s later."
+      },
+      "route_watch_stale_s": {
+        "value": 15.0,
+        "reason": "Held-out run 1 missed route fire for at least 20 s from 96 to 116 s. A 15 s stale look threshold checks before that measured blind interval."
+      },
+      "route_watch_max_stale_share": {
+        "value": 0.5,
+        "reason": "Require a majority of the route beyond escape_ignore_m to be unseen for 15 s. Held-out run 1 missed the fire along that route for 20 s; one unobserved cell should not turn the robot."
+      },
+      "route_watch_min_interval_s": {
+        "value": 90.0,
+        "reason": "Bound routine interruptions to one per 90 s. Held-out run 1 first needed the look during the 96 to 116 s blind interval; the 12 s cap then costs at most 12/90 of search time."
+      },
+      "route_watch_dwell_s": {
+        "value": 4.5,
+        "reason": "The closing-rate rule needs two intervals of escape_check_s=2 s after seeing fire. A 4.5 s dwell provides both plus 0.5 s for image delivery."
+      },
+      "route_watch_max_s": {
+        "value": 12.0,
+        "reason": "At sweep_yaw_dps=45 a half turn needs 4 s, plus the 4.5 s dwell. A 12 s cap leaves 3.5 s for heading convergence and delayed images without an unbounded stop."
+      },
+      "visual_keyframe_period_s": {
+        "value": 2.0,
+        "reason": "How often a robot asks its own OpenCV 5 place service for a camera keyframe (ORB features with positions). One per radio broadcast (2 s): at 0.3 to 0.5 m/s that is a keyframe every 0.6 to 1 m, closer than the 1.5 m within which two cameras still share most of a view."
+      },
+      "visual_keyframe_max": {
+        "value": 200,
+        "reason": "Own camera keyframes kept for sending (400 s of keyframes at one per 2 s, longer than a run)."
+      },
+      "visual_keyframes_per_message": {
+        "value": 1,
+        "reason": "Send at most one 96-feature visual keyframe per broadcast, newest first and older views in turn. Its payload is 3653 bytes; with one LiDAR sweep MessageByteLimitsUseActualBinaryRoundTripsAtHouseScale measured full 7975 bytes and delta 7407 bytes."
+      },
+      "visual_link_min_inliers": {
+        "value": 16,
+        "reason": "Match the service floor in config/perception.json. place_eval database mode rejected the worst wrong checkerboard/tile match with 15 inliers by requiring 16. The measured evaluation had 0 false accepts in about 58000 negatives. Map verification and two separated candidates still apply."
+      },
+      "visual_place_linking": {
+        "value": true,
+        "reason": "Enable camera proposals from the measured ORB service. tools/place_eval.py recorded 0 false accepts in about 58000 negative pairs, 4.6 percent cross-robot recall, and 2.4 cm median pose error. LiDAR map fit, uniqueness, and two separated agreeing candidates still gate every link."
+      },
+      "visual_lidar_keyframes_per_message": {
+        "value": 1,
+        "reason": "MessageByteLimitsUseActualBinaryRoundTripsAtHouseScale measured an 8165-byte delta with two 360-beam LiDAR sweeps and one 96-feature visual payload, above 8000 bytes. One sweep near the visual capture pose supports map verification even after a delayed service reply. The test measured 7407-byte deltas and 7975-byte full snapshots; LiDAR-only messages still carry two."
+      },
+      "visual_keyframe_max_payload_bytes": {
+        "value": 3653,
+        "reason": "The measured service uses 96 ORB features at 38 bytes each plus a 5-byte header, exactly 3653 bytes. Reject larger service payloads until the radio budget is measured again; the one-sweep house delta measured 7407 bytes."
+      }
+    },
+    "perception": {
+      "place_http_timeout_s": {
+        "value": 2.0,
+        "reason": "Keyframe extraction measured at most 0.35 s and matching about 10 ms in tools/place_eval.py. A 2 s client deadline allows over five times the measured extraction time. The recorder polls asynchronously and continues after timeout; the worker process has its own 30 s recovery bound."
+      }
+    }
+  },
+  "compile": {
+    "compiler": "Unity 6000.6.6f1 bundled DotNetSdk/sdk/8.0.318/Roslyn/bincore/csc.dll via NetCoreRuntime/dotnet",
+    "language_version": "9",
+    "references": "Unity install managed DLLs and read-only main-project Library/ScriptAssemblies and PackageCache",
+    "assemblies": {
+      "SmokeRescue.Brain": {
+        "source_files": 14,
+        "exit_code": 0
+      },
+      "SmokeRescue.Recording": {
+        "source_files": 5,
+        "exit_code": 0
+      },
+      "SmokeRescue.Tests.EditMode": {
+        "source_files": 12,
+        "exit_code": 0
+      }
+    },
+    "warnings": "Recording and EditMode emit CS1701 for Newtonsoft.Json netstandard 2.0 versus reference netstandard 2.1; no compilation errors."
+  },
+  "managed_tests": {
+    "passed": 120,
+    "failed": 0,
+    "scope": "BrainTests and RouteWatchTests via standalone NUnit and Unity managed DLLs; Unity was not launched. Other EditMode fixtures were compiled only.",
+    "not_executed": [
+      "ConfigurationLoadsThresholdsAndSensorMotionLimits requires native Application.dataPath/JsonUtility",
+      "BrainAssemblyHasOnlySensorDependency requires native Application.dataPath/JsonUtility",
+      "StepCostProbe is an explicit timing probe"
+    ]
+  },
+  "python_tests": {
+    "command": "cd brain && UV_CACHE_DIR=/tmp/smoke-rescue-uv-cache UV_NO_SYNC=1 PYTEST_ADDOPTS=--tb=short uv run pytest -q",
+    "passed": 287,
+    "failed": 26,
+    "skipped": 11,
+    "failure_reason": "24 indoor recorded-data cases and 2 recorded map3d cases require data/recordings/unity_house_hidden_run1, which is absent in this worktree. Main-tree recordings were not read.",
+    "failed_cases": [
+      "tests/test_agent_indoors.py::test_recorded_outside_doorway_and_facade[-35.0-A]",
+      "tests/test_agent_indoors.py::test_recorded_outside_doorway_and_facade[-35.0-B]",
+      "tests/test_agent_indoors.py::test_recorded_outside_doorway_and_facade[-30.0-A]",
+      "tests/test_agent_indoors.py::test_recorded_outside_doorway_and_facade[-30.0-B]",
+      "tests/test_agent_indoors.py::test_recorded_outside_doorway_and_facade[0.0-A]",
+      "tests/test_agent_indoors.py::test_recorded_outside_doorway_and_facade[0.0-B]",
+      "tests/test_agent_indoors.py::test_recorded_outside_doorway_and_facade[30.0-A]",
+      "tests/test_agent_indoors.py::test_recorded_outside_doorway_and_facade[30.0-B]",
+      "tests/test_agent_indoors.py::test_recorded_outside_doorway_and_facade[35.0-A]",
+      "tests/test_agent_indoors.py::test_recorded_outside_doorway_and_facade[35.0-B]",
+      "tests/test_agent_indoors.py::test_recorded_interval_labels_and_verdicts[60.0-A]",
+      "tests/test_agent_indoors.py::test_recorded_interval_labels_and_verdicts[60.0-B]",
+      "tests/test_agent_indoors.py::test_recorded_interval_labels_and_verdicts[70.0-A]",
+      "tests/test_agent_indoors.py::test_recorded_interval_labels_and_verdicts[70.0-B]",
+      "tests/test_agent_indoors.py::test_recorded_interval_labels_and_verdicts[80.0-A]",
+      "tests/test_agent_indoors.py::test_recorded_interval_labels_and_verdicts[80.0-B]",
+      "tests/test_agent_indoors.py::test_recorded_interval_labels_and_verdicts[90.0-A]",
+      "tests/test_agent_indoors.py::test_recorded_interval_labels_and_verdicts[90.0-B]",
+      "tests/test_agent_indoors.py::test_recorded_interval_labels_and_verdicts[100.0-A]",
+      "tests/test_agent_indoors.py::test_recorded_interval_labels_and_verdicts[100.0-B]",
+      "tests/test_agent_indoors.py::test_recorded_interval_labels_and_verdicts[110.0-A]",
+      "tests/test_agent_indoors.py::test_recorded_interval_labels_and_verdicts[110.0-B]",
+      "tests/test_agent_indoors.py::test_recorded_interval_labels_and_verdicts[120.0-A]",
+      "tests/test_agent_indoors.py::test_recorded_interval_labels_and_verdicts[120.0-B]",
+      "tests/test_map3d.py::test_recorded_sequence_accuracy_and_budget",
+      "tests/test_map3d.py::test_recorded_sequence_native_subprocess"
+    ],
+    "environment_limit": "Network disabled; locked transformers 5.20.2 was not cached. Tests used a local environment assembled from compatible cached wheels, including Python 3.11.15, OpenCV 5.0.0.93, NumPy 2.4.6 and pytest 9.1.1. Dependency files were not changed."
+  },
+  "radio_bytes": {
+    "visual_payload": 3653,
+    "visual_payload_formula": "5-byte header + 96 * (32 descriptor bytes + 3 int16 centimetre coordinates)",
+    "visual_record_overhead": 18,
+    "lidar_360_beam_record": 758,
+    "two_lidar_one_visual_delta_before_cap": 8165,
+    "house_test_without_keyframes": {
+      "full": 3546,
+      "delta": 2978
+    },
+    "house_test_one_lidar_one_visual": {
+      "full": 7975,
+      "delta": 7407
+    },
+    "committed_50_m_config_translated_house": {
+      "grid_side_shared_cells": 250,
+      "full": 7967,
+      "delta": 7407
+    },
+    "dense_fire_7000_hot_cells": {
+      "without_keyframes_full": 28949,
+      "one_lidar_one_visual_full": 33378
+    },
+    "limits": {
+      "full_strictly_less_than": 40000,
+      "house_delta_strictly_less_than": 8000
+    }
+  },
+  "message_format_changes": {
+    "radio": {
+      "outer_version": {
+        "before": 3,
+        "after": 4
+      },
+      "new_tail_after_CarriedOut": "int32 VisualKeyframes count, then for each: int32 id, float32 position.x, float32 position.y, float32 yawRad, uint16 payload length, raw payload bytes. BinaryWriter little-endian. Count is always present, including zero.",
+      "bounds": "Decoder count <=16 and payload <=8192 bytes; runtime config rejects visual payloads above 3653 bytes before matching. Older versions and truncated packets are dropped and logged by OnPeerPacket.",
+      "inner_payload_unchanged": "VP magic, uint8 version=1, uint16 feature count, then 32 descriptor bytes and int16 x/right, y/forward, height/up in centimetres per feature.",
+      "id_semantics": "Radio visual ids are monotone per robot/run. The recorder maps service ids into these ids and never reuses a radio id after a service restart."
+    },
+    "http": {
+      "POST /place/{robot}/keyframe": "Request unchanged {robot_dir,t}. Successful replies add database_id and t, the actual RGB image stamp, to {ok,id,features,payload_b64}. Ordinary ok=false replies also add database_id.",
+      "POST /place/{robot}/match": "Request unchanged {robot_dir,t,payload_b64}. Both matched and unmatched replies add database_id. Pose, mine_id, inliers and rmse fields retain their meanings.",
+      "database_id": "UUID hex string unique to a PlaceDatabase generation; changes when the run resets or a worker restarts. Client refuses unknown generations and requires the exact recorder image stamp."
+    },
+    "decision_events": {
+      "frame_linked": "fit becomes score; descriptor_distance is removed from this event; adds visual, a count from 0 to 2. dx_m,dy_m,dyaw_deg,candidates remain. score is LiDAR fit or camera inlier count according to source.",
+      "place_recognised": "fit becomes score. Common pose/link coordinates remain. LiDAR adds descriptor_distance and shift; camera adds inliers. Reasons name the sensor.",
+      "peer_message_received": "Adds visual_keyframes count.",
+      "new_events": {
+        "route_watch": [
+          "stale_share",
+          "x_m",
+          "y_m",
+          "route_m",
+          "distance_m"
+        ],
+        "route_watch_done": [
+          "duration_s",
+          "faced",
+          "cancelled"
+        ],
+        "place_service": "Reason text for HTTP, malformed-response, stale-frame and worker-generation failures."
+      },
+      "peer_message_rejected": "Existing kind also covers old/truncated byte packets and invalid visual metadata."
+    }
+  },
+  "new_editmode_tests": [
+    {
+      "name": "ARobotSearchingWithItsBackToTheRouteHomeTurnsToLookAlongIt",
+      "file": "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/RouteWatchTests.cs",
+      "checks": "Turns toward stale home route, holds, and refreshes thermal look times.",
+      "control": "WithRouteWatchOffNoLookStarts repeats the same walk with route_watch=false.",
+      "revert_checks": [
+        "route-watch-start"
+      ],
+      "result": "passed"
+    },
+    {
+      "name": "ARobotWhoseThermalCameraRecentlyLookedAlongTheRouteDoesNotTurnBack",
+      "file": "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/RouteWatchTests.cs",
+      "checks": "Fresh cool-floor thermal observations suppress a route look.",
+      "control": "The same walk facing away starts a look; cool readings do not add heat.",
+      "revert_checks": [
+        "route-watch-cool-look-time"
+      ],
+      "result": "passed"
+    },
+    {
+      "name": "WithRouteWatchOffNoLookStarts",
+      "file": "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/RouteWatchTests.cs",
+      "checks": "Disabled route watch leaves the route unseen and never turns back.",
+      "control": "The enabled walk starts a look.",
+      "revert_checks": [
+        "route-watch-disable-control"
+      ],
+      "result": "passed"
+    },
+    {
+      "name": "AHeatRetreatCancelsALookAndNoLookStartsWhileRetreating",
+      "file": "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/RouteWatchTests.cs",
+      "checks": "Heat retreat cancels a look on the same step and prevents another.",
+      "control": "Hot from the start never starts a look; the cool walk starts and finishes one.",
+      "revert_checks": [
+        "route-watch-cancel"
+      ],
+      "result": "passed"
+    },
+    {
+      "name": "AfterTheLookTheRobotResumesItsPreviousGoal",
+      "file": "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/RouteWatchTests.cs",
+      "checks": "Keeps the frontier path and goal through the look, then turns back.",
+      "control": "The feature-off walk retains the previous exploration behavior.",
+      "revert_checks": [
+        "route-watch-resume-goal"
+      ],
+      "result": "passed"
+    },
+    {
+      "name": "CarryingAPersonDoesNotStartARouteLook",
+      "file": "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/RouteWatchTests.cs",
+      "checks": "Carrying suppresses route watch.",
+      "control": "Identical safe exploration starts a look; both feature-on and feature-off carrying stay quiet.",
+      "revert_checks": [
+        "route-watch-carry-control"
+      ],
+      "result": "passed"
+    },
+    {
+      "name": "ReturningDoesNotStartARouteLook",
+      "file": "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/RouteWatchTests.cs",
+      "checks": "A returning robot does not start a route look.",
+      "control": "Identical safe exploration starts a look; both feature-on and feature-off returning stay quiet.",
+      "revert_checks": [
+        "route-watch-return-control"
+      ],
+      "result": "passed"
+    },
+    {
+      "name": "LowHeatBudgetDoesNotStartARouteLook",
+      "file": "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/RouteWatchTests.cs",
+      "checks": "Low heat budget cannot start a look before the retreat branch runs.",
+      "control": "Identical full-budget exploration starts a look; feature-off stays quiet.",
+      "revert_checks": [
+        "route-watch-heat-budget"
+      ],
+      "result": "passed"
+    },
+    {
+      "name": "UnknownRouteHomeDoesNotStartARouteLook",
+      "file": "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/RouteWatchTests.cs",
+      "checks": "An obstructed, unknown route home cannot trigger a look.",
+      "control": "The same mapped walk with a known route starts a look; feature-off stays quiet.",
+      "revert_checks": [
+        "route-watch-unknown-control"
+      ],
+      "result": "passed"
+    },
+    {
+      "name": "CameraMatchesWithoutALidarMapNeverBecomeLinkCandidates",
+      "file": "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/CameraLinkTests.cs",
+      "checks": "RANSAC matches cannot create candidates without an own LiDAR map.",
+      "control": "The same two views with a measured LiDAR map link.",
+      "revert_checks": [
+        "camera-map-verification"
+      ],
+      "result": "passed"
+    },
+    {
+      "name": "RepeatingCorridorCameraMatchesFailTheLidarUniquenessTest",
+      "file": "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/CameraLinkTests.cs",
+      "checks": "A repeated corridor fails shifted-sweep uniqueness even after a camera match.",
+      "control": "An asymmetric room with off-centre pillars links.",
+      "revert_checks": [
+        "camera-uniqueness"
+      ],
+      "result": "passed"
+    },
+    {
+      "name": "CameraRansacDisagreeingWithALidarCandidateCannotLink",
+      "file": "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/CameraLinkTests.cs",
+      "checks": "Two camera transforms agreeing with each other but 0.5 m from the LiDAR placement cannot link.",
+      "control": "An agreeing camera candidate links with the existing LiDAR candidate.",
+      "revert_checks": [
+        "camera-pose-agreement"
+      ],
+      "result": "passed"
+    },
+    {
+      "name": "CameraMatchCannotReplaceAnExistingFrameLink",
+      "file": "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/CameraLinkTests.cs",
+      "checks": "Later camera callbacks and shared-accumulator calls cannot replace an established transform.",
+      "control": "The feature-off scene never establishes a link.",
+      "revert_checks": [
+        "linked-transform-immutable"
+      ],
+      "result": "passed"
+    },
+    {
+      "name": "CameraMatchesNeedSeparatedPartnerPlacesAndEnoughInliers",
+      "file": "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/CameraLinkTests.cs",
+      "checks": "Near-duplicate places and insufficient RANSAC inliers cannot link.",
+      "control": "Separated views with enough inliers link.",
+      "revert_checks": [
+        "independent-places",
+        "camera-inlier-floor"
+      ],
+      "result": "passed"
+    },
+    {
+      "name": "OldAndTruncatedRadioPacketsAreDroppedAndLogged",
+      "file": "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/CameraLinkTests.cs",
+      "checks": "Version 3, empty and several truncated packets are rejected without an exception or peer-state changes.",
+      "control": "The old direct decoder throws on the same inputs; a complete version 4 packet is accepted.",
+      "revert_checks": [
+        "old-radio-packet-drop"
+      ],
+      "result": "passed"
+    },
+    {
+      "name": "CameraPacketsCarryANearbyLidarSweepWithinTheByteBudget",
+      "file": "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/CameraLinkTests.cs",
+      "checks": "Camera-bearing packets carry one sweep near the visual capture, including delayed older captures.",
+      "control": "LiDAR-only packets keep two sweeps; a fresh visual capture gets the newest nearby sweep.",
+      "revert_checks": [
+        "camera-radio-count-cap",
+        "camera-paired-lidar"
+      ],
+      "result": "passed"
+    },
+    {
+      "name": "VisualOnlyPacketsAreResentAndCallerPayloadsAreDetached",
+      "file": "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/CameraLinkTests.cs",
+      "checks": "Visual-only broadcasts are retried and input/output array mutations cannot alter retained fingerprints.",
+      "control": "An idle robot without visual data emits no delta.",
+      "revert_checks": [
+        "visual-only-resend",
+        "visual-payload-owned",
+        "outgoing-visual-payload-owned"
+      ],
+      "result": "passed"
+    },
+    {
+      "name": "PartnerVisualWorkIsBoundedAndRetriedWhenAnOwnViewArrives",
+      "file": "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/CameraLinkTests.cs",
+      "checks": "Bounds pending work, retries retained partner views after a new own view, and detaches drained payloads.",
+      "control": "Draining without a new view does not requeue work.",
+      "revert_checks": [
+        "retry-partner-after-own-view",
+        "drained-visual-payload-owned"
+      ],
+      "result": "passed"
+    },
+    {
+      "name": "InvalidVisualPoseOrOversizePayloadIsRejectedBeforeMatching",
+      "file": "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/CameraLinkTests.cs",
+      "checks": "Nonfinite visual pose and 97-feature payloads are rejected before queuing matches.",
+      "control": "Valid camera and LiDAR metadata is accepted.",
+      "revert_checks": [
+        "visual-incoming-payload-cap",
+        "incoming-visual-pose"
+      ],
+      "result": "passed"
+    },
+    {
+      "name": "CameraVerificationUsesTheSamePerStepBudgetAsLidar",
+      "file": "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/CameraLinkTests.cs",
+      "checks": "A one-verification step cannot verify a second camera candidate.",
+      "control": "A fresh step admits it and links.",
+      "revert_checks": [
+        "camera-verification-budget"
+      ],
+      "result": "passed"
+    },
+    {
+      "name": "PlaceServiceDownOrSlowDoesNotBlockTheRecorderPump",
+      "file": "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/VisualPlaceServiceTests.cs",
+      "checks": "Unavailable and slow HTTP requests end through connection failure or the configured cancellation timeout and log an error.",
+      "control": "The disabled feature makes no HTTP requests.",
+      "revert_checks": [
+        "place-http-timeout"
+      ],
+      "result": "passed"
+    },
+    {
+      "name": "PlaceServiceRepliesFeedTheVerifiedFrameLinkPath",
+      "file": "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/VisualPlaceServiceTests.cs",
+      "checks": "HTTP keyframes and matches reach OnVisualPlaceMatch and the map-verified shared accumulator.",
+      "control": "One HTTP match still does not link; the second independent match does.",
+      "revert_checks": [
+        "place-feeds-candidate"
+      ],
+      "result": "passed"
+    },
+    {
+      "name": "PlaceWorkerRestartAndStaleFrameRepliesCannotReuseOldPoses",
+      "file": "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/VisualPlaceServiceTests.cs",
+      "checks": "Service restarts get fresh radio ids, and a reply for another image cannot inherit the capture pose.",
+      "control": "A valid exact-stamp reply updates the keyframe; a stale stamp leaves it unchanged.",
+      "revert_checks": [
+        "place-capture-timestamp",
+        "place-radio-id-after-restart"
+      ],
+      "result": "passed"
+    },
+    {
+      "name": "MalformedPlaceResponsesAreLoggedWithoutStoppingThePump",
+      "file": "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/VisualPlaceServiceTests.cs",
+      "checks": "Malformed JSON and missing required fields log errors without stopping polling.",
+      "control": "Disabled capture makes no request.",
+      "revert_checks": [
+        "place-malformed-json",
+        "place-missing-fields"
+      ],
+      "result": "passed"
+    },
+    {
+      "name": "AnUnfinishedPlaceRequestDoesNotBlockCaptureOrPolling",
+      "file": "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/VisualPlaceServiceTests.cs",
+      "checks": "An unresolved response gate does not block starting a capture or polling completion.",
+      "control": "Releasing the gate allows the completed response to be applied.",
+      "revert_checks": [
+        "place-nonblocking-poll"
+      ],
+      "result": "passed"
+    },
+    {
+      "name": "ASubsecondCameraReplyUsesTheRecordersExactImageStamp",
+      "file": "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/VisualPlaceServiceTests.cs",
+      "checks": "A capture at 2 + 1/15 s accepts the recorder index stamp 2.066667 and keeps the capture pose.",
+      "control": "Disabled capture leaves the old result; stale stamps are rejected by the restart/stale-frame test.",
+      "revert_checks": [
+        "capture-stamp-normalization"
+      ],
+      "result": "passed"
+    },
+    {
+      "name": "TwoAgreeingCameraPlaceMatchesLinkTheFramesAndOneOrAConflictDoesNot",
+      "file": "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/BrainTests.cs",
+      "checks": "Two verified, separated camera candidates recover a rotated/translated frame and apply waiting partner map and survivor content.",
+      "control": "One candidate, a conflicting pose, and visual_place_linking=false do not link; partner content stays withheld before linking.",
+      "revert_checks": [
+        "camera-disable-control"
+      ],
+      "result": "passed"
+    },
+    {
+      "name": "CameraKeyframesSurviveTheRadioFormat",
+      "file": "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/BrainTests.cs",
+      "checks": "Version 4 preserves visual id, pose and all payload bytes.",
+      "control": "A packet without visual keyframes decodes to an empty array.",
+      "revert_checks": [
+        "visual-wire-decoding"
+      ],
+      "result": "passed"
+    }
+  ],
+  "new_python_tests": [
+    {
+      "name": "test_database_identity_changes_when_service_ids_restart",
+      "checks": "Database identity changes across reset/restart, service ids restart, actual image stamp and identity reach both endpoints.",
+      "control": "Consecutive keyframes in the same database retain identity; a new database differs.",
+      "revert_checks": [
+        "place-database-reset-id",
+        "place-frame-stamp-response"
+      ],
+      "result": "passed"
+    },
+    {
+      "name": "test_repeated_texture_descriptors_cannot_fix_a_place_pose",
+      "checks": "Repeated descriptors fail the existing ratio/one-to-one matcher even with matching 3D geometry.",
+      "control": "Distinct descriptors at the same positions self-match with 96 inliers.",
+      "revert_checks": [],
+      "revert_note": "Existing matcher behavior; no production matcher change. The new C# uniqueness guard has its own removal check.",
+      "result": "passed"
+    },
+    {
+      "name": "test_place_endpoints_report_worker_failure_as_unavailable",
+      "checks": "A place worker failure returns HTTP 503.",
+      "control": "An ordinary no-feature response returns HTTP 200 with ok=false.",
+      "revert_checks": [],
+      "revert_note": "Existing server error mapping; no production error-handler change. New HTTP cancellation and nonblocking behavior have C# removal checks.",
+      "result": "passed"
+    }
+  ],
+  "revert_checks": [
+    {
+      "name": "route-watch-start",
+      "test": "RouteWatchTests::ARobotSearchingWithItsBackToTheRouteHomeTurnsToLookAlongIt",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Brain/RobotBrain.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "route-watch-cool-look-time",
+      "test": "RouteWatchTests::ARobotWhoseThermalCameraRecentlyLookedAlongTheRouteDoesNotTurnBack",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Brain/ThermalPerception.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "route-watch-heat-budget",
+      "test": "RouteWatchTests::LowHeatBudgetDoesNotStartARouteLook",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Brain/RobotBrain.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "route-watch-cancel",
+      "test": "RouteWatchTests::AHeatRetreatCancelsALookAndNoLookStartsWhileRetreating",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Brain/RobotBrain.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "camera-map-verification",
+      "test": "BrainTests::CameraMatchesWithoutALidarMapNeverBecomeLinkCandidates",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Brain/FrameLink.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "camera-uniqueness",
+      "test": "BrainTests::RepeatingCorridorCameraMatchesFailTheLidarUniquenessTest",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Brain/FrameLink.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "camera-pose-agreement",
+      "test": "BrainTests::CameraRansacDisagreeingWithALidarCandidateCannotLink",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Brain/FrameLink.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "linked-transform-immutable",
+      "test": "BrainTests::CameraMatchCannotReplaceAnExistingFrameLink",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Brain/FrameLink.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "independent-places",
+      "test": "BrainTests::CameraMatchesNeedSeparatedPartnerPlacesAndEnoughInliers",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Brain/FrameLink.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "camera-inlier-floor",
+      "test": "BrainTests::CameraMatchesNeedSeparatedPartnerPlacesAndEnoughInliers",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Brain/FrameLink.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "camera-disable-control",
+      "test": "BrainTests::TwoAgreeingCameraPlaceMatchesLinkTheFramesAndOneOrAConflictDoesNot",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Brain/FrameLink.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "camera-verification-budget",
+      "test": "BrainTests::CameraVerificationUsesTheSamePerStepBudgetAsLidar",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Brain/FrameLink.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "old-radio-packet-drop",
+      "test": "BrainTests::OldAndTruncatedRadioPacketsAreDroppedAndLogged",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Brain/DistributedContext.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "visual-wire-decoding",
+      "test": "BrainTests::CameraKeyframesSurviveTheRadioFormat",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Brain/BrainMessage.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "camera-radio-count-cap",
+      "test": "BrainTests::CameraPacketsCarryANearbyLidarSweepWithinTheByteBudget",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Brain/DistributedContext.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "camera-paired-lidar",
+      "test": "BrainTests::CameraPacketsCarryANearbyLidarSweepWithinTheByteBudget",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Brain/FrameLink.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "visual-only-resend",
+      "test": "BrainTests::VisualOnlyPacketsAreResentAndCallerPayloadsAreDetached",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Brain/DistributedContext.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "visual-payload-owned",
+      "test": "BrainTests::VisualOnlyPacketsAreResentAndCallerPayloadsAreDetached",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Brain/FrameLink.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "retry-partner-after-own-view",
+      "test": "BrainTests::PartnerVisualWorkIsBoundedAndRetriedWhenAnOwnViewArrives",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Brain/FrameLink.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "visual-incoming-payload-cap",
+      "test": "BrainTests::InvalidVisualPoseOrOversizePayloadIsRejectedBeforeMatching",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Brain/DistributedContext.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "place-http-timeout",
+      "test": "BrainTests::PlaceServiceDownOrSlowDoesNotBlockTheRecorderPump",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Recording/VisualPlaceClient.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "place-nonblocking-poll",
+      "test": "BrainTests::AnUnfinishedPlaceRequestDoesNotBlockCaptureOrPolling",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Recording/VisualPlaceClient.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "place-feeds-candidate",
+      "test": "BrainTests::PlaceServiceRepliesFeedTheVerifiedFrameLinkPath",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Recording/VisualPlaceClient.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "place-capture-timestamp",
+      "test": "BrainTests::PlaceWorkerRestartAndStaleFrameRepliesCannotReuseOldPoses",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Recording/VisualPlaceClient.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "place-radio-id-after-restart",
+      "test": "BrainTests::PlaceWorkerRestartAndStaleFrameRepliesCannotReuseOldPoses",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Recording/VisualPlaceClient.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "place-malformed-json",
+      "test": "BrainTests::MalformedPlaceResponsesAreLoggedWithoutStoppingThePump",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Recording/VisualPlaceClient.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "place-missing-fields",
+      "test": "BrainTests::MalformedPlaceResponsesAreLoggedWithoutStoppingThePump",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Recording/VisualPlaceClient.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "incoming-visual-pose",
+      "test": "BrainTests::InvalidVisualPoseOrOversizePayloadIsRejectedBeforeMatching",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Brain/DistributedContext.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "capture-stamp-normalization",
+      "test": "BrainTests::ASubsecondCameraReplyUsesTheRecordersExactImageStamp",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Recording/VisualPlaceClient.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "outgoing-visual-payload-owned",
+      "test": "BrainTests::VisualOnlyPacketsAreResentAndCallerPayloadsAreDetached",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Brain/FrameLink.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "drained-visual-payload-owned",
+      "test": "BrainTests::PartnerVisualWorkIsBoundedAndRetriedWhenAnOwnViewArrives",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Brain/FrameLink.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "route-watch-disable-control",
+      "test": "RouteWatchTests::WithRouteWatchOffNoLookStarts",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Brain/RobotBrain.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "route-watch-resume-goal",
+      "test": "RouteWatchTests::AfterTheLookTheRobotResumesItsPreviousGoal",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Brain/RobotBrain.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "route-watch-carry-control",
+      "test": "RouteWatchTests::CarryingAPersonDoesNotStartARouteLook",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Brain/RobotBrain.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "route-watch-return-control",
+      "test": "RouteWatchTests::ReturningDoesNotStartARouteLook",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Brain/RobotBrain.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "route-watch-unknown-control",
+      "test": "RouteWatchTests::UnknownRouteHomeDoesNotStartARouteLook",
+      "source": "unity/SmokeRescue/Assets/SmokeRescue/Brain/RobotBrain.cs",
+      "failed_as_expected": true,
+      "mutation_exit": 1
+    },
+    {
+      "name": "place-database-reset-id",
+      "test": "tests/test_place_recognition.py::test_database_identity_changes_when_service_ids_restart",
+      "source": "brain/brain/agent/place.py",
+      "failed_as_expected": true
+    },
+    {
+      "name": "place-frame-stamp-response",
+      "test": "tests/test_place_recognition.py::test_database_identity_changes_when_service_ids_restart",
+      "source": "brain/brain/agent/place.py",
+      "failed_as_expected": true
+    }
+  ],
+  "limits_and_unverified": [
+    "Unity was not launched and no recordings were run. Real camera/radio behavior in a recording remains unverified.",
+    "The two native-Unity Brain tests and other EditMode fixtures were compiled only.",
+    "Full Python pass remains blocked by missing recorded fixtures and the offline dependency environment.",
+    "New place HTTP calls are nonblocking and use a 2 s deadline. Existing people, map3d and LLM HTTP calls retain their earlier synchronous behavior.",
+    "Existing place-recognition precision/recall measurements were read from data/evidence/place_recognition_eval.json and not rerun.",
+    "The branch could not be advanced because worktree Git metadata locks were denied."
+  ],
+  "files_changed": [
+    "brain/brain/agent/place.py",
+    "brain/brain/agent/server.py",
+    "brain/tests/test_place_recognition.py",
+    "config/brain.json",
+    "config/perception.json",
+    "data/evidence/c9_c16_integration.json",
+    "unity/SmokeRescue/Assets/SmokeRescue/Brain/BrainConfig.cs",
+    "unity/SmokeRescue/Assets/SmokeRescue/Brain/BrainMessage.cs",
+    "unity/SmokeRescue/Assets/SmokeRescue/Brain/DistributedContext.cs",
+    "unity/SmokeRescue/Assets/SmokeRescue/Brain/FrameLink.cs",
+    "unity/SmokeRescue/Assets/SmokeRescue/Brain/OccupancyGrid.cs",
+    "unity/SmokeRescue/Assets/SmokeRescue/Brain/RobotBrain.cs",
+    "unity/SmokeRescue/Assets/SmokeRescue/Brain/ThermalPerception.cs",
+    "unity/SmokeRescue/Assets/SmokeRescue/Recording/RecordingSession.Agents.cs",
+    "unity/SmokeRescue/Assets/SmokeRescue/Recording/RecordingSession.cs",
+    "unity/SmokeRescue/Assets/SmokeRescue/Recording/VisualPlaceClient.cs",
+    "unity/SmokeRescue/Assets/SmokeRescue/Recording/VisualPlaceClient.cs.meta",
+    "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/BrainTests.cs",
+    "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/CameraLinkTests.cs",
+    "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/CameraLinkTests.cs.meta",
+    "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/RouteWatchTests.cs",
+    "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/RouteWatchTests.cs.meta",
+    "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/SmokeRescue.Tests.EditMode.asmdef",
+    "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/VisualPlaceServiceTests.cs",
+    "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/VisualPlaceServiceTests.cs.meta"
+  ],
+  "source_sha256": {
+    "brain/brain/agent/place.py": "2bf877c656406df2247083be682d1cb353333a80651ef7dc608912a26fc92c2f",
+    "brain/brain/agent/server.py": "c188e2048e616c3a9c9fab7deb1d5d6a38e83e3f2dd4be6ca0a1b1dff63a626d",
+    "brain/tests/test_place_recognition.py": "c53951ffa8648c4afb72ecb75175bc00090685ceac0e0ea397b44acb4a4278a7",
+    "config/brain.json": "6b5668e79baa73990b163d47dfb5f71cdb6ba0cc64452fcc456942ba6049e74e",
+    "config/perception.json": "700c50016f664f7e21cc806e3d762677ab766f558ed398e47b2a0f6348622c9b",
+    "unity/SmokeRescue/Assets/SmokeRescue/Brain/BrainConfig.cs": "c27ddd6861b147405d14fb1d6d89ba95fe33dc3ac7346603f414116329773677",
+    "unity/SmokeRescue/Assets/SmokeRescue/Brain/BrainMessage.cs": "47e3e73a2aa237dbed6fafdcee2c89684f2754cc37842c4b515b70890520741c",
+    "unity/SmokeRescue/Assets/SmokeRescue/Brain/DistributedContext.cs": "2d36f1e75116db2d454dc984854d34b865ecfd94fab455484127a092e16c0b72",
+    "unity/SmokeRescue/Assets/SmokeRescue/Brain/FrameLink.cs": "1d01dfe96bb17b263abf768f01f9a5e77eac18f7c3a0f3ba521ec178255c4bdb",
+    "unity/SmokeRescue/Assets/SmokeRescue/Brain/OccupancyGrid.cs": "2ad3aa08690835d440252d25f2778f00e233405be2259b0c628019bf27de11f8",
+    "unity/SmokeRescue/Assets/SmokeRescue/Brain/RobotBrain.cs": "89eed3ad3df1e701ba4bf839b946474a2bb2d8451d2302f16877ff9b406b388e",
+    "unity/SmokeRescue/Assets/SmokeRescue/Brain/ThermalPerception.cs": "60cf3241170193e365c79f8aa6c2903082e507a65db2384f00f5395da8216569",
+    "unity/SmokeRescue/Assets/SmokeRescue/Recording/RecordingSession.Agents.cs": "095469aed94bbec0209127f39c08d8b4af6238f9767c3a730fbec7cf2cdcc0fa",
+    "unity/SmokeRescue/Assets/SmokeRescue/Recording/RecordingSession.cs": "3e89df6a0bb1f90dd13ee488ef30c69316ad770d62d0e03551a3eb5646357c24",
+    "unity/SmokeRescue/Assets/SmokeRescue/Recording/VisualPlaceClient.cs": "55f2c1cefc1dde3862c6f78952695580d5fe37e563f2ef02f9b5725f1c788f7d",
+    "unity/SmokeRescue/Assets/SmokeRescue/Recording/VisualPlaceClient.cs.meta": "91fd82f7ada331d46374af0c69171e6f2c435b74df44e76f706319eb7b9fdf1a",
+    "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/BrainTests.cs": "0b936acc22c001dc7483a4401a8d4d9b8d53ad406b7740d6bf2de587f0b6a99f",
+    "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/CameraLinkTests.cs": "0e6e65830d4b964f9ae7dd6e88242c079df935980aaf9703560adcd3fb81f537",
+    "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/CameraLinkTests.cs.meta": "9219130a5614427929e59074502f150eaf1088b94b2a9b6b1ed74ae4e77c9498",
+    "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/RouteWatchTests.cs": "f26f6f32d85a5eec4097e9cac75d032d0d7c806c8925748c7adcb4eada7d6e26",
+    "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/RouteWatchTests.cs.meta": "1ee81512195b017dbc05513df2806a9f5ad8f18b4f217014b853eaf6f33e6a13",
+    "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/SmokeRescue.Tests.EditMode.asmdef": "1885c8a2f325978ebbe3a4948e8259da202b97b18ed471e5a266ea27ca4b9084",
+    "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/VisualPlaceServiceTests.cs": "25d7d5bd6451ba785c2e6deb854a13995e2cb2b544a461a57ef668a261741b67",
+    "unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/VisualPlaceServiceTests.cs.meta": "84b693cd5b8b78957222ee241f3f012834ca5749c1e96d36fd4a2335290266c9"
+  },
+  "c14_added_lines_preserved": 139
+}

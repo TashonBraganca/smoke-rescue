@@ -312,7 +312,7 @@
   "lidar_open_span_deg": 30.0,
   "lidar_open_span_deg_reason": "A span of at least this many degrees of neighbouring LiDAR beams with no return is open ground: nothing within the LiDAR's 12 m that way. Smoke loses each pulse on its own, at most half of them (sensors.json smoke_dropout.max), so 60 empty beams in a row by chance has odds under 1e-18. Inside the house the widest empty span is a doorway seen from close up or the far end of the 20 m hallway (about 10 degrees from 2 m inside one end); in the yard it is about 140 degrees. Rays of the enclosure test run on across open ground instead of stopping as unknown (held-out run 2: one long facade plus the person robot B had carried out made the yard walled in).",
   "frames_shared_at_start": false,
-  "frames_shared_at_start_reason": "No operator pose: each robot maps in its own frame and links frames only from matched LiDAR fingerprints (Tashon, 2026-10-20).",
+  "frames_shared_at_start_reason": "Each robot starts in its own frame without an operator pose. LiDAR and camera candidates must pass own LiDAR map fit, uniqueness, and two separated agreeing matches before partner content applies (Tashon, 2026-10-20; data/evidence/place_recognition_eval.json).",
   "keyframe_spacing_m": 1.0,
   "keyframe_spacing_m_reason": "Keep a LiDAR keyframe every metre walked.",
   "keyframe_turn_deg": 45.0,
@@ -402,7 +402,13 @@
   "visual_keyframe_max": 200,
   "visual_keyframe_max_reason": "Own camera keyframes kept for sending (400 s of keyframes at one per 2 s, longer than a run).",
   "visual_keyframes_per_message": 1,
-  "visual_keyframes_per_message_reason": "Camera keyframes per radio broadcast: the newest, else one older in turn. About 1.9 KB each (48 ORB features of 38 bytes); brain messages are already about 5.4 KB every 2 s (held-out run 1), so one keeps the added load near 35 %.",
-  "visual_link_min_inliers": 12,
-  "visual_link_min_inliers_reason": "A camera match becomes a link candidate only with at least this many RANSAC inliers; the place service applies its own measured threshold first (config/perception.json place_min_inliers), this is the brain's floor. The frame link still needs two agreeing candidates from places at least link_min_separation_m apart."
+  "visual_keyframes_per_message_reason": "Send at most one 96-feature visual keyframe per broadcast, newest first and older views in turn. Its payload is 3653 bytes; with one LiDAR sweep MessageByteLimitsUseActualBinaryRoundTripsAtHouseScale measured full 7975 bytes and delta 7407 bytes.",
+  "visual_link_min_inliers": 16,
+  "visual_link_min_inliers_reason": "Match the service floor in config/perception.json. place_eval database mode rejected the worst wrong checkerboard/tile match with 15 inliers by requiring 16. The measured evaluation had 0 false accepts in about 58000 negatives. Map verification and two separated candidates still apply.",
+  "visual_place_linking": true,
+  "visual_place_linking_reason": "Enable camera proposals from the measured ORB service. tools/place_eval.py recorded 0 false accepts in about 58000 negative pairs, 4.6 percent cross-robot recall, and 2.4 cm median pose error. LiDAR map fit, uniqueness, and two separated agreeing candidates still gate every link.",
+  "visual_lidar_keyframes_per_message": 1,
+  "visual_lidar_keyframes_per_message_reason": "MessageByteLimitsUseActualBinaryRoundTripsAtHouseScale measured an 8165-byte delta with two 360-beam LiDAR sweeps and one 96-feature visual payload, above 8000 bytes. One sweep near the visual capture pose supports map verification even after a delayed service reply. The test measured 7407-byte deltas and 7975-byte full snapshots; LiDAR-only messages still carry two.",
+  "visual_keyframe_max_payload_bytes": 3653,
+  "visual_keyframe_max_payload_bytes_reason": "The measured service uses 96 ORB features at 38 bytes each plus a 5-byte header, exactly 3653 bytes. Reject larger service payloads until the radio budget is measured again; the one-sweep house delta measured 7407 bytes."
 }

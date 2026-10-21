@@ -37,6 +37,7 @@ namespace SmokeRescue.Recording
         /// cloud in the recording (for the replay and the video).</summary>
         const double Map3dLayersPeriodS = 5, Map3dExportPeriodS = 30;
         // The agent server bounds a step at about 75 s plus one 45 s call; past 120 s the reflex layer carries on alone.
+        static float PlaceHttpTimeoutS;
         static readonly HttpClient Http = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
         static readonly HashSet<string> AgentTriggers = new HashSet<string>
             { "survivor_candidate", "survivor_view_ready", "sensor_switch", "avoid_fire", "retreat", "stuck",
@@ -57,8 +58,8 @@ namespace SmokeRescue.Recording
             public readonly List<Outgoing> outbox = new List<Outgoing>();  // texts not yet heard by every listener
             public readonly List<double> thermalTimes = new List<double>();
             public readonly StringBuilder agentLog = new StringBuilder();
-            public double lastPeople = double.NegativeInfinity, lastMap3dLayers = double.NegativeInfinity, lastMap3dExport = double.NegativeInfinity,
-                lastVisualKeyframe = double.NegativeInfinity;
+            public double lastPeople = double.NegativeInfinity, lastMap3dLayers = double.NegativeInfinity, lastMap3dExport = double.NegativeInfinity;
+            public VisualPlaceWorker visualPlaces;
         }
 
         /// <summary>A team text and who has heard it. Delivery is tracked per listener: clearing the whole outbox when
@@ -388,35 +389,17 @@ namespace SmokeRescue.Recording
                     rig.brain.OnPersonSighting(Math.Min(seen, t), p.Value<float>("bearing_deg"), p.Value<float>("range_m"), p.Value<float>("confidence"));
                 }
                 Map3d(rig, t);
-                VisualKeyframe(rig, t);
             }
         }
 
-        /// <summary>Every visual_keyframe_period_s: the robot's own place service turns its latest colour and depth frame into a
-        /// camera keyframe (ORB features with body-frame positions, OpenCV 5); the brain keeps it and radios it.</summary>
-        static void VisualKeyframe(RobotRig rig, double t)
+        static void VisualKeyframe(RobotRig rig, double t, Queue<Task> pending, SensorConfig cfg)
         {
-            if (t - rig.lastVisualKeyframe < rig.brain.VisualKeyframePeriodS - 1e-9) return;
-            rig.lastVisualKeyframe = t;
-            var pose = rig.brain.Snapshot().pose;
-            var reply = Post($"/place/{rig.robot.RobotId}/keyframe", new JObject { ["robot_dir"] = Path.GetFullPath(rig.dir), ["t"] = t }, PeopleUrl);
-            if (reply == null || reply.Value<bool?>("ok") != true) return;
-            rig.brain.AddVisualKeyframe(reply.Value<int>("id"), pose, Convert.FromBase64String(reply.Value<string>("payload_b64")));
-        }
-
-        /// <summary>After a partner's packet is delivered: its camera keyframes go to this robot's own place service, which looks
-        /// for them among this robot's keyframes; a verified match becomes a link candidate in the brain.</summary>
-        static void MatchPartnerPlaces(RobotRig rig, double t)
-        {
-            if (PeopleUrl == null || rig.brain == null) return;
-            foreach (var (sender, kf) in rig.brain.DrainPartnerVisualKeyframes())
-            {
-                var reply = Post($"/place/{rig.robot.RobotId}/match", new JObject { ["robot_dir"] = Path.GetFullPath(rig.dir), ["t"] = t,
-                    ["payload_b64"] = Convert.ToBase64String(kf.payload) }, PeopleUrl);
-                if (reply == null || reply.Value<bool?>("matched") != true) continue;
-                rig.brain.OnVisualPlaceMatch(sender, kf.id, reply.Value<int>("mine_id"), reply.Value<float>("dx_m"), reply.Value<float>("dy_m"),
-                    reply.Value<float>("dyaw_deg"), reply.Value<int>("inliers"), t);
-            }
+            if (PeopleUrl == null || rig.brain == null || rig.missionDone || !rig.brain.VisualPlacesEnabled) return;
+            if (rig.visualPlaces == null) rig.visualPlaces = new VisualPlaceWorker(rig.brain, rig.robot.RobotId,
+                Path.GetFullPath(rig.dir), new VisualPlaceClient(PeopleUrl, PlaceHttpTimeoutS));
+            if (!rig.visualPlaces.CaptureDue(t)) return;
+            FlushForAgent(rig, pending, cfg);
+            rig.visualPlaces.TryCapture(t, rig.brain.Snapshot().pose);
         }
 
         /// <summary>The robot's live 3D map: its latest depth frame fused at its own estimated pose into an OpenCV 5 TSDF
