@@ -117,6 +117,7 @@ namespace SmokeRescue.Brain
             if (!completed && !returning && t >= c.mission_time_limit_s) BeginReturn(t, "Exploration time limit reached.");
             CheckWayOut(t);
             CheckEmergencyExit(t);
+            CheckHeatBuilding(t);
             if (!retreating && !emergencyExit && (airC > c.heat_retreat_c || budget < c.heat_retreat_fraction))
             {
                 ResetStuckRecovery(); retreating = true; sweeping = false; active = null; dwell = 0; ClearPath();
@@ -204,7 +205,7 @@ namespace SmokeRescue.Brain
                 {
                     completed = true; ClearPath(); carryClearFrom = stepAwayFrom = new Vector2(float.NaN, float.NaN);
                     // Left early to stay safe, or carried someone out: it may go back in once that is safe (CheckReenter).
-                    canReenter = returnReason == WayOutClosing || returnReason == EmergencyExit || returnReason == CarryingOut;
+                    canReenter = returnReason == WayOutClosing || returnReason == EmergencyExit || returnReason == CarryingOut || returnReason == HeatLeave;
                     if (returnReason == CarryingOut && !carriedOutReported)
                     {
                         carryingSpeed = 0;
@@ -226,7 +227,19 @@ namespace SmokeRescue.Brain
                         Emit(t, "emergency_exit", "The way out was cut on the way: leave past the fire at reduced clearance.",
                             "clearance_m", c.emergency_fire_clearance_m, "route_points", path.Count);
                     }
-                    if (path.Count == 0 && returnReason == WayOutClosing)
+                    if (path.Count == 0 && returnReason == CarryingOut && grid.FireClearance > c.emergency_fire_clearance_m && HeatBuilding(t, out _))
+                    {
+                        // Carrying a person, the way out blocked and the air heating: leave past the fire at reduced
+                        // clearance, still as a carry so the person is set down clear of the way out.
+                        grid.FireClearance = c.emergency_fire_clearance_m; SetPath(PlanOut());
+                        Emit(t, "emergency_exit", "Carrying a person, the way out blocked and the air heating: leave past the fire at reduced clearance.",
+                            "clearance_m", c.emergency_fire_clearance_m, "route_points", path.Count, "air_c", airC);
+                    }
+                    if (path.Count == 0 && returnReason != EmergencyExit && returnReason != CarryingOut && returnReason != WayOutClosing &&
+                        returnReason != HeatLeave && HeatBuilding(t, out _) &&
+                        TryEmergencyExit(t, "The way out is blocked and the air is heating: leave by the nearest way out"))
+                        return Command(0, 0, dt, true);
+                    if (path.Count == 0 && (returnReason == WayOutClosing || returnReason == HeatLeave))
                     {
                         // Fire cut the way home while the robot was on it (agent run 12: robot A held still for the rest
                         // of the run). Same as finding it cut: retreat to the coolest floor and search on while it is cool.
@@ -378,7 +391,7 @@ namespace SmokeRescue.Brain
                     if (frontier != null)
                     {
                         SetPath(frontier.path, true); frontierCentre = frontier.claimCentre; frontierRadius = frontier.claimRadius;
-                        scanSince = double.NaN;
+                        scanSince = double.NaN; noFrontierAt = double.NaN;
                         Emit(t, "goal", "Reachable frontier minimizes travel and heat cost minus nearby unknown-cell gain.",
                             "x_m", frontier.position.x, "y_m", frontier.position.y, "path_cost", frontier.cost, "information_cells", frontier.information, "score", frontier.score);
                         Emit(t, "replan", "Build a path to the selected frontier.", "path_points", path.Count);
@@ -387,7 +400,7 @@ namespace SmokeRescue.Brain
                     {
                         ClearPath(); lastPlan = t; if (double.IsNaN(scanSince))
                         {
-                            scanSince = t; Emit(t, "goal", "No reachable frontier is visible; scan unseen directions before returning.");
+                            scanSince = t; noFrontierAt = t; Emit(t, "goal", "No reachable frontier is visible; scan unseen directions before returning.");
                             // With an agent, the model hears of it during the scan and may order a way on (a door, debris).
                             Emit(t, "no_frontier", "No reachable unsearched floor in this robot's map; returning after the scan unless ordered on.",
                                 "scan_s", c.no_frontier_scan_s);
@@ -540,11 +553,15 @@ namespace SmokeRescue.Brain
             while (airQueue.Count > 0 && airQueue[0].t <= t)
             {
                 var sample = airQueue[0]; airQueue.RemoveAt(0);
+                airHistory.Add(sample);
                 if (sample.t < from) { if (sample.t > lastAir) { airC = sample.c; lastAir = sample.t; } continue; }
                 IntegrateBudget((float)(sample.t - from), from); from = sample.t;
                 airC = sample.c; lastAir = sample.t;
             }
             IntegrateBudget((float)(t - from), from);
+            double keep = t - Math.Max(c.air_rise_window_s, c.air_rise_baseline_s) - 1;
+            int old = 0; while (old < airHistory.Count && airHistory[old].t < keep) old++;
+            if (old > 0) airHistory.RemoveRange(0, old);
         }
         void IntegrateBudget(float duration, double t)
         {
@@ -778,6 +795,7 @@ namespace SmokeRescue.Brain
                 if (Vector2.Distance(p, motion.Pose.position) > c.escape_ignore_m) closest = Mathf.Min(closest, grid.FireDistance(grid.Cell(p)));
             if (closest < c.escape_fire_margin_m) return;
             completed = false; canReenter = false; emergencyExit = false; returning = false; hadWayOut = false; ClearPath();
+            noFrontierAt = double.NaN; cutOff = false;
             Emit(t, "reenter", "Heat budget recovered and a frontier is reachable with the fire clear of the way: go back in.",
                 "fire_distance_m", closest, "information_cells", frontier.information, "heat_budget", budget);
         }
@@ -791,20 +809,101 @@ namespace SmokeRescue.Brain
         {
             if (emergencyExit || completed || budget >= c.heat_emergency_fraction || t < nextEmergencyCheck) return;
             nextEmergencyCheck = t + c.escape_check_s;
-            // Leave by the normal route when there is one: the retreat's "coolest reachable cell" can be a hot spot next
-            // to the robot (2x2 attempt 4: robot A sat 0.2 m from its retreat goal with the budget at 0 and a route out open).
+            TryEmergencyExit(t, "Heat budget nearly spent: leave by the nearest way out");
+        }
+        /// <summary>Plan the nearest way out at the normal fire clearance, else at emergency_fire_clearance_m (past the fire,
+        /// never through a burning cell), and leave by it; false if there is none. The normal route comes first: the
+        /// retreat's "coolest reachable cell" can be a hot spot next to the robot (2x2 attempt 4: robot A sat 0.2 m from its
+        /// retreat goal with the budget at 0 and a route out open).</summary>
+        bool TryEmergencyExit(double t, string why)
+        {
             var exit = PlanOut(); float clearance = c.fire_clearance_m;
             if (exit.Count == 0)
             {
                 grid.FireClearance = clearance = c.emergency_fire_clearance_m;
                 exit = PlanOut();
-                if (exit.Count == 0) { grid.FireClearance = c.fire_clearance_m; return; }
+                if (exit.Count == 0) { grid.FireClearance = c.fire_clearance_m; return false; }
             }
-            emergencyExit = true; retreating = false;
-            Emit(t, "emergency_exit", "Heat budget nearly spent: leave by the nearest way out" +
-                (clearance < c.fire_clearance_m ? ", past the fire at reduced clearance." : "."),
-                "heat_budget", budget, "clearance_m", clearance, "route_points", exit.Count);
+            emergencyExit = true; retreating = false; cutOff = false;
+            Emit(t, "emergency_exit", why + (clearance < c.fire_clearance_m ? ", past the fire at reduced clearance." : "."),
+                "heat_budget", budget, "clearance_m", clearance, "route_points", exit.Count, "air_c", airC);
             BeginReturn(t, EmergencyExit);
+            return true;
+        }
+        // The robot's own thermocouple readings, oldest first, kept for HeatBuilding.
+        readonly List<AirSample> airHistory = new List<AirSample>();
+        // Set when the brain finds no reachable frontier (it would return after its scan unless an agent orders it on);
+        // cleared when it finds one again. cutOff: the way out was lost and the robot retreats to cool floor.
+        double noFrontierAt = double.NaN, nextCutOffCheck; bool cutOff;
+        const string HeatLeave = "No reachable frontier was left and the air was heating.";
+        /// <summary>
+        /// The hot gas layer is reaching the robot: its own air reading is at least air_warm_c, or it rises at
+        /// air_rise_c_per_min or faster (least squares over air_rise_window_s) and is at least air_rise_min_delta_c above
+        /// its lowest reading of the last air_rise_baseline_s. Used only when the robot is already in trouble (no reachable
+        /// frontier left, or cut off from its way out): on its own it would fire in 15 of 33 recorded robot runs that
+        /// stayed safe, because robots walk from the yard into halls already at 25 to 45 C (air_rise check, 2026-10-21).
+        /// No fresh reading: no decision.
+        /// </summary>
+        bool HeatBuilding(double t, out float risePerMin)
+        {
+            risePerMin = AirSlopePerMin(t);
+            if (t - lastAir > c.frame_max_age_s) return false;
+            if (airC >= c.air_warm_c) return true;
+            if (risePerMin < c.air_rise_c_per_min) return false;
+            float low = float.PositiveInfinity;
+            foreach (var sample in airHistory) if (sample.t >= t - c.air_rise_baseline_s && sample.c < low) low = sample.c;
+            return airC >= low + c.air_rise_min_delta_c;
+        }
+        float AirSlopePerMin(double t)
+        {
+            double from = t - c.air_rise_window_s, n = 0, sx = 0, sy = 0, sxx = 0, sxy = 0, first = double.NaN;
+            foreach (var sample in airHistory)
+            {
+                if (sample.t < from || sample.t > t) continue;
+                if (double.IsNaN(first)) first = sample.t;
+                double x = sample.t - t; n++; sx += x; sy += sample.c; sxx += x * x; sxy += x * sample.c;
+            }
+            // Most of the window must be covered: two seconds of readings after a gap are not a trend.
+            if (n < 5 || t - first < .8 * c.air_rise_window_s) return 0;
+            double den = n * sxx - sx * sx;
+            return den <= 1e-9 ? 0 : (float)((n * sxy - sx * sy) / den * 60);
+        }
+        /// <summary>
+        /// Held-out run 2, robot A: at 89.8 s the brain found no reachable frontier (fire blocked them) and would have
+        /// returned after its scan; the agent ordered it on, then on again at 106.9 s. From 95 s its air rose 24 to 39 C
+        /// (about 45 C/min) while it inspected warm shapes beside the fire; its way out closed at 114 s, it retreated
+        /// "to search on while it is cool", the hot gas reached it at 123 s and it took its emergency exit only at 126 s
+        /// (299 C, budget 0.08): 77 s above 60 C, peak 381 C. Now: with no reachable frontier left, heat building ends
+        /// the scan or any agent order to stay, and the robot leaves while its way out is open (it may come back in
+        /// later). A robot cut off from its way out leaves at once by the emergency route when heat builds, instead of
+        /// retreating; in cool, steady air it still retreats and searches on.
+        /// </summary>
+        void CheckHeatBuilding(double t)
+        {
+            if (completed || emergencyExit) return;
+            if (cutOff && retreating)
+            {
+                if (t < nextCutOffCheck) return;
+                nextCutOffCheck = t + c.escape_check_s;
+                if (HeatBuilding(t, out _)) TryEmergencyExit(t, "Cut off from the way out and the air is heating: leave now by the nearest way out");
+                return;
+            }
+            if (returning || retreating || double.IsNaN(noFrontierAt)) return;
+            bool ordered = AgentGoalActive(t) || t < agentHoldUntil || facing.HasValue;
+            if ((!ordered && double.IsNaN(scanSince)) || !HeatBuilding(t, out float rise)) return;
+            agentGoal = null; agentGoalIsFrontier = false; agentHoldUntil = double.NegativeInfinity; facing = null; agentFace = null;
+            Emit(t, "stay_overridden", (ordered ? "The agent's order to stay is overridden: " : "") +
+                "no reachable frontier is left and the air is heating; leave while the way out is open.",
+                "air_c", airC, "rise_c_per_min", rise, "no_frontier_s", t - noFrontierAt);
+            BeginReturn(t, HeatLeave);
+        }
+        /// <summary>Why an agent order to move must be refused now, or null.</summary>
+        string AgentMoveRefusal(double t)
+        {
+            if (returning) return "the robot is leaving (" + returnReason + ")";
+            if (!double.IsNaN(noFrontierAt) && HeatBuilding(t, out float rise))
+                return $"no reachable frontier is left and the air is heating ({airC:0} C, {rise:0} C/min); the robot is leaving";
+            return null;
         }
         /// <summary>Known ways out: this robot's own entry and, once a partner's map is linked, the partner's entry (the
         /// origin of its frame), which it reported by radio. Slow-fire run: robot B's way home was cut by fire 5.5 m from
@@ -828,6 +927,12 @@ namespace SmokeRescue.Brain
         }
         void LoseWayOut(double t)
         {
+            if (HeatBuilding(t, out _) && TryEmergencyExit(t, "The known way out is closed and the air is heating: leave now by the nearest way out"))
+            {
+                Emit(t, "escape_closing", "The known way out is closed and the air is heating: emergency exit instead of a retreat.", "route_points", 0, "air_c", airC);
+                return;
+            }
+            cutOff = true; nextCutOffCheck = t + c.escape_check_s;
             hadWayOut = false; returning = false; ResetStuckRecovery(); ResetWayOutAndArrival(); retreating = true; sweeping = false; active = null; dwell = 0; ClearPath();
             // A route that reappears next to the fire would start a return that is cut again at once; wait a while.
             nextWayOutCheck = t + c.escape_recheck_s;

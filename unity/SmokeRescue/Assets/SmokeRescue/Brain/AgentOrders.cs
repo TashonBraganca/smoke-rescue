@@ -25,6 +25,8 @@ namespace SmokeRescue.Brain
             // near an entrance the robot's own cell may not be known to be inside yet).
             bool turnInPlace = face.HasValue && Vector2.Distance(target, motion.Pose.position) <= c.goal_tolerance_m;
             if (!turnInPlace && !InSearchArea(target)) { Emit(t, "agent_order", "Refused go_to: no ceiling has been seen over that point, so it is not known to be inside.", "x_m", target.x, "y_m", target.y); return; }
+            string busy = AgentMoveRefusal(t);
+            if (busy != null) { Emit(t, "agent_order", "Refused go_to: " + busy + ".", "x_m", target.x, "y_m", target.y); return; }
             agentGoal = target; agentGoalUntil = t + holdS; agentGoalReason = reason ?? ""; agentGoalIsFrontier = false;
             agentFace = face; facing = null; agentHoldUntil = double.NegativeInfinity;
             if (active == null) ClearPath();
@@ -160,6 +162,8 @@ namespace SmokeRescue.Brain
         /// and marks it visited exactly as for a frontier it chose itself.</summary>
         public void AgentExplore(Vector2 target, double t, double holdS, string reason, string indoorEvidence = null)
         {
+            string busy = AgentMoveRefusal(t);
+            if (busy != null) { Emit(t, "agent_order", "Refused explore_frontier: " + busy + ".", "x_m", target.x, "y_m", target.y); return; }
             if (!string.IsNullOrEmpty(indoorEvidence) && !InSearchArea(target))
             {
                 // Floor the robot cannot prove is indoors, chosen by the agent on an OpenCV indoor check of its own frame.
