@@ -88,9 +88,20 @@ namespace SmokeRescue.Editor
             RecordingSession.PeopleUrl = up ? vision : null;
             Debug.Log(up ? $"[SmokeRescue] colour person detector at {vision}" : $"[SmokeRescue] WARNING: vision service {vision} not reachable; colour person detection is off");
             SmokeRescue.Robots.Robot.BodyPrefab = UseQuadruped ? FurnitureBuilder.RobotBodyPrefab() : null;
-            // People are placed clear of the furniture actually in the scene (Props layer), with a body-sized box.
+            // People are placed clear of the house's own furniture (Props layer), with a body-sized box. People and scenario
+            // debris left from an earlier recording are not furniture: they changed where the next run placed people.
             int props = 1 << LayerMask.NameToLayer("Props");
-            Scenario.PlacementBlocked = q => Physics.CheckBox(new Vector3(q.x, .35f, q.y), new Vector3(.9f, .3f, .9f), Quaternion.identity, props, QueryTriggerInteraction.Ignore);
+            Physics.SyncTransforms();
+            Scenario.PlacementBlocked = q =>
+            {
+                foreach (var hit in Physics.OverlapBox(new Vector3(q.x, .35f, q.y), new Vector3(.9f, .3f, .9f), Quaternion.identity, props, QueryTriggerInteraction.Ignore))
+                {
+                    bool scenarioObject = false;
+                    for (var t = hit.transform; t != null; t = t.parent) if (t.name == ScenePreview.SurvivorsRoot || t.name == "Obstacles") { scenarioObject = true; break; }
+                    if (!scenarioObject) return true;
+                }
+                return false;
+            };
             var sc = Scenario.Load(scenario);
             FurnitureBuilder.PlaceScenarioObstacles(sc);
             int warm = FurnitureBuilder.ApplyWarmObjects(scenario);

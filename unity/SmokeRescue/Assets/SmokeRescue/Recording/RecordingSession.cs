@@ -81,11 +81,30 @@ namespace SmokeRescue.Recording
         /// footprint grew about 1 GB a minute (13 GB to 21 GB in 10 minutes of run 15) until the system killed it
         /// (OS_REASON_JETSAM at 11:17:42 in run 14, with about 40 other processes). The simulation is the same either way.
         /// </summary>
+        /// <summary>Gate: the people the evaluator scores against must be where the bodies are in the scene. Held-out seed 914
+        /// runs 3 and 4 wrote oracle positions up to 4.7 m from the bodies; a mismatch over 5 cm now stops the recording.</summary>
+        static void CheckSurvivorsMatchScene(Scenario scenario)
+        {
+            var root = GameObject.Find("Survivors");
+            if (root == null) return;   // no people built (component tests)
+            foreach (var s in scenario.survivors)
+            {
+                Transform body = null;
+                foreach (Transform child in root.transform) if (child.name.StartsWith("Survivor_" + s.id + "_")) { body = child; break; }
+                if (body == null) throw new InvalidOperationException($"scenario survivor {s.id} has no body in the scene");
+                var renderers = body.GetComponentsInChildren<Renderer>();
+                if (renderers.Length == 0) continue;
+                var b = renderers[0].bounds; foreach (var r in renderers) b.Encapsulate(r.bounds);
+                float d = Vector2.Distance(new Vector2(b.center.x, b.center.z), new Vector2(s.at[0], s.at[1]));
+                if (d > .05f) throw new InvalidOperationException($"scenario survivor {s.id} at ({s.at[0]:0.00}, {s.at[1]:0.00}) but its body in the scene is at ({b.center.x:0.00}, {b.center.z:0.00}), {d:0.00} m away");
+            }
+        }
         public static IEnumerable<Result> RecordSteps(string scenarioFile, string runId, float maxSeconds = float.PositiveInfinity, bool noise = true, Action<string> progress = null)
         {
             var wall = Stopwatch.StartNew();
             var plan = FloorPlan.Load();
             var scenario = Scenario.Load(scenarioFile);
+            CheckSurvivorsMatchScene(scenario);
             var sensorCfg = SensorConfig.Load();
             PeoplePeriodS = BrainConfig.Load().person_rgb_scan_period_s;
             PlaceHttpTimeoutS = JObject.Parse(File.ReadAllText(Path.Combine(SensorConfig.ConfigDir, "perception.json"))).Value<float>("place_http_timeout_s");

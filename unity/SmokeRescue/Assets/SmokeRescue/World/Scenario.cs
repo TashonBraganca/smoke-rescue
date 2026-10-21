@@ -114,9 +114,28 @@ namespace SmokeRescue.World
             var merged = LoadMerged(path);
             var scenario = merged.ToObject<Scenario>();
             if (scenario.robots.Count == 0) throw new InvalidDataException($"scenario has no robots: {path}");
-            if (scenario.survivor_placement == "random") scenario.PlaceSurvivorsRandomly(FloorPlan.Load());
+            if (scenario.survivor_placement == "random")
+            {
+                // Placed once per scenario file and seed in an editor session, then reused: the editor loads a scenario to
+                // build the scene and again inside the recorder, and with PlacementBlocked the second load saw the people
+                // the first had placed and chose other spots, so oracle/survivors.json disagreed with the scene (held-out
+                // seed 914 runs 3 and 4).
+                string key = Path.GetFullPath(path) + "|" + scenario.seed;
+                if (RandomPlacements.TryGetValue(key, out var placed) && placed.Count == scenario.survivors.Count)
+                    for (int i = 0; i < placed.Count; i++)
+                    { scenario.survivors[i].room = placed[i].room; scenario.survivors[i].at = (float[])placed[i].at.Clone(); scenario.survivors[i].yaw = placed[i].yaw; }
+                else
+                {
+                    scenario.PlaceSurvivorsRandomly(FloorPlan.Load());
+                    RandomPlacements[key] = scenario.survivors.Select(s => (s.room, (float[])s.at.Clone(), s.yaw)).ToList();
+                }
+            }
             return scenario;
         }
+        static readonly Dictionary<string, List<(string room, float[] at, float yaw)>> RandomPlacements =
+            new Dictionary<string, List<(string room, float[] at, float yaw)>>();
+        /// <summary>Forget random placements (tests; a changed house).</summary>
+        public static void ForgetRandomPlacements() => RandomPlacements.Clear();
 
         /// <summary>Seeded random survivor spots: any room, at least 0.6 m from its walls, 0.9 m from landmarks and
         /// obstacles, 1.2 m from doors and spawn points, and 3 m from each other.</summary>

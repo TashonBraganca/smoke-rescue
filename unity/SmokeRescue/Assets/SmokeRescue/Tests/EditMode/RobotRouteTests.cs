@@ -14,6 +14,28 @@ namespace SmokeRescue.Tests.EditMode
         const float Dt = 1f / 60f;
 
         [Test]
+        public void RandomPeopleArePlacedOncePerScenarioSoTheTruthFileMatchesTheScene()
+        {
+            // Held-out seed 914 runs 3 and 4: the scenario was loaded to build the scene and again inside the recorder; the
+            // second load saw the people the first had placed and chose other spots, so oracle/survivors.json disagreed with
+            // the scene by up to 4.7 m. A random placement is now made once per file and seed and reused.
+            // Control: forgetting the placement lets a changed scene move the people.
+            const string file = "scenario_house_heldout_seed914.json";
+            try
+            {
+                Scenario.ForgetRandomPlacements(); Scenario.PlacementBlocked = null;
+                var first = Scenario.Load(file).survivors.Select(s => new Vector2(s.at[0], s.at[1])).ToList();
+                Scenario.PlacementBlocked = q => Vector2.Distance(q, first[0]) < 2f;   // the scene changed: person 0's spot is now taken
+                var again = Scenario.Load(file).survivors.Select(s => new Vector2(s.at[0], s.at[1])).ToList();
+                Assert.That(again, Is.EqualTo(first), "the second load reuses the first placement");
+                Scenario.ForgetRandomPlacements();
+                var fresh = Scenario.Load(file).survivors.Select(s => new Vector2(s.at[0], s.at[1])).ToList();
+                Assert.That(Vector2.Distance(fresh[0], first[0]), Is.GreaterThanOrEqualTo(2f), "control: placed afresh, the changed scene moves person 0");
+            }
+            finally { Scenario.PlacementBlocked = null; Scenario.ForgetRandomPlacements(); }
+        }
+
+        [Test]
         public void RandomlyPlacedPeopleStayInsideTheScenarioSearchArea()
         {
             // Held-out run 1: four of five randomly placed people landed in the apartment, office and workshop of the larger
