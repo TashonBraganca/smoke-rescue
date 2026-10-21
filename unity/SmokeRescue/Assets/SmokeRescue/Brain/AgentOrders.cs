@@ -23,13 +23,14 @@ namespace SmokeRescue.Brain
         {
             if (!InSearchArea(target)) { Emit(t, "agent_order", "Refused go_to: no ceiling has been seen over that point, so it is not known to be inside.", "x_m", target.x, "y_m", target.y); return; }
             agentGoal = target; agentGoalUntil = t + holdS; agentGoalReason = reason ?? ""; agentGoalIsFrontier = false;
-            agentFace = face; facing = null;
+            agentFace = face; facing = null; agentHoldUntil = double.NegativeInfinity;
             if (active == null) ClearPath();
             Emit(t, "agent_order", "go_to: " + agentGoalReason, "x_m", target.x, "y_m", target.y, "hold_s", holdS);
         }
 
         bool agentGoalIsFrontier;
         Vector2? agentFace, facing; double facingUntil; string facingReason;
+        double agentHoldUntil = double.NegativeInfinity;
 
         /// <summary>Arrival at an agent go_to: start facing the named point, or tell the agent now.</summary>
         void AgentArrived(double t, string how)
@@ -39,7 +40,11 @@ namespace SmokeRescue.Brain
                 facing = agentFace; facingUntil = t + c.sweep_max_s; facingReason = agentGoalReason;
                 Emit(t, "goal", "At the agent's goal; turn to face the point it named.", "x_m", agentFace.Value.x, "y_m", agentFace.Value.y);
             }
-            else Emit(t, "agent_goal_reached", how + agentGoalReason, "x_m", agentGoal.Value.x, "y_m", agentGoal.Value.y);
+            else
+            {
+                Emit(t, "agent_goal_reached", how + agentGoalReason, "x_m", agentGoal.Value.x, "y_m", agentGoal.Value.y);
+                agentHoldUntil = t + c.agent_arrival_hold_s;
+            }
             agentFace = null;
         }
 
@@ -55,7 +60,7 @@ namespace SmokeRescue.Brain
                 return Command(0, Mathf.Clamp(error * c.heading_gain, -c.sweep_yaw_dps, c.sweep_yaw_dps), dt, true);
             Emit(t, "agent_goal_reached", "Arrived where the agent asked and turned to face the point it named: " + facingReason,
                 "x_m", facing.Value.x, "y_m", facing.Value.y, "bearing_error_deg", error);
-            facing = null;
+            facing = null; agentHoldUntil = t + c.agent_arrival_hold_s;
             return null;
         }
 
@@ -150,6 +155,7 @@ namespace SmokeRescue.Brain
 
         public void AgentRejectCandidate(Vector2 p, double t, string evidence)
         {
+            agentHoldUntil = double.NegativeInfinity;
             int n = 0;
             foreach (var track in tracks)
             {

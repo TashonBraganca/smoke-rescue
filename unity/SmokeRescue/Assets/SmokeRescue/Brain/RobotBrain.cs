@@ -288,6 +288,8 @@ namespace SmokeRescue.Brain
             CheckProgress(t);
             var face = FaceStep(t, dt);
             if (face.HasValue) return face.Value;
+            // Sent here for a reason: wait for the agent's next order instead of driving off to a frontier.
+            if (t < agentHoldUntil && !returning && !retreating) return Command(0, 0, dt, true);
             if (agentGoal.HasValue && Vector2.Distance(agentGoal.Value, motion.Pose.position) <= c.goal_tolerance_m)
             {
                 Emit(t, "goal", "Reached the agent's goal.", "x_m", agentGoal.Value.x, "y_m", agentGoal.Value.y);
@@ -636,12 +638,28 @@ namespace SmokeRescue.Brain
             float closest = float.PositiveInfinity; Vector2 at = motion.Pose.position;
             foreach (var p in route)
                 if (Vector2.Distance(p, at) > c.escape_ignore_m) closest = Mathf.Min(closest, grid.FireDistance(grid.Cell(p)));
-            if (closest < c.escape_fire_margin_m)
+            // How fast is the fire closing on the route? Measured from this robot's own fire map over escape_rate_window_s.
+            float routeM = 0; for (int i = 1; i < route.Count; i++) routeM += Vector2.Distance(route[i - 1], route[i]);
+            float walkS = routeM / c.open_speed_mps, closeS = float.PositiveInfinity;
+            if (float.IsInfinity(closest)) wayOutFire.Clear(); else wayOutFire.Add((t, closest));
+            // Keep as the first entry the latest reading at least escape_rate_window_s old.
+            while (wayOutFire.Count > 2 && t - wayOutFire[1].t >= c.escape_rate_window_s) wayOutFire.RemoveAt(0);
+            var first = wayOutFire.Count > 0 ? wayOutFire[0] : (t: t, fire: closest);
+            if (t - first.t >= c.escape_rate_window_s)
             {
-                Emit(t, "escape_closing", "Fire is closing on the way out; leave while it is open.", "fire_distance_m", closest, "margin_m", c.escape_fire_margin_m);
+                float rate = (first.fire - closest) / (float)(t - first.t);
+                if (rate > 0) closeS = Mathf.Max(0, closest - c.fire_clearance_m) / rate;
+            }
+            if (closest < c.escape_fire_margin_m || closeS < walkS * c.escape_time_factor)
+            {
+                Emit(t, "escape_closing", closest < c.escape_fire_margin_m ? "Fire is closing on the way out; leave while it is open."
+                    : "Fire is closing on the way out faster than the robot could walk it later; leave while it is open.",
+                    "fire_distance_m", closest, "margin_m", c.escape_fire_margin_m, "closes_in_s", float.IsInfinity(closeS) ? -1 : closeS, "walk_out_s", walkS);
+                wayOutFire.Clear();
                 BeginReturn(t, WayOutClosing);
             }
         }
+        readonly List<(double t, float fire)> wayOutFire = new List<(double t, float fire)>();
         const string WayOutClosing = "The way out was closing.", EmergencyExit = "Emergency exit.", CarryingOut = "Carrying a person out.";
         float carryingSpeed;
         /// <summary>A person is strapped onto the sled: take them to the nearest known way out at carry speed, then the

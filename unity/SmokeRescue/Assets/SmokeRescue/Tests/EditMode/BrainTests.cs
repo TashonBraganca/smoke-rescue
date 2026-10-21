@@ -739,6 +739,35 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void ARobotLeavesEarlyWhenFireClosesOnItsWayOutFasterThanItCouldWalkIt()
+        {
+            // Run 21: the fixed 2 m margin fired 2.4 s before robot B's hallway route closed, and it was trapped for 137 s.
+            // A fire front moving toward the route at 0.3 m/s must start the return while it is still beyond 2 m, from the
+            // closing rate the robot measures on its own map. Control: escape_time_factor 0 leaves only the 2 m margin.
+            float FireDistanceAtLeave(float factor)
+            {
+                var c = Settings(); c.grid_size_m = 12; c.robot_radius_m = .25f; c.escape_time_factor = factor;
+                var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -5, 5, -2, 6);
+                for (int i = 0; i < 225; i++)
+                {
+                    double t = i / 15.0; Motion(b, t, t < 3 ? 1f : 0); b.OnRgbd(Image(t, true)); b.OnAirTemperature(t, 20);
+                    if (t >= 3.2)
+                    {
+                        var g = Map(b); float x = 5.0f - .3f * (float)(t - 3.2);
+                        for (float dx = -.3f; dx <= .3f; dx += .1f) for (float dy = -.3f; dy <= .3f; dy += .1f) g.ObserveHeat(g.Cell(new Vector2(x + dx, .8f + dy)), 500, t);
+                    }
+                    b.Step(t, 1f / 15);
+                    var leave = b.DrainEvents().FirstOrDefault(e => e.kind == "escape_closing");
+                    if (leave != null) return (float)leave.numbers["fire_distance_m"];
+                }
+                return -1;
+            }
+            float early = FireDistanceAtLeave(1.5f), late = FireDistanceAtLeave(0f);
+            Assert.That(early, Is.GreaterThan(2.3f), "left on the closing rate, well before the 2 m margin");
+            Assert.That(late, Is.InRange(0f, 2.0f), "control: without the rate only the 2 m margin acts");
+        }
+
+        [Test]
         public void AReturnCutByFireBecomesARetreatNotAStandstill()
         {
             // Agent run 12: robot A started home as fire closed on its route, the route was cut a moment later, and it
@@ -818,6 +847,37 @@ namespace SmokeRescue.Tests.EditMode
             var plain = Drive(null);
             Assert.That(plain.events.Count(e => e.kind == "agent_goal_reached" && e.reason.StartsWith("Arrived where the agent asked: ")), Is.EqualTo(1), "control");
             Assert.That(Mathf.Abs(Mathf.DeltaAngle(plain.yawDeg, 0)), Is.LessThan(20f), "control: no turn toward anything");
+        }
+
+        [Test]
+        public void AfterArrivingWhereTheAgentAskedTheRobotWaitsForItsNextOrder()
+        {
+            // Run 21: robot A arrived facing a confirmed person within 9 deg and drove toward a frontier in the same tick;
+            // when the agent answered 1.1 s later the person was 61 deg off, outside the camera. The robot now holds
+            // agent_arrival_hold_s for the next order. Controls: a new go_to during the hold is driven at once, and with
+            // the hold set to 0 the robot leaves for a frontier.
+            float Moved(float holdS, bool newOrder)
+            {
+                var settings = Settings(); settings.agent_arrival_hold_s = holdS;
+                var b = new RobotBrain(Calibration(), settings, "A", 0); Room(b, -4, 4, -4, 4);
+                var g = Map(b);
+                for (float y = 1.0f; y <= 3.9f; y += .1f) g.ObserveFree(g.Cell(new Vector2(0, y)));   // a frontier to tempt it
+                b.AgentGoTo(new Vector2(0, -1.0f), 0, 30, "closer look");
+                var command = new BrainCommand(); int tick = 0; Vector2 at = default; bool arrived = false;
+                for (; tick < 400 && !arrived; tick++)
+                {
+                    command = DriveTick(b, tick, command.forwardMps, command.yawRateDeg);
+                    arrived = b.DrainEvents().Any(e => e.kind == "agent_goal_reached");
+                }
+                Assert.That(arrived, "reached the goal");
+                at = b.Snapshot().pose.position;
+                if (newOrder) b.AgentGoTo(new Vector2(-1.5f, -1.0f), tick / 20.0, 30, "next look");
+                for (int k = 0; k < 80; k++, tick++) { command = DriveTick(b, tick, command.forwardMps, command.yawRateDeg); b.DrainEvents(); }   // 4 s
+                return Vector2.Distance(at, b.Snapshot().pose.position);
+            }
+            Assert.That(Moved(5f, false), Is.LessThan(.05f), "holds for the agent");
+            Assert.That(Moved(5f, true), Is.GreaterThan(.3f), "control: a new order is driven at once");
+            Assert.That(Moved(0f, false), Is.GreaterThan(.3f), "control: without the hold it drives off");
         }
 
         [Test]

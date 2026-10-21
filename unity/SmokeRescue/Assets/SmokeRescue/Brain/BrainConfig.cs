@@ -78,6 +78,8 @@ namespace SmokeRescue.Brain
         public float survivor_stop_min_m = 1.0f;
         public float survivor_stop_max_m = 1.5f;
         public float survivor_face_tolerance_deg = 10.0f;
+        public float agent_arrival_hold_s = 5.0f;
+        public float escape_time_factor = 1.5f, escape_rate_window_s = 4.0f;
         public float survivor_dwell_s = 3.0f;
         public float survivor_fresh_s = 0.5f;
         public float survivor_lost_s = 3.0f;
@@ -212,7 +214,7 @@ namespace SmokeRescue.Brain
                 person_min_pixels < 3 || person_max_c <= person_min_c || person_min_area_m2 <= 0 || person_max_area_m2 < person_min_area_m2 || blob_depth_jump_m <= 0 ||
                 survivor_merge_m <= 0 || survivor_stop_min_m <= 0 || survivor_stop_min_m > survivor_standoff_m || survivor_standoff_m > survivor_stop_max_m ||
                 survivor_dwell_s <= 0 || survivor_fresh_s <= 0 || survivor_lost_s < survivor_fresh_s || survivor_stop_speed_mps < 0 || standoff_samples < 4 ||
-                survivor_face_tolerance_deg <= 0 || survivor_face_tolerance_deg > 90 || replan_s <= 0 || frontier_min_distance_m <= 0 ||
+                survivor_face_tolerance_deg <= 0 || agent_arrival_hold_s < 0 || escape_time_factor < 0 || escape_rate_window_s <= 0 || survivor_face_tolerance_deg > 90 || replan_s <= 0 || frontier_min_distance_m <= 0 ||
                 frontier_gain_weight < 0 || frontier_information_radius_cells < 1 || frontier_information_radius_cells > 20 ||
                 lookahead_m <= 0 || goal_tolerance_m <= 0 || goal_slow_distance_m <= 0 || open_speed_mps <= 0 || near_speed_mps <= 0 || thermal_speed_mps <= 0 ||
                 near_obstacle_m < collision_stop_m || collision_stop_m <= robot_radius_m || collision_cone_deg <= 0 || collision_cone_deg > 90 ||
