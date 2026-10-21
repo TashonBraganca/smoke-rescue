@@ -84,6 +84,8 @@ namespace SmokeRescue.Editor
             SmokeRescue.Robots.Robot.BodyPrefab = UseQuadruped ? FurnitureBuilder.RobotBodyPrefab() : null;
             var sc = Scenario.Load(scenario);
             FurnitureBuilder.PlaceScenarioObstacles(sc);
+            int warm = FurnitureBuilder.ApplyWarmObjects(scenario);
+            if (warm > 0) Debug.Log($"[SmokeRescue] {warm} warm objects that are not people");
             ScenePreview.PlaceSurvivors(sc);
             ThermalPreview.TagSurvivors();
             if (running != null) { RecordingSession.AgentUrl = null; throw new System.InvalidOperationException("A recording is already running."); }
