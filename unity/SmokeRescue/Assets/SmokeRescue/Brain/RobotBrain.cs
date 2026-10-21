@@ -642,6 +642,8 @@ namespace SmokeRescue.Brain
             BeginReturn(t, CarryingOut);
         }
         bool canReenter; double nextReenterCheck;
+        /// <summary>Outside after leaving for heat, fire or a rescue, and allowed back in once it is safe (CheckReenter).</summary>
+        public bool MayReenter => completed && canReenter;
         /// <summary>
         /// A robot that left early to stay safe goes back in once its heat budget has recovered and a frontier can be
         /// reached by a path that stays escape_fire_margin_m clear of fire (beyond escape_ignore_m), so the way back out

@@ -238,7 +238,9 @@ namespace SmokeRescue.Recording
                         foreach (var rig in rigs) rig.robot.Step(dt);
                     if (k > 0) AgentWorldStep(world, rigs, dt);
                 }
-                bool allDone = rigs.All(r => r.robot.Driver.Finished);
+                // A robot that left for heat or to carry someone out may go back in, so it does not end the run (run 18
+                // ended at 69 s, one second after robot A's emergency exit, before it could recover and re-enter).
+                bool allDone = rigs.All(r => r.robot.Driver.Finished && !(r.brain?.MayReenter ?? false));
                 if (allDone && double.IsNaN(finishedAt)) finishedAt = t;
                 if (allDone && t - finishedAt >= 1.0) break;   // one second of standing still at the end
 
