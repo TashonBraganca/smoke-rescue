@@ -34,6 +34,8 @@ namespace SmokeRescue.World
             public void Schedule(FireSim sim) => sim.ScheduleWater(time, nozzle, heading, range, halfAngle, flow, duration);
         }
         readonly List<Spray> sprays = new List<Spray>();
+        // The smoke solver owns a separate deterministic fire and replays these same water commands.
+        internal SmokeSolver FluidSmoke { get; set; }
 
         /// <summary>Uses absolute fire time, in seconds, as FireSim.ScheduleWater does. Convert robot time
         /// with FireTime first. The wrapper owns this log so previews can replay water after a rewind.</summary>
@@ -44,6 +46,7 @@ namespace SmokeRescue.World
             {
                 var spray = new Spray(t, nozzleXZ, headingRad, rangeM, halfAngleDeg, flowLps, durationS);
                 spray.Schedule(Sim); // Validate before retaining a command for future replays.
+                FluidSmoke?.ScheduleWater(t, nozzleXZ, headingRad, rangeM, halfAngleDeg, flowLps, durationS);
                 sprays.Add(spray);
                 flamesT = float.NaN;
             }

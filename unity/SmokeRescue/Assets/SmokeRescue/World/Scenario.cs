@@ -45,6 +45,7 @@ namespace SmokeRescue.World
         [Serializable]
         public class Smoke
         {
+            public string model = "rooms";
             public float global_haze;
             [SerializeField] public Dictionary<string, float> rooms = new Dictionary<string, float>();
             public float ramp_per_minute;
