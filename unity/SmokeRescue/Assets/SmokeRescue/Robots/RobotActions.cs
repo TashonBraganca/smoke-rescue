@@ -284,7 +284,13 @@ namespace SmokeRescue.Robots
         void ShowJet(bool on)
         {
             if (!on) { water?.End(); return; }
-            if (water == null) water = new WaterSprayVisual(robot.transform, nozzle.half_angle_deg, nozzle.range_m, robot.name.GetHashCode() & 0x7fff);
+            if (water == null)
+            {
+                // FNV-1a fixes the seed across processes; string.GetHashCode can change between replays.
+                uint seed = 2166136261u;
+                foreach (char c in robot.name) seed = unchecked((seed ^ c) * 16777619u);
+                water = new WaterSprayVisual(robot.transform, nozzle.half_angle_deg, nozzle.range_m, (int)(seed & 0x7fffffffu));
+            }
             water.Begin(robot.Arm.GripperPosition, sprayHeadingDeg * Mathf.Deg2Rad);
         }
 
