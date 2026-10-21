@@ -286,14 +286,15 @@ namespace SmokeRescue.Brain
             }
             if (sweeping && !returning) return SweepStep(t, dt);
             CheckProgress(t);
+            var face = FaceStep(t, dt);
+            if (face.HasValue) return face.Value;
             if (agentGoal.HasValue && Vector2.Distance(agentGoal.Value, motion.Pose.position) <= c.goal_tolerance_m)
             {
                 Emit(t, "goal", "Reached the agent's goal.", "x_m", agentGoal.Value.x, "y_m", agentGoal.Value.y);
                 // The agent asked to be here for a reason (a closer look, a person to lift, a blocked opening to measure):
                 // tell it, or the next look waits for an unrelated event (agent run 14: robot A stood 1.4 m from the person
                 // it had confirmed, within the arm's reach, and walked on because nothing asked the agent to act).
-                if (!agentGoalIsFrontier)
-                    Emit(t, "agent_goal_reached", "Arrived where the agent asked: " + agentGoalReason, "x_m", agentGoal.Value.x, "y_m", agentGoal.Value.y);
+                if (!agentGoalIsFrontier) AgentArrived(t, "Arrived where the agent asked: ");
                 var reached = agentGoal.Value; bool frontier = agentGoalIsFrontier; agentGoal = null; agentGoalIsFrontier = false;
                 if (frontier) { ClearPath(); OnFrontierReached(reached, t); if (sweeping) return SweepStep(t, dt); }
             }
@@ -312,7 +313,18 @@ namespace SmokeRescue.Brain
                 {
                     // An agent order outranks frontier choice until it is reached, expires or proves unreachable.
                     var agentPath = planner.Plan(motion.Pose.position, agentGoal.Value); lastPlan = t;
-                    if (agentPath.Count > 0)
+                    if (agentPath.Count > 0 && !agentGoalIsFrontier &&
+                        Vector2.Distance(agentPath[agentPath.Count - 1], motion.Pose.position) <= c.goal_tolerance_m)
+                    {
+                        // The goal itself is not standable (inside a wall or obstacle margin) and the robot already stands
+                        // at the nearest point it can reach: that is arrival. Replanning to the same spot every tick held
+                        // robot A still for 13 to 20 s three times in run 19 (700 to 900 identical goal events each).
+                        Emit(t, "goal", "Reached the agent's goal as closely as the map allows.", "x_m", agentGoal.Value.x, "y_m", agentGoal.Value.y,
+                            "offset_m", Vector2.Distance(agentGoal.Value, motion.Pose.position));
+                        AgentArrived(t, "Arrived where the agent asked (as closely as the map allows): ");
+                        agentGoal = null; ClearPath();
+                    }
+                    else if (agentPath.Count > 0)
                     {
                         SetPath(agentPath, agentGoalIsFrontier); scanSince = double.NaN;
                         if (agentGoalIsFrontier) { frontierCentre = agentGoal.Value; frontierRadius = c.peer_claim_radius_m; }

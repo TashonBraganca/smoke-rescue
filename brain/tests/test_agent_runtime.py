@@ -277,3 +277,36 @@ def test_confirmed_people_not_yet_lifted_are_listed_with_bearing_and_approach():
     T.ToolRegistry._lifted["robot_A"] = [(3.1, 0.1)]
     assert [s["x"] for s in T.survivors_to_rescue("robot_A", pose, [[3.0, 0.0], [0.0, -5.0]])] == [0.0]
     T.ToolRegistry._lifted.clear()
+
+
+def test_turn_to_face_is_a_go_to_where_the_robot_stands_with_a_face_point(tmp_path, monkeypatch):
+    # Run 20: robot A was within reach of a confirmed person 106 to 148 deg off its heading; inspections there looked
+    # outside the picture. turn_to_face sends a go_to at the robot's own position with the person as the face point.
+    # Control: during a heat event it is refused.
+    fake_vision(monkeypatch)
+    out, _ = run(tmp_path, [[ToolCall("turn_to_face", {"x": 2.0, "y": 3.0, "reason": "person to lift"})]])
+    (o,) = out["orders"]
+    req = request(tmp_path)
+    assert o["type"] == "go_to" and (o["face_x"], o["face_y"]) == (2.0, 3.0)
+    assert (o["x"], o["y"]) == (round(req["pose"]["x"], 2), round(req["pose"]["y"], 2))
+    RobotAgent._recent.clear()   # another test's avoid_fire at this place would be skipped as a repeat
+    heat = RobotAgent(Scripted([[ToolCall("turn_to_face", {"x": 2.0, "y": 3.0, "reason": "r"})]]), tmp_path / "t.jsonl").step(
+        request(tmp_path) | {"t": 20.0, "event": {"kind": "avoid_fire"}})   # a new step time: steps are keyed by robot and t
+    assert heat["orders"] == [] and heat["refusals"][0]["tool"] == "turn_to_face"
+
+
+def test_approach_candidate_faces_the_inspected_spot_on_arrival(tmp_path, monkeypatch):
+    fake_vision(monkeypatch, "uncertain")
+    T.ToolRegistry._looks.clear()
+    out, _ = run(tmp_path, [[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": 5})],
+                            [ToolCall("approach_candidate", {"evidence_id": "ev1"})]])
+    (o,) = out["orders"]
+    assert (o["face_x"], o["face_y"]) == pytest.approx((5.0, 10.0))
+
+
+def test_people_to_rescue_say_whether_they_are_in_the_camera_view():
+    T.ToolRegistry._lifted.clear()
+    assert 37.0 < T.CAMERA_HALF_HFOV_DEG < 38.0               # 640 px wide, fx 415.7
+    pose = {"x": 0.0, "y": 0.0, "heading_deg": 0.0}           # facing +y
+    side, ahead = T.survivors_to_rescue("robot_A", pose, [[0.5, 2.0], [-1.5, 0.2]])   # nearest first
+    assert ahead["in_view"] is True and side["in_view"] is False

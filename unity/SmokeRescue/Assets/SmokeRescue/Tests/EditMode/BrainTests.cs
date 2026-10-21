@@ -788,6 +788,62 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void AnAgentGoToWithAFacePointTurnsToFaceItBeforeReportingArrival()
+        {
+            // Run 20: robot A stood within the arm's reach of a confirmed person but looked at them 106 to 148 degrees off
+            // its heading, outside the camera's view, so every inspection was uncertain and the lift was refused. A go_to
+            // with a face point turns in place on arrival and reports arrival only when facing it. Control: without a face
+            // point arrival is reported at once and the heading does not change.
+            (List<BrainEvent> events, float yawErrorDeg, float yawDeg) Drive(Vector2? face)
+            {
+                var b = new RobotBrain(Calibration(), Settings(), "A", 0); Room(b, -4, 4, -4, 4);
+                b.AgentGoTo(new Vector2(0, 1.0f), 0, 30, "person to lift", face);
+                var all = new List<BrainEvent>(); var command = new BrainCommand();
+                for (int tick = 0; tick < 300; tick++)
+                {
+                    command = DriveTick(b, tick, command.forwardMps, command.yawRateDeg); var events = b.DrainEvents(); all.AddRange(events);
+                    if (events.Any(e => e.kind == "agent_goal_reached")) break;   // the heading at the moment arrival is reported
+                }
+                var pose = b.Snapshot().pose;
+                float error = face.HasValue ? Mathf.DeltaAngle(pose.yawRad * Mathf.Rad2Deg, Mathf.Atan2(-(face.Value.x - pose.position.x), face.Value.y - pose.position.y) * Mathf.Rad2Deg) : 0;
+                return (all, error, pose.yawRad * Mathf.Rad2Deg);
+            }
+            var faced = Drive(new Vector2(2.5f, 0.5f));   // behind and to the right of the robot on arrival
+            var arrived = faced.events.Where(e => e.kind == "agent_goal_reached").ToList();
+            Assert.That(arrived, Has.Count.EqualTo(1));
+            Assert.That(arrived[0].reason, Does.StartWith("Arrived where the agent asked and turned to face"));
+            Assert.That(Mathf.Abs(faced.yawErrorDeg), Is.LessThanOrEqualTo(12f), "facing the named point");
+            int reachedAt = faced.events.FindIndex(e => e.reason == "Reached the agent's goal."), reportedAt = faced.events.IndexOf(arrived[0]);
+            Assert.That(reachedAt, Is.GreaterThanOrEqualTo(0).And.LessThan(reportedAt), "arrival is reported after the turn");
+            var plain = Drive(null);
+            Assert.That(plain.events.Count(e => e.kind == "agent_goal_reached" && e.reason.StartsWith("Arrived where the agent asked: ")), Is.EqualTo(1), "control");
+            Assert.That(Mathf.Abs(Mathf.DeltaAngle(plain.yawDeg, 0)), Is.LessThan(20f), "control: no turn toward anything");
+        }
+
+        [Test]
+        public void AnAgentGoalOffItsCellCentreEndsAtTheCellAndDoesNotReplanEveryTick()
+        {
+            // Run 19: an agent goal sat 0.2 to 0.25 m from where path following stops (within goal_tolerance_m of the
+            // goal cell's centre, not of the exact point). The path was cleared on arrival at the cell, the agent goal was
+            // not yet "reached", and it was replanned every tick: robot A stood still 13 to 20 s three times (700 to 900
+            // identical goal events each). Reaching the planned end cell is arrival. Control: a goal on its cell centre.
+            List<BrainEvent> Drive(float offset)
+            {
+                var b = new RobotBrain(Calibration(), Settings(), "A", 0); Room(b, -4, 4, -4, 4);
+                var g = Map(b); var centre = g.Centre(g.Cell(new Vector2(0, 1.5f)));
+                b.AgentGoTo(centre + new Vector2(0, offset), 0, 30, "closer look");
+                var all = new List<BrainEvent>(); var command = new BrainCommand();
+                for (int tick = 0; tick < 300; tick++) { command = DriveTick(b, tick, command.forwardMps, command.yawRateDeg); all.AddRange(b.DrainEvents()); }
+                return all;
+            }
+            var off = Drive(.049f);   // just inside the goal cell, beyond its centre along the approach
+            Assert.That(off.Count(e => e.kind == "agent_goal_reached"), Is.EqualTo(1), "goal off its cell centre");
+            Assert.That(off.Count(e => e.kind == "goal" && e.reason.StartsWith("Agent order")), Is.LessThan(20), "no replanning loop");
+            var centred = Drive(0);
+            Assert.That(centred.Count(e => e.kind == "agent_goal_reached"), Is.EqualTo(1), "control: goal on its cell centre");
+        }
+
+        [Test]
         public void AnAgentGoToNeverSendsAnEmptyClaimAndABadPacketIsDropped()
         {
             // Slow-fire run: an agent go_to was refreshed as a frontier and sent a claim with radius 0; the partner threw

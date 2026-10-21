@@ -68,7 +68,9 @@ Playbook by event kind:
   back in. If fire spreads toward unexplored rooms, tell your partner and the commander.
 - survivors_to_rescue lists people already confirmed that you have not lifted, with bearing and distance from you.
   Getting them out comes before searching on. Whenever you are not towing anyone and the event is not a heat event:
-  if the nearest is within 4 m, scan_thermal, inspect_candidate at its bearing_deg and distance_m, then
+  if the nearest is within 4 m and in_view is false, turn_to_face its x and y and finish (agent_goal_reached follows
+  when the robot faces them; an inspection outside the camera's view sees nothing). If it is within 4 m and in view,
+  scan_thermal, inspect_candidate at its bearing_deg and distance_m, then
   extract_survivor (within the arm's reach) or approach_candidate citing that inspection; if it is farther, go_to its
   approach point and finish (agent_goal_reached follows on arrival).
 - agent_goal_reached: the robot is where you sent it; the event's reason says why. After a closer look or an approach
