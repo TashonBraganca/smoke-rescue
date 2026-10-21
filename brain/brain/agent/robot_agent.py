@@ -99,8 +99,12 @@ class RobotAgent:
         if ev.get("kind") in ("periodic", None) or last is None:
             return False
         lt, lpos = last
-        near = None not in here and None not in lpos and ((here[0] - lpos[0]) ** 2 + (here[1] - lpos[1]) ** 2) ** 0.5 < 1.5
-        return float(req["t"]) - lt < REPEAT_WINDOW_S and (near or ev.get("kind") != "survivor_candidate")
+        # An event with a position repeats only at the same spot: arriving at a second place within the window is a new
+        # decision (held-out seed 914 runs 1 to 3: five agent_goal_reached events at new places were dropped, so the reflex
+        # chose the next frontier alone). Events without a position repeat by time alone.
+        positional = None not in here and None not in lpos
+        near = positional and ((here[0] - lpos[0]) ** 2 + (here[1] - lpos[1]) ** 2) ** 0.5 < 1.5
+        return float(req["t"]) - lt < REPEAT_WINDOW_S and (near if positional else ev.get("kind") != "survivor_candidate")
 
     _run: str | None = None
     _last_t: dict = {}

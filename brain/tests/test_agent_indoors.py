@@ -237,3 +237,16 @@ def test_withdraw_needs_a_close_unblocked_look_that_finds_nobody(case, allowed, 
     r = reg.call('withdraw_survivor', {'x': target[0], 'y': target[1], 'evidence_id': ev['id']})
     assert bool(r.get('ok')) == allowed, r
     assert bool(reg.orders) == allowed
+
+
+def test_inspection_evidence_carries_the_measured_body_position(tmp_path, monkeypatch):
+    # Run 4: an inspection asked at -2.9 deg, 3.05 m matched a body measured at 3.2 deg, 3.52 m; the evidence position
+    # (and the confirmation) used the request. It now uses the measured body.
+    reg = withdraw_registry(tmp_path, monkeypatch, depth_m=7., warm=True)
+    ev = reg.call('inspect_candidate', {'bearing_deg': 4.0, 'range_m': 3.2})
+    cand = ev['candidate']
+    assert cand is not None
+    import math
+    a = math.radians(cand['bearing_deg'])
+    assert (ev['x'], ev['y']) == pytest.approx((cand['range_m'] * math.sin(a), cand['range_m'] * math.cos(a)), abs=.02)
+    assert abs(ev['x'] - 3.2 * math.sin(math.radians(4.0))) > .05, "not the requested point"
