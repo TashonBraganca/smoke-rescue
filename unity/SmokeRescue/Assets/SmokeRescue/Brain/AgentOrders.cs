@@ -70,45 +70,31 @@ namespace SmokeRescue.Brain
         }
 
         /// <summary>The frontiers the agent chooses from: reachable, worth searching, not claimed by a partner, inside
-        /// the search area. Positions are the walkable cell the robot would drive to; path_m is the planned distance
+        /// the search area or explicitly unproven for an agent indoor check. Positions are walkable cells; path_m is the planned distance
         /// including heat and wall costs; unsearched_m2 is the floor no camera on the team has seen near it.</summary>
         public IReadOnlyList<BrainFrontier> FrontierOptions(double t, int max)
         {
-            // Proven frontiers first; then floor the robot cannot yet prove is indoors, which only the agent may choose
-            // (with an OpenCV indoor check of its own frame). Unentered rooms have unmapped walls and were never proven,
-            // so they were never searched (hidden-corner run: robot A walked out with 30 % of the floor unsearched).
-            var proven = FrontierOptions(t, max, true);
-            if (proven.Count >= max) return proven;
-            var list = new List<BrainFrontier>(proven);
-            foreach (var f in FrontierOptions(t, max, false))
-            {
-                if (list.Count >= max) break;
-                if (f.provenIndoors) continue;
-                var copy = f; copy.id = list.Count; list.Add(copy);
-            }
-            return list;
-        }
-
-        IReadOnlyList<BrainFrontier> FrontierOptions(double t, int max, bool provenOnly)
-        {
-            // Frontier cells dropped by each filter, so a short list can be explained from the log (agent run 9: robot A
-            // was offered one 0.5 m2 frontier at 20 s with most of its LiDAR-mapped floor unsearched).
+            if (max <= 0) return Array.Empty<BrainFrontier>();
+            // Keep the indoor boundary when clustering, so a nearby proven standpoint cannot hide an unproven
+            // doorway in the same cluster. Wide slots compete across both sets before either set is truncated.
             int claimed = 0, blacklisted = 0, visited = 0, outside = 0;
             bool Excluded(Vector2 p)
             {
                 if (ClaimBlocks(p, t)) { claimed++; return true; }
                 if (GoalBlacklisted(p, t)) { blacklisted++; return true; }
                 if (VisitedGoal(p, t)) { visited++; return true; }
-                if (provenOnly && !InSearchArea(p)) { outside++; return true; }
+                if (!InSearchArea(p)) { outside++; return true; }
                 return false;
             }
-            var list = new List<BrainFrontier>(); var all = planner.Frontiers(motion.Pose.position, Excluded);
-            // Nearest first alone fills the list with corners of the room the robot stands in once floor behind furniture
-            // is unsearched (held-out seed 914 runs 3 and 4: 102 of 162 options were in the robot's current room; in the
-            // foyer all six were corners while the doors to three unsearched rooms were not offered). Up to
-            // frontier_wide_options slots go to the frontiers opening onto the largest distinct regions of mapped but
-            // unsearched floor, one per region; the rest stay nearest first; the agent gets them all nearest first.
-            var picked = new List<int>(); int wide = 0;
+            var proven = planner.Frontiers(motion.Pose.position, Excluded);
+            var unproven = planner.Frontiers(motion.Pose.position,
+                p => ClaimBlocks(p, t) || GoalBlacklisted(p, t) || VisitedGoal(p, t) || InSearchArea(p));
+            // Merge the already sorted sets. Equal scores prefer proven evidence, as does the local-slot fill below.
+            var all = new List<GridPlanner.FrontierChoice>(); int pi = 0, ui = 0;
+            while (pi < proven.Count || ui < unproven.Count)
+                if (ui >= unproven.Count || (pi < proven.Count && proven[pi].score <= unproven[ui].score)) all.Add(proven[pi++]);
+                else all.Add(unproven[ui++]);
+            var picked = new List<int>(); int wide = 0, wideUnproven = 0;
             if (c.frontier_wide_options > 0 && all.Count > max)
             {
                 var label = grid.UnsearchedRegions(); var nearestOf = new Dictionary<int, int>();
@@ -117,14 +103,23 @@ namespace SmokeRescue.Brain
                 var regions = new List<(int index, float m2)>();
                 foreach (int i in new HashSet<int>(nearestOf.Values))
                 {
-                    float m2 = grid.UnsearchedFloorBeyond(all[i].position, c.frontier_beyond_m);
+                    // Ranking must include unproven mapped floor. The reported area keeps its indoor-only meaning,
+                    // and provenIndoors stays false until the robot has evidence. The tool still requires check_indoors.
+                    float m2 = grid.UnsearchedFloorBeyond(all[i].position, c.frontier_beyond_m, false);
                     if (m2 >= c.frontier_wide_min_m2) regions.Add((i, m2));
                 }
-                regions.Sort((a, b) => b.m2.CompareTo(a.m2));
-                for (int k = 0; k < regions.Count && wide < c.frontier_wide_options; k++) { picked.Add(regions[k].index); wide++; }
+                regions.Sort((a, b) => { int k = b.m2.CompareTo(a.m2); return k != 0 ? k : a.index.CompareTo(b.index); });
+                for (int k = 0; k < regions.Count && wide < Math.Min(max, c.frontier_wide_options); k++)
+                {
+                    int i = regions[k].index; picked.Add(i); wide++;
+                    if (!InSearchArea(all[i].position)) wideUnproven++;
+                }
             }
-            for (int i = 0; i < all.Count && picked.Count < max; i++) if (!picked.Contains(i)) picked.Add(i);
+            for (int pass = 0; pass < 2; pass++)
+                for (int i = 0; i < all.Count && picked.Count < max; i++)
+                    if (InSearchArea(all[i].position) == (pass == 0) && !picked.Contains(i)) picked.Add(i);
             picked.Sort();
+            var list = new List<BrainFrontier>();
             foreach (int index in picked)
             {
                 var f = all[index];
@@ -132,10 +127,9 @@ namespace SmokeRescue.Brain
                     unsearchedM2 = f.information * grid.CellM * grid.CellM, provenIndoors = InSearchArea(f.position),
                     mappedUnsearchedM2 = grid.UnsearchedFloorBeyond(f.position, c.frontier_beyond_m) });
             }
-            if (!provenOnly) return list;
-            Emit(t, "frontier_options", $"{all.Count} frontiers; boundary cells dropped as claimed by a partner, blacklisted, visited, or not known to be indoors.",
-                "frontiers", all.Count, "cells_claimed", claimed, "cells_blacklisted", blacklisted, "cells_visited", visited, "cells_not_indoors", outside,
-                "wide_options", wide);
+            Emit(t, "frontier_options", $"{proven.Count} proven and {unproven.Count} unproven frontiers; boundary cells dropped from the proven set as claimed by a partner, blacklisted, visited, or not known to be indoors.",
+                "frontiers", proven.Count, "cells_claimed", claimed, "cells_blacklisted", blacklisted, "cells_visited", visited, "cells_not_indoors", outside,
+                "unproven_frontiers", unproven.Count, "wide_options", wide, "wide_unproven_options", wideUnproven);
             return list;
         }
 

@@ -539,18 +539,16 @@ namespace SmokeRescue.Brain
         /// <summary>
         /// A camera that stands indoors and sees a ceiling looks up at it across the floor in between. When that floor is
         /// known free all the way (no wall, nothing unmapped), it lies under the same roof, so it is indoors. This needs no
-        /// outline: the camera position must already be indoors by the robot's own evidence, so a camera in the yard
-        /// marks nothing, and a line that meets a wall or unmapped floor stops there. The ceiling radius alone left most
+        /// outline: the camera must already be indoors or stand in a mapped wall opening with proven indoor floor
+        /// behind it. A camera in the yard without that anchor marks nothing. A wall or unmapped floor stops the line. The ceiling radius alone left most
         /// of small rooms outside the search area, because the camera sees ceiling only about 4.7 m away (agent run 14:
         /// 530 of robot A's frontier cells inside the house were hidden as not indoors, 454 of them in the study, where a
-        /// person lay). Sight-line floor does not seed the ceiling radius, so it never reaches past a doorway.
+        /// person lay). Sight-line floor does not seed the ceiling radius. Only the current ceiling view can extend it.
         /// </summary>
         void MarkCeilingSightLines(int camera)
         {
             if (!c.ceiling_sight_lines || frameRoof.Count == 0) return;
-            bool cameraIndoors = sightIndoors[camera] || (roofDistance != null && roofDistance[camera] <= c.ceiling_radius_m) ||
-                (OwnOccupancy(camera) == 1 && Enclosed(camera));
-            if (!cameraIndoors) return;
+            bool cameraIndoors = sightIndoors[camera] || UnderCeiling(Centre(camera)) || (OwnOccupancy(camera) == 1 && Enclosed(camera));
             PrepareNavigation();
             Vector2 from = Centre(camera); float step = CellM * .5f;
             foreach (int roof in frameRoof)
@@ -560,15 +558,67 @@ namespace SmokeRescue.Brain
                 // the ceiling height band too. Seen from the yard it drew sight lines along the outside of the facade
                 // (held-out run 2: 98 % of robot B's ceiling-height points at 50 to 56 s lay within 0.4 m of a wall).
                 if (OwnOccupancy(roof) == 255 || obstacleDistance[roof] < c.ceiling_wall_margin_m) continue;
-                Vector2 to = Centre(roof); int steps = Mathf.CeilToInt(Vector2.Distance(from, to) / step);
+                Vector2 to = Centre(roof);
+                // At an unproven doorway the camera can use ceiling ahead only when its own wall jambs and a clear
+                // line back to proven indoor floor anchor the view. Looking back at an indoor roof from the yard
+                // does not qualify: there is no indoor anchor behind that outward camera-to-roof direction.
+                if (!cameraIndoors && !DoorwayFromInside(from, (to - from).normalized)) continue;
+                int steps = Mathf.CeilToInt(Vector2.Distance(from, to) / step);
                 for (int k = 0; k <= steps; k++)
                 {
                     int cell = Cell(Vector2.Lerp(from, to, steps == 0 ? 0 : k / (float)steps));
                     if (cell < 0 || OwnOccupancy(cell) != 1) break;
                     if (!sightIndoors[cell]) { sightIndoors[cell] = true; roofDirty = true; }
                 }
+                // The first accepted line proves the camera's own floor too. Reuse that fact for the rest of this
+                // frame instead of rebuilding all ceiling distances for each new roof endpoint.
+                cameraIndoors |= sightIndoors[camera];
             }
         }
+        /// <summary>Known-free line, including both ends. An unknown cell cannot support an evidence move.</summary>
+        internal bool OwnFreeLine(Vector2 from, Vector2 to)
+        {
+            int steps = Mathf.Max(1, Mathf.CeilToInt(Vector2.Distance(from, to) / (CellM * .5f)));
+            for (int k = 0; k <= steps; k++) if (OwnOccupancy(Cell(Vector2.Lerp(from, to, k / (float)steps))) != 1) return false;
+            return true;
+        }
+
+        /// <summary>A local opening in this robot's mapped wall line, seen from proven indoor floor. Each jamb must
+        /// continue along the wall for ceiling_wall_margin_m. All floor to both jambs and back to the indoor anchor
+        /// must be mapped free. The same frontier_peek_m bounds each ray and the later evidence move. This establishes
+        /// an observation position, never indoor proof by itself. Only a fresh ceiling sight line supplies that proof.</summary>
+        internal bool DoorwayFromInside(Vector2 at, Vector2 forward) => DoorwayFromInside(at, forward, out _);
+        internal bool DoorwayFromInside(Vector2 at, Vector2 forward, out Vector2 openingCentre)
+        {
+            openingCentre = at;
+            if (OwnOccupancy(Cell(at)) != 1 || forward.sqrMagnitude == 0 || c.frontier_peek_m <= 0) return false;
+            float step = CellM * .5f;
+            bool Jamb(Vector2 side, out float distance)
+            {
+                distance = 0;
+                for (float d = step; d <= c.frontier_peek_m; d += step)
+                {
+                    byte own = OwnOccupancy(Cell(at + side * d));
+                    if (own == 1) continue;
+                    if (own != 255 || d < c.robot_radius_m) return false;
+                    for (float wall = step; wall <= c.ceiling_wall_margin_m; wall += step)
+                        if (OwnOccupancy(Cell(at + side * (d + wall))) != 255) return false;
+                    distance = d; return true;
+                }
+                return false;
+            }
+            var across = new Vector2(-forward.y, forward.x);
+            if (!Jamb(across, out float left) || !Jamb(-across, out float right)) return false;
+            openingCentre = at + across * ((left - right) * .5f);
+            for (float d = step; d <= c.frontier_peek_m; d += step)
+            {
+                Vector2 back = at - forward * d; int cell = Cell(back);
+                if (OwnOccupancy(cell) != 1) return false;
+                if (UnderCeiling(back) || Enclosed(cell)) return true;
+            }
+            return false;
+        }
+
         ushort[] topCm;
         /// <summary>Heights above which an obstacle blocks the camera's view (camera mount height less
         /// see_over_clearance_m); set by the brain from its calibration.</summary>
@@ -594,10 +644,12 @@ namespace SmokeRescue.Brain
         /// frontier read 0 when it started only from cells beside p, because past furniture the unsearched floor begins up
         /// to that far away). With search_requires_ceiling only floor proven indoors counts (the fill still crosses the
         /// rest), so the yard past a front door adds nothing.
+        /// Set indoorsOnly false only for wide-slot ranking, so an unproven region can compete for an agent option.
+        /// This does not supply indoor evidence or change the reported indoor area.
         /// The frontier's own unsearched_m2 counts only cells beside the frontier, so a doorway onto a whole unsearched
         /// hallway read 1.5 m2 (held-out seed 914 run 1, robot B, which chose the kitchen at 8.5 m2 instead).
         /// </summary>
-        public float UnsearchedFloorBeyond(Vector2 p, float maxM)
+        public float UnsearchedFloorBeyond(Vector2 p, float maxM, bool indoorsOnly = true)
         {
             int start = Cell(p); if (start < 0) return 0;
             var mark = new HashSet<int>(); var queue = new Queue<int>(); int count = 0;
@@ -608,7 +660,7 @@ namespace SmokeRescue.Brain
             while (queue.Count > 0)
             {
                 int cell = queue.Dequeue();
-                if (!c.search_requires_ceiling || Indoors(Centre(cell))) count++;
+                if (!indoorsOnly || !c.search_requires_ceiling || Indoors(Centre(cell))) count++;
                 int x = cell % Size, y = cell / Size;
                 for (int k = 0; k < 4; k++)
                 {
@@ -622,19 +674,42 @@ namespace SmokeRescue.Brain
         }
         /// <summary>No cell this robot's own map holds as occupied lies on the straight line between two cells, so floor seen
         /// past a frontier is not counted through a wall (Codex review: a 1.2 m seed disc reached the room behind a thin wall).</summary>
-        bool ClearLine(int from, int to)
+        bool ClearLine(int from, int to, bool seeOver = false)
         {
             int x = from % Size, y = from / Size, ex = to % Size, ey = to / Size;
             int dx = Math.Abs(ex - x), dy = Math.Abs(ey - y), sx = x < ex ? 1 : -1, sy = y < ey ? 1 : -1, error = dx - dy;
             while (true)
             {
-                if (OwnOccupancy(y * Size + x) == 255) return false;
+                int cell = y * Size + x;
+                if (OwnOccupancy(cell) == 255 && (!seeOver || !SeeOver(cell))) return false;
                 if (x == ex && y == ey) return true;
                 int twice = 2 * error;
                 if (twice > -dy) { error -= dy; x += sx; }
                 if (twice < dx) { error += dx; y += sy; }
             }
         }
+        /// <summary>Whether a camera sector can still search floor. Unknown floor keeps a look eligible; only known
+        /// opaque obstacles hide it. A low obstacle with measured top height does not hide the whole view behind it.
+        /// This is a prediction for choosing looks, never an observation or a searched-cell update.</summary>
+        internal bool HasUnsearchedFloorInView(Vector2 eye, float heading, float leftRad, float rightRad, float rangeM)
+        {
+            int start = Cell(eye); if (start < 0) return true;
+            int reach = Mathf.CeilToInt(rangeM / CellM), sx = start % Size, sy = start / Size;
+            for (int dy = -reach; dy <= reach; dy++) for (int dx = -reach; dx <= reach; dx++)
+            {
+                int x = sx + dx, y = sy + dy;
+                Vector2 d = Origin + new Vector2(x + .5f, y + .5f) * CellM - eye;
+                if (d.sqrMagnitude > rangeM * rangeM) continue;
+                float bearing = BrainMath.Angle(heading, BrainMath.Heading(d));
+                if (bearing < -rightRad * Mathf.Rad2Deg || bearing > leftRad * Mathf.Rad2Deg) continue;
+                // Floor outside this finite map is unknown, so it cannot justify skipping a look.
+                if (!Inside(x, y)) return true;
+                int cell = y * Size + x;
+                if (Unsearched(cell) && ClearLine(start, cell, true)) return true;
+            }
+            return false;
+        }
+
         /// <summary>Connected regions of floor this robot mapped free that no camera on the team has searched (4-connected):
         /// a label per cell, -1 elsewhere. Labels only; no indoor test, which would cost rays per cell.</summary>
         public int[] UnsearchedRegions()
