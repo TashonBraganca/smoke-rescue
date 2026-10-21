@@ -344,6 +344,8 @@ def test_lift_may_cite_the_confirming_inspection_once_within_reach_and_facing(tm
         return RobotAgent(Scripted([[ToolCall("extract_survivor", {"evidence_id": "ev1"})]]), tmp_path / "t.jsonl").step(req)
     near = lift(5.0, 6.8, 0.0, 20.0)                 # 1.2 m short of them, facing +y
     assert [o["type"] for o in near["orders"]] == ["extract_survivor"]
+    # The order names the person: the arm lifts only the body at that spot.
+    assert (near["orders"][0]["target_x"], near["orders"][0]["target_y"]) == (5.0, 8.0)
     T.ToolRegistry._lifted.clear()
     assert lift(5.0, 4.0, 0.0, 30.0)["refusals"], "control: 4 m away"
     assert lift(5.0, 6.8, 180.0, 40.0)["refusals"], "control: facing away"
