@@ -17,6 +17,11 @@ namespace SmokeRescue.Robots
         const float LaunchUpDeg = 5f, DragMargin = 1.1f;
         // At 2200 visual drops/s this holds the full flight, with room for the high edge of the fog cone.
         const int MaxDrops = 3200;
+        const float DropRate = 2200f, SplashLifetimeMin = .15f, SplashLifetimeMax = .35f;
+        const int SplashDropsPerImpact = 3;
+        // 2310 slots cover 2200 impacts/s * 0.35 s * 3 drops. A deferred flight can bunch up at a wall,
+        // so also reserve three slots for every in-flight drop: 3 * (3200 + 770) = 11910.
+        static readonly int MaxSplash = SplashDropsPerImpact * (MaxDrops + Mathf.CeilToInt(DropRate * SplashLifetimeMax));
         // Bound physics queries even at capture steps of 1/15 s. Deferred drops retain their unchecked travel.
         const int MaxRaycastsPerStep = 384;
         // A 2 cm floor skin also catches drops when the visual floor has no collider.
@@ -46,30 +51,36 @@ namespace SmokeRescue.Robots
             var dot = SoftDot();
             // The project's alpha-blended particle shader (the smoke uses it): texture alpha shapes each particle and the
             // colour-over-lifetime fades it. HDRP/Lit ignored both and drew hard-edged cards (first capture, 2026-10-22).
-            // Blue-grey and stronger coverage stay visible on black smoke and attenuate bright orange fire.
+            // Blue-grey stays visible on black smoke. Stream alpha is lower than splash alpha because many
+            // near-nozzle cards overlap when viewed along the stream from the robot's camera.
             // The shader uses ordinary alpha blending; none of these particles adds light.
-            var dropMat = Particle("WaterDrops", dot, new Color(.42f, .58f, .68f, .85f));
+            var dropMat = Particle("WaterDrops", dot, new Color(.42f, .58f, .68f, .4f));
+            var splashMat = Particle("WaterSplash", dot, new Color(.42f, .58f, .68f, .85f));
             var cloud = Resources.Load<Texture2D>("Fire/SmokeCloud_8x8");
             var mistMat = Particle("WaterMist", cloud ?? dot, new Color(.55f, .60f, .64f, .13f));
             drops = System(root.transform, "Drops", dropMat, seed, MaxDrops);
             mist = System(root.transform, "Mist", mistMat, seed + 1, 400);
             // Siblings are simulated separately so recursive simulation cannot advance impact effects twice.
-            splash = System(root.transform, "Splash", dropMat, seed + 2, 1500);
+            splash = System(root.transform, "Splash", splashMat, seed + 2, MaxSplash);
             impactMist = System(root.transform, "ImpactMist", mistMat, seed + 3, 300);
 
             var main = drops.main;
-            // Each visible streak represents many physical drops, wide enough to survive the 640 px sensor frame.
-            main.startSize = new ParticleSystem.MinMaxCurve(.025f, .045f);
+            // Keep individual drops narrower than the 24 mm nozzle. The old 25-45 mm cards overlapped
+            // across the entire core and accumulated into an opaque column in the robot's view.
+            main.startSize = new ParticleSystem.MinMaxCurve(.01f, .018f);
             main.gravityModifier = 1f;
             // More streaks in the 12 mm nozzle core; the configured cone spreads them apart with distance.
-            var em = drops.emission; em.rateOverTime = 2200f;
+            var em = drops.emission; em.rateOverTime = DropRate;
             var sh = drops.shape; sh.shapeType = ParticleSystemShapeType.Cone; sh.angle = halfAngleDeg; sh.radius = .012f; sh.radiusThickness = 1f;
-            // Break the stream into smaller drops downstream. A short fade-in exposes the near-nozzle core.
+            // Break the stream into smaller drops downstream. Fade in while the cone separates the cards.
             var size = drops.sizeOverLifetime; size.enabled = true; size.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, .4f));
-            Fade(drops, 1f, .65f, .015f);
+            Fade(drops, 1f, .65f, .06f);
             var r = drops.GetComponent<ParticleSystemRenderer>();
-            // About 35 ms of travel per streak keeps individual drops readable without drawing a solid ribbon.
-            r.renderMode = ParticleSystemRenderMode.Stretch; r.velocityScale = .035f; r.lengthScale = 2f;
+            // 8 ms of travel keeps streaks below 15 cm at the configured throw, rather than the old
+            // roughly 40 cm cards. Limit close-up size to 2.5% of the viewport and ignore camera motion.
+            r.renderMode = ParticleSystemRenderMode.Stretch; r.velocityScale = .008f; r.lengthScale = 1f;
+            r.cameraVelocityScale = 0f; r.maxParticleSize = .025f;
+            r.sortMode = ParticleSystemSortMode.Distance;
             var dropDrag = drops.limitVelocityOverLifetime;
             dropDrag.enabled = true; dropDrag.drag = .18f; dropDrag.multiplyDragByParticleSize = false;
             // Use drag alone. The module's default speed limit must not override the calculated throw speed.
@@ -79,7 +90,7 @@ namespace SmokeRescue.Robots
             var sub = drops.subEmitters; sub.enabled = false;
 
             var sm = splash.main;
-            sm.startLifetime = new ParticleSystem.MinMaxCurve(.15f, .35f); sm.startSpeed = new ParticleSystem.MinMaxCurve(.6f, 1.8f);
+            sm.startLifetime = new ParticleSystem.MinMaxCurve(SplashLifetimeMin, SplashLifetimeMax); sm.startSpeed = new ParticleSystem.MinMaxCurve(.6f, 1.8f);
             sm.startSize = new ParticleSystem.MinMaxCurve(.012f, .028f); sm.gravityModifier = 1f;
             var se = splash.emission; se.enabled = false;
             var ss = splash.shape; ss.enabled = false;
@@ -237,7 +248,7 @@ namespace SmokeRescue.Robots
             if (state == 0) state = 1;
             var reflected = Vector3.Reflect(incoming.normalized, normal);
             // Three secondary drops per representative impact limit particle work for the 1 L/s spray.
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < SplashDropsPerImpact; i++)
             {
                 // A random hemisphere adds breakup. Reject any component pointing into the struck face.
                 float z = 2f * Random01(ref state) - 1f, azimuth = 2f * Mathf.PI * Random01(ref state);
