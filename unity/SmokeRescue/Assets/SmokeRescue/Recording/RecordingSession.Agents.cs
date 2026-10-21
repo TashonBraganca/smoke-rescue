@@ -71,6 +71,9 @@ namespace SmokeRescue.Recording
             public Vector3 post;
             public double lastCommander = double.NegativeInfinity;
             public readonly List<JObject> postInbox = new List<JObject>();
+            public NozzleConfig nozzle;
+            /// <summary>Recorder log of every spray the world received (water.jsonl): who, when, where, how much.</summary>
+            public readonly StringBuilder waterLog = new StringBuilder();
             /// <summary>Recorder-side audit of the command post's radio: each link check with a text waiting, and each text
             /// heard. Written beside agent_trace.jsonl; no robot reads it.</summary>
             public readonly StringBuilder postLog = new StringBuilder();
@@ -87,7 +90,8 @@ namespace SmokeRescue.Recording
                 catch (Exception e) { Debug.LogWarning($"[SmokeRescue] doors not actuated: {e.Message}"); }
             var obstacles = GameObject.Find("Obstacles");
             if (obstacles != null) w.obstacles = new ObstacleRuntime(obstacles.transform);
-            foreach (var rig in rigs) rig.actions = new RobotActions(rig.robot, w.doors, w.obstacles);
+            w.nozzle = NozzleConfig.Load();
+            foreach (var rig in rigs) rig.actions = new RobotActions(rig.robot, w.doors, w.obstacles, w.nozzle);
             var at = scenario.robots[0].spawn.at;    // world side only: where the commander's radio stands, outside the first entry
             w.post = new Vector3(at[0], 0f, at[1] - 2f);
             return w;
@@ -149,6 +153,7 @@ namespace SmokeRescue.Recording
                         ["path_m"] = Math.Round(f.pathM, 1), ["unsearched_m2"] = Math.Round(f.unsearchedM2, 1),
                     })),
                     ["lidar"] = LidarSummary(rig.lastScan),
+                    ["water_l"] = Math.Round(rig.actions?.WaterLitres ?? 0, 2),
                     ["blocked_unsearched"] = rig.brain.BlockedUnsearched() is Brain.BrainBlockedFloor blocked ? new JObject
                     {
                         ["bearing_deg"] = Math.Round(blocked.bearingDegRight, 1), ["distance_m"] = Math.Round(blocked.distanceM, 2),
@@ -209,6 +214,13 @@ namespace SmokeRescue.Recording
                     }
                     catch (ArgumentException e) { brain.LogAgentAction(t, "torch order refused: " + e.Message); }
                     break;
+                case "spray_water":
+                {
+                    bool sprayed = rig.actions.BeginSpray(o.Value<float>("bearing_deg"), o.Value<float>("seconds"));
+                    brain.LogAgentAction(t, sprayed ? $"spray_water at {o.Value<float>("bearing_deg"):0} deg for up to {o.Value<float>("seconds"):0.#} s, OpenCV evidence {ev}."
+                        : $"spray_water refused: {rig.actions.FailureReason}", "water_l", rig.actions.WaterLitres);
+                    break;
+                }
                 case "open_door":
                 case "clear_debris":
                     bool begun = rig.actions.Begin(type);
@@ -365,6 +377,7 @@ namespace SmokeRescue.Recording
             foreach (var rig in rigs.Where(r => r.agentLog.Length > 0))
                 File.WriteAllText(Path.Combine(rig.dir, "agent_steps.jsonl"), rig.agentLog.ToString());
             if (w.postLog.Length > 0) File.WriteAllText(Path.Combine(root, "command_post.jsonl"), w.postLog.ToString());
+            if (w.waterLog.Length > 0) File.WriteAllText(Path.Combine(root, "water.jsonl"), w.waterLog.ToString());
             if (AgentUrl != null)
                 File.WriteAllText(Path.Combine(root, "agent_summary.json"), JsonConvert.SerializeObject(new
                     { url = AgentUrl, w.steps, w.orders, w.refusals, w.errors }, Formatting.Indented));

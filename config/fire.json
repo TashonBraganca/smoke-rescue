@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "model_note": "Fixed-step grid plus room hot-gas layers. Approximation for a residential fire demonstration, not a validated fire engineering or structural solver. Thin wall barriers separate cells. Mixed floor, wall finish, ceiling and furniture fuel in each cell share the lowest combustible ignition temperature. Imported room gas mixes instantly within each layer. Door states are fixed at load. Ceiling panels do not open the roof or alter ventilation. Legacy floorplan fires are ignored. Oxygen depletion, suppression, wind, window breakage and structural load paths are not solved. Room heat release is fuel-driven; do not use this model to infer ventilation-limited fire safety.",
+  "model_note": "Fixed-step grid plus room hot-gas layers. Approximation for a residential fire demonstration, not a validated fire engineering or structural solver. Thin wall barriers separate cells. Mixed floor, wall finish, ceiling and furniture fuel in each cell share the lowest combustible ignition temperature. Imported room gas mixes instantly within each layer. Door states are fixed at load. Ceiling panels do not open the roof or alter ventilation. Legacy floorplan fires are ignored. Oxygen depletion, wind, window breakage and structural load paths are not solved. Room heat release is fuel-driven; do not use this model to infer ventilation-limited fire safety.",
   "cell_size_m": 0.25,
   "step_s": 0.1,
   "ambient_c": 20,
@@ -518,6 +518,17 @@
       ],
       "justification": "Estimated 1.9 m square envelope of a 1.8 m fitted timber meeting table and four 0.5 m chairs; timber supplies fuel."
     }
+  },
+  "water": {
+    "latent_heat_kj_l": 2260,
+    "latent_heat_kj_l_reason": "Rounded 2257 kJ/kg latent heat at 100 C, taking 1 litre as 1 kg. Grimwood, Fire-fighting Flow-rate, January 2005, p.24, example 2. https://highrisefire.co.uk/docs/FLOW-RATE%20202004.pdf",
+    "sensible_heat_kj_l": 330,
+    "sensible_heat_kj_l_reason": "Rounded 4.183 kJ/kg/K times 80 K from 20 C to 100 C, with 1 litre approximated as 1 kg. Same source, p.24; its worked example starts at 18 C. Combined budget is 2590 kJ/litre.",
+    "application_efficiency": 0.5,
+    "application_efficiency_reason": "Selected 50 percent effective hose-stream cooling, following Grimwood 2005, pp.26 to 28, especially example 6 for a jet nozzle. This is an estimate for this nozzle, not a measurement. https://highrisefire.co.uk/docs/FLOW-RATE%20202004.pdf",
+    "wet_seconds_per_litre": 30,
+    "wet_seconds_per_litre_reason": "Scenario estimate of 30 seconds of ignition inhibition per litre delivered to a cell, additive after the last application. NISTIR 6191 motivates fuel cooling and surface contact, but does not measure this dry-out coefficient. https://www.nist.gov/publications/fire-fighting-properties-nistir-6191",
+    "_reason": "Flow is shared equally across visible cone cell centres, including cold fuel. Tick-interval overlap conserves litres for non-grid times. Exact room boundaries block water except within current door widths; no furniture occlusion. Flame heat is absorbed first; surplus cools toward ambient using gas.effective_heat_capacity_kj_m2_k times cell area, the existing effective heated-lining capacity. There is no separate solid-cell capacity in this model. Smoke and room gas use the remaining heat release. Wetting is a dry-out timer, not moisture transport or a validated suppression model. Sources accessed 2026-10-21."
   },
   "spread": {
     "neighbour_heat_per_s": 0.028,

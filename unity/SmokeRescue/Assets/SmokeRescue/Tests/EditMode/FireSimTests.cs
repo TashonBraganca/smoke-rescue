@@ -326,6 +326,218 @@ namespace SmokeRescue.Tests.EditMode
             Assert.AreEqual(0, sim.SmokeDensity(new Vector3(-1, 1, -1)));
         }
 
+        // Isolate spray effects from room heating; the reignition test restores neighbour heating.
+        string WaterFire(bool neighbour = false) => Config(j =>
+        {
+            j["spread"]["neighbour_heat_per_s"] = neighbour ? 1 : 0;
+            j["spread"]["gas_surface_heat_per_s"] = 0;
+            j["spread"]["flashover_surface_heat_c_s"] = 0;
+            j["ignitions"] = JArray.Parse(neighbour
+                ? "[{\"room\":\"living\",\"at\":[2.125,2.125],\"time_s\":0,\"radius_m\":0},{\"room\":\"living\",\"at\":[2.375,2.125],\"time_s\":0,\"radius_m\":0}]"
+                : "[{\"room\":\"living\",\"at\":[2.125,2.125],\"time_s\":0,\"radius_m\":0}]");
+        });
+
+        static void TargetWater(FireSim sim, double flow = 1, double start = 0, double duration = 10) =>
+            sim.ScheduleWater(start, new Vector2(2.125f, 1.875f), 0, .3f, 1, flow, duration);
+
+        [Test]
+        public void OneLitrePerSecondForTenSecondsExtinguishesButZeroFlowDoesNot()
+        {
+            string path = WaterFire();
+            var wet = FireSim.Load(TwoRooms("closed"), path, 7);
+            var dry = FireSim.Load(TwoRooms("closed"), path, 7);
+            TargetWater(wet); TargetWater(dry, 0);
+            wet.AdvanceTo(10); dry.AdvanceTo(10);
+            Assert.AreEqual(0, wet.GetCell(8, 8).FlameIntensity, "The cone must extinguish the burning target.");
+            Assert.Less(wet.GetCell(8, 8).SurfaceTemperatureC, 330, "Extinction includes cooling below wood ignition.");
+            Assert.Greater(dry.GetCell(8, 8).FlameIntensity, 0, "Zero-flow control must still burn.");
+            Assert.Greater(wet.GetCell(8, 8).FuelRemainingKg, dry.GetCell(8, 8).FuelRemainingKg,
+                "Water must stop burning before fuel exhaustion.");
+        }
+
+        [TestCase(2.125f, 1.625f)]
+        [TestCase(2.125f, 2.625f)]
+        public void CellsBehindNozzleOrBeyondRangeAreUnchanged(float x, float z)
+        {
+            string path = WaterFire();
+            var json = JObject.Parse(File.ReadAllText(path));
+            ((JArray)json["ignitions"]).Add(new JObject { ["room"] = "living", ["at"] = new JArray(x, z),
+                ["time_s"] = 0, ["radius_m"] = 0 });
+            File.WriteAllText(path, json.ToString());
+            var wet = FireSim.Load(TwoRooms("closed"), path, 7);
+            var dry = FireSim.Load(TwoRooms("closed"), path, 7);
+            TargetWater(wet); wet.AdvanceTo(10); dry.AdvanceTo(10);
+            int cx = (int)(x / wet.CellSize), cz = (int)(z / wet.CellSize);
+            Assert.AreEqual(dry.GetCell(cx, cz).FuelRemainingKg, wet.GetCell(cx, cz).FuelRemainingKg,
+                "An excluded cell must consume exactly the same fuel.");
+            Assert.AreEqual(dry.GetCell(cx, cz).SurfaceTemperatureC, wet.GetCell(cx, cz).SurfaceTemperatureC);
+            Assert.AreEqual(dry.GetCell(cx, cz).FlameIntensity, wet.GetCell(cx, cz).FlameIntensity);
+            Assert.AreEqual(0, wet.GetCell(8, 8).FlameIntensity, "The in-cone positive control must be extinguished.");
+        }
+
+        [Test]
+        public void WaterSchedulesGiveIdenticalHashesAcrossAdvanceCadencesAtSixtySeconds()
+        {
+            string path = WaterFire(); var plan = TwoRooms("closed");
+            var a = FireSim.Load(plan, path, 7); var b = FireSim.Load(plan, path, 7);
+            var dry = FireSim.Load(plan, path, 7);
+            // Start-time ordering must work even if the future command is submitted first.
+            TargetWater(a, .5, 20, 1); TargetWater(a, 1, .05, 10);
+            TargetWater(b, 1, .05, 10); TargetWater(b, .5, 20, 1);
+            for (int n = 1; n <= 600; n++) b.AdvanceTo(n * .1);
+            a.AdvanceTo(60); dry.AdvanceTo(60);
+            Assert.AreEqual(a.StateHash(), b.StateHash(), "Same sprays must survive different advance and submission order.");
+            Assert.AreNotEqual(a.StateHash(), dry.StateHash());
+            Assert.Greater(a.GetCell(8, 8).FuelRemainingKg, dry.GetCell(8, 8).FuelRemainingKg,
+                "Hash differences must reflect suppression, not just the stored command log.");
+        }
+
+        [Test]
+        public void HeatSourceReplaysSpraysAfterRewindingFromSixtyToFiveSeconds()
+        {
+            var plan = FloorPlan.Load();
+            var direct = new FireSimHeat(plan, 7, 0); var rewind = new FireSimHeat(plan, 7, 0);
+            foreach (var heat in new[] { direct, rewind })
+                heat.ScheduleWater(0, new Vector2(3.125f, .875f), 0, .5f, 5, 1, 10);
+            direct.Sample(Vector2.zero, 60); rewind.Sample(Vector2.zero, 60);
+            string first = rewind.Sim.StateHash();
+            rewind.Sample(Vector2.zero, 5); rewind.Sample(Vector2.zero, 60);
+            Assert.AreEqual(first, rewind.Sim.StateHash(), "Reload must restore every spray before replay.");
+            Assert.AreEqual(direct.Sim.StateHash(), rewind.Sim.StateHash());
+            Assert.Greater(rewind.Sim.TotalWaterEnergyRemovedKj, 0, "Replayed commands must actually absorb heat.");
+        }
+
+        [Test]
+        public void WetFuelResistsReignitionBesideBurningNeighbourUntilDry()
+        {
+            string path = WaterFire(true);
+            var wet = FireSim.Load(TwoRooms("closed"), path, 7);
+            var dry = FireSim.Load(TwoRooms("closed"), path, 7);
+            TargetWater(wet); wet.AdvanceTo(10); dry.AdvanceTo(10);
+            Assert.AreEqual(0, wet.GetCell(8, 8).FlameIntensity);
+            Assert.Greater(dry.GetCell(8, 8).FlameIntensity, 0, "No-water control keeps burning.");
+            Assert.Greater(wet.GetCell(9, 8).FlameIntensity, 0, "Neighbour must remain a live ignition source.");
+            float fuel = wet.GetCell(8, 8).FuelRemainingKg;
+            bool reheated = false;
+            for (int second = 11; second <= 30; second++)
+            {
+                wet.AdvanceTo(second);
+                reheated |= wet.GetCell(8, 8).SurfaceTemperatureC >= 330;
+                Assert.AreEqual(0, wet.GetCell(8, 8).FlameIntensity, "Wet fuel must not relight after the spray stops.");
+                Assert.AreEqual(fuel, wet.GetCell(8, 8).FuelRemainingKg);
+            }
+            Assert.IsTrue(reheated, "The wet timer must block ignition even after neighbour heat raises temperature above ignition.");
+            // Change only the dry-out time to prove that cooling alone cannot explain the result.
+            var json = JObject.Parse(File.ReadAllText(path)); json["water"]["wet_seconds_per_litre"] = .001;
+            File.WriteAllText(path, json.ToString());
+            var fastDry = FireSim.Load(TwoRooms("closed"), path, 7);
+            TargetWater(fastDry); fastDry.AdvanceTo(10);
+            Assert.AreEqual(0, fastDry.GetCell(8, 8).FlameIntensity);
+            fastDry.AdvanceTo(30);
+            Assert.Greater(fastDry.GetCell(8, 8).FlameIntensity, 0, "The same cooled fuel must relight when its wet time expires.");
+        }
+
+        [Test]
+        public void WaterEnergyCannotExceedDeliveredLitresTimesConfiguredCapacity()
+        {
+            string path = WaterFire(); var sim = FireSim.Load(TwoRooms("closed"), path, 7);
+            var water = JObject.Parse(File.ReadAllText(path))["water"];
+            double perLitre = (double)water["latent_heat_kj_l"] + (double)water["sensible_heat_kj_l"];
+            double efficiency = (double)water["application_efficiency"];
+            // Short, off-grid spray exercises partial ticks rather than rounding up the water supply.
+            TargetWater(sim, .2, .035, .14);
+            for (int n = 1; n <= 20; n++)
+            {
+                sim.AdvanceTo(n * .1);
+                double litres = .2 * Math.Max(0, Math.Min(sim.Time, .175) - .035);
+                Assert.LessOrEqual(sim.TotalWaterEnergyRemovedKj, litres * perLitre * efficiency + 1e-8,
+                    "Absorbed energy cannot exceed the effective water budget, including partial ticks.");
+            }
+            Assert.Greater(sim.TotalWaterEnergyRemovedKj, 0, "A zero-energy implementation must fail this check.");
+            Assert.LessOrEqual(sim.TotalWaterEnergyRemovedKj, .2 * .14 * perLitre);
+            double stopped = sim.TotalWaterEnergyRemovedKj;
+            sim.AdvanceTo(10); Assert.AreEqual(stopped, sim.TotalWaterEnergyRemovedKj, "Cooling stops at the spray end.");
+        }
+
+        [TestCase("x", "closed")]
+        [TestCase("z", "closed")]
+        [TestCase("x", "open")]
+        [TestCase("z", "half")]
+        public void WaterSightUsesDoorWidthsAndUnityYaw(string axis, string state)
+        {
+            bool east = axis == "x";
+            string path = WaterFire(); var json = JObject.Parse(File.ReadAllText(path));
+            json["ignitions"] = JArray.Parse(east
+                ? "[{\"room\":\"hallway\",\"at\":[4.125,2.125],\"time_s\":0,\"radius_m\":0}]"
+                : "[{\"room\":\"hallway\",\"at\":[2.125,4.125],\"time_s\":0,\"radius_m\":0}]");
+            File.WriteAllText(path, json.ToString());
+            var sim = FireSim.Load(TwoRooms(state, axis), path, 7);
+            sim.ScheduleWater(0, east ? new Vector2(3.875f, 2.125f) : new Vector2(2.125f, 3.875f),
+                east ? Mathf.PI / 2 : 0, .3f, 1, 1, 10);
+            sim.AdvanceTo(10);
+            var target = sim.GetCell(east ? 16 : 8, east ? 8 : 16);
+            Assert.AreEqual(state == "closed", target.FlameIntensity > 0,
+                "A closed wall blocks the stream; an open aperture admits it along the stated yaw.");
+            if (state != "closed") Assert.Greater(sim.TotalWaterEnergyRemovedKj, 0);
+            else
+            {
+                // Positive control prevents a no-water implementation passing the closed-door case.
+                var open = FireSim.Load(TwoRooms("open", axis), path, 7);
+                open.ScheduleWater(0, east ? new Vector2(3.875f, 2.125f) : new Vector2(2.125f, 3.875f),
+                    east ? Mathf.PI / 2 : 0, .3f, 1, 1, 10);
+                open.AdvanceTo(10);
+                Assert.AreEqual(0, open.GetCell(east ? 16 : 8, east ? 8 : 16).FlameIntensity);
+            }
+        }
+
+        [Test]
+        public void WaterAtAmbientOnlyWetsAndBlocksADelayedIgnition()
+        {
+            string path = WaterFire();
+            var json = JObject.Parse(File.ReadAllText(path));
+            json["ignitions"][0]["time_s"] = 1;
+            File.WriteAllText(path, json.ToString());
+            var wet = FireSim.Load(TwoRooms("closed"), path, 7);
+            var dry = FireSim.Load(TwoRooms("closed"), path, 7);
+            TargetWater(wet, 1, 0, .5);
+            float fuel = wet.GetCell(8, 8).FuelRemainingKg;
+            wet.AdvanceTo(.5);
+            Assert.AreEqual(20, wet.GetCell(8, 8).SurfaceTemperatureC, "Cold cells cannot cool below ambient.");
+            Assert.AreEqual(0, wet.TotalWaterEnergyRemovedKj, "Ambient, unlit fuel supplies no energy to absorb.");
+            Assert.AreEqual(fuel, wet.GetCell(8, 8).FuelRemainingKg);
+            wet.AdvanceTo(2); dry.AdvanceTo(2);
+            Assert.AreEqual(0, wet.GetCell(8, 8).FlameIntensity, "Wetting must inhibit a later ignition after the stream stops.");
+            Assert.Greater(dry.GetCell(8, 8).FlameIntensity, 0, "The delayed dry ignition must burn.");
+        }
+
+        [Test]
+        public void WaterRejectsInvalidArgumentsAndPastRequestsWithoutChangingState()
+        {
+            var sim = FireSim.Load(TwoRooms("closed"), WaterFire(), 7);
+            string initial = sim.StateHash();
+            foreach (double bad in new[] { -1d, double.NaN, double.PositiveInfinity, double.NegativeInfinity })
+            {
+                Assert.Throws<ArgumentOutOfRangeException>(() => TargetWater(sim, start: bad));
+                Assert.Throws<ArgumentOutOfRangeException>(() => TargetWater(sim, flow: bad));
+                Assert.Throws<ArgumentOutOfRangeException>(() => TargetWater(sim, duration: bad));
+                Assert.Throws<ArgumentOutOfRangeException>(() => sim.ScheduleWater(0, Vector2.zero, (float)bad, 1, 1, 1, 1));
+                Assert.Throws<ArgumentOutOfRangeException>(() => sim.ScheduleWater(0, Vector2.zero, 0, (float)bad, 1, 1, 1));
+                Assert.Throws<ArgumentOutOfRangeException>(() => sim.ScheduleWater(0, Vector2.zero, 0, 1, (float)bad, 1, 1));
+                Assert.Throws<ArgumentOutOfRangeException>(() => sim.ScheduleWater(0, new Vector2((float)bad, 0), 0, 1, 1, 1, 1));
+                Assert.Throws<ArgumentOutOfRangeException>(() => sim.ScheduleWater(0, new Vector2(0, (float)bad), 0, 1, 1, 1, 1));
+            }
+            Assert.Throws<ArgumentOutOfRangeException>(() => sim.ScheduleWater(0, Vector2.zero, float.NaN, 1, 1, 1, 1));
+            Assert.Throws<ArgumentOutOfRangeException>(() => sim.ScheduleWater(0, Vector2.zero, 0, -1, 1, 1, 1));
+            Assert.Throws<ArgumentOutOfRangeException>(() => sim.ScheduleWater(0, Vector2.zero, 0, 1, -1, 1, 1));
+            Assert.Throws<ArgumentOutOfRangeException>(() => sim.ScheduleWater(0, Vector2.zero, 0, 1, 181, 1, 1));
+            Assert.Throws<ArgumentOutOfRangeException>(() => sim.ScheduleWater(0, new Vector2(float.PositiveInfinity, 0), 0, 1, 1, 1, 1));
+            Assert.AreEqual(initial, sim.StateHash(), "Rejected schedules must not mutate the replay log.");
+            sim.AdvanceTo(.15);
+            Assert.Throws<ArgumentOutOfRangeException>(() => TargetWater(sim, start: .14));
+            TargetWater(sim, start: .15); sim.AdvanceTo(10.2);
+            Assert.Greater(sim.TotalWaterEnergyRemovedKj, 0, "A schedule at the last requested time must work.");
+        }
+
         static IEnumerable<FireSim.CellState> Cells(FireSim sim)
         {
             for (int z = 0; z < sim.Height; z++) for (int x = 0; x < sim.Width; x++) yield return sim.GetCell(x, z);

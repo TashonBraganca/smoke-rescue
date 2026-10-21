@@ -23,6 +23,32 @@ namespace SmokeRescue.World
         float flamesT = float.NaN;
         const float GasAbsorptionPerDensity = 0.8f;   // LWIR absorption per metre at smoke density 1 (estimate)
 
+        readonly struct Spray
+        {
+            public readonly double time, flow, duration;
+            public readonly Vector2 nozzle;
+            public readonly float heading, range, halfAngle;
+            public Spray(double time, Vector2 nozzle, float heading, float range, float halfAngle, double flow, double duration)
+            { this.time = time; this.nozzle = nozzle; this.heading = heading; this.range = range;
+              this.halfAngle = halfAngle; this.flow = flow; this.duration = duration; }
+            public void Schedule(FireSim sim) => sim.ScheduleWater(time, nozzle, heading, range, halfAngle, flow, duration);
+        }
+        readonly List<Spray> sprays = new List<Spray>();
+
+        /// <summary>Uses absolute fire time, in seconds, as FireSim.ScheduleWater does. Convert robot time
+        /// with FireTime first. The wrapper owns this log so previews can replay water after a rewind.</summary>
+        public void ScheduleWater(double t, Vector2 nozzleXZ, float headingRad, float rangeM,
+            float halfAngleDeg, double flowLps, double durationS)
+        {
+            lock (advanceGate)
+            {
+                var spray = new Spray(t, nozzleXZ, headingRad, rangeM, halfAngleDeg, flowLps, durationS);
+                spray.Schedule(Sim); // Validate before retaining a command for future replays.
+                sprays.Add(spray);
+                flamesT = float.NaN;
+            }
+        }
+
         readonly int seed;
         double lastFireTime = -1;
 
@@ -55,6 +81,7 @@ namespace SmokeRescue.World
                 {
                     Rewinds++;
                     Sim = FireSim.Load(plan, Path.Combine(FloorPlan.ConfigDir, "fire.json"), seed);
+                    foreach (var spray in sprays) spray.Schedule(Sim);
                     flamesT = float.NaN;
                 }
                 Sim.AdvanceTo(ft);

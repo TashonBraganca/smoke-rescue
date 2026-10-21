@@ -86,6 +86,7 @@ namespace SmokeRescue.World
             public Dictionary<string, Furniture> furniture;
             public Spread spread;
             public GasConfig gas;
+            public WaterConfig water;
             public CollapseConfig collapse;
             public QueryConfig query;
         }
@@ -106,6 +107,10 @@ namespace SmokeRescue.World
             public double lower_temperature_fraction, smoke_production_per_cell_s, smoke_reference_volume_m3;
             public double smoke_decay_per_s, lower_smoke_fraction;
         }
+        sealed class WaterConfig
+        {
+            public double latent_heat_kj_l, sensible_heat_kj_l, application_efficiency, wet_seconds_per_litre;
+        }
         sealed class CollapseConfig
         {
             public double temperature_c, duration_s, interval_s, door_clear_width_m;
@@ -119,7 +124,7 @@ namespace SmokeRescue.World
         internal sealed class Cell
         {
             public int room = -1;
-            public double initialFuel, fuel, temperature, flame, ignition = double.MaxValue;
+            public double initialFuel, fuel, temperature, flame, wetUntil, ignition = double.MaxValue;
             public bool burning, collapsed, protectedApproach;
         }
         internal sealed class Gas
@@ -135,6 +140,17 @@ namespace SmokeRescue.World
             public bool alongX;
             public double x, z, width;
         }
+
+        sealed class Spray
+        {
+            public double start, end, flow;
+            public int[] targets;
+        }
+        readonly List<Spray> sprays = new List<Spray>();
+        readonly Rect[] roomRects;
+        readonly double[] waterLitres;
+        /// <summary>Actual flame and surface energy absorbed, excluding unused cooling capacity, in kJ.</summary>
+        public double TotalWaterEnergyRemovedKj { get; private set; }
 
         readonly Configuration config;
         readonly int seed;
@@ -188,9 +204,12 @@ namespace SmokeRescue.World
             cells = new Cell[checked(Width * Height)];
             nextTemperature = new double[cells.Length]; nextFlame = new double[cells.Length];
             rooms = new Gas[plan.rooms.Count];
+            roomRects = new Rect[rooms.Length];
+            waterLitres = new double[cells.Length];
             for (int r = 0; r < rooms.Length; r++)
             {
                 var room = plan.rooms[r];
+                roomRects[r] = room.Rect;
                 roomIndices.Add(room.id, r);
                 rooms[r] = new Gas { id = room.id, area = room.Rect.width * room.Rect.height,
                     temperature = cfg.ambient_c, height = ceiling - cfg.gas.initial_layer_depth_m,
@@ -272,6 +291,108 @@ namespace SmokeRescue.World
             lastRequestedTime = t;
         }
 
+        /// <summary>
+        /// Schedules a fixed cone in world x/z metres. Heading 0 points north, positive yaw turns east.
+        /// Each tick integrates its overlap with [t, t + durationS), sharing flow equally among visible
+        /// cell centres, including cold cells. Exact room edges and current door widths block sight.
+        /// All inputs must be finite and nonnegative. Normalize signed yaw to [0, 2*pi) before scheduling.
+        /// Schedules are ordered by start time, with insertion order breaking ties. No past scheduling.
+        /// </summary>
+        public void ScheduleWater(double t, Vector2 nozzleXZ, float headingRad, float rangeM,
+            float halfAngleDeg, double flowLps, double durationS)
+        {
+            WaterInput(t, nameof(t)); WaterInput(rangeM, nameof(rangeM));
+            WaterInput(halfAngleDeg, nameof(halfAngleDeg)); WaterInput(flowLps, nameof(flowLps));
+            WaterInput(durationS, nameof(durationS));
+            if (t < lastRequestedTime || !Finite(t + durationS)) throw new ArgumentOutOfRangeException(nameof(t));
+            WaterInput(nozzleXZ.x, nameof(nozzleXZ)); WaterInput(nozzleXZ.y, nameof(nozzleXZ));
+            WaterInput(headingRad, nameof(headingRad));
+            if (halfAngleDeg > 180) throw new ArgumentOutOfRangeException(nameof(halfAngleDeg));
+            // Reject overflow before a tick can change any state.
+            double energyPerLitre = config.water.latent_heat_kj_l + config.water.sensible_heat_kj_l;
+            if (!Finite(flowLps * durationS * energyPerLitre) ||
+                !Finite(t + durationS + flowLps * durationS * config.water.wet_seconds_per_litre))
+                throw new ArgumentOutOfRangeException(nameof(flowLps));
+            var targets = new List<int>();
+            int nozzle = PointIndex(nozzleXZ);
+            if (nozzle >= 0 && cells[nozzle].room >= 0)
+            {
+                double hx = Math.Sin(headingRad), hz = Math.Cos(headingRad);
+                double cosine = Math.Cos(halfAngleDeg * Math.PI / 180);
+                for (int i = 0; i < cells.Length; i++)
+                {
+                    if (cells[i].room < 0) continue;
+                    Vector2 p = CellCentre(i % Width, i / Width);
+                    double dx = p.x - nozzleXZ.x, dz = p.y - nozzleXZ.y;
+                    double distance = Math.Sqrt(dx * dx + dz * dz);
+                    if (distance > rangeM || (distance > 0 && (dx * hx + dz * hz) / distance < cosine)) continue;
+                    if (WaterVisible(nozzleXZ, p)) targets.Add(i);
+                }
+            }
+            var spray = new Spray { start = t, end = t + durationS, flow = flowLps, targets = targets.ToArray() };
+            int at = sprays.Count;
+            while (at > 0 && sprays[at - 1].start > t) at--;
+            sprays.Insert(at, spray);
+        }
+
+        static void WaterInput(double value, string name)
+        { if (!Finite(value) || value < 0) throw new ArgumentOutOfRangeException(name); }
+
+        bool WaterVisible(Vector2 p, Vector2 q)
+        {
+            // The preview rounds apertures to grid cells. Test actual room edges instead so half-open
+            // doors retain their exact clear width and a diagonal ray cannot cut through a wall corner.
+            for (int r = 0; r < roomRects.Length; r++)
+            {
+                var rect = roomRects[r];
+                if (WaterWall(p, q, r, true, rect.yMin, rect.xMin, rect.xMax) ||
+                    WaterWall(p, q, r, true, rect.yMax, rect.xMin, rect.xMax) ||
+                    WaterWall(p, q, r, false, rect.xMin, rect.yMin, rect.yMax) ||
+                    WaterWall(p, q, r, false, rect.xMax, rect.yMin, rect.yMax)) return false;
+            }
+            return true;
+        }
+
+        bool WaterWall(Vector2 p, Vector2 q, int room, bool alongX, double line, double lo, double hi)
+        {
+            double a = alongX ? p.y : p.x, b = alongX ? q.y : q.x;
+            if (a == b)
+            {
+                // A ray lying on a wall is blocked, including a nozzle placed on that wall.
+                if (a != line) return false;
+                double u = alongX ? p.x : p.y, v = alongX ? q.x : q.y;
+                return Math.Max(u, v) >= lo && Math.Min(u, v) <= hi;
+            }
+            double t = (line - a) / (b - a);
+            if (t < 0 || t > 1) return false;
+            double along = alongX ? p.x + t * (q.x - p.x) : p.y + t * (q.y - p.y);
+            if (along < lo || along > hi) return false;
+            foreach (var d in openings)
+                if ((d.a == room || d.b == room) && d.alongX == alongX &&
+                    (alongX ? d.z : d.x) == line && Math.Abs(along - (alongX ? d.x : d.z)) < d.width / 2)
+                    return false;
+            return true;
+        }
+
+        void ApplyWater(double dt)
+        {
+            Array.Clear(waterLitres, 0, waterLitres.Length);
+            foreach (var spray in sprays)
+            {
+                if (spray.start >= Time + dt) break;
+                double overlap = Math.Max(0, Math.Min(Time + dt, spray.end) - Math.Max(Time, spray.start));
+                if (overlap <= 0 || spray.flow == 0 || spray.targets.Length == 0) continue;
+                double litres = spray.flow * overlap / spray.targets.Length;
+                foreach (int i in spray.targets)
+                {
+                    waterLitres[i] += litres;
+                    // Retained water buys an additive dry-out time after the last wetted part of a tick.
+                    cells[i].wetUntil = Math.Max(cells[i].wetUntil, Math.Min(Time + dt, spray.end)) +
+                        litres * config.water.wet_seconds_per_litre;
+                }
+            }
+        }
+
         void ApplyIgnitions()
         {
             for (int n = 0; n < ignitionApplied.Length; n++)
@@ -284,7 +405,7 @@ namespace SmokeRescue.World
                 {
                     int i = Index(x, z); var c = cells[i]; var p = CellCentre(x, z);
                     double dx = p.x - fire.at[0], dz = p.y - fire.at[1];
-                    if (c.room != room || c.fuel <= 0 || (i != centre && dx * dx + dz * dz > fire.radius_m * fire.radius_m)) continue;
+                    if (c.wetUntil > Time || c.room != room || c.fuel <= 0 || (i != centre && dx * dx + dz * dz > fire.radius_m * fire.radius_m)) continue;
                     c.burning = true; c.temperature = Math.Max(c.temperature, c.ignition); c.flame = Math.Max(c.flame, .01);
                 }
                 ignitionApplied[n] = true;
@@ -295,6 +416,7 @@ namespace SmokeRescue.World
         {
             double dt = config.step_s, area = config.cell_size_m * config.cell_size_m;
             var s = config.spread; var g = config.gas;
+            ApplyWater(dt);
             Array.Clear(heatKw, 0, heatKw.Length); Array.Clear(smokeProduction, 0, smokeProduction.Length);
             // Every neighbour read comes from the previous tick, never a partly updated row.
             for (int i = 0; i < cells.Length; i++)
@@ -309,7 +431,11 @@ namespace SmokeRescue.World
                 if (room.temperature >= config.flashover_threshold_c)
                     warming += s.flashover_surface_heat_c_s * Math.Max(0, (room.temperature - c.temperature) / room.temperature);
                 double temperature = c.temperature + dt * (warming - s.surface_cooling_per_s * (c.temperature - config.ambient_c));
-                if (c.fuel > 0 && (c.burning || temperature >= c.ignition))
+                double waterEnergy = waterLitres[i] * (config.water.latent_heat_kj_l + config.water.sensible_heat_kj_l) *
+                    config.water.application_efficiency;
+                double remainingWaterEnergy = waterEnergy;
+                bool flameAbsorbed = false;
+                if (c.fuel > 0 && (c.burning || (c.wetUntil <= Time && temperature >= c.ignition)))
                 {
                     double flame = Math.Min(1, c.flame + dt / s.flame_ramp_s);
                     // Taper during the final second of fuel. Consumed mass, rather than a free
@@ -318,13 +444,29 @@ namespace SmokeRescue.World
                     double consumed = Math.Min(c.fuel, dt * s.fuel_burn_kg_m2_s * area * flame);
                     c.fuel -= consumed; c.burning = c.fuel > 1e-10;
                     if (!c.burning) { c.fuel = 0; flame = 0; }
-                    nextFlame[i] = flame;
+                    double release = consumed * s.heat_of_combustion_kj_kg;
+                    double absorbed = Math.Min(release, remainingWaterEnergy);
+                    remainingWaterEnergy -= absorbed;
+                    flameAbsorbed = absorbed >= release;
+                    double retained = release > 0 ? (release - absorbed) / release : 0;
+                    nextFlame[i] = flame * retained;
                     double flameC = s.flame_min_c + (s.flame_max_c - s.flame_min_c) * flame;
-                    temperature += (flameC - temperature) * Math.Min(1, dt / s.flame_relaxation_s);
-                    heatKw[c.room] += consumed * s.heat_of_combustion_kj_kg / dt;
+                    temperature += (flameC - temperature) * Math.Min(1, dt / s.flame_relaxation_s) * retained;
+                    heatKw[c.room] += (release - absorbed) / dt;
                     smokeProduction[c.room] += g.smoke_production_per_cell_s * g.smoke_reference_volume_m3 *
-                        consumed / (dt * s.fuel_burn_kg_m2_s * area);
+                        consumed * retained / (dt * s.fuel_burn_kg_m2_s * area);
                 }
+                if (remainingWaterEnergy > 0)
+                {
+                    // There is no separate solid capacity in the original temperature proxy. Reuse its
+                    // effective lining/gas capacity per floor area rather than invent a material constant.
+                    double capacity = g.effective_heat_capacity_kj_m2_k * area;
+                    double cooling = Math.Min(remainingWaterEnergy, Math.Max(0, temperature - config.ambient_c) * capacity);
+                    temperature -= cooling / capacity;
+                    remainingWaterEnergy -= cooling;
+                }
+                TotalWaterEnergyRemovedKj += waterEnergy - remainingWaterEnergy;
+                if (flameAbsorbed && temperature < c.ignition) { c.burning = false; nextFlame[i] = 0; }
                 nextTemperature[i] = Clamp(temperature, config.ambient_c, s.max_temperature_c);
             }
             for (int i = 0; i < cells.Length; i++) { cells[i].temperature = nextTemperature[i]; cells[i].flame = nextFlame[i]; }
@@ -490,13 +632,21 @@ namespace SmokeRescue.World
                 foreach (var c in cells)
                 {
                     writer.Write(c.room); writer.Write(c.initialFuel); writer.Write(c.fuel); writer.Write(c.temperature);
-                    writer.Write(c.flame); writer.Write(c.ignition); writer.Write(c.burning); writer.Write(c.collapsed); writer.Write(c.protectedApproach);
+                    writer.Write(c.flame); writer.Write(c.wetUntil); writer.Write(c.ignition); writer.Write(c.burning); writer.Write(c.collapsed); writer.Write(c.protectedApproach);
                 }
                 for (int i = 0; i < rooms.Length; i++)
                 {
                     var g = rooms[i]; writer.Write(g.id); writer.Write(g.temperature); writer.Write(g.height);
                     writer.Write(g.smoke); writer.Write(g.hotSeconds); writer.Write(g.hotTicks); writer.Write(g.flashoverTime); writer.Write(g.hasFuel);
                     writer.Write(hotPreviously[i]);
+                }
+                writer.Write(TotalWaterEnergyRemovedKj);
+                writer.Write(sprays.Count);
+                foreach (var spray in sprays)
+                {
+                    writer.Write(spray.start); writer.Write(spray.end); writer.Write(spray.flow);
+                    writer.Write(spray.targets.Length);
+                    foreach (int i in spray.targets) writer.Write(i);
                 }
                 foreach (bool applied in ignitionApplied) writer.Write(applied);
                 foreach (var e in collapses)
@@ -684,6 +834,12 @@ namespace SmokeRescue.World
             Require(c.materials != null && c.surfaces != null && c.furniture != null && c.ignitions != null && c.ignitions.Count > 0,
                 "materials, surfaces, furniture and ignitions are required");
             Require(c.spread != null && c.gas != null && c.collapse != null && c.query != null, "missing model parameters");
+            Require(c.water != null, "missing water parameters");
+            Positive(c.water.latent_heat_kj_l, "water.latent_heat_kj_l");
+            Nonnegative(c.water.sensible_heat_kj_l, "water.sensible_heat_kj_l");
+            Positive(c.water.wet_seconds_per_litre, "water.wet_seconds_per_litre");
+            Fraction(c.water.application_efficiency, "water.application_efficiency");
+            Require(Finite(c.water.latent_heat_kj_l + c.water.sensible_heat_kj_l), "water energy overflow");
             var s = c.spread; var g = c.gas; var r = c.collapse; var q = c.query;
             Nonnegative(s.neighbour_heat_per_s, "neighbour_heat_per_s"); Nonnegative(s.surface_cooling_per_s, "surface_cooling_per_s");
             Nonnegative(s.gas_surface_heat_per_s, "gas_surface_heat_per_s"); Nonnegative(s.flashover_surface_heat_c_s, "flashover_surface_heat_c_s");

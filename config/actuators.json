@@ -1,0 +1,16 @@
+{
+  "nozzle": {
+    "tank_l": 12.0,
+    "tank_l_reason": "Water carried on the robot. A Spot-class quadruped carries about 14 kg of payload; 12 L of water plus the pump and nozzle fits it. The robot cannot refill inside the building.",
+    "flow_lps": 1.0,
+    "flow_lps_reason": "Flow from a small battery pump. Firefighting hand lines run 2 to 8 L/s; a robot-mounted pump on this payload delivers about 1 L/s, so a full tank lasts 12 s.",
+    "range_m": 5.0,
+    "range_m_reason": "Throw of a 1 L/s straight-to-narrow-fog stream at the pressure such a pump gives; water beyond this does not reach the fire as a stream.",
+    "half_angle_deg": 12.0,
+    "half_angle_deg_reason": "Half-angle of a narrow fog pattern, wide enough to cover a 2 m wide fire 5 m away, narrow enough to keep the range.",
+    "max_spray_s": 6.0,
+    "max_spray_s_reason": "Longest single spray an agent may order, so one order cannot empty the tank; it can order again after the robot looks again.",
+    "aim_tolerance_deg": 15.0,
+    "aim_tolerance_deg_reason": "An agent may spray only toward a hot spot its cited thermal scan found within this bearing of the requested direction (half the thermal camera's 50 degree field is 25 degrees; 15 keeps the stream on the measured fire)."
+  }
+}

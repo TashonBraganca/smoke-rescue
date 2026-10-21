@@ -19,6 +19,7 @@ from pathlib import Path as _Path
 # Thresholds come from config/brain.json, each with its reason there.
 _CONFIG = json.loads((_Path(__file__).resolve().parents[3] / "config" / "brain.json").read_text())
 CONFIRM_MAX_RANGE_M = float(_CONFIG["person_confirm_max_range_m"])
+_NOZZLE = json.loads((_Path(__file__).resolve().parents[3] / "config" / "actuators.json").read_text())["nozzle"]
 from pathlib import Path
 
 from brain.agent import vision
@@ -72,6 +73,10 @@ ACTIONS = [
         "way is not passable.", {"evidence_id": EVIDENCE}, ["evidence_id"]),
     _fn("clear_debris", "Use the arm to push light debris ahead out of the way. Needs a measure_opening result showing "
         "the way is not passable.", {"evidence_id": EVIDENCE}, ["evidence_id"]),
+    _fn("spray_water", "Spray water from the robot's nozzle toward a fire to knock it down. Needs a scan_thermal result "
+        "with a hot spot near that bearing and within the nozzle's range. Water is limited (context water_l); the "
+        "robot holds still while spraying.", {"bearing_deg": NUM, "seconds": NUM, "evidence_id": EVIDENCE},
+        ["bearing_deg", "seconds", "evidence_id"]),
     _fn("send_team_message", "Radio a short message to the partner robot and the commander. It may be delayed or "
         "lost if walls or distance block the link.", {"text": STR}, ["text"]),
     _fn("request_human_approval", "Ask the human incident commander before a risky move, citing evidence.",
@@ -95,6 +100,7 @@ class AgentContext:
     torch: str = "wide"
     frame_times: list[float] = field(default_factory=list)   # recent thermal stamps, oldest first
     frontiers: list[dict] = field(default_factory=list)      # search targets offered by the robot's own map
+    water_l: float = 0.0                                      # water left in the robot's tank
 
 
 class ToolRegistry:
@@ -211,6 +217,17 @@ class ToolRegistry:
             refusal = self._need(args, ("scan_thermal", "track_fire_spread"),
                                  lambda ev: ev.get("tool") == "track_fire_spread" or bool(ev.get("hotspots")),
                                  "the cited scan found no hotspot")
+        elif name == "spray_water":
+            aim, reach = float(_NOZZLE["aim_tolerance_deg"]), float(_NOZZLE["range_m"])
+            bearing = float(args.get("bearing_deg", 0))
+            refusal = self._need(args, ("scan_thermal",), lambda ev: any(
+                abs(float(h.get("bearing_deg", 1e9)) - bearing) <= aim and h.get("range_m") is not None and float(h["range_m"]) <= reach
+                for h in ev.get("hotspots") or []),
+                f"the cited scan has no hot spot within {aim:.0f} deg of bearing {bearing:.0f} and {reach:.0f} m")
+            if refusal is None and self.ctx.water_l <= 0:
+                refusal = {"refused": True, "reason": "the water tank is empty"}
+            if refusal is None:
+                args = {**args, "seconds": round(min(max(0.0, float(args.get("seconds", 0))), float(_NOZZLE["max_spray_s"])), 2)}
         elif name == "set_torch":
             refusal = self._need(args, ("assess_visibility",))
         elif name in ("open_door", "clear_debris"):
