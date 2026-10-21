@@ -829,6 +829,27 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void AnAgentKeepOutAreaNeverCutsTheWayOut()
+        {
+            // 2x2 building run: robot A's agent drew 2.5 m around its own target, the route home was cut, and the robot held
+            // still. Across the route home: refused. To one side: shrunk to stay clear of the route.
+            string Order(Vector2 centre, out float radius)
+            {
+                var c = Settings(); c.grid_size_m = 12; c.robot_radius_m = .25f;
+                var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -5, 5, -2, 6);
+                for (int i = 0; i < 46; i++) { double t = i / 15.0; Motion(b, t, t < 3 ? 1f : 0); b.OnRgbd(Image(t, true)); b.OnAirTemperature(t, 20); b.Step(t, 1f / 15); }
+                b.DrainEvents();
+                b.AgentAvoidArea(centre, 2f, 3.1, 30, "ev");
+                var e = b.DrainEvents().Single(x => x.kind == "agent_order");
+                radius = (float)e.numbers["radius_m"]; return e.reason;
+            }
+            Assert.That(Order(new Vector2(0, -.2f), out _), Does.Contain("way out"), "behind the robot, over its start");
+            // 2.2 m beside the route home, 3.1 m from the robot: the robot-only rule would allow 1.66 m, the route rule 0.75 m.
+            Assert.That(Order(new Vector2(-2.2f, .8f), out float r), Does.StartWith("avoid_area around"), "beside the route: accepted");
+            Assert.That(r, Is.LessThan(1f), "and shrunk clear of the route home");
+        }
+
+        [Test]
         public void AReturnEndsWithinHalfAMetreOfADoorwayStart()
         {
             // House reflex check: robot B stopped 0.3 m from its doorway start, where the return path ended, and replanned

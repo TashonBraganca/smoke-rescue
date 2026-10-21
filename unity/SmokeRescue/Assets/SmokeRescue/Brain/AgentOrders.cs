@@ -114,6 +114,17 @@ namespace SmokeRescue.Brain
                     "x_m", centre.x, "y_m", centre.y, "radius_m", radiusM);
                 return;
             }
+            // Nor may it cut the robot's own way out (2x2 building run: robot A's agent drew 2.5 m around its own frontier
+            // target, the route home was gone, and the robot held still from 88 s). Stay clear of the planned route out.
+            float routeRoom = float.PositiveInfinity;
+            foreach (var p in PlanOut()) routeRoom = Mathf.Min(routeRoom, Vector2.Distance(centre, p) - c.fire_clearance_m - c.robot_radius_m);
+            if (routeRoom < c.agent_avoid_min_radius_m)
+            {
+                Emit(t, "agent_order", "avoid_area refused: it would cut the robot's way out; the reflex keeps clear of real heat by itself.",
+                    "x_m", centre.x, "y_m", centre.y, "radius_m", radiusM);
+                return;
+            }
+            room = Mathf.Min(room, routeRoom);
             radiusM = Mathf.Clamp(Mathf.Min(radiusM, room), c.agent_avoid_min_radius_m, c.agent_avoid_max_radius_m);
             float temperature = c.fire_c + c.heat_decay_c_per_s * (float)Math.Max(1.0, seconds) + 50f;
             int cells = 0;
