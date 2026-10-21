@@ -102,6 +102,13 @@ namespace SmokeRescue.Brain
             odds[i] = Mathf.Max(-c.log_odds_cap, odds[i] + c.free_log_odds);
             observed[i] = true; localTime[i] = localObservationTime; dirty = roofDirty = true;
         }
+        /// <summary>Free floor mapped by the depth camera but too far away to count as searched.</summary>
+        void MapFree(int i)
+        {
+            if (i < 0 || i >= Count) return;
+            odds[i] = Mathf.Max(-c.log_odds_cap, odds[i] + c.free_log_odds);
+            localTime[i] = localObservationTime; dirty = roofDirty = true;
+        }
         public void ObserveOccupied(int i)
         {
             if (i < 0 || i >= Count) return;
@@ -265,8 +272,16 @@ namespace SmokeRescue.Brain
                 Ray(start, end, obstacle);
             }
             // Aggregate a frame before updating odds. A floor ray cannot erase a wall hit in this frame.
+            // Free floor further than search_max_range_m from the camera is mapped but not searched: a person lying there
+            // could not have been found from here (hidden-corner runs: a glance through a doorway from 8 m counted a whole
+            // room as searched and the robot never went in, while a confirmation needs an inspection within 4 m).
+            Vector2 eye = Centre(start); float reach = c.search_max_range_m;
             for (int i = 0; i < Count; i++)
-                if (hits[i]) ObserveOccupied(i); else if (frees[i] && frame.Timestamp >= localTime[i]) ObserveFree(i);
+                if (hits[i]) ObserveOccupied(i);
+                else if (frees[i] && frame.Timestamp >= localTime[i])
+                {
+                    if (Vector2.Distance(Centre(i), eye) <= reach) ObserveFree(i); else MapFree(i);
+                }
             MarkCeilingSightLines(start);
             localObservationTime = time;
         }

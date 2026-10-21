@@ -9,6 +9,9 @@ namespace SmokeRescue.World
     public sealed class ThermalBody : MonoBehaviour
     {
         public float TemperatureC = 34f;
+        /// <summary>Optional temperature per material, by name (a person's skin, clothing, hair, shoes); null gives every
+        /// material TemperatureC.</summary>
+        public System.Func<string, float> ByMaterial;
         static readonly int Prop = Shader.PropertyToID("_ThermalBaseC");
         void OnEnable() => Apply();
         void OnValidate() => Apply();
@@ -17,10 +20,34 @@ namespace SmokeRescue.World
             var block = new MaterialPropertyBlock();
             foreach (var r in GetComponentsInChildren<Renderer>(true))
             {
-                r.GetPropertyBlock(block);
-                block.SetFloat(Prop, TemperatureC);
-                r.SetPropertyBlock(block);
+                var materials = r.sharedMaterials;
+                for (int m = 0; m < Mathf.Max(1, materials.Length); m++)
+                {
+                    float c = ByMaterial != null && m < materials.Length && materials[m] != null ? ByMaterial(materials[m].name) : TemperatureC;
+                    r.GetPropertyBlock(block, m);
+                    block.SetFloat(Prop, c);
+                    r.SetPropertyBlock(block, m);
+                }
             }
+        }
+        /// <summary>A person: skin, clothing, hair and footwear at the temperatures in props.json "survivor_thermal",
+        /// matched by material name (case-insensitive substring), others at its default.</summary>
+        public static ThermalBody AddPerson(GameObject go, Newtonsoft.Json.Linq.JObject cfg)
+        {
+            float Get(string key) => cfg.Value<float>(key);
+            string[] Names(string key) => cfg[key].ToObject<string[]>();
+            var classes = new[] { (Names("footwear_names"), Get("footwear_c")), (Names("hair_names"), Get("hair_c")),
+                                  (Names("clothing_names"), Get("clothing_c")), (Names("skin_names"), Get("skin_c")) };
+            float Classify(string material)
+            {
+                string n = material.ToLowerInvariant();
+                foreach (var (names, c) in classes) foreach (var k in names) if (n.Contains(k)) return c;
+                return Get("default_c");
+            }
+            var b = go.GetComponent<ThermalBody>() ?? go.AddComponent<ThermalBody>();
+            b.TemperatureC = Get("default_c"); b.ByMaterial = Classify;
+            b.Apply();
+            return b;
         }
         public static ThermalBody Add(GameObject go, float tempC)
         {

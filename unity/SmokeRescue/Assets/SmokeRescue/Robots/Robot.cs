@@ -30,7 +30,7 @@ namespace SmokeRescue.Robots
         public float TorchPitchDeg { get; private set; }
         public float TorchYawDeg { get; private set; }
         public const float TorchPitchMinDeg = -30f, TorchPitchMaxDeg = 15f, TorchYawLimitDeg = 45f, LowBeamDownDeg = 15f;
-        float wideAngle, wideInner, wideRange, wideIntensity;
+        float wideAngle, wideInner, wideRange, wideIntensity, narrowAngle, narrowInner;
 
         /// <summary>Gait bob amplitude in metres (peak), and sway in degrees. Spec: 1 to 2 cm, 1 to 2 degrees.</summary>
         public const float BobAmplitude = 0.007f;
@@ -95,11 +95,11 @@ namespace SmokeRescue.Robots
             lightGo.transform.SetParent(robot.CameraMount, false);
             var light = lightGo.AddComponent<Light>();
             light.type = LightType.Spot;
-            // Floodlight, not the spec's hard 40 degree spot: the sharp edge of a 40 degree cone gave ORB a ring of
-            // strong corners that move with the camera, and ORB-SLAM3 lost tracking on them during turns (clear run,
-            // robot_A at 12.8 s and 74.7 s). A 100 degree cone with a broad falloff has no edge inside the 75 x 60 view.
-            light.spotAngle = 100f;
-            light.innerSpotAngle = 15f;
+            // A real torch beam (sensors.json headlight: cone and bright centre, with reasons). It was a 100 degree floodlight
+            // while the offline ORB-SLAM3 tracker was the localiser; live localisation is LiDAR now.
+            light.spotAngle = head.Value<float>("cone_deg");
+            light.innerSpotAngle = head.Value<float>("inner_cone_deg");
+            (robot.narrowAngle, robot.narrowInner) = (head.Value<float>("narrow_cone_deg"), head.Value<float>("narrow_inner_deg"));
             light.range = head.Value<float>("range_m");
             light.lightUnit = UnityEngine.Rendering.LightUnit.Lumen;
             light.intensity = head.Value<float>("intensity_lumen");
@@ -162,7 +162,7 @@ namespace SmokeRescue.Robots
             switch (mode)
             {
                 case "wide": Beam(wideAngle, wideInner, wideRange, wideIntensity); break;
-                case "narrow": Beam(30f, 12f, wideRange * 2f, wideIntensity); break;          // same lumens, focused
+                case "narrow": Beam(narrowAngle, narrowInner, wideRange * 2f, wideIntensity); break;   // same lumens, focused
                 case "low": Beam(wideAngle, wideInner, wideRange * 0.6f, wideIntensity * 0.35f); pitch = Mathf.Min(pitch, -LowBeamDownDeg); break;
                 case "off": Headlight.enabled = false; break;
                 default: throw new System.ArgumentException($"Unknown torch mode '{mode}'.", nameof(mode));
