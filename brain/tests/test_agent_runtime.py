@@ -406,3 +406,17 @@ def test_a_person_this_robot_carried_out_is_not_confirmed_again(tmp_path, monkey
     assert near["orders"] == [] and "already rescued" in near["refusals"][0]["reason"]
     assert [o["type"] for o in confirm(5.0, 1.0, 5.0)["orders"]] == ["confirm_survivor"], "control: set down 7 m away"
     assert [o["type"] for o in confirm(5.2, 8.3, 50.0)["orders"]] == ["confirm_survivor"], "control: logged after this step"
+
+
+def test_an_event_at_a_new_place_is_not_dropped_as_a_repeat(tmp_path):
+    # Held-out seed 914 runs 1 to 3: arriving at a second place within 12 s was dropped as a repeat of the first arrival,
+    # so the reflex picked the next frontier alone. Positional events repeat only at the same spot; others by time.
+    agent = RobotAgent(Scripted([]), tmp_path / "t.jsonl")
+    def ev(t, kind, x=None):
+        n = {} if x is None else {"x_m": x, "y_m": 0.0}
+        return {"robot": "robot_A", "t": t, "event": {"kind": kind, "numbers": n}}
+    assert not agent._repeat(ev(0, "agent_goal_reached", 0.0))
+    assert not agent._repeat(ev(8, "agent_goal_reached", 4.0)), "a new place is a new decision"
+    assert agent._repeat(ev(10, "agent_goal_reached", 4.5)), "the same place within the window repeats"
+    assert not agent._repeat(ev(0, "sensor_switch"))
+    assert agent._repeat(ev(5, "sensor_switch")), "events without a position repeat by time"

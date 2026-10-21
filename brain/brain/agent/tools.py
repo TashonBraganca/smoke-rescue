@@ -208,7 +208,13 @@ class ToolRegistry:
 
     def _p_inspect_candidate(self, bearing_deg: float, range_m: float):
         r = vision.inspect_candidate(self._frame(), float(bearing_deg), float(range_m), output_dir=self.debug_dir)
-        r["x"], r["y"] = (round(v, 2) for v in self.world(float(bearing_deg), float(range_m)))
+        # Where the matched warm body was measured, not where the agent asked to look: the scan's bearing and range are
+        # rough, and confirmations inherited them (held-out seed 914 run 4: asked at -2.9 deg, 3.05 m; the body measured
+        # at 3.2 deg, 3.52 m; the same person was then confirmed twice, 1.4 m apart).
+        cand = r.get("candidate") or {}
+        at = (cand["bearing_deg"], cand["range_m"]) if cand.get("bearing_deg") is not None and cand.get("range_m") is not None \
+            else (float(bearing_deg), float(range_m))
+        r["x"], r["y"] = (round(v, 2) for v in self.world(float(at[0]), float(at[1])))
         r["requested"] = {"bearing_deg": float(bearing_deg), "range_m": float(range_m)}
         return r
 
