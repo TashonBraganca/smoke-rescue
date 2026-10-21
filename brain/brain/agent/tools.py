@@ -115,6 +115,8 @@ class AgentContext:
 class ToolRegistry:
     # Close looks per spot, kept across steps (the server builds a new registry per step): (robot, cell) -> times.
     _looks: dict = {}
+    # Where each robot has lifted someone, from its own extract orders, so a lifted person is not offered again.
+    _lifted: dict = {}
     MAX_LOOKS, LOOK_CELL_M, LOOK_MEMORY_S = 2, 1.5, 90.0
 
     def __init__(self, robot_dir: Path, ctx: AgentContext, debug_dir: Path | None = None):
@@ -233,6 +235,10 @@ class ToolRegistry:
                                  f"the cited inspection is not a person verdict within {reach:.1f} m; approach_candidate first")
             if refusal is None and self.ctx.carrying_person:
                 refusal = {"refused": True, "reason": "already towing a person; take them out first"}
+            if refusal is None:
+                ev = self.evidence[str(args["evidence_id"])]
+                if ev.get("x") is not None:
+                    self._lifted.setdefault(self.ctx.robot, []).append((float(ev["x"]), float(ev["y"])))
         elif name == "spray_water":
             aim, reach = float(_NOZZLE["aim_tolerance_deg"]), float(_NOZZLE["range_m"])
             bearing = float(args.get("bearing_deg", 0))
@@ -308,3 +314,23 @@ class ToolRegistry:
                 hint = f"beyond the arm's {reach:.1f} m reach: approach_candidate citing {args['evidence_id']}, then extract on arrival"
             return {"ok": True, "queued": name, "next": hint}
         return {"ok": True, "queued": name}
+
+
+def survivors_to_rescue(robot: str, pose: dict, survivors: list, standoff_m: float = APPROACH_STANDOFF_M,
+                        lifted_within_m: float = 1.5) -> list[dict]:
+    """Confirmed people this robot has not lifted, nearest first, with the bearing (degrees, right positive) and
+    distance from the robot and an approach point standoff_m short of them on the line from the robot. Run 19: robot A
+    confirmed a person, a heat alarm interrupted the approach, and nothing brought the agent back to them."""
+    lifted = ToolRegistry._lifted.get(robot, [])
+    out = []
+    for p in survivors or []:
+        x, y = float(p[0]), float(p[1])
+        if any(math.hypot(x - lx, y - ly) <= lifted_within_m for lx, ly in lifted):
+            continue
+        dx, dy = x - float(pose["x"]), y - float(pose["y"])
+        dist = math.hypot(dx, dy)
+        bearing = (math.degrees(math.atan2(dx, dy)) - float(pose["heading_deg"]) + 180) % 360 - 180
+        k = max(0.0, dist - standoff_m) / max(dist, 1e-6)
+        out.append({"x": round(x, 2), "y": round(y, 2), "bearing_deg": round(bearing, 1), "distance_m": round(dist, 2),
+                    "approach": {"x": round(float(pose["x"]) + dx * k, 2), "y": round(float(pose["y"]) + dy * k, 2)}})
+    return sorted(out, key=lambda s: s["distance_m"])
