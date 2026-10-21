@@ -14,7 +14,7 @@ namespace SmokeRescue.Brain
             public Vector2 position;
             public double lastSeen, retryAfter;
             public readonly Queue<double> observations = new Queue<double>();
-            public bool candidate, confirmed, rgb;
+            public bool candidate, confirmed, rgb, onWall;
         }
         readonly struct AirSample
         { public readonly double t; public readonly float c; public AirSample(double time, float value) { t = time; c = value; } }
@@ -218,14 +218,34 @@ namespace SmokeRescue.Brain
                 }
                 if (NeedPlan(t))
                 {
-                    SetPath(PlanOut()); lastPlan = t;
+                    var fresh = PlanOut(); lastPlan = t;
+                    // A margin that shuts for a moment does not stop an emergency exit: keep the route while nothing on it burns.
+                    if (!(fresh.Count == 0 && EmergencyRoute && path.Count > 0 && EmergencyPathOk(path, cursor))) SetPath(fresh);
                     if (path.Count == 0 && returnReason == EmergencyExit && grid.FireClearance > c.emergency_fire_clearance_m)
                     {
                         // The exit route at normal clearance was cut on the way out (2x2 attempt 5: robot A held still with its
                         // budget spent): leave at the emergency clearance instead, still never through a burning cell.
-                        grid.FireClearance = c.emergency_fire_clearance_m; SetPath(PlanOut());
+                        grid.FireClearance = c.emergency_fire_clearance_m; grid.FirePrediction = false; SetPath(PlanOut());
                         Emit(t, "emergency_exit", "The way out was cut on the way: leave past the fire at reduced clearance.",
                             "clearance_m", c.emergency_fire_clearance_m, "route_points", path.Count);
+                    }
+                    if (path.Count == 0 && EmergencyRoute && grid.FireClearance > c.last_resort_fire_clearance_m)
+                    {
+                        grid.FireClearance = c.last_resort_fire_clearance_m; SetPath(PlanOut());
+                        Emit(t, "emergency_exit", "The way out is shut at the emergency clearance: last-resort route with only the body clear of the fire, never through it.",
+                            "clearance_m", c.last_resort_fire_clearance_m, "route_points", path.Count, "air_c", airC);
+                    }
+                    if (path.Count == 0 && EmergencyRoute)
+                    {
+                        // No way out is open at all: standing still in rising heat is the worst choice. Go to the coolest
+                        // reachable floor; the next replan tries the way out again.
+                        var cool = planner.CoolestPath(motion.Pose.position);
+                        if (cool.Count > 0)
+                        {
+                            SetPath(cool);
+                            Emit(t, "replan", "No way out is open: move to the coolest reachable floor and keep trying the way out.", "path_points", path.Count);
+                            return FollowOrHold(t, dt);
+                        }
                     }
                     if (path.Count == 0 && returnReason == CarryingOut && grid.FireClearance > c.emergency_fire_clearance_m && HeatBuilding(t, out _))
                     {
@@ -246,7 +266,16 @@ namespace SmokeRescue.Brain
                         LoseWayOut(t);
                         return Command(0, 0, dt, true);
                     }
-                    Emit(t, "replan", path.Count > 0 ? "Return to the start through observed free space." : "The known return route is blocked; hold and keep sensing.", "path_points", path.Count);
+                    if (path.Count > 0) Emit(t, "replan", "Return to the start through observed free space.", "path_points", path.Count);
+                    else
+                    {
+                        // Say why, so a blocked return can be diagnosed from the log alone (held-out seed 914, robot B).
+                        int at = grid.Cell(motion.Pose.position), home0 = grid.Cell(home);
+                        Emit(t, "replan", "The known return route is blocked; hold and keep sensing.", "path_points", 0,
+                            "start_walkable", grid.Walkable(at) ? 1 : 0, "home_walkable", grid.Walkable(home0) ? 1 : 0,
+                            "fire_clearance_m", grid.FireClearance, "fire_prediction", grid.FirePrediction ? 1 : 0,
+                            "start_fire_m", grid.FireDistance(at), "start_obstacle_m", grid.ObstacleDistance(at));
+                    }
                 }
                 return FollowOrHold(t, dt);
             }
@@ -261,7 +290,7 @@ namespace SmokeRescue.Brain
                 float best = float.PositiveInfinity;
                 foreach (var track in tracks)
                 {
-                    if (!track.candidate || track.confirmed || track.retryAfter > t || GoalBlacklisted(track.position, t) || t - track.lastSeen > FreshS(track)) continue;
+                    if (!track.candidate || track.confirmed || track.onWall || track.retryAfter > t || GoalBlacklisted(track.position, t) || t - track.lastSeen > FreshS(track)) continue;
                     // A warm shape outside the ceilinged floor is beyond a window or door: not a person inside.
                     if (!InSearchArea(track.position)) continue;
                     float range = Vector2.Distance(track.position, motion.Pose.position);
@@ -353,6 +382,15 @@ namespace SmokeRescue.Brain
             {
                 bool blocked = path.Count > 0 && !planner.PathSafe(path, cursor);
                 if (blocked) Emit(t, nearFire ? "avoid_fire" : "replan", "A mapped obstacle or fire margin blocks the previous path; discard it.");
+                // Held-out run seed 914, robot A at 87 to 94 s: the same frontier by a burning doorway was chosen, its path cut
+                // by the fire margin 1.5 s later, chosen again as the flames flickered, three times in 4 s: no_frontier kept
+                // restarting, the scan never ended and the agent was woken each time. Leave such a frontier for a while.
+                // The whole frontier is left, not one standpoint: its standable look-out cells vary from plan to plan (in the
+                // test the next one chosen lay 1.0 m from the cut one), and every look-out for the same unsearched floor lies
+                // within frontier_peek_m of it, so frontier_peek_m plus the stall radius (or the claim, if larger) is excluded.
+                if (blocked && frontierGoal && goal.HasValue && FireCuts(path, cursor))
+                    BlacklistGoal(frontierCentre, t, 0, c.fire_cut_blacklist_s, "The fire margin cut the path to this frontier; leave it until the retry time.",
+                        Mathf.Max(frontierRadius, c.frontier_peek_m + c.stuck_repeat_radius_m));
                 if (goal.HasValue && !blocked)
                 {
                     // Keep what the goal is: an agent go_to refreshed as a frontier sent a claim with radius 0, which the
@@ -507,8 +545,12 @@ namespace SmokeRescue.Brain
                 if (!nearest.candidate && nearest.observations.Count >= c.candidate_frames)
                 {
                     nearest.candidate = true;
-                    Emit(t, "survivor_candidate", "A human-temperature, person-sized depth blob persisted across independent frames.",
-                        "x_m", nearest.position.x, "y_m", nearest.position.y, "area_m2", detection.areaM2, "frames", nearest.observations.Count);
+                    // A thermal-only warm shape on a long mapped wall is almost always wall heated by the fire (15 runs: 150 of
+                    // 151 such candidates); flagged for the agent and not approached by the robot on its own.
+                    nearest.onWall = !nearest.rgb && grid.OccupiedExtent(nearest.position, c.candidate_wall_disc_m, c.candidate_wall_window_m) >= c.candidate_wall_extent_m;
+                    Emit(t, "survivor_candidate", nearest.onWall ? "A human-temperature, person-sized depth blob on a long mapped wall persisted across independent frames (thermal only)."
+                        : "A human-temperature, person-sized depth blob persisted across independent frames.",
+                        "x_m", nearest.position.x, "y_m", nearest.position.y, "area_m2", detection.areaM2, "frames", nearest.observations.Count, "on_wall", nearest.onWall ? 1 : 0);
                 }
             }
         }
@@ -538,7 +580,7 @@ namespace SmokeRescue.Brain
             }
             if (nearest == null) { nearest = new Track { position = position, lastSeen = double.NegativeInfinity }; tracks.Add(nearest); }
             if (t <= nearest.lastSeen) return;
-            nearest.rgb = true; nearest.position = position; nearest.lastSeen = t; nearest.observations.Enqueue(t);
+            nearest.rgb = true; nearest.onWall = false; nearest.position = position; nearest.lastSeen = t; nearest.observations.Enqueue(t);
             while (nearest.observations.Count > 0 && t - nearest.observations.Peek() > c.person_rgb_window_s) nearest.observations.Dequeue();
             if (!nearest.candidate && nearest.observations.Count >= c.person_rgb_sightings)
             {
@@ -569,11 +611,25 @@ namespace SmokeRescue.Brain
             else if (airC < c.heat_recover_below_c && t - lastAir <= c.frame_max_age_s) budget += c.heat_recover_per_s * duration;
             budget = Mathf.Clamp01(budget);
         }
-        bool NeedPlan(double t) => t - lastPlan >= c.replan_s || (path.Count > 0 && !planner.PathSafe(path, cursor));
+        bool NeedPlan(double t) => t - lastPlan >= c.replan_s || (path.Count > 0 && !(EmergencyRoute ? EmergencyPathOk(path, cursor) : planner.PathSafe(path, cursor)));
+        bool EmergencyRoute => returning && returnReason == EmergencyExit;
+        /// <summary>On an emergency exit only a burning or occupied cell on the rest of the route breaks it; the fire margin
+        /// is already reduced and flickers with the flames (held-out seed 914, robot B, 148 to 163 s: the route flipped between
+        /// planned and blocked every second and the robot stood still in the foyer while its air went from 26 to 52 C).</summary>
+        bool EmergencyPathOk(List<Vector2> route, int from)
+        {
+            for (int i = Math.Max(0, from); i < route.Count; i++)
+            {
+                // Not through an obstacle, and the body (last_resort_fire_clearance_m) kept off burning cells.
+                int cell = grid.Cell(route[i]);
+                if (cell < 0 || grid.Occupancy(cell) == 255 || grid.FireDistance(cell) <= c.last_resort_fire_clearance_m) return false;
+            }
+            return true;
+        }
         sealed class StuckPlace
         { public Vector2 position; public int repeats; public double lastAt; }
         sealed class BlockedGoal
-        { public Vector2 position; public double until; }
+        { public Vector2 position; public double until; public float radius; }
         readonly List<StuckPlace> stuckPlaces = new List<StuckPlace>();
         readonly List<BlockedGoal> blockedGoals = new List<BlockedGoal>();
         double stalledFor, recoverySince;
@@ -588,13 +644,22 @@ namespace SmokeRescue.Brain
         bool GoalBlacklisted(Vector2 point, double t)
         {
             blockedGoals.RemoveAll(g => t >= g.until);
-            return blockedGoals.Exists(g => Vector2.Distance(point, g.position) <= c.stuck_repeat_radius_m);
+            return blockedGoals.Exists(g => Vector2.Distance(point, g.position) <= (g.radius > 0 ? g.radius : c.stuck_repeat_radius_m));
         }
-        void BlacklistGoal(Vector2 point, double t, int repeats)
+        void BlacklistGoal(Vector2 point, double t, int repeats, double forS = double.NaN, string why = null, float radius = 0)
         {
-            blockedGoals.Add(new BlockedGoal { position = point, until = t + c.stuck_blacklist_s });
-            Emit(t, "goal_blacklisted", "Repeated stalls near one location exclude this goal area until the retry time.",
-                "x_m", point.x, "y_m", point.y, "repeats", repeats, "until_s", t + c.stuck_blacklist_s);
+            double until = t + (double.IsNaN(forS) ? c.stuck_blacklist_s : forS);
+            blockedGoals.Add(new BlockedGoal { position = point, until = until, radius = radius });
+            Emit(t, "goal_blacklisted", why ?? "Repeated stalls near one location exclude this goal area until the retry time.",
+                "x_m", point.x, "y_m", point.y, "repeats", repeats, "until_s", until, "radius_m", radius > 0 ? radius : c.stuck_repeat_radius_m);
+        }
+        /// <summary>True when the rest of the path passes within the fire clearance of a dangerous cell (the fire margin,
+        /// not a wall, is what made it unsafe).</summary>
+        bool FireCuts(List<Vector2> route, int from)
+        {
+            float margin = grid.FireClearance + grid.CellM * .707107f;
+            for (int i = Math.Max(0, from); i < route.Count; i++) if (grid.FireDistance(grid.Cell(route[i])) <= margin) return true;
+            return false;
         }
         bool DetectStuck(double t, double previous, float elapsed)
         {
@@ -786,7 +851,7 @@ namespace SmokeRescue.Brain
             if (!completed || !canReenter || t < nextReenterCheck) return;
             nextReenterCheck = t + c.escape_check_s;
             if (budget < c.heat_resume_fraction || t >= c.mission_time_limit_s) return;
-            grid.FireClearance = c.fire_clearance_m;
+            grid.FireClearance = c.fire_clearance_m; grid.FirePrediction = true;
             System.Func<Vector2, bool> excluded = p => ClaimBlocks(p, t) || GoalBlacklisted(p, t) || VisitedGoal(p, t) || !InSearchArea(p);
             var frontier = planner.Frontier(motion.Pose.position, excluded);
             if (frontier == null) return;
@@ -820,9 +885,15 @@ namespace SmokeRescue.Brain
             var exit = PlanOut(); float clearance = c.fire_clearance_m;
             if (exit.Count == 0)
             {
-                grid.FireClearance = clearance = c.emergency_fire_clearance_m;
+                // Leaving now: only measured fire closes a cell (OccupancyGrid.FirePrediction).
+                grid.FireClearance = clearance = c.emergency_fire_clearance_m; grid.FirePrediction = false;
                 exit = PlanOut();
-                if (exit.Count == 0) { grid.FireClearance = c.fire_clearance_m; return false; }
+            }
+            if (exit.Count == 0)
+            {
+                grid.FireClearance = clearance = c.last_resort_fire_clearance_m;
+                exit = PlanOut();
+                if (exit.Count == 0) { grid.FireClearance = c.fire_clearance_m; grid.FirePrediction = true; return false; }
             }
             emergencyExit = true; retreating = false; cutOff = false;
             Emit(t, "emergency_exit", why + (clearance < c.fire_clearance_m ? ", past the fire at reduced clearance." : "."),

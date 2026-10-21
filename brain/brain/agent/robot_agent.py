@@ -64,7 +64,9 @@ Playbook by event kind:
 - survivor_candidate: scan_thermal, then inspect_candidate on the warm region; confirm_survivor or reject_candidate
   with its evidence_id; if uncertain, approach_candidate citing that inspection (never compute coordinates
   yourself). If the colour image is dark, set the torch first so the second look can use both sensors. Tell your
-  partner.
+  partner. If the event has on_wall 1 it is a thermal-only warm patch on a long mapped wall: in 15 test runs 150 of
+  151 such candidates were walls heated by the fire, one was a person lying against a wall. Inspect it from where
+  you stand; approach only if that inspection says person.
 - avoid_fire or retreat: track_fire_spread, then avoid_area around the hot area citing that evidence. Never go_to
   toward heat. If fire blocks the way to unsearched floor or to a person and water_l is above 0, scan_thermal and
   spray_water at the hot spot's bearing citing that scan (a few seconds at a time), then look again.

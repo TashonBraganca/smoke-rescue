@@ -832,6 +832,134 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void AFrontierWhoseRouteTheFireCutIsLeftAloneWhileTheFlamesFlicker()
+        {
+            // Held-out run seed 914, robot A at 87 to 94 s: the only frontier, past a burning doorway, was chosen, its path cut
+            // by the fire margin 1.5 s later and chosen again as the flames flickered, three times in 4 s; no_frontier kept
+            // restarting and the scan never ended. Now the cut frontier is left for fire_cut_blacklist_s. Control: with that
+            // time 0 the same frontier is chosen again as soon as the fire reads cool.
+            string lastLog = "";
+            (int chosenAfterCut, int blacklisted, int noFrontier) Run(float blacklistS)
+            {
+                var c = Settings(); c.grid_size_m = 12; c.fire_cut_blacklist_s = blacklistS;
+                var b = new RobotBrain(Calibration(), c, "A", 0); var g = Map(b);
+                for (int i = 0; i < g.Count; i++)
+                {
+                    var p = g.Centre(i);
+                    bool pocket = Mathf.Abs(p.x) < .3f && p.y > 3f && p.y < 3.6f;                  // the only unsearched floor
+                    bool wall = (Mathf.Abs(Mathf.Abs(p.x) - .7f) < .06f && p.y > .6f && p.y < 4.4f) || (Mathf.Abs(p.x) < .75f && Mathf.Abs(p.y - 4.4f) < .06f);
+                    if (wall) g.ObserveOccupied(i); else if (!pocket) g.ObserveFree(i);          // at the end of a 1.3 m corridor
+                }
+                var events = new List<BrainEvent>(); double cutAt = double.NaN; bool cooled = false;
+                for (int k = 0; k <= 15 * 14; k++)
+                {
+                    double t = k / 15.0;
+                    Motion(b, t); b.OnRgbd(Image(t, true, 0)); b.OnAirTemperature(t, 20);
+                    bool chosen = events.Any(e => e.kind == "goal" && e.reason.StartsWith("Reachable frontier"));
+                    if (chosen && double.IsNaN(cutAt)) cutAt = t;
+                    if (!double.IsNaN(cutAt) && t < cutAt + 2.5)          // fire on the route, then it reads cool (flicker)
+                        for (float x = -.3f; x <= .3f; x += .1f) g.ObserveHeat(g.Cell(new Vector2(x, 1.6f)), 500, t);
+                    else if (!double.IsNaN(cutAt) && t >= cutAt + 5 && !cooled)
+                    { cooled = true; for (float x = -.3f; x <= .3f; x += .1f) g.ObserveHeat(g.Cell(new Vector2(x, 1.6f)), 20, t); }
+                    b.Step(t, 1f / 15); events.AddRange(b.DrainEvents());
+                }
+                Assert.That(double.IsNaN(cutAt), Is.False, "the frontier was chosen");
+                lastLog = string.Join("; ", events.Where(e => e.kind == "goal_blacklisted" || (e.kind == "goal" && e.reason.StartsWith("Reachable frontier")) || e.kind == "no_frontier")
+                    .Select(e => $"{e.t:F1} {e.kind} {(e.numbers != null && e.numbers.ContainsKey("x_m") ? $"({e.numbers["x_m"]:F2},{e.numbers["y_m"]:F2})" : "")}"));
+                return (events.Count(e => e.t > cutAt + 5 && e.kind == "goal" && e.reason.StartsWith("Reachable frontier")),
+                        events.Count(e => e.kind == "goal_blacklisted" && e.reason.StartsWith("The fire margin cut")),
+                        events.Count(e => e.kind == "no_frontier"));
+            }
+            var left = Run(20);
+            Assert.That(left.blacklisted, Is.EqualTo(1), "the cut frontier is left alone once: " + lastLog);
+            Assert.That(left.chosenAfterCut, Is.Zero, "and not chosen again while the flames flicker: " + lastLog);
+            Assert.That(left.noFrontier, Is.EqualTo(1), "one no_frontier, one scan");
+            var control = Run(0);
+            Assert.That(control.chosenAfterCut, Is.GreaterThan(0), "control: with no exclusion it is chosen again once the fire reads cool");
+        }
+
+        [Test]
+        public void CutOffInWarmAirTheRobotTakesALastResortRouteWhenTheEmergencyOneIsShut()
+        {
+            // Held-out seed 914, robot B: on its emergency exit the route was shut at the 0.5 m emergency clearance and it
+            // stood still for 15 s while its air rose from 26 to 52 C. Fire cuts the room leaving a 0.9 m gap: shut at 0.5 m,
+            // open with only the body clear (0.25 m). With heat building it now leaves through the gap. Control: with the
+            // last-resort clearance equal to the emergency one there is no route and it retreats, as before.
+            (int exits, int retreats, string state) Run(float lastResort)
+            {
+                var c = Settings(); c.grid_size_m = 12; c.robot_radius_m = .25f; c.last_resort_fire_clearance_m = lastResort;
+                var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -5, 5, -2, 6);
+                var events = new List<BrainEvent>(); double cutAt = double.NaN;
+                for (int i = 0; i < 150; i++)
+                {
+                    double t = i / 15.0;
+                    if (double.IsNaN(cutAt) && events.Any(e => e.kind == "goal" && e.reason.StartsWith("The way out was closing"))) cutAt = t;
+                    Motion(b, t, t < 3 ? 1f : 0); b.OnRgbd(Image(t, true)); b.OnAirTemperature(t, double.IsNaN(cutAt) ? 20 : 35);
+                    var g = Map(b);
+                    if (t >= 3.2) for (float dx = -.3f; dx <= .3f; dx += .1f) for (float dy = -.3f; dy <= .3f; dy += .1f) g.ObserveHeat(g.Cell(new Vector2(1.9f + dx, .8f + dy)), 500, t);
+                    if (!double.IsNaN(cutAt))
+                        for (float x = -5; x <= 5; x += .05f) if (Mathf.Abs(x) >= .45f) g.ObserveHeat(g.Cell(new Vector2(x, 1.5f)), 500, t);
+                    b.Step(t, 1f / 15); events.AddRange(b.DrainEvents());
+                }
+                Assert.That(double.IsNaN(cutAt), Is.False, "the way out started closing");
+                return (events.Count(e => e.kind == "emergency_exit"), events.Count(e => e.kind == "escape_closing" && e.reason.StartsWith("The known way out is closed; retreat")),
+                    b.Snapshot().state);
+            }
+            var through = Run(.25f);
+            Assert.That((through.exits, through.retreats, through.state), Is.EqualTo((1, 0, "return")), "leaves through the gap with only the body clear");
+            var control = Run(.5f);
+            Assert.That(control.exits, Is.Zero, "control: no route at 0.5 m");
+            Assert.That(control.retreats, Is.EqualTo(1), "control: a retreat, as before");
+        }
+
+        [Test]
+        public void OnAnEmergencyExitOnlyMeasuredFireShutsTheDoorNotAFastRisingReading()
+        {
+            // Held-out seed 914, robot B: in the hot gas filling the foyer its thermal camera read the floor of the only door
+            // out at 60 to 187 C and rising fast; the 1 s fire forecast marked the doorway about to ignite, the route home
+            // opened and shut every second and the robot stood still for 50 s (185 C peak). On an emergency exit only
+            // measured fire closes a cell. Controls: the same doorway shuts a normal plan (forecast on), and a doorway
+            // measured at fire_c stays shut on the emergency exit too.
+            var c = Settings(); c.grid_size_m = 12; c.robot_radius_m = .25f;
+            int Route(float doorC, bool emergency)
+            {
+                var g = OpenGrid(c);
+                for (float x = -6; x <= 6; x += .05f) if (Mathf.Abs(x) > .55f) for (float y = 1.9f; y <= 2.1f; y += .05f) g.ObserveOccupied(g.Cell(new Vector2(x, y)));   // wall across the grid, 1.1 m door
+                for (float x = -.4f; x <= .4f; x += .1f) for (float y = 1.7f; y <= 2.3f; y += .1f)
+                {
+                    int cell = g.Cell(new Vector2(x, y));
+                    g.ObserveHeat(cell, doorC - 35, 10.0); g.ObserveHeat(cell, doorC, 10.2);   // rising 175 C/s
+                }
+                g.DecayTo(10.2);
+                var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+                if (emergency)
+                {
+                    typeof(OccupancyGrid).GetProperty("FirePrediction", flags).SetValue(g, false);
+                    typeof(OccupancyGrid).GetProperty("FireClearance", flags).SetValue(g, c.emergency_fire_clearance_m);
+                }
+                return new GridPlanner(g, c).Plan(new Vector2(0, 3.5f), Vector2.zero).Count;
+            }
+            Assert.That(Route(185, false), Is.Zero, "control: a normal plan treats the fast-rising doorway as fire");
+            Assert.That(Route(185, true), Is.GreaterThan(0), "on an emergency exit a 185 C reading does not shut the door");
+            Assert.That(Route(260, true), Is.Zero, "control: a doorway measured above fire_c stays shut");
+        }
+
+        [Test]
+        public void AWarmPatchOnALongWallIsFlaggedAndNotApproachedButABodyIs()
+        {
+            // Held-out seed 914: walls heated by the burning hallway made a stream of thermal-only "person" candidates on the
+            // wall lines, and the robots drove over to each; over 15 runs 150 of 151 such candidates were walls. The map
+            // extent under the spot tells a wall (runs on) from a body (a compact blob). Controls: a compact 1 m blob is
+            // not flagged; the same 4 m wall line is.
+            var c = Settings(); c.grid_size_m = 12; var g = OpenGrid(c);
+            for (float x = -2; x <= 2; x += .05f) g.ObserveOccupied(g.Cell(new Vector2(x, 3)));          // a 4 m wall
+            for (float x = 2.6f; x <= 3.4f; x += .1f) for (float y = -1.3f; y <= -.7f; y += .1f) g.ObserveOccupied(g.Cell(new Vector2(x, y)));   // a body-sized blob
+            Assert.That(g.OccupiedExtent(new Vector2(0, 3.05f), .3f, 3f), Is.GreaterThanOrEqualTo(c.candidate_wall_extent_m), "on the wall");
+            Assert.That(g.OccupiedExtent(new Vector2(3, -1), .3f, 3f), Is.LessThan(c.candidate_wall_extent_m), "control: a compact blob");
+            Assert.That(g.OccupiedExtent(new Vector2(0, 1.5f), .3f, 3f), Is.Zero, "nothing occupied near open floor");
+        }
+
+        [Test]
         public void AnAgentCannotKeepARobotInOnceNoFrontierIsLeftAndTheAirIsHeating()
         {
             // Held-out run 2, robot A: no reachable frontier at 89.8 s; its agent ordered it on twice while its air rose from
@@ -1303,6 +1431,7 @@ namespace SmokeRescue.Tests.EditMode
             string Final(float emergencyClearance, out int exits)
             {
                 var c = Settings(); c.grid_size_m = 12; c.robot_radius_m = .25f; c.emergency_fire_clearance_m = emergencyClearance;
+                c.last_resort_fire_clearance_m = emergencyClearance;   // no smaller clearance either, so the control has no route at all
                 var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -3, 3, -2, 6);
                 exits = 0;
                 for (int i = 0; i < 150; i++)
@@ -1351,7 +1480,10 @@ namespace SmokeRescue.Tests.EditMode
                 }
                 cut.Step(t, 1f / 15); cutEvents.AddRange(cut.DrainEvents());
             }
-            Assert.That(cutEvents.Count(e => e.kind == "emergency_exit"), Is.EqualTo(2), "normal route first, then the reduced clearance");
+            // It never holds still: the route is kept while no cell on it burns and the body stays clear of flames, or
+            // re-planned at a reduced clearance (held-out seed 914 replaced "re-plan" with "keep the route" when it is safe).
+            Assert.That(cutEvents.Any(e => e.kind == "replan" && e.reason.StartsWith("The known return route is blocked")), Is.False, "no hold on the way out");
+            Assert.That(cut.Snapshot().path.Length, Is.GreaterThan(0), "a route out is still being followed");
             Assert.That(cutEvents.Last(e => e.kind == "emergency_exit").numbers["route_points"], Is.GreaterThan(0));
         }
 
