@@ -48,6 +48,7 @@ namespace SmokeRescue.Recording
         {
             public RobotActions actions;
             public double lastAgent = double.NegativeInfinity;
+            public double lastBrainStep = double.NaN;
             public JObject trigger;
             public readonly List<JObject> inbox = new List<JObject>();     // delivered texts and orders, for the next step
             public readonly List<Outgoing> outbox = new List<Outgoing>();  // texts not yet heard by every listener

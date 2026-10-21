@@ -291,7 +291,11 @@ namespace SmokeRescue.Recording
                     {
                         if (rig.brain == null) continue;
                         if (rig.actions != null && rig.actions.IsRunning) continue;   // the arm is working; legs hold
-                        using (perf.Time("brain_step")) rig.command = rig.brain.Step(t, brainEvery / (float)ClockHz);
+                        // After an arm action the brain resumes with the time that really passed (run 17: the first agent arm
+                        // action stopped the recording with "dt must equal elapsed simulation time").
+                        float brainDt = double.IsNaN(rig.lastBrainStep) ? brainEvery / (float)ClockHz : (float)(t - rig.lastBrainStep);
+                        rig.lastBrainStep = t;
+                        using (perf.Time("brain_step")) rig.command = rig.brain.Step(t, brainDt);
                         foreach (var e in rig.brain.DrainEvents())
                         {
                             rig.decisions.Append(JsonConvert.SerializeObject(e)).Append('\n');
