@@ -305,12 +305,16 @@ namespace SmokeRescue.Brain
             Distances(i => Occupancy(i) == 255, obstacleDistance);
             Distances(Dangerous, fireDistance); dirty = false;
         }
+        /// <summary>Distance planned routes keep from fire: fire_clearance_m, lowered to emergency_fire_clearance_m only for an
+        /// emergency exit (RobotBrain.CheckEmergencyExit).</summary>
+        internal float FireClearance { get => fireClearance ?? c.fire_clearance_m; set => fireClearance = value; }
+        float? fireClearance;
         internal bool Walkable(int i)
         {
             if (i < 0 || i >= Count || Occupancy(i) != 1) return false;
             // Include half a cell diagonal so clearance applies to the whole hot/occupied cell.
             float padding = CellM * .707107f;
-            return obstacleDistance[i] > c.robot_radius_m + padding && fireDistance[i] > c.fire_clearance_m + padding;
+            return obstacleDistance[i] > c.robot_radius_m + padding && fireDistance[i] > FireClearance + padding;
         }
         /// <summary>Free and wide enough for the body itself, without the planning margin. Used only to step out of a
         /// spot that is tighter than the planning clearance; see GridPlanner.Lead.</summary>

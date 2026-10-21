@@ -116,7 +116,8 @@ namespace SmokeRescue.Brain
 
             if (!completed && !returning && t >= c.mission_time_limit_s) BeginReturn(t, "Exploration time limit reached.");
             CheckWayOut(t);
-            if (!retreating && (airC > c.heat_retreat_c || budget < c.heat_retreat_fraction))
+            CheckEmergencyExit(t);
+            if (!retreating && !emergencyExit && (airC > c.heat_retreat_c || budget < c.heat_retreat_fraction))
             {
                 ResetStuckRecovery(); retreating = true; sweeping = false; active = null; dwell = 0; ClearPath();
                 Emit(t, "retreat", "Air temperature or remaining heat budget requires a cool reachable goal.", "air_c", airC, "heat_budget", budget);
@@ -609,6 +610,25 @@ namespace SmokeRescue.Brain
             }
         }
         const string WayOutClosing = "The way out was closing.";
+        bool emergencyExit; double nextEmergencyCheck;
+        /// <summary>
+        /// Last resort: the heat budget is nearly spent and no exit can be reached with the normal fire clearance. Plan the
+        /// exit with emergency_fire_clearance_m (past the fire, never through a burning cell) and leave. 2x2 building run:
+        /// robot A retreated beside its entry door with its heat budget at 0 while fire margins closed every route out.
+        /// </summary>
+        void CheckEmergencyExit(double t)
+        {
+            if (emergencyExit || completed || budget >= c.heat_emergency_fraction || t < nextEmergencyCheck) return;
+            nextEmergencyCheck = t + c.escape_check_s;
+            if (PlanOut().Count > 0) return;
+            grid.FireClearance = c.emergency_fire_clearance_m;
+            var exit = PlanOut();
+            if (exit.Count == 0) { grid.FireClearance = c.fire_clearance_m; return; }
+            emergencyExit = true; retreating = false;
+            Emit(t, "emergency_exit", "Heat budget nearly spent and no exit at the normal fire clearance: leave past the fire.",
+                "heat_budget", budget, "clearance_m", c.emergency_fire_clearance_m, "route_points", exit.Count);
+            BeginReturn(t, "Emergency exit.");
+        }
         /// <summary>Known ways out: this robot's own entry and, once a partner's map is linked, the partner's entry (the
         /// origin of its frame), which it reported by radio. Slow-fire run: robot B's way home was cut by fire 5.5 m from
         /// the door robot A had entered and left by, and it held still for 50 s.</summary>
