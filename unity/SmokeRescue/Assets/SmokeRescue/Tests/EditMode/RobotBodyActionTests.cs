@@ -139,6 +139,60 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(Lift(1.9f), Does.StartWith("refused"), "control: near edge beyond the arm");
         }
 
+        [Test] public void ExtractTakesOnlyThePersonTheAgentNamed()
+        {
+            // Review: the arm lifted whoever was nearest, not who the agent named. Two people within reach; the named one is
+            // gripped. Control: a named spot with nobody near it is refused.
+            string Lift(Vector3? named, out string who)
+            {
+                var r = MakeRobot();
+                var people = new GameObject("Survivors"); people.transform.SetParent(root.transform);
+                GameObject Person(string name, Vector3 offset)
+                {
+                    var go = new GameObject(name); go.transform.SetParent(people.transform);
+                    go.AddComponent<BoxCollider>().size = new Vector3(.5f, .3f, 1.7f);
+                    go.transform.position = r.transform.position + offset; return go;
+                }
+                Person("near_left", new Vector3(-.45f, .15f, .7f + .85f)); Person("far_right", new Vector3(.45f, .15f, .8f + .85f));
+                Physics.SyncTransforms();
+                var actions = new RobotActions(r, null, null, null, new RescueConfig { reach_m = 1.6f, grip_s = 2f, tow_offset_m = .9f, carry_speed_mps = .25f, target_tolerance_m = 1.05f });
+                var ok = actions.BeginExtract(named.HasValue ? r.transform.position + named.Value : (Vector3?)null);
+                who = actions.TargetId; string result = ok ? "begun" : "refused: " + actions.FailureReason;
+                Object.DestroyImmediate(people); return result;
+            }
+            Assert.That(Lift(new Vector3(.45f, 0, 1.7f), out var named), Is.EqualTo("begun")); Assert.That(named, Is.EqualTo("far_right"));
+            Assert.That(Lift(new Vector3(-.45f, 0, 1.6f), out var other), Is.EqualTo("begun")); Assert.That(other, Is.EqualTo("near_left"));
+            Assert.That(Lift(new Vector3(3f, 0, -2f), out _), Does.StartWith("refused"), "control: nobody at the named spot");
+        }
+
+        [Test] public void TheSledFollowsTheRobotsTrailAroundACorner()
+        {
+            // Review: the sled was placed straight behind the robot, so at a corner it cut through the wall. It follows the
+            // trail the robot walked (from where the person lay). The robot walks 2 m south then 2 m east; every sled position
+            // lies on that trail.
+            var r = MakeRobot();
+            var people = new GameObject("Survivors"); people.transform.SetParent(root.transform);
+            var p = new GameObject("p"); p.transform.SetParent(people.transform); p.AddComponent<BoxCollider>().size = new Vector3(.5f, .3f, 1.7f);
+            p.transform.position = r.transform.position + new Vector3(0, .15f, .7f + .85f); Physics.SyncTransforms();
+            var actions = new RobotActions(r, null, null, null, new RescueConfig { reach_m = 1.6f, grip_s = .5f, tow_offset_m = .9f, carry_speed_mps = .25f, target_tolerance_m = 1.05f });
+            Assert.That(actions.BeginExtract(), Is.True, actions.FailureReason);
+            for (int i = 0; i < 60 && actions.IsRunning; i++) { r.Step(.1f); actions.Step(.1f); }
+            Assert.That(actions.Carrying, Is.EqualTo("p"));
+            var start = r.transform.position; float worst = 0;
+            for (int i = 1; i <= 80; i++)
+            {
+                float s = i * .05f;   // 4 m of walking in 5 cm steps: south 2 m, then east 2 m
+                var at = s <= 2 ? start + new Vector3(0, 0, -s) : start + new Vector3(s - 2, 0, -2);
+                r.transform.position = at; actions.Tow();
+                var q = p.transform.position;
+                float toNorthLeg = Mathf.Abs(q.x - start.x) + Mathf.Max(0, q.z - (start.z + 1.6f)) + Mathf.Max(0, start.z - 2 - q.z);
+                float toEastLeg = Mathf.Abs(q.z - (start.z - 2)) + Mathf.Max(0, start.x - q.x);
+                worst = Mathf.Max(worst, Mathf.Min(toNorthLeg, toEastLeg));
+            }
+            Assert.That(worst, Is.LessThan(.06f), "the sled stays on the robot's trail");
+            Object.DestroyImmediate(people);
+        }
+
         [Test] public void ClearDebrisHoldsDriverThenResumesAndSequenceRepeatsExactly()
         {
             var first = RunClear(); Object.DestroyImmediate(root); root = new GameObject("Repeated body action tests");

@@ -236,7 +236,18 @@ namespace SmokeRescue.Recording
                     break;
                 case "extract_survivor":
                 {
-                    bool gripping = rig.actions.BeginExtract();
+                    // The agent names the person by a position in its robot's own frame; the arm reaches that way from the
+                    // robot's real pose (relative bearing and range, as a physical arm would).
+                    Vector3? target = null;
+                    if (o["target_x"] != null && o["target_y"] != null)
+                    {
+                        var pose = brain.Snapshot().pose;
+                        var rel = new Vector2(o.Value<float>("target_x"), o.Value<float>("target_y")) - pose.position;
+                        float forward = Vector2.Dot(rel, pose.Forward), right = Vector2.Dot(rel, new Vector2(Mathf.Cos(pose.yawRad), Mathf.Sin(pose.yawRad)));
+                        float yaw = rig.robot.Driver.YawDeg * Mathf.Deg2Rad;
+                        target = rig.robot.transform.position + new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw)) * forward + new Vector3(Mathf.Cos(yaw), 0f, -Mathf.Sin(yaw)) * right;
+                    }
+                    bool gripping = rig.actions.BeginExtract(target);
                     brain.LogAgentAction(t, gripping ? $"extract_survivor: strapping {rig.actions.TargetId} onto the sled, OpenCV evidence {ev}."
                         : $"extract_survivor refused: {rig.actions.FailureReason}");
                     break;
