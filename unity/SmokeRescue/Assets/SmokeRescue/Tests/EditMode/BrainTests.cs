@@ -1880,6 +1880,43 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void APersonCarriedOutLeavesTheToRescueListHereAndOnThePartner()
+        {
+            // Hidden-corner run: robot B went back twice for s1 after robot A had carried them out, because only the
+            // confirmation travelled by radio. The carrier drops the person and broadcasts it (message version 3); the
+            // partner drops them too and ignores the stale confirmation. Control: without the carried-out entry the
+            // partner keeps the person.
+            var a = new RobotBrain(Calibration(), Settings(), "A", 0);
+            a.AgentConfirmSurvivor(new Vector2(0, 1.2f), 0, "ev1");
+            Assert.That(a.Snapshot().confirmedSurvivors, Has.Length.EqualTo(1));
+            a.BeginCarry(1, .25f, "p", .9f);
+            Assert.That(a.Snapshot().confirmedSurvivors, Is.Empty, "off the carrier's list");
+            Motion(a, 2); a.OnAirTemperature(2, 20); a.Step(2, 1f);
+            var sent = Wire(a.BuildMessage(2));
+            Assert.That(sent.CarriedOut, Has.Length.EqualTo(1), "carried out, round trip through the radio format");
+            Assert.That(sent.Survivors, Is.Empty);
+
+            List<BrainEvent> Receive(bool withCarried, out int remaining)
+            {
+                var b = new RobotBrain(Calibration(), Settings(), "B", 0);
+                var sender = new RobotBrain(Calibration(), Settings(), "A", 0);
+                var m = sender.BuildMessage(0);
+                m.Survivors = new[] { new BrainSurvivor { position = new Vector2(0, 3), confirmedAt = 0, sourceRobot = "A" } };
+                b.OnPeerMessage(Wire(m), .2);
+                m.Sequence++; m.SentAt = .3;
+                if (withCarried) m.CarriedOut = new[] { new BrainCarried { position = new Vector2(0, 3), at = .25, sourceRobot = "A" } };
+                b.OnPeerMessage(Wire(m), .4);
+                remaining = b.Snapshot().confirmedSurvivors.Length;
+                return b.DrainEvents().ToList();
+            }
+            var events = Receive(true, out int left);
+            Assert.That(left, Is.Zero, "the partner drops the person");
+            Assert.That(events.Count(e => e.kind == "survivor_carried_by_peer"), Is.EqualTo(1));
+            Receive(false, out int kept);
+            Assert.That(kept, Is.EqualTo(1), "control: no carried-out entry, the person stays");
+        }
+
+        [Test]
         public void PeerSurvivorCancelsInspectionAndLogsOnlyOnce()
         {
             var b = new RobotBrain(Calibration(), Settings(), "B", 0);

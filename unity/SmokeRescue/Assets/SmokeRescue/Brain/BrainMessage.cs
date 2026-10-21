@@ -22,6 +22,9 @@ namespace SmokeRescue.Brain
     { public Vector2 centre; public float radiusM; public double expiresAt; }
     [Serializable] public struct BrainSurvivor
     { public Vector2 position; public double confirmedAt; public string sourceRobot; }
+    /// <summary>A person this robot strapped onto its sled, at the position they were confirmed (sender's frame).</summary>
+    [Serializable] public struct BrainCarried
+    { public Vector2 position; public double at; public string sourceRobot; }
     [Serializable] public struct BrainHotspot
     { public int cell; public float temperatureC; public double observedAt; }
     [Serializable] public struct BrainAck
@@ -34,7 +37,7 @@ namespace SmokeRescue.Brain
     [Serializable] public struct SurvivorSnapshot
     { public Vector2 position; public double confirmedAt; public string source, sourceRobot; }
 
-    /// <summary>Version 2 binary radio state (version 1 plus LiDAR keyframes), in the sender's own map frame. Masks are row-major,
+    /// <summary>Version 3 binary radio state (version 1 plus LiDAR keyframes, then people carried out), in the sender's own map frame. Masks are row-major,
     /// least-significant bit first. Explored is cumulative since BaseSequence; Occupied is always full.
     /// ToBytes is the transport format. JSON/base64 and transport headers are outside EstimatedBytes.
     /// Sequence numbers last for one run; create new brains when restarting a sender.</summary>
@@ -56,6 +59,10 @@ namespace SmokeRescue.Brain
         public BrainHotspot[] Hotspots = Array.Empty<BrainHotspot>();
         public BrainAck[] Acknowledgements = Array.Empty<BrainAck>();
         public BrainKeyframe[] Keyframes = Array.Empty<BrainKeyframe>();
+        public BrainCarried[] CarriedOut = Array.Empty<BrainCarried>();
+        /// <summary>Version 3 adds CarriedOut after the keyframes (hidden-corner run: robot B went back for a person
+        /// robot A had already carried out, because only confirmations travelled).</summary>
+        public const byte Version = 3;
         public int EstimatedBytes => ToBytes().Length;
         internal static bool Bit(byte[] mask, int cell) => (mask[cell >> 3] & (1 << (cell & 7))) != 0;
         internal static void Set(byte[] mask, int cell) { mask[cell >> 3] |= (byte)(1 << (cell & 7)); }
@@ -70,7 +77,7 @@ namespace SmokeRescue.Brain
             using (var stream = new MemoryStream())
             using (var w = new BinaryWriter(stream, Encoding.UTF8, true))
             {
-                w.Write((byte)2); WriteString(w, Sender); w.Write(Sequence); w.Write(BaseSequence); w.Write(SentAt); w.Write(FullSnapshot);
+                w.Write(Version); WriteString(w, Sender); w.Write(Sequence); w.Write(BaseSequence); w.Write(SentAt); w.Write(FullSnapshot);
                 w.Write(GridSize); Write(w, Origin); Write(w, Pose.position); w.Write(Pose.yawRad);
                 w.Write(Goal.HasValue); if (Goal.HasValue) Write(w, Goal.Value);
                 w.Write(Claim != null);
@@ -89,6 +96,8 @@ namespace SmokeRescue.Brain
                     w.Write(k.angleMinRad); w.Write(k.incrementRad); w.Write(k.minM); w.Write(k.maxM); w.Write(k.mountForwardM);
                     w.Write((ushort)k.rangesCm.Length); foreach (var r in k.rangesCm) w.Write(r);
                 }
+                w.Write(CarriedOut.Length);
+                foreach (var cOut in CarriedOut) { Write(w, cOut.position); w.Write(cOut.at); WriteString(w, cOut.sourceRobot); }
                 w.Flush();
                 if (stream.Length >= MaxBytes) throw new InvalidDataException("Brain state exceeds the 40000-byte radio limit; increase compression before using this scene.");
                 return stream.ToArray();
@@ -100,7 +109,7 @@ namespace SmokeRescue.Brain
             using (var stream = new MemoryStream(bytes, false))
             using (var r = new BinaryReader(stream, Encoding.UTF8))
             {
-                if (r.ReadByte() != 2) throw new InvalidDataException("Unsupported brain message version.");
+                if (r.ReadByte() != Version) throw new InvalidDataException("Unsupported brain message version.");
                 var m = new BrainMessage { Sender = ReadString(r), Sequence = r.ReadInt64(), BaseSequence = r.ReadInt64(), SentAt = r.ReadDouble(),
                     FullSnapshot = r.ReadBoolean(), GridSize = r.ReadInt32(), Origin = ReadPoint(r) };
                 m.Pose = new BrainPose { position = ReadPoint(r), yawRad = r.ReadSingle() };
@@ -123,6 +132,8 @@ namespace SmokeRescue.Brain
                     for (int j = 0; j < k.rangesCm.Length; j++) k.rangesCm[j] = r.ReadUInt16();
                     m.Keyframes[i] = k;
                 }
+                m.CarriedOut = new BrainCarried[ReadCount(r, 1024)];
+                for (int i = 0; i < m.CarriedOut.Length; i++) m.CarriedOut[i] = new BrainCarried { position = ReadPoint(r), at = r.ReadDouble(), sourceRobot = ReadString(r) };
                 if (stream.Position != stream.Length) throw new InvalidDataException("Trailing brain packet bytes.");
                 return m;
             }
