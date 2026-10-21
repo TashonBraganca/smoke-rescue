@@ -139,6 +139,31 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(Lift(1.9f), Does.StartWith("refused"), "control: near edge beyond the arm");
         }
 
+        [Test, Explicit("measurement probe, run by hand")] public void ArmReachProbe()
+        {
+            // #39 measurement: the largest near-edge distance (robot centre to the nearest point of a lying body) at which
+            // the arm's own link check lets the strap go on, lying along and across the heading.
+            string Lift(float nearEdgeM, bool across)
+            {
+                var r = MakeRobot();
+                var people = new GameObject("Survivors"); people.transform.SetParent(root.transform);
+                var person = new GameObject("test_person"); person.transform.SetParent(people.transform);
+                var box = person.AddComponent<BoxCollider>(); box.size = across ? new Vector3(1.7f, .3f, .5f) : new Vector3(.5f, .3f, 1.7f);
+                person.transform.position = r.transform.position + new Vector3(0, .15f, nearEdgeM + (across ? .25f : .85f));
+                Physics.SyncTransforms();
+                var actions = new RobotActions(r, null, null, null, new RescueConfig { reach_m = 3f, grip_s = 2f, tow_offset_m = .9f, carry_speed_mps = .25f });
+                bool ok = actions.BeginExtract();
+                Object.DestroyImmediate(people);
+                return ok ? "ok" : "refused";
+            }
+            foreach (bool across in new[] { false, true })
+            {
+                float best = 0;
+                for (float d = .3f; d <= 1.6f; d += .05f) if (Lift(d, across) == "ok") best = d;
+                TestContext.WriteLine($"REACH across={across} max_near_edge_m={best:0.00}");
+            }
+        }
+
         [Test] public void ExtractTakesOnlyThePersonTheAgentNamed()
         {
             // Review: the arm lifted whoever was nearest, not who the agent named. Two people within reach; the named one is

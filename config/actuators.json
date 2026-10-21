@@ -14,8 +14,10 @@
     "aim_tolerance_deg_reason": "An agent may spray only toward a hot spot its cited thermal scan found within this bearing of the requested direction (half the thermal camera's 50 degree field is 25 degrees; 15 keeps the stream on the measured fire)."
   },
   "rescue": {
-    "reach_m": 1.6,
-    "reach_m_reason": "A person may be gripped when the nearest point of their body is within this distance ahead of the robot (the arm reaches 1.2 m; a lying person's near edge sits a little beyond).",
+    "reach_m": 0.85,
+    "reach_m_reason": "A person may be gripped when the nearest point of their body is within this distance of the robot's centre, ahead. Measured, not assumed: RobotBodyActionTests.ArmReachProbe steps a lying body's near edge out from 0.3 m and the arm's own link check (0.45 m upper arm, 0.5 m forearm and gripper, from the body top) admits the strap up to 0.85 m, lying along or across the heading. The old 1.6 m let the tools accept lifts the arm then refused (held-out seed 914 run 6, robot B at 1.54 m).",
+    "approach_m": 0.6,
+    "approach_m_reason": "A walk to a person the robot saw or confirmed stops this far short of them, so their near edge is inside reach_m (0.85 m) with 0.25 m to spare for localisation and measurement error (run 19 pose error p95 0.19 m). Walks to an uncertain warm region keep survivor_standoff_m, because the colour camera sees a lying person only from about 1.9 m. Seed 914 runs 5 and 6: approaches stopped 1.2 m short and no one was lifted.",
     "grip_s": 2.0,
     "grip_s_reason": "Time to fit the drag strap and lift the shoulders onto the rescue sled with the arm.",
     "tow_offset_m": 0.9,

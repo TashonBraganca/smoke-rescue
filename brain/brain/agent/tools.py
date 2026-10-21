@@ -26,6 +26,8 @@ APPROACH_STANDOFF_M = float(_CONFIG["survivor_standoff_m"])
 SURVIVOR_MERGE_M = float(_CONFIG["survivor_merge_m"])
 _ACTUATORS = json.loads((_Path(__file__).resolve().parents[3] / "config" / "actuators.json").read_text())
 _NOZZLE, _RESCUE = _ACTUATORS["nozzle"], _ACTUATORS["rescue"]
+# A walk to a person (seen or confirmed) ends inside the arm's measured reach (actuators.json rescue.approach_m).
+RESCUE_APPROACH_M = float(_RESCUE["approach_m"])
 _PERCEPTION = json.loads((_Path(__file__).resolve().parents[3] / "config" / "perception.json").read_text())
 _CAMERA = json.loads((_Path(__file__).resolve().parents[3] / "config" / "sensors.json").read_text())["camera"]
 # Half the colour camera's horizontal view (atan of half the width over fx: 37.6 deg). A person further off the heading
@@ -69,7 +71,8 @@ ACTIONS = [
     _fn("go_to", "Drive to a building position (x, y in metres) by the robot's own planner.",
         {"x": NUM, "y": NUM, "reason": STR}, ["x", "y", "reason"]),
     _fn("approach_candidate", f"Walk to a viewpoint {APPROACH_STANDOFF_M:.1f} m short of an inspected warm region, on the line from the robot, "
-        "computed from the inspection itself. You get an agent_goal_reached event on arrival.", {"evidence_id": EVIDENCE},
+        f"computed from the inspection itself; for a person the inspection saw, or one this robot confirmed there, the walk "
+        f"stops {RESCUE_APPROACH_M:.1f} m short, inside the arm's reach. You get an agent_goal_reached event on arrival.", {"evidence_id": EVIDENCE},
         ["evidence_id"]),
     _fn("turn_to_face", "Turn in place to face a building position. You get agent_goal_reached when facing it.",
         {"x": NUM, "y": NUM, "reason": STR}, ["x", "y", "reason"]),
@@ -443,7 +446,7 @@ class ToolRegistry:
                 ev = self.evidence[args["evidence_id"]]
                 dx, dy = ev["x"] - self.ctx.x, ev["y"] - self.ctx.y
                 dist = max(1e-6, (dx * dx + dy * dy) ** 0.5)
-                k = max(0.0, dist - APPROACH_STANDOFF_M) / dist
+                k = max(0.0, dist - RESCUE_APPROACH_M) / dist
                 args = {**args, "x": round(self.ctx.x + dx * k, 2), "y": round(self.ctx.y + dy * k, 2),
                         "face_x": ev["x"], "face_y": ev["y"],
                         "reason": f"reach the person seen at ({ev['x']}, {ev['y']}) to lift them"}
@@ -513,7 +516,7 @@ class ToolRegistry:
         return {"ok": True, "queued": name}
 
 
-def survivors_to_rescue(robot: str, pose: dict, survivors: list, standoff_m: float = APPROACH_STANDOFF_M,
+def survivors_to_rescue(robot: str, pose: dict, survivors: list, standoff_m: float = RESCUE_APPROACH_M,
                         lifted_within_m: float = 1.5) -> list[dict]:
     """Confirmed people this robot has not lifted, nearest first, with the bearing (degrees, right positive) and
     distance from the robot and an approach point standoff_m short of them on the line from the robot. Run 19: robot A
