@@ -127,6 +127,7 @@ namespace SmokeRescue.Brain
                 ResetStuckRecovery(); retreating = false; ClearPath();
                 Emit(t, "goal", "Cool air and a recovered heat budget permit travel again.", "air_c", airC, "heat_budget", budget);
             }
+            CheckReenter(t);
             if (completed && !retreating) return Command(0, 0, dt, true);
             bool sensorsHealthy = t - lastRgb <= c.frame_max_age_s && motion.Healthy(t) &&
                 t - lastAir <= c.frame_max_age_s && (!health.Thermal || t - lastThermal <= c.frame_max_age_s);
@@ -170,6 +171,8 @@ namespace SmokeRescue.Brain
                 if (toExit <= Mathf.Max(c.goal_tolerance_m, c.return_arrive_m))
                 {
                     completed = true; ClearPath();
+                    // Left early to stay safe: it may go back in once that is safe again (CheckReenter).
+                    canReenter = returnReason == WayOutClosing || returnReason == EmergencyExit;
                     Emit(t, "mission_complete", returnReason + " Reached a known way out.", "distance_to_start_m", Vector2.Distance(motion.Pose.position, home),
                         "distance_to_exit_m", toExit);
                     return Command(0, 0, dt, true);
@@ -609,7 +612,30 @@ namespace SmokeRescue.Brain
                 BeginReturn(t, WayOutClosing);
             }
         }
-        const string WayOutClosing = "The way out was closing.";
+        const string WayOutClosing = "The way out was closing.", EmergencyExit = "Emergency exit.";
+        bool canReenter; double nextReenterCheck;
+        /// <summary>
+        /// A robot that left early to stay safe goes back in once its heat budget has recovered and a frontier can be
+        /// reached by a path that stays escape_fire_margin_m clear of fire (beyond escape_ignore_m), so the way back out
+        /// is open too. Slow-fire run: robot A left at 74 s and stood outside its door for the last two minutes.
+        /// </summary>
+        void CheckReenter(double t)
+        {
+            if (!completed || !canReenter || t < nextReenterCheck) return;
+            nextReenterCheck = t + c.escape_check_s;
+            if (budget < c.heat_resume_fraction || t >= c.mission_time_limit_s) return;
+            grid.FireClearance = c.fire_clearance_m;
+            System.Func<Vector2, bool> excluded = p => ClaimBlocks(p, t) || GoalBlacklisted(p, t) || VisitedGoal(p, t) || !InSearchArea(p);
+            var frontier = planner.Frontier(motion.Pose.position, excluded);
+            if (frontier == null) return;
+            float closest = float.PositiveInfinity;
+            foreach (var p in frontier.path)
+                if (Vector2.Distance(p, motion.Pose.position) > c.escape_ignore_m) closest = Mathf.Min(closest, grid.FireDistance(grid.Cell(p)));
+            if (closest < c.escape_fire_margin_m) return;
+            completed = false; canReenter = false; emergencyExit = false; returning = false; hadWayOut = false; ClearPath();
+            Emit(t, "reenter", "Heat budget recovered and a frontier is reachable with the fire clear of the way: go back in.",
+                "fire_distance_m", closest, "information_cells", frontier.information, "heat_budget", budget);
+        }
         bool emergencyExit; double nextEmergencyCheck;
         /// <summary>
         /// Last resort: the heat budget is nearly spent and no exit can be reached with the normal fire clearance. Plan the
@@ -620,14 +646,20 @@ namespace SmokeRescue.Brain
         {
             if (emergencyExit || completed || budget >= c.heat_emergency_fraction || t < nextEmergencyCheck) return;
             nextEmergencyCheck = t + c.escape_check_s;
-            if (PlanOut().Count > 0) return;
-            grid.FireClearance = c.emergency_fire_clearance_m;
-            var exit = PlanOut();
-            if (exit.Count == 0) { grid.FireClearance = c.fire_clearance_m; return; }
+            // Leave by the normal route when there is one: the retreat's "coolest reachable cell" can be a hot spot next
+            // to the robot (2x2 attempt 4: robot A sat 0.2 m from its retreat goal with the budget at 0 and a route out open).
+            var exit = PlanOut(); float clearance = c.fire_clearance_m;
+            if (exit.Count == 0)
+            {
+                grid.FireClearance = clearance = c.emergency_fire_clearance_m;
+                exit = PlanOut();
+                if (exit.Count == 0) { grid.FireClearance = c.fire_clearance_m; return; }
+            }
             emergencyExit = true; retreating = false;
-            Emit(t, "emergency_exit", "Heat budget nearly spent and no exit at the normal fire clearance: leave past the fire.",
-                "heat_budget", budget, "clearance_m", c.emergency_fire_clearance_m, "route_points", exit.Count);
-            BeginReturn(t, "Emergency exit.");
+            Emit(t, "emergency_exit", "Heat budget nearly spent: leave by the nearest way out" +
+                (clearance < c.fire_clearance_m ? ", past the fire at reduced clearance." : "."),
+                "heat_budget", budget, "clearance_m", clearance, "route_points", exit.Count);
+            BeginReturn(t, EmergencyExit);
         }
         /// <summary>Known ways out: this robot's own entry and, once a partner's map is linked, the partner's entry (the
         /// origin of its frame), which it reported by radio. Slow-fire run: robot B's way home was cut by fire 5.5 m from
