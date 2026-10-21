@@ -454,7 +454,9 @@ namespace SmokeRescue.Brain
                             Emit(t, "no_frontier", "No reachable unsearched floor in this robot's map; returning after the scan unless ordered on.",
                                 "scan_s", c.no_frontier_scan_s);
                         }
-                        if (t - scanSince >= c.no_frontier_scan_s) BeginReturn(t, NoFrontierLeft);
+                        // Cut off, a return would only find the way out closed: stay, keep checking for a way out, and leave the
+                        // agent free to act (held-out seed 914 run 4, robot B).
+                        if (t - scanSince >= c.no_frontier_scan_s && !cutOff) BeginReturn(t, NoFrontierLeft);
                     }
                 }
             }
@@ -781,7 +783,7 @@ namespace SmokeRescue.Brain
                 if (hadWayOut) LoseWayOut(t);
                 return;
             }
-            hadWayOut = true;
+            hadWayOut = true; cutOff = false;
             float closest = float.PositiveInfinity; Vector2 at = motion.Pose.position;
             foreach (var p in route)
                 if (Vector2.Distance(p, at) > c.escape_ignore_m) closest = Mathf.Min(closest, grid.FireDistance(grid.Cell(p)));
@@ -952,10 +954,41 @@ namespace SmokeRescue.Brain
             foreach (var p in frontier.path)
                 if (Vector2.Distance(p, motion.Pose.position) > c.escape_ignore_m) closest = Mathf.Min(closest, grid.FireDistance(grid.Cell(p)));
             if (closest < c.escape_fire_margin_m) return;
+            // The leave rule's closing test too (CheckWayOut): held-out seed 914 run 4, robot A left at 50 s because the fire
+            // was closing on its way out and went back in the second it got out (75 s), along a route the front was still
+            // advancing on. Go back in only where the robot would not have to leave again at once.
+            if (!ReentryFrontSteady(t, frontier.path, closest)) return;
+            reenterCells.Clear(); reenterRates.Clear(); reenterThenT = double.NaN;
             completed = false; canReenter = false; emergencyExit = false; returning = false; hadWayOut = false; ClearPath();
             noFrontierAt = double.NaN; cutOff = false;
             Emit(t, "reenter", "Heat budget recovered and a frontier is reachable with the fire clear of the way: go back in.",
                 "fire_distance_m", closest, "information_cells", frontier.information, "heat_budget", budget);
+        }
+        readonly List<int> reenterCells = new List<int>(); readonly List<float> reenterRates = new List<float>();
+        float reenterThen = float.PositiveInfinity; double reenterThenT = double.NaN;
+        /// <summary>The leave rule applied to the way in: the fire distance at the previous check's route cells, now and
+        /// then, gives a closing rate per interval; once two intervals spanning escape_rate_window_s are measured, the way in
+        /// is steady when the smaller rate is not positive, or when the front would take at least escape_time_factor times
+        /// the walk along the route to reach fire_clearance_m of it.</summary>
+        bool ReentryFrontSteady(double t, List<Vector2> route, float closest)
+        {
+            Vector2 at = motion.Pose.position;
+            if (reenterCells.Count > 0 && t > reenterThenT)
+            {
+                float now = float.PositiveInfinity; foreach (int cell in reenterCells) now = Mathf.Min(now, grid.FireDistance(cell));
+                // No fire on the map reads as 1e4 m (the distance transform's empty value): nothing closing.
+                reenterRates.Add(now <= c.grid_size_m && reenterThen <= c.grid_size_m ? (reenterThen - now) / (float)(t - reenterThenT) : 0);
+                while (reenterRates.Count > 2) reenterRates.RemoveAt(0);
+            }
+            reenterCells.Clear();
+            foreach (var p in route) if (Vector2.Distance(p, at) > c.escape_ignore_m) reenterCells.Add(grid.Cell(p));
+            reenterThen = float.PositiveInfinity; foreach (int cell in reenterCells) reenterThen = Mathf.Min(reenterThen, grid.FireDistance(cell));
+            reenterThenT = t;
+            if (reenterRates.Count < 2 || 2 * c.escape_check_s < c.escape_rate_window_s - 1e-3f) return false;
+            float rate = Mathf.Min(reenterRates[0], reenterRates[1]);
+            if (rate <= 0) return true;
+            float routeM = 0; for (int i = 1; i < route.Count; i++) routeM += Vector2.Distance(route[i - 1], route[i]);
+            return Mathf.Max(0, closest - c.fire_clearance_m) / rate >= routeM / c.open_speed_mps * c.escape_time_factor;
         }
         bool emergencyExit; double nextEmergencyCheck;
         /// <summary>
@@ -1048,7 +1081,11 @@ namespace SmokeRescue.Brain
         void CheckHeatBuilding(double t)
         {
             if (completed || emergencyExit) return;
-            if (cutOff && retreating)
+            // Cut off (the known way out closed, no emergency route yet), retreating or searching on in cooler air: a
+            // normal return would only find the way out closed again. Held-out seed 914 run 4, robot B: with its air in the
+            // 30 to 35 C band (heat building from air_warm_c, yet below heat_recover_below_c, so each retreat ended at once)
+            // it started 360 returns in 45 s. Retry the emergency exit on the check interval instead.
+            if (cutOff)
             {
                 if (t < nextCutOffCheck) return;
                 nextCutOffCheck = t + c.escape_check_s;
@@ -1077,7 +1114,9 @@ namespace SmokeRescue.Brain
         string AgentMoveRefusal(double t)
         {
             if (returning) return "the robot is leaving (" + returnReason + ")";
-            if (!double.IsNaN(noFrontierAt) && HeatBuilding(t, out float rise))
+            // A cut-off robot cannot leave, so "the robot is leaving" is not a reason to refuse its agent (run 4: robot B's
+            // moves toward a confirmed person were refused this way while its way out was closed).
+            if (!cutOff && !double.IsNaN(noFrontierAt) && HeatBuilding(t, out float rise))
                 return $"no reachable frontier is left and the air is heating ({airC:0} C, {rise:0} C/min); the robot is leaving";
             return null;
         }
