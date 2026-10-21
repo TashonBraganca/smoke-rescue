@@ -168,7 +168,12 @@ namespace SmokeRescue.Recording
             // Water from a robot's nozzle reaches the fire simulation at the moment it starts to flow.
             foreach (var rig in rigs)
             {
-                var id = rig.robot.RobotId;
+                var id = rig.robot.RobotId; var r0 = rig;
+                rig.actions.GripCompleted += who =>
+                {
+                    r0.brain?.BeginCarry(SimNow, world.rescue.carry_speed_mps, who);
+                    world.rescueLog.Append(new JObject { ["t"] = Math.Round(SimNow, 3), ["robot"] = id, ["event"] = "gripped", ["person"] = who }.ToString(Formatting.None)).Append('\n');
+                };
                 rig.actions.SprayStarted += (nozzleAt, headingRad, flow, seconds) =>
                 {
                     atmosphere.FireSpread?.ScheduleWater(atmosphere.FireSpread.FireTime((float)SimNow), new Vector2(nozzleAt.x, nozzleAt.z),
@@ -272,6 +277,14 @@ namespace SmokeRescue.Recording
                         {
                             rig.decisions.Append(JsonConvert.SerializeObject(e)).Append('\n');
                             if (e.kind == "mission_complete") rig.missionDone = true;
+                            if (e.kind == "reenter") rig.missionDone = false;   // went back in: its agent decides again
+                            if (e.kind == "person_carried_out" && rig.actions?.Carrying != null)
+                            {
+                                var who = rig.actions.Release(); var at = GameObject.Find(who)?.transform.position ?? Vector3.zero;
+                                bool inside = plan.rooms.Any(r => at.x >= r.rect[0] && at.x <= r.rect[2] && at.z >= r.rect[1] && at.z <= r.rect[3]);
+                                world.rescueLog.Append(new JObject { ["t"] = Math.Round(t, 3), ["robot"] = rig.robot.RobotId, ["event"] = "released", ["person"] = who,
+                                    ["x"] = Math.Round(at.x, 2), ["z"] = Math.Round(at.z, 2), ["outside_building"] = !inside }.ToString(Formatting.None)).Append('\n');
+                            }
                             NoteAgentTrigger(rig, e);
                         }
                         if (k % stateEvery == 0) rig.brainState.Append(BrainStateLine(t, rig.brain.Snapshot())).Append('\n');

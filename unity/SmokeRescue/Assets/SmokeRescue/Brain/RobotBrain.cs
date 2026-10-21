@@ -171,8 +171,13 @@ namespace SmokeRescue.Brain
                 if (toExit <= Mathf.Max(c.goal_tolerance_m, c.return_arrive_m))
                 {
                     completed = true; ClearPath();
-                    // Left early to stay safe: it may go back in once that is safe again (CheckReenter).
-                    canReenter = returnReason == WayOutClosing || returnReason == EmergencyExit;
+                    // Left early to stay safe, or carried someone out: it may go back in once that is safe (CheckReenter).
+                    canReenter = returnReason == WayOutClosing || returnReason == EmergencyExit || returnReason == CarryingOut;
+                    if (returnReason == CarryingOut)
+                    {
+                        carryingSpeed = 0;
+                        Emit(t, "person_carried_out", "Reached a way out with the person on the sled.", "distance_to_exit_m", toExit);
+                    }
                     Emit(t, "mission_complete", returnReason + " Reached a known way out.", "distance_to_start_m", Vector2.Distance(motion.Pose.position, home),
                         "distance_to_exit_m", toExit);
                     return Command(0, 0, dt, true);
@@ -612,7 +617,17 @@ namespace SmokeRescue.Brain
                 BeginReturn(t, WayOutClosing);
             }
         }
-        const string WayOutClosing = "The way out was closing.", EmergencyExit = "Emergency exit.";
+        const string WayOutClosing = "The way out was closing.", EmergencyExit = "Emergency exit.", CarryingOut = "Carrying a person out.";
+        float carryingSpeed;
+        /// <summary>A person is strapped onto the sled: take them to the nearest known way out at carry speed, then the
+        /// robot may go back in (CheckReenter). The heat reflexes stay active.</summary>
+        public void BeginCarry(double t, float speedMps, string who)
+        {
+            if (!(speedMps > 0)) throw new ArgumentOutOfRangeException(nameof(speedMps));
+            carryingSpeed = speedMps; canReenter = false; completed = false; retreating = false; emergencyExit = false;
+            Emit(t, "carrying_out", "Person strapped onto the sled; taking them to the nearest known way out.", "speed_mps", speedMps);
+            BeginReturn(t, CarryingOut);
+        }
         bool canReenter; double nextReenterCheck;
         /// <summary>
         /// A robot that left early to stay safe goes back in once its heat budget has recovered and a frontier can be
@@ -815,6 +830,7 @@ namespace SmokeRescue.Brain
         BrainCommand Command(float speed, float yaw, float dt, bool stop)
         {
             float allowed = Mathf.Min(c.limits.max_forward_mps, health.Thermal ? c.thermal_speed_mps : c.open_speed_mps);
+            if (carryingSpeed > 0) allowed = Mathf.Min(allowed, carryingSpeed);
             float limited = Mathf.Clamp(speed, -c.limits.max_reverse_mps, allowed);
             if (!stop && limited > 0) limited = SafeForward(limited);
             // A safety stop bypasses the nominal acceleration ramp. The simulator must honour emergency zero.

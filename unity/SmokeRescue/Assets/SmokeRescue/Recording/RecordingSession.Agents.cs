@@ -72,6 +72,9 @@ namespace SmokeRescue.Recording
             public double lastCommander = double.NegativeInfinity;
             public readonly List<JObject> postInbox = new List<JObject>();
             public NozzleConfig nozzle;
+            public RescueConfig rescue;
+            /// <summary>Recorder log of people strapped onto a sled and released (rescues.jsonl), with where they ended up.</summary>
+            public readonly StringBuilder rescueLog = new StringBuilder();
             /// <summary>Recorder log of every spray the world received (water.jsonl): who, when, where, how much.</summary>
             public readonly StringBuilder waterLog = new StringBuilder();
             /// <summary>Recorder-side audit of the command post's radio: each link check with a text waiting, and each text
@@ -90,8 +93,8 @@ namespace SmokeRescue.Recording
                 catch (Exception e) { Debug.LogWarning($"[SmokeRescue] doors not actuated: {e.Message}"); }
             var obstacles = GameObject.Find("Obstacles");
             if (obstacles != null) w.obstacles = new ObstacleRuntime(obstacles.transform);
-            w.nozzle = NozzleConfig.Load();
-            foreach (var rig in rigs) rig.actions = new RobotActions(rig.robot, w.doors, w.obstacles, w.nozzle);
+            w.nozzle = NozzleConfig.Load(); w.rescue = RescueConfig.Load();
+            foreach (var rig in rigs) rig.actions = new RobotActions(rig.robot, w.doors, w.obstacles, w.nozzle, w.rescue);
             var at = scenario.robots[0].spawn.at;    // world side only: where the commander's radio stands, outside the first entry
             w.post = new Vector3(at[0], 0f, at[1] - 2f);
             return w;
@@ -99,6 +102,7 @@ namespace SmokeRescue.Recording
 
         static void AgentWorldStep(AgentWorld w, List<RobotRig> rigs, float dt)
         {
+            foreach (var rig in rigs) rig.actions?.Tow();   // a person on the sled follows the robot every tick
             w.doors?.Step(dt);
             w.obstacles?.Step(dt);
             foreach (var rig in rigs)
@@ -154,6 +158,7 @@ namespace SmokeRescue.Recording
                     })),
                     ["lidar"] = LidarSummary(rig.lastScan),
                     ["water_l"] = Math.Round(rig.actions?.WaterLitres ?? 0, 2),
+                    ["carrying_person"] = rig.actions?.Carrying != null,
                     ["blocked_unsearched"] = rig.brain.BlockedUnsearched() is Brain.BrainBlockedFloor blocked ? new JObject
                     {
                         ["bearing_deg"] = Math.Round(blocked.bearingDegRight, 1), ["distance_m"] = Math.Round(blocked.distanceM, 2),
@@ -214,6 +219,13 @@ namespace SmokeRescue.Recording
                     }
                     catch (ArgumentException e) { brain.LogAgentAction(t, "torch order refused: " + e.Message); }
                     break;
+                case "extract_survivor":
+                {
+                    bool gripping = rig.actions.BeginExtract();
+                    brain.LogAgentAction(t, gripping ? $"extract_survivor: strapping {rig.actions.TargetId} onto the sled, OpenCV evidence {ev}."
+                        : $"extract_survivor refused: {rig.actions.FailureReason}");
+                    break;
+                }
                 case "spray_water":
                 {
                     bool sprayed = rig.actions.BeginSpray(o.Value<float>("bearing_deg"), o.Value<float>("seconds"));
@@ -378,6 +390,7 @@ namespace SmokeRescue.Recording
                 File.WriteAllText(Path.Combine(rig.dir, "agent_steps.jsonl"), rig.agentLog.ToString());
             if (w.postLog.Length > 0) File.WriteAllText(Path.Combine(root, "command_post.jsonl"), w.postLog.ToString());
             if (w.waterLog.Length > 0) File.WriteAllText(Path.Combine(root, "water.jsonl"), w.waterLog.ToString());
+            if (w.rescueLog.Length > 0) File.WriteAllText(Path.Combine(root, "rescues.jsonl"), w.rescueLog.ToString());
             if (AgentUrl != null)
                 File.WriteAllText(Path.Combine(root, "agent_summary.json"), JsonConvert.SerializeObject(new
                     { url = AgentUrl, w.steps, w.orders, w.refusals, w.errors }, Formatting.Indented));

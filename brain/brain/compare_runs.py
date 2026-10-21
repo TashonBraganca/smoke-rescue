@@ -87,12 +87,23 @@ def score(rec: Path) -> dict:
                     kinds.update(o["type"] for o in e.get("orders", []))
         agent["orders_by_type"] = dict(kinds)
     duration = max(float(load_trajectory(rec, r).timestamps[-1]) for r in robots)
+    # People carried out: released from a sled outside every room of the floor plan (recorder log, world truth).
+    rescued, released = set(), []
+    rp = rec / "rescues.jsonl"
+    if rp.exists():
+        for line in rp.read_text().splitlines():
+            e = json.loads(line)
+            if e.get("event") == "released":
+                released.append(e)
+                if e.get("outside_building"):
+                    rescued.add(e["person"])
     return {"recording": rec.name, "duration_s": round(duration, 1), "survivors_total": len(truth_people),
             "survivors_found": len(found), "first_found_s": round(min(found.values()), 1) if found else None,
             "confirmations": len(confirmations), "false_confirmations": len(false), "confirmation_details": confirmations,
             "area_searched_m2": round(len(union) * CELL_M ** 2, 1),
             "area_searched_by_both_m2": round(len(both) * CELL_M ** 2, 1),
             "double_coverage_share": round(len(both) / len(union), 3) if union else None,
+            "people_carried_out": len(rescued), "releases": released,
             "heat": heat, "collision_s": coll, "agent": agent}
 
 
@@ -103,7 +114,7 @@ def main() -> None:
     a = ap.parse_args()
     rows = [score(r) for r in a.recordings]
     keys = ["duration_s", "survivors_total", "survivors_found", "first_found_s", "confirmations", "false_confirmations",
-            "area_searched_m2", "double_coverage_share", "collision_s"]
+            "area_searched_m2", "double_coverage_share", "people_carried_out", "collision_s"]
     print(f"{'':28s}" + "".join(f"{r['recording'][:26]:>28s}" for r in rows))
     for k in keys:
         print(f"{k:28s}" + "".join(f"{str(r[k])[:26]:>28s}" for r in rows))
