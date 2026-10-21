@@ -19,7 +19,8 @@ from pathlib import Path as _Path
 # Thresholds come from config/brain.json, each with its reason there.
 _CONFIG = json.loads((_Path(__file__).resolve().parents[3] / "config" / "brain.json").read_text())
 CONFIRM_MAX_RANGE_M = float(_CONFIG["person_confirm_max_range_m"])
-_NOZZLE = json.loads((_Path(__file__).resolve().parents[3] / "config" / "actuators.json").read_text())["nozzle"]
+_ACTUATORS = json.loads((_Path(__file__).resolve().parents[3] / "config" / "actuators.json").read_text())
+_NOZZLE, _RESCUE = _ACTUATORS["nozzle"], _ACTUATORS["rescue"]
 from pathlib import Path
 
 from brain.agent import vision
@@ -73,6 +74,9 @@ ACTIONS = [
         "way is not passable.", {"evidence_id": EVIDENCE}, ["evidence_id"]),
     _fn("clear_debris", "Use the arm to push light debris ahead out of the way. Needs a measure_opening result showing "
         "the way is not passable.", {"evidence_id": EVIDENCE}, ["evidence_id"]),
+    _fn("extract_survivor", "Strap the person directly ahead onto the rescue sled and take them out to the nearest known "
+        "way out, slowly. Needs an inspect_candidate result with verdict person, taken within the rescue reach.",
+        {"evidence_id": EVIDENCE}, ["evidence_id"]),
     _fn("spray_water", "Spray water from the robot's nozzle toward a fire to knock it down. Needs a scan_thermal result "
         "with a hot spot near that bearing and within the nozzle's range. Water is limited (context water_l); the "
         "robot holds still while spraying.", {"bearing_deg": NUM, "seconds": NUM, "evidence_id": EVIDENCE},
@@ -101,6 +105,7 @@ class AgentContext:
     frame_times: list[float] = field(default_factory=list)   # recent thermal stamps, oldest first
     frontiers: list[dict] = field(default_factory=list)      # search targets offered by the robot's own map
     water_l: float = 0.0                                      # water left in the robot's tank
+    carrying_person: bool = False                             # a person is already on the sled
 
 
 class ToolRegistry:
@@ -217,6 +222,13 @@ class ToolRegistry:
             refusal = self._need(args, ("scan_thermal", "track_fire_spread"),
                                  lambda ev: ev.get("tool") == "track_fire_spread" or bool(ev.get("hotspots")),
                                  "the cited scan found no hotspot")
+        elif name == "extract_survivor":
+            reach = float(_RESCUE["reach_m"])
+            refusal = self._need(args, ("inspect_candidate",), lambda ev: ev.get("verdict") == "person" and
+                                 self._inspection_range(ev) is not None and self._inspection_range(ev) <= reach,
+                                 f"the cited inspection is not a person verdict within {reach:.1f} m; approach_candidate first")
+            if refusal is None and self.ctx.carrying_person:
+                refusal = {"refused": True, "reason": "already towing a person; take them out first"}
         elif name == "spray_water":
             aim, reach = float(_NOZZLE["aim_tolerance_deg"]), float(_NOZZLE["range_m"])
             bearing = float(args.get("bearing_deg", 0))

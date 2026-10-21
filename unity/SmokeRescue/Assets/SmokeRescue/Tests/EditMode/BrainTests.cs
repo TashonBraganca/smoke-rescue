@@ -945,6 +945,45 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void ACarriedPersonGoesOutSlowlyAndTheRobotMayComeBack()
+        {
+            // With a person on the sled the robot heads for the nearest known way out at carry speed, and once there it
+            // reports them carried out and may go back in. Control: without carrying, the speed is not capped.
+            var c = Settings(); c.grid_size_m = 12; c.robot_radius_m = .25f;
+            var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -5, 5, -2, 6);
+            float fastest = 0; var events = new List<BrainEvent>();
+            for (int i = 0; i < 90; i++)
+            {
+                double t = i / 15.0; Motion(b, t, t < 3 ? 1f : 0); b.OnRgbd(Image(t, true)); b.OnAirTemperature(t, 20);
+                if (i == 47) b.BeginCarry(t, .25f, "Survivor_s1");
+                var cmd = b.Step(t, 1f / 15); events.AddRange(b.DrainEvents());
+                if (i > 47) fastest = Mathf.Max(fastest, cmd.forwardMps);
+            }
+            Assert.That(events.Any(e => e.kind == "carrying_out"), Is.True);
+            Assert.That(b.Snapshot().state, Is.EqualTo("return"), "heading for a way out");
+            // The robot turns toward its way out first, so check the cap where it applies: the speed it settles at when
+            // full speed is commanded (control: the same robot before carrying settles faster).
+            float Settle(RobotBrain brain)
+            {
+                var command = typeof(RobotBrain).GetMethod("Command", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                float v = 0; for (int k = 0; k < 120; k++) v = ((BrainCommand)command.Invoke(brain, new object[] { 2f, 0f, 1f / 15, false })).forwardMps;
+                return v;
+            }
+            var free = new RobotBrain(Calibration(), c, "B", 0); Room(free, -5, 5, -2, 6);
+            Assert.That(Settle(b), Is.LessThanOrEqualTo(.25f + 1e-4f), "carry speed");
+            Assert.That(Settle(free), Is.GreaterThan(.25f), "control: not carrying");
+            var home = new RobotBrain(Calibration(), c, "A", 0); Room(home, -5, 5, -2, 6); var done = new List<BrainEvent>();
+            for (int i = 0; i < 30; i++)
+            {
+                double t = i / 15.0; Motion(home, t); home.OnRgbd(Image(t, true)); home.OnAirTemperature(t, 20);
+                if (i == 2) home.BeginCarry(t, .25f, "Survivor_s1");
+                home.Step(t, 1f / 15); done.AddRange(home.DrainEvents());
+            }
+            Assert.That(done.Count(e => e.kind == "person_carried_out"), Is.EqualTo(1), "at the way out: carried out");
+            Assert.That(done.Any(e => e.kind == "reenter"), Is.True, "and it may go back in");
+        }
+
+        [Test]
         public void AReturnEndsWithinHalfAMetreOfADoorwayStart()
         {
             // House reflex check: robot B stopped 0.3 m from its doorway start, where the return path ended, and replanned

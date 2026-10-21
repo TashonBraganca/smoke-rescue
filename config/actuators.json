@@ -12,5 +12,15 @@
     "max_spray_s_reason": "Longest single spray an agent may order, so one order cannot empty the tank; it can order again after the robot looks again.",
     "aim_tolerance_deg": 15.0,
     "aim_tolerance_deg_reason": "An agent may spray only toward a hot spot its cited thermal scan found within this bearing of the requested direction (half the thermal camera's 50 degree field is 25 degrees; 15 keeps the stream on the measured fire)."
+  },
+  "rescue": {
+    "reach_m": 1.6,
+    "reach_m_reason": "A person may be gripped when the nearest point of their body is within this distance ahead of the robot (the arm reaches 1.2 m; a lying person's near edge sits a little beyond).",
+    "grip_s": 2.0,
+    "grip_s_reason": "Time to fit the drag strap and lift the shoulders onto the rescue sled with the arm.",
+    "tow_offset_m": 0.9,
+    "tow_offset_m_reason": "The sled rides this far behind the robot body on its strap.",
+    "carry_speed_mps": 0.25,
+    "carry_speed_mps_reason": "Walking speed while dragging an adult on a low-friction rescue sled. Assumed for a Spot-class robot pulling roughly 150 to 200 N (sled friction on a smooth floor); slow enough to keep the strap and sled stable."
   }
 }

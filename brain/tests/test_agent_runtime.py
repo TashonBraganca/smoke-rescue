@@ -219,3 +219,19 @@ def test_spray_water_needs_a_measured_hot_spot_on_that_bearing_and_water(tmp_pat
     assert spray(40, 12)["refusals"][0]["tool"] == "spray_water", "40 deg off the measured fire"
     assert "empty" in spray(0, 0)["refusals"][0]["reason"]
     assert spray(0, 12, seconds=60)["orders"][0]["seconds"] == 6.0, "clipped to max_spray_s"
+
+
+def test_extract_survivor_needs_a_close_person_verdict_and_a_free_sled(tmp_path, monkeypatch):
+    fake_vision(monkeypatch, "person")
+    monkeypatch.setattr(T.vision, "inspect_candidate", lambda f, b, r, output_dir: {
+        "id": f"ev{r:g}", "tool": "inspect_candidate", "verdict": "person", "candidate": {"bearing_deg": b, "range_m": r}})
+
+    def extract(range_m, carrying=False):
+        extract.t += 30
+        agent = RobotAgent(Scripted([[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": range_m})],
+                                     [ToolCall("extract_survivor", {"evidence_id": f"ev{range_m:g}"})]]), tmp_path / f"x{extract.t}.jsonl")
+        return agent.step({**request(tmp_path), "t": extract.t, "carrying_person": carrying})
+    extract.t = 0
+    assert [o["type"] for o in extract(1.2)["orders"]] == ["extract_survivor"]
+    assert extract(3.0)["refusals"][0]["tool"] == "extract_survivor", "too far: approach first"
+    assert "already towing" in extract(1.2, carrying=True)["refusals"][0]["reason"]
