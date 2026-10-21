@@ -310,3 +310,21 @@ def test_people_to_rescue_say_whether_they_are_in_the_camera_view():
     pose = {"x": 0.0, "y": 0.0, "heading_deg": 0.0}           # facing +y
     side, ahead = T.survivors_to_rescue("robot_A", pose, [[0.5, 2.0], [-1.5, 0.2]])   # nearest first
     assert ahead["in_view"] is True and side["in_view"] is False
+
+
+def test_memory_of_close_looks_and_lifts_resets_with_a_new_recording(tmp_path, monkeypatch):
+    # Run 24: the server kept looks from runs 21 to 23, so a fresh run's first approach to a person was refused.
+    # Control: within one recording, the third close look at a spot is still refused.
+    fake_vision(monkeypatch, "uncertain")
+    def look(run_dir, t):
+        d = tmp_path / run_dir / "robot_A"; d.mkdir(parents=True, exist_ok=True)
+        req = request(tmp_path) | {"robot_dir": str(d), "t": t}
+        return RobotAgent(Scripted([[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": 5})],
+                                    [ToolCall("approach_candidate", {"evidence_id": "ev1"})]]), tmp_path / "t.jsonl").step(req)
+    for k in range(2):
+        look("run_a", 10.0 + k)
+    assert look("run_a", 12.0)["refusals"], "control: third look in the same recording"
+    assert look("run_b", 10.0)["orders"], "a new recording starts with no looks"
+    for k in range(2):
+        look("run_b", 20.0 + k)
+    assert look("run_b", 1.0)["orders"], "same folder, clock restarted: a new recording"
