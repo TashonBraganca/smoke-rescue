@@ -24,6 +24,10 @@ CONFIRM_MAX_RANGE_M = float(_CONFIG["person_confirm_max_range_m"])
 APPROACH_STANDOFF_M = float(_CONFIG["survivor_standoff_m"])
 _ACTUATORS = json.loads((_Path(__file__).resolve().parents[3] / "config" / "actuators.json").read_text())
 _NOZZLE, _RESCUE = _ACTUATORS["nozzle"], _ACTUATORS["rescue"]
+_CAMERA = json.loads((_Path(__file__).resolve().parents[3] / "config" / "sensors.json").read_text())["camera"]
+# Half the colour camera's horizontal view (atan of half the width over fx: 37.6 deg). A person further off the heading
+# than this is outside the picture, so an inspection there cannot see them (run 20: looks at 106 and 148 deg).
+CAMERA_HALF_HFOV_DEG = math.degrees(math.atan(_CAMERA["width"] / 2 / _CAMERA["fx"]))
 from pathlib import Path
 
 from brain.agent import vision
@@ -63,6 +67,9 @@ ACTIONS = [
         "computed from the inspection itself. Use when inspect_candidate says uncertain, or to get within the arm's reach "
         "of a confirmed person. You get an agent_goal_reached event on arrival.", {"evidence_id": EVIDENCE},
         ["evidence_id"]),
+    _fn("turn_to_face", "Turn in place to face a building position, such as a confirmed person in survivors_to_rescue "
+        "whose bearing is outside the camera's view (in_view false). You get agent_goal_reached when facing it.",
+        {"x": NUM, "y": NUM, "reason": STR}, ["x", "y", "reason"]),
     _fn("confirm_survivor", "Report a survivor at a building position. Needs an inspect_candidate result with verdict "
         "person.", {"x": NUM, "y": NUM, "evidence_id": EVIDENCE}, ["x", "y", "evidence_id"]),
     _fn("reject_candidate", "Mark a warm region as not a person so nobody inspects it again. Needs an "
@@ -286,7 +293,16 @@ class ToolRegistry:
                 dist = max(1e-6, (dx * dx + dy * dy) ** 0.5)
                 k = max(0.0, dist - APPROACH_STANDOFF_M) / dist
                 args = {**args, "x": round(self.ctx.x + dx * k, 2), "y": round(self.ctx.y + dy * k, 2),
+                        "face_x": ev["x"], "face_y": ev["y"],
                         "reason": f"closer look at an uncertain warm region ({ev['x']}, {ev['y']})"}
+                name = "go_to"
+        elif name == "turn_to_face":
+            # A go_to where the robot stands, with a point to face: the brain arrives at once, turns, then reports.
+            if self.ctx.event_kind in ("avoid_fire", "retreat"):
+                refusal = {"refused": True, "reason": "no turning toward a target during a heat event; let the reflex layer back away"}
+            else:
+                args = {"x": round(self.ctx.x, 2), "y": round(self.ctx.y, 2), "face_x": float(args["x"]), "face_y": float(args["y"]),
+                        "reason": str(args.get("reason") or "turn to face")}
                 name = "go_to"
         elif name == "request_human_approval":
             refusal = self._need(args, tuple(f["function"]["name"] for f in PERCEPTION))
@@ -332,5 +348,6 @@ def survivors_to_rescue(robot: str, pose: dict, survivors: list, standoff_m: flo
         bearing = (math.degrees(math.atan2(dx, dy)) - float(pose["heading_deg"]) + 180) % 360 - 180
         k = max(0.0, dist - standoff_m) / max(dist, 1e-6)
         out.append({"x": round(x, 2), "y": round(y, 2), "bearing_deg": round(bearing, 1), "distance_m": round(dist, 2),
+                    "in_view": abs(bearing) <= CAMERA_HALF_HFOV_DEG,
                     "approach": {"x": round(float(pose["x"]) + dx * k, 2), "y": round(float(pose["y"]) + dy * k, 2)}})
     return sorted(out, key=lambda s: s["distance_m"])

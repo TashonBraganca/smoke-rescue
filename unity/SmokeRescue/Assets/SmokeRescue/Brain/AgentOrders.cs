@@ -17,15 +17,47 @@ namespace SmokeRescue.Brain
 
         bool AgentGoalActive(double t) => agentGoal.HasValue && t <= agentGoalUntil && !returning && !retreating;
 
-        public void AgentGoTo(Vector2 target, double t, double holdS, string reason)
+        /// <summary>Drive to target; with face set, turn in place on arrival until the robot faces that point, and only
+        /// then tell the agent it arrived (the camera sees about 37 degrees either side, the arm grips within 60).</summary>
+        public void AgentGoTo(Vector2 target, double t, double holdS, string reason, Vector2? face = null)
         {
             if (!InSearchArea(target)) { Emit(t, "agent_order", "Refused go_to: no ceiling has been seen over that point, so it is not known to be inside.", "x_m", target.x, "y_m", target.y); return; }
             agentGoal = target; agentGoalUntil = t + holdS; agentGoalReason = reason ?? ""; agentGoalIsFrontier = false;
+            agentFace = face; facing = null;
             if (active == null) ClearPath();
             Emit(t, "agent_order", "go_to: " + agentGoalReason, "x_m", target.x, "y_m", target.y, "hold_s", holdS);
         }
 
         bool agentGoalIsFrontier;
+        Vector2? agentFace, facing; double facingUntil; string facingReason;
+
+        /// <summary>Arrival at an agent go_to: start facing the named point, or tell the agent now.</summary>
+        void AgentArrived(double t, string how)
+        {
+            if (agentFace.HasValue)
+            {
+                facing = agentFace; facingUntil = t + c.sweep_max_s; facingReason = agentGoalReason;
+                Emit(t, "goal", "At the agent's goal; turn to face the point it named.", "x_m", agentFace.Value.x, "y_m", agentFace.Value.y);
+            }
+            else Emit(t, "agent_goal_reached", how + agentGoalReason, "x_m", agentGoal.Value.x, "y_m", agentGoal.Value.y);
+            agentFace = null;
+        }
+
+        /// <summary>Turning in place toward the point an agent go_to named; null when not facing. Run 20: robot A stood
+        /// within the arm's reach of a confirmed person three times, but looked at them 106 to 148 degrees off its heading,
+        /// outside the camera's view, so every inspection came back uncertain and the lift was refused.</summary>
+        BrainCommand? FaceStep(double t, float dt)
+        {
+            if (!facing.HasValue) return null;
+            if (returning || retreating) { facing = null; return null; }
+            float error = BrainMath.Angle(motion.Pose.yawRad, BrainMath.Heading(facing.Value - motion.Pose.position));
+            if (Mathf.Abs(error) > c.survivor_face_tolerance_deg && t < facingUntil)
+                return Command(0, Mathf.Clamp(error * c.heading_gain, -c.sweep_yaw_dps, c.sweep_yaw_dps), dt, true);
+            Emit(t, "agent_goal_reached", "Arrived where the agent asked and turned to face the point it named: " + facingReason,
+                "x_m", facing.Value.x, "y_m", facing.Value.y, "bearing_error_deg", error);
+            facing = null;
+            return null;
+        }
 
         /// <summary>The frontiers the agent chooses from: reachable, worth searching, not claimed by a partner, inside
         /// the search area. Positions are the walkable cell the robot would drive to; path_m is the planned distance

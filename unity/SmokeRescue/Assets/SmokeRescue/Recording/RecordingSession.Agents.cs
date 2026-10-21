@@ -216,7 +216,10 @@ namespace SmokeRescue.Recording
             Vector2 P() => new Vector2(o.Value<float>("x"), o.Value<float>("y"));
             switch (type)
             {
-                case "go_to": brain.AgentGoTo(P(), t, OrderHoldS, o.Value<string>("reason")); break;
+                case "go_to":
+                    brain.AgentGoTo(P(), t, OrderHoldS, o.Value<string>("reason"),
+                        o["face_x"] != null && o["face_y"] != null ? new Vector2(o.Value<float>("face_x"), o.Value<float>("face_y")) : (Vector2?)null);
+                    break;
                 case "explore_frontier": brain.AgentExplore(P(), t, ExploreHoldS, o.Value<string>("reason")); break;
                 case "confirm_survivor": brain.AgentConfirmSurvivor(P(), t, ev); break;
                 case "reject_candidate": brain.AgentRejectCandidate(P(), t, ev); break;
