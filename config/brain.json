@@ -251,6 +251,8 @@
   "agent_avoid_min_radius_m_reason": "Smallest keep-out circle an agent's avoid_area may draw: three cells, so it shows on the map. An area that would have to shrink below this to leave the robot outside is refused.",
   "agent_avoid_max_radius_m": 4.0,
   "agent_avoid_max_radius_m_reason": "Largest keep-out circle: about one room, so one model call cannot close off the house.",
+  "scan_yaw_gain": 0.05,
+  "scan_yaw_gain_reason": "Share of each scan match's heading correction that is applied; position corrections apply in full. Measured on run 13, robot A: the simulated gyro alone stayed within 0.55 deg of true heading over 200 s and 3669 deg of turning, while applying full scan-matched turns gave up to 2.4 deg, because each sweep is matched to a map that has itself turned. Most of that error is matching noise carried forward through the map, which scales with the gain; 0.05 at 10 sweeps per second still pulls the heading to the map within about 2 s, so slow gyro drift stays bounded.",
   "scan_beam_stride": 3,
   "scan_beam_stride_reason": "Use every third LiDAR beam for matching (240 of 720).",
   "scan_min_beams": 40,
