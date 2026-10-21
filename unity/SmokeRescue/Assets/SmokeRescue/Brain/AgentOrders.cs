@@ -107,7 +107,8 @@ namespace SmokeRescue.Brain
             {
                 if (list.Count >= max) break;
                 list.Add(new BrainFrontier { id = list.Count, position = f.position, pathM = f.cost,
-                    unsearchedM2 = f.information * grid.CellM * grid.CellM, provenIndoors = InSearchArea(f.position) });
+                    unsearchedM2 = f.information * grid.CellM * grid.CellM, provenIndoors = InSearchArea(f.position),
+                    mappedUnsearchedM2 = grid.UnsearchedFloorBeyond(f.position, c.frontier_beyond_m) });
             }
             if (!provenOnly) return list;
             Emit(t, "frontier_options", $"{all.Count} frontiers; boundary cells dropped as claimed by a partner, blacklisted, visited, or not known to be indoors.",

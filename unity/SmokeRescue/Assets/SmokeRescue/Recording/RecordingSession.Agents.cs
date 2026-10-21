@@ -152,7 +152,7 @@ namespace SmokeRescue.Recording
                 var frontiers = new JArray(rig.brain.FrontierOptions(t, FrontierOptions).Select(f => (object)new JObject
                 {
                     ["id"] = f.id, ["x"] = Math.Round(f.position.x, 2), ["y"] = Math.Round(f.position.y, 2),
-                    ["path_m"] = Math.Round(f.pathM, 1), ["unsearched_m2"] = Math.Round(f.unsearchedM2, 1), ["proven_indoors"] = f.provenIndoors,
+                    ["path_m"] = Math.Round(f.pathM, 1), ["unsearched_m2"] = Math.Round(f.unsearchedM2, 1), ["mapped_unsearched_m2"] = Math.Round(f.mappedUnsearchedM2, 1), ["proven_indoors"] = f.provenIndoors,
                 }));
                 var req = new JObject
                 {

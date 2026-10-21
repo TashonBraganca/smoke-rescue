@@ -208,6 +208,7 @@ namespace SmokeRescue.Brain
                     completed = true; ClearPath(); carryClearFrom = stepAwayFrom = new Vector2(float.NaN, float.NaN);
                     // Left early to stay safe, or carried someone out: it may go back in once that is safe (CheckReenter).
                     canReenter = returnReason == WayOutClosing || returnReason == EmergencyExit || returnReason == CarryingOut || returnReason == HeatLeave;
+                    if (returnReason == HeatLeave || returnReason == EmergencyExit) { burned = true; heatExitAt = t; }
                     if (returnReason == CarryingOut && !carriedOutReported)
                     {
                         carryingSpeed = 0;
@@ -922,6 +923,10 @@ namespace SmokeRescue.Brain
             if (!completed || !canReenter || t < nextReenterCheck) return;
             nextReenterCheck = t + c.escape_check_s;
             if (budget < c.heat_resume_fraction || t >= c.mission_time_limit_s) return;
+            // Left because heat was building: the hot layer inside cannot be seen from outside and does not clear in
+            // seconds (held-out seed 914 run 1: robot A re-entered 0.1 s after its emergency exit, into the hallway it had
+            // just left with its air at 34 C and rising). Wait reenter_after_heat_s in cool, steady air first.
+            if (burned && (t - heatExitAt < c.reenter_after_heat_s || HeatBuilding(t, out _))) return;
             grid.FireClearance = c.fire_clearance_m; grid.FirePrediction = true;
             System.Func<Vector2, bool> excluded = p => ClaimBlocks(p, t) || GoalBlacklisted(p, t) || VisitedGoal(p, t) || !InSearchArea(p);
             var frontier = planner.Frontier(motion.Pose.position, excluded);
@@ -977,6 +982,8 @@ namespace SmokeRescue.Brain
         // Set when the brain finds no reachable frontier (it would return after its scan unless an agent orders it on);
         // cleared when it finds one again. cutOff: the way out was lost and the robot retreats to cool floor.
         double noFrontierAt = double.NaN, nextCutOffCheck; bool cutOff;
+        // Left once because heat was building (a heat return or an emergency exit), and when.
+        bool burned; double heatExitAt = double.NegativeInfinity;
         const string HeatLeave = "No reachable frontier was left and the air was heating.";
         /// <summary>
         /// The hot gas layer is reaching the robot: its own air reading is at least air_warm_c, or it rises at
@@ -1028,6 +1035,15 @@ namespace SmokeRescue.Brain
                 if (t < nextCutOffCheck) return;
                 nextCutOffCheck = t + c.escape_check_s;
                 if (HeatBuilding(t, out _)) TryEmergencyExit(t, "Cut off from the way out and the air is heating: leave now by the nearest way out");
+                return;
+            }
+            if (!returning && !retreating && burned && HeatBuilding(t, out float again))
+            {
+                // Back inside after leaving for heat: the building is known to be heating, so leave at the first sign.
+                agentGoal = null; agentGoalIsFrontier = false; agentHoldUntil = double.NegativeInfinity; facing = null; agentFace = null;
+                Emit(t, "heat_again", "Back inside after leaving for heat, and the air is heating again: leave while the way out is open.",
+                    "air_c", airC, "rise_c_per_min", again);
+                BeginReturn(t, HeatLeave);
                 return;
             }
             if (returning || retreating || double.IsNaN(noFrontierAt)) return;

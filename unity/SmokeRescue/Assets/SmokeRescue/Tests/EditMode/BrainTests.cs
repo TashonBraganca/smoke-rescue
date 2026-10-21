@@ -960,6 +960,42 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void AfterLeavingForHeatTheRobotWaitsBeforeGoingBackAndLeavesAgainAtTheFirstSign()
+        {
+            // Held-out seed 914 run 1: robot A re-entered 0.1 s after its emergency exit, into the hallway it had just left
+            // with its air at 34 C and rising. After a heat exit it now waits reenter_after_heat_s in cool air; once back in,
+            // heat building makes it leave at once. Control: with no wait it goes straight back in.
+            (double reenterAt, bool leftAgain) Run(float wait)
+            {
+                var c = Settings(); c.grid_size_m = 12; c.reenter_after_heat_s = wait;
+                var b = new RobotBrain(Calibration(), c, "A", 0); var g = Map(b);
+                for (int i = 0; i < g.Count; i++) { var p = g.Centre(i); if (!(Mathf.Abs(p.x) < .6f && p.y > 3f && p.y < 4f)) g.ObserveFree(i); }   // one unsearched pocket
+                var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static;
+                string heatLeave = (string)typeof(RobotBrain).GetField("HeatLeave", flags).GetValue(null);
+                var begin = typeof(RobotBrain).GetMethod("BeginReturn", flags);
+                double reenterAt = double.NaN; bool left = false;
+                for (int k = 0; k <= 15 * 40; k++)
+                {
+                    double t = k / 15.0;
+                    if (k == 8) begin.Invoke(b, new object[] { t, heatLeave });   // left for heat, standing at its start
+                    float air = !double.IsNaN(reenterAt) && t > reenterAt + 1 ? 35 : 20;   // warm air once back in
+                    Motion(b, t); b.OnRgbd(Image(t, true, 0)); b.OnAirTemperature(t, air); b.Step(t, 1f / 15);
+                    foreach (var e in b.DrainEvents())
+                    {
+                        if (e.kind == "reenter" && double.IsNaN(reenterAt)) reenterAt = e.t;
+                        if (e.kind == "heat_again") left = true;
+                    }
+                }
+                return (reenterAt, left);
+            }
+            var waits = Run(30);
+            Assert.That(waits.reenterAt, Is.GreaterThanOrEqualTo(30.5).Or.NaN, "no re-entry within 30 s of the heat exit");
+            var control = Run(0);
+            Assert.That(control.reenterAt, Is.LessThan(5), "control: with no wait it goes straight back in");
+            Assert.That(control.leftAgain, Is.True, "once back in, warm air makes it leave again");
+        }
+
+        [Test]
         public void AnAgentCannotKeepARobotInOnceNoFrontierIsLeftAndTheAirIsHeating()
         {
             // Held-out run 2, robot A: no reachable frontier at 89.8 s; its agent ordered it on twice while its air rose from
@@ -2031,6 +2067,51 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void FloorBehindATableIsMappedButNotSearched()
+        {
+            // Held-out seed 914 run 1: a person slumped by the kitchen island lay on floor the depth rays had crossed high on
+            // their way to the wall, so it counted as searched though no depth image ever showed it. A 0.75 m table spans the
+            // view 2.6 to 3.2 m ahead; the floor behind it at 3.6 m is crossed only by rays 0.6 m up. Control: search_low_m 0
+            // (the old rule) counts it searched.
+            (bool front, bool shadowSearched, bool shadowFree, bool table) Look(float low)
+            {
+                var c = Settings(); c.search_low_m = low;
+                var b = new RobotBrain(Calibration(), c, "A", 0);
+                Motion(b, 0); b.OnAirTemperature(0, 20); b.Step(0, 1f / 60);
+                var frame = Image(.1, true, 0); float pitch = 10 * Mathf.Deg2Rad, sp = Mathf.Sin(pitch), cp = Mathf.Cos(pitch);
+                for (int v = 0; v < 60; v++) for (int u = 0; u < 80; u++)
+                {
+                    float dn = (v - 29.5f) / 52f, up = -(sp + dn * cp), forward = cp - dn * sp, z = float.PositiveInfinity;
+                    if (up > 1e-4f) z = Mathf.Min(z, 1.2f / up);                              // ceiling at 2.8 m
+                    if (up < -1e-4f) z = Mathf.Min(z, 1.6f / -up);                            // floor
+                    if (forward > 1e-4f) z = Mathf.Min(z, (7f - .25f) / forward);              // far wall
+                    if (forward > 1e-4f)
+                    {
+                        float front = (2.6f - .25f) / forward, h = 1.6f + front * up;          // table front face
+                        if (h >= 0 && h <= .75f) z = Mathf.Min(z, front);
+                    }
+                    if (up < -1e-4f)
+                    {
+                        float top = .85f / -up, y = .25f + top * forward;                     // table top
+                        if (y >= 2.6f && y <= 3.2f) z = Mathf.Min(z, top);
+                    }
+                    frame.Depth[v * 80 + u] = (ushort)Mathf.Clamp(Mathf.RoundToInt(z * 1000), 0, 65535);
+                }
+                Motion(b, .1); b.OnAirTemperature(.1, 20); b.OnRgbd(frame); b.Step(.1, .1f);
+                var g = Map(b);
+                int front0 = g.Cell(new Vector2(0, 2.3f)), shadow = g.Cell(new Vector2(0, 3.6f)), table = g.Cell(new Vector2(0, 2.65f));
+                return (g.OwnObserved(front0), g.OwnObserved(shadow), g.Occupancy(shadow) == 1, g.Occupancy(table) == 255);
+            }
+            var now = Look(.3f);
+            Assert.That(now.front, Is.True, "floor in front of the table is seen");
+            Assert.That(now.table, Is.True, "the table is mapped as an obstacle");
+            Assert.That(now.shadowSearched, Is.False, "floor behind the table is not searched");
+            Assert.That(now.shadowFree, Is.True, "but it is still mapped free for driving");
+            var old = Look(0);
+            Assert.That(old.shadowSearched, Is.True, "control: the old rule counted it searched");
+        }
+
+        [Test]
         public void FloorSeenFromBeyondTheSearchRangeIsMappedButNotSearched()
         {
             // Hidden-corner runs: the depth camera marked floor searched out to 8 m, so a glance through a doorway counted a
@@ -2258,6 +2339,37 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(orders, Has.Count.EqualTo(2));
             Assert.That(orders[0], Does.StartWith("Refused go_to"));
             Assert.That(orders[1], Does.StartWith("go_to: ahead"));
+        }
+
+        [Test]
+        public void ADoorwayFrontierReportsTheUnsearchedFloorMappedBeyondIt()
+        {
+            // Held-out seed 914 run 1: the doorway onto a LiDAR-mapped hallway showed unsearched_m2 1.5, counted only beside
+            // the frontier, and the agent chose a kitchen corner at 8.5 m2. A searched room with a doorway north onto an
+            // 8 x 1.8 m corridor mapped by LiDAR only; the doorway frontier reports the corridor. A yard behind a south door,
+            // with no ceiling seen over it, adds nothing.
+            var c = Settings(); c.grid_size_m = 16; c.search_requires_ceiling = true; c.ceiling_min_hits = 1;
+            var b = new RobotBrain(Calibration(), c, "A", 0); var g = Map(b);
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var lidar = (float[])typeof(OccupancyGrid).GetField("lidarOdds", flags).GetValue(g);
+            var roof = (byte[])typeof(OccupancyGrid).GetField("roofHits", flags).GetValue(g);
+            for (int i = 0; i < g.Count; i++)
+            {
+                var p = g.Centre(i); float ax = Mathf.Abs(p.x), ay = Mathf.Abs(p.y);
+                bool room = ax < 2f && ay < 2f, wall = !room && ax < 2.2f && ay < 2.2f, door = wall && ax < .5f;
+                bool corridor = ax < 4f && p.y >= 2.2f && p.y < 4f, yard = ax < 5f && p.y <= -2.2f && p.y > -7f;
+                if (wall && !door) g.ObserveOccupied(i);
+                else if (room) g.ObserveFree(i);
+                else if (door || corridor || yard) lidar[i] = -c.log_odds_cap;
+                if ((room && ax <= 1.5f && ay <= 1.5f) || (corridor && p.y > 2.6f && p.y < 3.6f)) roof[i] = 255;   // ceiling seen over the room and the corridor
+            }
+            typeof(OccupancyGrid).GetField("roofDirty", flags).SetValue(g, true);
+            typeof(OccupancyGrid).GetField("dirty", flags).SetValue(g, true);
+            float corridorM2 = g.UnsearchedFloorBeyond(new Vector2(0, 1.9f), 12f), yardM2 = g.UnsearchedFloorBeyond(new Vector2(0, -1.9f), 12f);
+            Assert.That(corridorM2, Is.GreaterThan(.8f * 8f * 1.8f), "most of the 14.4 m2 corridor");
+            Assert.That(corridorM2, Is.LessThan(8f * 1.8f + 1f), "and not much more");
+            Assert.That(yardM2, Is.LessThan(.5f), "the yard has no ceiling seen over it");
+            Assert.That(g.UnsearchedFloorBeyond(new Vector2(0, 1.9f), 1f), Is.LessThan(corridorM2 / 3), "bounded by the radius");
         }
 
         [Test]
