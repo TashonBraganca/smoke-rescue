@@ -23,6 +23,8 @@
     "carry_speed_mps": 0.25,
     "carry_speed_mps_reason": "Walking speed while dragging an adult on a low-friction rescue sled. Assumed for a Spot-class robot pulling roughly 150 to 200 N (sled friction on a smooth floor); slow enough to keep the strap and sled stable.",
     "grip_cone_deg": 60.0,
-    "grip_cone_deg_reason": "A person may be gripped only within this angle of the robot's heading; the same 60 deg cone RobotActions.BeginExtract applies to the arm's contact check."
+    "grip_cone_deg_reason": "A person may be gripped only within this angle of the robot's heading; the same 60 deg cone RobotActions.BeginExtract applies to the arm's contact check.",
+    "target_tolerance_m": 1.05,
+    "target_tolerance_m_reason": "The arm straps on only a person whose body lies within this distance of the spot the agent named: half a roughly 1.7 m adult lying down (0.85 m) plus 0.2 m for the robot's measured localisation error (run 19 pose error p95 0.19 m). Same allowance as config/evaluation.json survivor_match_m."
   }
 }

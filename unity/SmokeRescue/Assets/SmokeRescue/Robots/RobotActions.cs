@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System;
 using System.IO;
 using SmokeRescue.World;
@@ -19,7 +20,7 @@ namespace SmokeRescue.Robots
     [Serializable]
     public sealed class RescueConfig
     {
-        public float reach_m, grip_s, tow_offset_m, carry_speed_mps;
+        public float reach_m, grip_s, tow_offset_m, carry_speed_mps, target_tolerance_m;
         [Serializable] sealed class File { public RescueConfig rescue; }
         public static RescueConfig Load() =>
             JsonUtility.FromJson<File>(System.IO.File.ReadAllText(Path.Combine(FloorPlan.ConfigDir, "actuators.json"))).rescue;
@@ -55,6 +56,8 @@ namespace SmokeRescue.Robots
         readonly RescueConfig rescue;
         LineRenderer jet;   // the visible stream while water flows (cameras and the showcase view see it)
         Transform carried; Collider[] carriedColliders;
+        /// <summary>Where the robot walked while towing, starting where the person lay: the sled follows this trail.</summary>
+        readonly List<Vector3> trail = new List<Vector3>();
         /// <summary>Raised when a person is strapped onto the sled; the recorder tells the brain to carry them out.</summary>
         public event Action<string> GripCompleted;
         /// <summary>Scene name of the person on the sled, or null.</summary>
@@ -79,7 +82,12 @@ namespace SmokeRescue.Robots
 
         /// <summary>Strap the nearest person within rescue reach ahead onto the sled (reach, grip, stow). Afterwards the
         /// person is towed behind the robot (Tow, every tick) until Release.</summary>
-        public bool BeginExtract()
+        public bool BeginExtract() => BeginExtract(null);
+
+        /// <summary>Strap on the person nearest the named world point (the agent's target, carried from its robot's own
+        /// frame through the robot's pose), within target_tolerance_m of it; null names nobody and takes the nearest
+        /// within reach (kept for tests and callers without a target).</summary>
+        public bool BeginExtract(Vector3? target)
         {
             if (IsRunning) return Refuse($"busy with {Action}");
             if (rescue == null) return Refuse("no rescue sled fitted");
@@ -97,12 +105,22 @@ namespace SmokeRescue.Robots
                 if (flat.magnitude > .05f && Vector3.Angle(forward, flat) > 60f) continue;
                 // Whether the strap can go on, from the arm's own link lengths: the nearest part of the body to the arm.
                 if (!robot.Arm.CanReach(col.ClosestPoint(robot.Arm.Root.position))) continue;
+                // Only the person the agent named (review: the arm used to lift whoever was nearest): the body closest to
+                // the named spot, within target_tolerance_m of it.
+                float score = flat.magnitude;
+                if (target.HasValue)
+                {
+                    var onBody = col.ClosestPoint(target.Value);
+                    score = new Vector2(onBody.x - target.Value.x, onBody.z - target.Value.z).magnitude;
+                    if (score > rescue.target_tolerance_m) continue;
+                }
                 // The strap goes on the nearest part of the body (a shoulder or limb), the point closest to the arm. The
                 // centre of a lying person's bounds is a metre past their near edge, beyond the arm (run 26: robot A's lift
                 // of s1 failed with "contact point is out of the arm's reach" while their near edge was within reach_m).
-                if (flat.magnitude < bestDistance) { bestDistance = flat.magnitude; best = person; bestPoint = col.ClosestPoint(robot.Arm.Root.position); }
+                if (score < bestDistance) { bestDistance = score; best = person; bestPoint = col.ClosestPoint(robot.Arm.Root.position); }
             }
-            if (best == null) return Refuse("nobody within the arm's reach ahead; move closer, facing them");
+            if (best == null) return Refuse(target.HasValue ? "nobody at the named spot within the arm's reach ahead; move closer, facing them"
+                                                          : "nobody within the arm's reach ahead; move closer, facing them");
             contact = bestPoint; TargetId = best.name; pushed = best;
             Action = "extract_survivor"; Status = "running"; FailureReason = null;
             Enter(Phase.Reach);
@@ -114,9 +132,18 @@ namespace SmokeRescue.Robots
         public void Tow()
         {
             if (carried == null) return;
-            float yaw = robot.Driver.YawDeg * Mathf.Deg2Rad;
-            var back = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw)) * -rescue.tow_offset_m;
-            carried.position = new Vector3(robot.transform.position.x + back.x, carried.position.y, robot.transform.position.z + back.z);
+            // The sled follows the robot's own trail at the tow distance, so it goes where the robot went (review: placed
+            // straight behind the robot, it cut through walls at corners).
+            var here = robot.transform.position;
+            if (trail.Count == 0 || (here - trail[trail.Count - 1]).sqrMagnitude > .0004f) trail.Add(here);
+            float left = rescue.tow_offset_m; var at = trail[trail.Count - 1];
+            for (int i = trail.Count - 1; i > 0 && left > 0; i--)
+            {
+                var a = trail[i]; var b = trail[i - 1]; float d = Vector2.Distance(new Vector2(a.x, a.z), new Vector2(b.x, b.z));
+                if (d >= left) { at = Vector3.Lerp(a, b, left / Mathf.Max(d, 1e-6f)); left = 0; }
+                else { left -= d; at = b; }
+            }
+            carried.position = new Vector3(at.x, carried.position.y, at.z);
         }
 
         /// <summary>Unstrap the towed person where they are; returns their scene name, or null.</summary>
@@ -202,6 +229,7 @@ namespace SmokeRescue.Robots
                     {
                         // Strapped on: the body no longer blocks the robot or its LiDAR; it rides the sled behind.
                         carried = pushed; carriedColliders = carried.GetComponentsInChildren<Collider>();
+                        trail.Clear(); trail.Add(carried.position); trail.Add(robot.transform.position);
                         foreach (var col in carriedColliders) col.enabled = false;
                     }
                     else if (Action == "spray_water")
