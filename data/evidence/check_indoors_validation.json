@@ -1,0 +1,543 @@
+{
+  "opencv_version": "5.0.0",
+  "recording": "unity_house_hidden_v1",
+  "label_method": "Oracle camera locations are read only in evaluator tests. Direction annotations distinguish doorway interiors from facade views. A remains outside at 60-120 s; B is inside then. Labels describe the viewed direction, not camera occupancy.",
+  "unknown_scoring": "Unknown counts as a miss for strict indoor/outdoor accuracy and as an abstention for decided-only accuracy.",
+  "centre_bearing_accuracy": {
+    "correct": 10,
+    "n": 16,
+    "fraction": 0.625
+  },
+  "all_bearing_accuracy": {
+    "correct": 10,
+    "n": 24,
+    "fraction": 0.4166666666666667
+  },
+  "decided_accuracy": {
+    "correct": 10,
+    "n": 10,
+    "fraction": 1.0
+  },
+  "unknown_count": 14,
+  "recorded_cases": [
+    {
+      "robot": "A",
+      "t": 0.0,
+      "bearing": 0.0,
+      "camera_inside": false,
+      "label": "indoors",
+      "verdict": "indoors"
+    },
+    {
+      "robot": "A",
+      "t": 60.0,
+      "bearing": 0.0,
+      "camera_inside": false,
+      "label": "outdoors",
+      "verdict": "unknown"
+    },
+    {
+      "robot": "A",
+      "t": 70.0,
+      "bearing": 0.0,
+      "camera_inside": false,
+      "label": "indoors",
+      "verdict": "indoors"
+    },
+    {
+      "robot": "A",
+      "t": 80.0,
+      "bearing": 0.0,
+      "camera_inside": false,
+      "label": "indoors",
+      "verdict": "indoors"
+    },
+    {
+      "robot": "A",
+      "t": 90.0,
+      "bearing": 0.0,
+      "camera_inside": false,
+      "label": "indoors",
+      "verdict": "indoors"
+    },
+    {
+      "robot": "A",
+      "t": 100.0,
+      "bearing": 0.0,
+      "camera_inside": false,
+      "label": "indoors",
+      "verdict": "indoors"
+    },
+    {
+      "robot": "A",
+      "t": 110.0,
+      "bearing": 0.0,
+      "camera_inside": false,
+      "label": "indoors",
+      "verdict": "indoors"
+    },
+    {
+      "robot": "A",
+      "t": 120.0,
+      "bearing": 0.0,
+      "camera_inside": false,
+      "label": "indoors",
+      "verdict": "indoors"
+    },
+    {
+      "robot": "A",
+      "t": 0.0,
+      "bearing": -35.0,
+      "label": "outdoors",
+      "verdict": "unknown"
+    },
+    {
+      "robot": "A",
+      "t": 0.0,
+      "bearing": -30.0,
+      "label": "outdoors",
+      "verdict": "unknown"
+    },
+    {
+      "robot": "A",
+      "t": 0.0,
+      "bearing": 30.0,
+      "label": "outdoors",
+      "verdict": "unknown"
+    },
+    {
+      "robot": "A",
+      "t": 0.0,
+      "bearing": 35.0,
+      "label": "outdoors",
+      "verdict": "unknown"
+    },
+    {
+      "robot": "B",
+      "t": 0.0,
+      "bearing": 0.0,
+      "camera_inside": false,
+      "label": "indoors",
+      "verdict": "indoors"
+    },
+    {
+      "robot": "B",
+      "t": 60.0,
+      "bearing": 0.0,
+      "camera_inside": true,
+      "label": "indoors",
+      "verdict": "unknown"
+    },
+    {
+      "robot": "B",
+      "t": 70.0,
+      "bearing": 0.0,
+      "camera_inside": true,
+      "label": "indoors",
+      "verdict": "indoors"
+    },
+    {
+      "robot": "B",
+      "t": 80.0,
+      "bearing": 0.0,
+      "camera_inside": true,
+      "label": "indoors",
+      "verdict": "unknown"
+    },
+    {
+      "robot": "B",
+      "t": 90.0,
+      "bearing": 0.0,
+      "camera_inside": true,
+      "label": "indoors",
+      "verdict": "unknown"
+    },
+    {
+      "robot": "B",
+      "t": 100.0,
+      "bearing": 0.0,
+      "camera_inside": true,
+      "label": "indoors",
+      "verdict": "unknown"
+    },
+    {
+      "robot": "B",
+      "t": 110.0,
+      "bearing": 0.0,
+      "camera_inside": true,
+      "label": "indoors",
+      "verdict": "unknown"
+    },
+    {
+      "robot": "B",
+      "t": 120.0,
+      "bearing": 0.0,
+      "camera_inside": true,
+      "label": "indoors",
+      "verdict": "indoors"
+    },
+    {
+      "robot": "B",
+      "t": 0.0,
+      "bearing": -35.0,
+      "label": "outdoors",
+      "verdict": "unknown"
+    },
+    {
+      "robot": "B",
+      "t": 0.0,
+      "bearing": -30.0,
+      "label": "outdoors",
+      "verdict": "unknown"
+    },
+    {
+      "robot": "B",
+      "t": 0.0,
+      "bearing": 30.0,
+      "label": "outdoors",
+      "verdict": "unknown"
+    },
+    {
+      "robot": "B",
+      "t": 0.0,
+      "bearing": 35.0,
+      "label": "outdoors",
+      "verdict": "unknown"
+    }
+  ],
+  "temporary_revert_method": "Each named implementation change was removed temporarily and the entire new test file was rerun. Source files were restored in finally. These entries list the failing cases from actual pytest JUnit results.",
+  "new_test_cases_with_observed_revert_failure": 46,
+  "revert_check_per_test": {
+    "test_horizontal_ceiling_height_walls_and_debug_evidence": [
+      "remove_ceiling_evidence",
+      "remove_mount_rotation",
+      "remove_debug_image"
+    ],
+    "test_canopy_without_walls_is_unknown": [
+      "remove_ceiling_evidence",
+      "remove_unknown_fallback"
+    ],
+    "test_tall_ceiling_has_no_height_band_and_sensor_range_is_respected": [
+      "remove_ceiling_evidence",
+      "remove_unknown_fallback",
+      "remove_mount_rotation",
+      "remove_high_ceiling_wall_guard",
+      "remove_sensor_range_override"
+    ],
+    "test_verdict_thresholds_come_from_config": [
+      "remove_ceiling_evidence",
+      "remove_unknown_fallback",
+      "remove_config_override"
+    ],
+    "test_recorded_outside_doorway_and_facade[0.0-A]": [
+      "remove_ceiling_evidence",
+      "remove_mount_rotation"
+    ],
+    "test_recorded_outside_doorway_and_facade[0.0-B]": [
+      "remove_ceiling_evidence",
+      "remove_mount_rotation"
+    ],
+    "test_recorded_interval_labels_and_verdicts[70.0-A]": [
+      "remove_ceiling_evidence",
+      "remove_mount_rotation"
+    ],
+    "test_recorded_interval_labels_and_verdicts[70.0-B]": [
+      "remove_ceiling_evidence",
+      "remove_mount_rotation"
+    ],
+    "test_recorded_interval_labels_and_verdicts[80.0-A]": [
+      "remove_ceiling_evidence",
+      "remove_mount_rotation"
+    ],
+    "test_recorded_interval_labels_and_verdicts[90.0-A]": [
+      "remove_ceiling_evidence",
+      "remove_mount_rotation"
+    ],
+    "test_recorded_interval_labels_and_verdicts[100.0-A]": [
+      "remove_ceiling_evidence",
+      "remove_mount_rotation"
+    ],
+    "test_recorded_interval_labels_and_verdicts[110.0-A]": [
+      "remove_ceiling_evidence",
+      "remove_mount_rotation"
+    ],
+    "test_recorded_interval_labels_and_verdicts[120.0-A]": [
+      "remove_ceiling_evidence",
+      "remove_mount_rotation"
+    ],
+    "test_recorded_interval_labels_and_verdicts[120.0-B]": [
+      "remove_ceiling_evidence",
+      "remove_mount_rotation"
+    ],
+    "test_indoor_frontier_requires_matching_bearing[0.0-True]": [
+      "remove_ceiling_evidence",
+      "remove_frontier_evidence_gate"
+    ],
+    "test_indoor_frontier_requires_matching_bearing[5.0-True]": [
+      "remove_ceiling_evidence",
+      "remove_frontier_evidence_gate"
+    ],
+    "test_indoor_frontier_requires_matching_bearing[5.1-False]": [
+      "remove_ceiling_evidence",
+      "remove_frontier_evidence_gate"
+    ],
+    "test_indoor_frontier_requires_matching_bearing[-5.1-False]": [
+      "remove_ceiling_evidence",
+      "remove_frontier_evidence_gate"
+    ],
+    "test_indoor_frontier_requires_matching_bearing[20.0-False]": [
+      "remove_ceiling_evidence",
+      "remove_frontier_evidence_gate"
+    ],
+    "test_sky_needs_lower_returns_and_facade_is_not_indoor": [
+      "remove_unknown_fallback",
+      "remove_outdoors_verdict"
+    ],
+    "test_unseen_bearing_is_unknown[90.0]": [
+      "remove_unknown_fallback"
+    ],
+    "test_unseen_bearing_is_unknown[-90.0]": [
+      "remove_unknown_fallback"
+    ],
+    "test_unseen_bearing_is_unknown[180.0]": [
+      "remove_unknown_fallback"
+    ],
+    "test_recorded_outside_doorway_and_facade[-35.0-A]": [
+      "remove_unknown_fallback"
+    ],
+    "test_recorded_outside_doorway_and_facade[-35.0-B]": [
+      "remove_unknown_fallback"
+    ],
+    "test_recorded_outside_doorway_and_facade[-30.0-A]": [
+      "remove_unknown_fallback"
+    ],
+    "test_recorded_outside_doorway_and_facade[-30.0-B]": [
+      "remove_unknown_fallback"
+    ],
+    "test_recorded_outside_doorway_and_facade[30.0-A]": [
+      "remove_unknown_fallback"
+    ],
+    "test_recorded_outside_doorway_and_facade[30.0-B]": [
+      "remove_unknown_fallback"
+    ],
+    "test_recorded_outside_doorway_and_facade[35.0-A]": [
+      "remove_unknown_fallback"
+    ],
+    "test_recorded_outside_doorway_and_facade[35.0-B]": [
+      "remove_unknown_fallback"
+    ],
+    "test_recorded_interval_labels_and_verdicts[60.0-A]": [
+      "remove_unknown_fallback"
+    ],
+    "test_recorded_interval_labels_and_verdicts[60.0-B]": [
+      "remove_unknown_fallback"
+    ],
+    "test_recorded_interval_labels_and_verdicts[80.0-B]": [
+      "remove_unknown_fallback"
+    ],
+    "test_recorded_interval_labels_and_verdicts[90.0-B]": [
+      "remove_unknown_fallback"
+    ],
+    "test_recorded_interval_labels_and_verdicts[100.0-B]": [
+      "remove_unknown_fallback"
+    ],
+    "test_recorded_interval_labels_and_verdicts[110.0-B]": [
+      "remove_unknown_fallback"
+    ],
+    "test_outdoors_or_unknown_frontier_evidence_refused[missing]": [
+      "remove_unknown_fallback",
+      "remove_frontier_evidence_gate"
+    ],
+    "test_nonfinite_bearing_rejected[nan]": [
+      "remove_finite_bearing_guard"
+    ],
+    "test_nonfinite_bearing_rejected[inf]": [
+      "remove_finite_bearing_guard"
+    ],
+    "test_unproven_frontier_requires_evidence": [
+      "remove_frontier_evidence_gate"
+    ],
+    "test_outdoors_or_unknown_frontier_evidence_refused[sky]": [
+      "remove_frontier_evidence_gate"
+    ],
+    "test_frontier_cannot_cite_another_tool_or_another_step": [
+      "remove_frontier_evidence_gate"
+    ],
+    "test_proven_frontiers_unchanged[True]": [
+      "remove_proven_compatibility"
+    ],
+    "test_proven_frontiers_unchanged[absent]": [
+      "remove_proven_compatibility"
+    ],
+    "test_perception_schema_exposes_bearing_and_optional_action_evidence": [
+      "remove_tool_schema"
+    ]
+  },
+  "revert_checks": [
+    {
+      "mutation": "remove_ceiling_evidence",
+      "exit": 1,
+      "failed": [
+        "test_horizontal_ceiling_height_walls_and_debug_evidence",
+        "test_canopy_without_walls_is_unknown",
+        "test_tall_ceiling_has_no_height_band_and_sensor_range_is_respected",
+        "test_verdict_thresholds_come_from_config",
+        "test_recorded_outside_doorway_and_facade[0.0-A]",
+        "test_recorded_outside_doorway_and_facade[0.0-B]",
+        "test_recorded_interval_labels_and_verdicts[70.0-A]",
+        "test_recorded_interval_labels_and_verdicts[70.0-B]",
+        "test_recorded_interval_labels_and_verdicts[80.0-A]",
+        "test_recorded_interval_labels_and_verdicts[90.0-A]",
+        "test_recorded_interval_labels_and_verdicts[100.0-A]",
+        "test_recorded_interval_labels_and_verdicts[110.0-A]",
+        "test_recorded_interval_labels_and_verdicts[120.0-A]",
+        "test_recorded_interval_labels_and_verdicts[120.0-B]",
+        "test_indoor_frontier_requires_matching_bearing[0.0-True]",
+        "test_indoor_frontier_requires_matching_bearing[5.0-True]",
+        "test_indoor_frontier_requires_matching_bearing[5.1-False]",
+        "test_indoor_frontier_requires_matching_bearing[-5.1-False]",
+        "test_indoor_frontier_requires_matching_bearing[20.0-False]"
+      ]
+    },
+    {
+      "mutation": "remove_unknown_fallback",
+      "exit": 1,
+      "failed": [
+        "test_sky_needs_lower_returns_and_facade_is_not_indoor",
+        "test_canopy_without_walls_is_unknown",
+        "test_tall_ceiling_has_no_height_band_and_sensor_range_is_respected",
+        "test_unseen_bearing_is_unknown[90.0]",
+        "test_unseen_bearing_is_unknown[-90.0]",
+        "test_unseen_bearing_is_unknown[180.0]",
+        "test_verdict_thresholds_come_from_config",
+        "test_recorded_outside_doorway_and_facade[-35.0-A]",
+        "test_recorded_outside_doorway_and_facade[-35.0-B]",
+        "test_recorded_outside_doorway_and_facade[-30.0-A]",
+        "test_recorded_outside_doorway_and_facade[-30.0-B]",
+        "test_recorded_outside_doorway_and_facade[30.0-A]",
+        "test_recorded_outside_doorway_and_facade[30.0-B]",
+        "test_recorded_outside_doorway_and_facade[35.0-A]",
+        "test_recorded_outside_doorway_and_facade[35.0-B]",
+        "test_recorded_interval_labels_and_verdicts[60.0-A]",
+        "test_recorded_interval_labels_and_verdicts[60.0-B]",
+        "test_recorded_interval_labels_and_verdicts[80.0-B]",
+        "test_recorded_interval_labels_and_verdicts[90.0-B]",
+        "test_recorded_interval_labels_and_verdicts[100.0-B]",
+        "test_recorded_interval_labels_and_verdicts[110.0-B]",
+        "test_outdoors_or_unknown_frontier_evidence_refused[missing]"
+      ]
+    },
+    {
+      "mutation": "remove_outdoors_verdict",
+      "exit": 1,
+      "failed": [
+        "test_sky_needs_lower_returns_and_facade_is_not_indoor"
+      ]
+    },
+    {
+      "mutation": "remove_finite_bearing_guard",
+      "exit": 1,
+      "failed": [
+        "test_nonfinite_bearing_rejected[nan]",
+        "test_nonfinite_bearing_rejected[inf]"
+      ]
+    },
+    {
+      "mutation": "remove_config_override",
+      "exit": 1,
+      "failed": [
+        "test_verdict_thresholds_come_from_config"
+      ]
+    },
+    {
+      "mutation": "remove_frontier_evidence_gate",
+      "exit": 1,
+      "failed": [
+        "test_unproven_frontier_requires_evidence",
+        "test_outdoors_or_unknown_frontier_evidence_refused[sky]",
+        "test_outdoors_or_unknown_frontier_evidence_refused[missing]",
+        "test_indoor_frontier_requires_matching_bearing[0.0-True]",
+        "test_indoor_frontier_requires_matching_bearing[5.0-True]",
+        "test_indoor_frontier_requires_matching_bearing[5.1-False]",
+        "test_indoor_frontier_requires_matching_bearing[-5.1-False]",
+        "test_indoor_frontier_requires_matching_bearing[20.0-False]",
+        "test_frontier_cannot_cite_another_tool_or_another_step"
+      ]
+    },
+    {
+      "mutation": "remove_proven_compatibility",
+      "exit": 1,
+      "failed": [
+        "test_proven_frontiers_unchanged[True]",
+        "test_proven_frontiers_unchanged[absent]"
+      ]
+    },
+    {
+      "mutation": "remove_tool_schema",
+      "exit": 1,
+      "failed": [
+        "test_perception_schema_exposes_bearing_and_optional_action_evidence"
+      ]
+    },
+    {
+      "mutation": "remove_mount_rotation",
+      "exit": 1,
+      "failed": [
+        "test_horizontal_ceiling_height_walls_and_debug_evidence",
+        "test_tall_ceiling_has_no_height_band_and_sensor_range_is_respected",
+        "test_recorded_outside_doorway_and_facade[0.0-A]",
+        "test_recorded_outside_doorway_and_facade[0.0-B]",
+        "test_recorded_interval_labels_and_verdicts[70.0-A]",
+        "test_recorded_interval_labels_and_verdicts[70.0-B]",
+        "test_recorded_interval_labels_and_verdicts[80.0-A]",
+        "test_recorded_interval_labels_and_verdicts[90.0-A]",
+        "test_recorded_interval_labels_and_verdicts[100.0-A]",
+        "test_recorded_interval_labels_and_verdicts[110.0-A]",
+        "test_recorded_interval_labels_and_verdicts[120.0-A]",
+        "test_recorded_interval_labels_and_verdicts[120.0-B]"
+      ]
+    },
+    {
+      "mutation": "remove_debug_image",
+      "exit": 1,
+      "failed": [
+        "test_horizontal_ceiling_height_walls_and_debug_evidence"
+      ]
+    },
+    {
+      "mutation": "remove_high_ceiling_wall_guard",
+      "exit": 1,
+      "failed": [
+        "test_tall_ceiling_has_no_height_band_and_sensor_range_is_respected"
+      ]
+    },
+    {
+      "mutation": "remove_sensor_range_override",
+      "exit": 1,
+      "failed": [
+        "test_tall_ceiling_has_no_height_band_and_sensor_range_is_respected"
+      ]
+    }
+  ],
+  "perception_config": {
+    "bearing_tolerance_deg": 5.0,
+    "bearing_tolerance_deg_reason": "A 10 degree column band spans about 73 centre pixels at sensors.json camera.fx=415.692. Recorded A/B t=0 at bearing 0 contain doorway ceilings while bands at +/-30 and +/-35 contain facade walls. The same half-width limits frontier evidence reuse.",
+    "wall_side_offset_deg": 10.0,
+    "wall_side_offset_deg_reason": "Adjacent 10 degree bands touch the central band without a gap. At the 640 pixel camera's 37.6 degree half horizontal view, central and side walls can be measured separately.",
+    "normal_offset_px": 12,
+    "normal_offset_px_reason": "Normals use endpoints 24 pixels apart. At 8 m and fx=415.692 this is a 0.462 m baseline, compared with sensors.json depth sigma=0.096 m. Recorded A/B t=0 facade bands yielded no overhead horizontal hits with this baseline; a 5 pixel OpenCV normal window yielded spurious hits at heights 1.815-1.858 m.",
+    "surface_tilt_tolerance_deg": 15.0,
+    "surface_tilt_tolerance_deg_reason": "Recorded A/B t=0 doorway ceiling normals with the 24 pixel baseline have gravity dot products near 0.998-1.000; facade normals have 90th percentiles 0.066-0.073. A 15 degree cone admits the ceiling and rejects these vertical facades. Walls use the complementary cone.",
+    "overhead_clearance_m": 0.2,
+    "overhead_clearance_m_reason": "Require points above the 1.6 m mast by at least the depth sensor's 0.2 m minimum measurable distance. This excludes camera-height clutter without imposing a ceiling height band.",
+    "min_ceiling_upward_fraction": 0.04,
+    "min_ceiling_upward_fraction_reason": "With the 24 pixel normal baseline, recorded A/B t=0 central doorway ceiling shares are 0.356/0.301 and facade shares are zero. A t=120 has only 0.059 with this baseline; a 0.04 minimum retains narrow visible ceiling evidence while rejecting isolated normal errors. This is calibrated on these frames, not a universal indoor prior.",
+    "min_wall_fraction": 0.02,
+    "min_wall_fraction_reason": "Recorded A t=0 centre wall share is about 0.025 with the 24 pixel baseline, and facade shares exceed 0.79. Require at least 0.02 in one of the three bands so overhead evidence alone does not accept an isolated canopy.",
+    "min_lower_return_fraction": 0.5,
+    "min_lower_return_fraction_reason": "Recorded A/B t=0 doorway lower return shares are 0.685/0.686. Requiring a majority retains these entry views but leaves total sensor dropout unknown instead of calling it sky.",
+    "min_upward_void_fraction": 0.9,
+    "min_upward_void_fraction_reason": "Recorded indoor B t=60 upward dropout is 0.486, and doorway B t=0 is 0.495. Requiring 0.9 prevents those measured dropout levels from being called outdoors. Open-sky analytic rays have share 1.0. Wall evidence keeps a range-limited high-ceiling view unknown even above this threshold."
+  },
+  "limits": "Calibration uses this recording and analytic ray intersections, not an independent held-out dataset. Recorded facade checks abstain. Open sky is verified synthetically. A ceiling beyond the depth range cannot be measured; visible walls keep that view unknown."
+}

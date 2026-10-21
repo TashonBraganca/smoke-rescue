@@ -43,6 +43,9 @@ STR = {"type": "string"}
 EVIDENCE = {"type": "string", "description": "id of the OpenCV result that supports this action"}
 
 PERCEPTION = [
+    _fn("check_indoors", "Check whether a direction is indoors using this robot's depth frame. Returns indoors / "
+        "outdoors / unknown, ceiling height, walls, void rays and an evidence id.",
+        {"bearing_deg": NUM}, ["bearing_deg"]),
     _fn("scan_thermal", "OpenCV 5 thermal scan of the current view: fire hotspots (over 200 C) and person-sized warm "
         "regions, each with bearing (deg, + right), range (m) and building position."),
     _fn("inspect_candidate", "Verify one warm region with independent OpenCV cues (metric size, thermal structure, "
@@ -60,7 +63,7 @@ ACTIONS = [
     _fn("explore_frontier", "Search one of the frontiers listed in the context next (unsearched floor the robot can reach). "
         "The robot's planner drives there, keeping clear of walls, and sweeps the area on arrival. Pick by more "
         "unsearched area, shorter path, and away from where your partner is searching.",
-        {"frontier_id": {"type": "integer"}, "reason": STR}, ["frontier_id", "reason"]),
+        {"frontier_id": {"type": "integer"}, "reason": STR, "evidence_id": EVIDENCE}, ["frontier_id", "reason"]),
     _fn("go_to", "Drive to a building position (x, y in metres) by the robot's own planner.",
         {"x": NUM, "y": NUM, "reason": STR}, ["x", "y", "reason"]),
     _fn("approach_candidate", f"Walk to a viewpoint {APPROACH_STANDOFF_M:.1f} m short of an inspected warm region, on the line from the robot, "
@@ -182,6 +185,9 @@ class ToolRegistry:
         r["x"], r["y"] = (round(v, 2) for v in self.world(float(bearing_deg), float(range_m)))
         return r
 
+    def _p_check_indoors(self, bearing_deg: float):
+        return vision.check_indoors(self._frame(), float(bearing_deg), output_dir=self.debug_dir)
+
     def _p_assess_visibility(self):
         return vision.assess_visibility(self._frame())
 
@@ -291,7 +297,18 @@ class ToolRegistry:
             elif self.ctx.event_kind in ("avoid_fire", "retreat"):
                 refusal = {"refused": True, "reason": "no exploring during a heat event: let the reflex layer back away"}
             else:
-                args = {**args, "x": float(match[0]["x"]), "y": float(match[0]["y"])}
+                frontier = match[0]
+                if frontier.get("proven_indoors", True) is False:
+                    dx, dy = float(frontier["x"]) - self.ctx.x, float(frontier["y"]) - self.ctx.y
+                    bearing = (math.degrees(math.atan2(dx, dy)) - self.ctx.heading_deg + 180) % 360 - 180
+                    refusal = self._need(args, ("check_indoors",), lambda ev:
+                        ev.get("verdict") == "indoors" and
+                        abs((float(ev["bearing_deg"]) - bearing + 180) % 360 - 180) <= float(ev["bearing_tolerance_deg"]),
+                        "the cited indoor check must say indoors within its bearing tolerance of this frontier")
+                    if refusal is None:
+                        args = {**args, "unproven": True}
+                if refusal is None:
+                    args = {**args, "x": float(frontier["x"]), "y": float(frontier["y"])}
         elif name == "go_to":
             # No outline exists (no prior knowledge); the brain refuses targets not known to be indoors.
             if self.ctx.event_kind in ("avoid_fire", "retreat"):

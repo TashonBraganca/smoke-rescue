@@ -1,0 +1,20 @@
+{
+  "bearing_tolerance_deg": 5.0,
+  "bearing_tolerance_deg_reason": "A 10 degree column band spans about 73 centre pixels at sensors.json camera.fx=415.692. Recorded A/B t=0 at bearing 0 contain doorway ceilings while bands at +/-30 and +/-35 contain facade walls. The same half-width limits frontier evidence reuse.",
+  "wall_side_offset_deg": 10.0,
+  "wall_side_offset_deg_reason": "Adjacent 10 degree bands touch the central band without a gap. At the 640 pixel camera's 37.6 degree half horizontal view, central and side walls can be measured separately.",
+  "normal_offset_px": 12,
+  "normal_offset_px_reason": "Normals use endpoints 24 pixels apart. At 8 m and fx=415.692 this is a 0.462 m baseline, compared with sensors.json depth sigma=0.096 m. Recorded A/B t=0 facade bands yielded no overhead horizontal hits with this baseline; a 5 pixel OpenCV normal window yielded spurious hits at heights 1.815-1.858 m.",
+  "surface_tilt_tolerance_deg": 15.0,
+  "surface_tilt_tolerance_deg_reason": "Recorded A/B t=0 doorway ceiling normals with the 24 pixel baseline have gravity dot products near 0.998-1.000; facade normals have 90th percentiles 0.066-0.073. A 15 degree cone admits the ceiling and rejects these vertical facades. Walls use the complementary cone.",
+  "overhead_clearance_m": 0.2,
+  "overhead_clearance_m_reason": "Require points above the 1.6 m mast by at least the depth sensor's 0.2 m minimum measurable distance. This excludes camera-height clutter without imposing a ceiling height band.",
+  "min_ceiling_upward_fraction": 0.04,
+  "min_ceiling_upward_fraction_reason": "With the 24 pixel normal baseline, recorded A/B t=0 central doorway ceiling shares are 0.356/0.301 and facade shares are zero. A t=120 has only 0.059 with this baseline; a 0.04 minimum retains narrow visible ceiling evidence while rejecting isolated normal errors. This is calibrated on these frames, not a universal indoor prior.",
+  "min_wall_fraction": 0.02,
+  "min_wall_fraction_reason": "Recorded A t=0 centre wall share is about 0.025 with the 24 pixel baseline, and facade shares exceed 0.79. Require at least 0.02 in one of the three bands so overhead evidence alone does not accept an isolated canopy.",
+  "min_lower_return_fraction": 0.5,
+  "min_lower_return_fraction_reason": "Recorded A/B t=0 doorway lower return shares are 0.685/0.686. Requiring a majority retains these entry views but leaves total sensor dropout unknown instead of calling it sky.",
+  "min_upward_void_fraction": 0.9,
+  "min_upward_void_fraction_reason": "Recorded indoor B t=60 upward dropout is 0.486, and doorway B t=0 is 0.495. Requiring 0.9 prevents those measured dropout levels from being called outdoors. Open-sky analytic rays have share 1.0. Wall evidence keeps a range-limited high-ceiling view unknown even above this threshold."
+}

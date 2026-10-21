@@ -448,6 +448,110 @@ def detect_people_rgb(frame: Frame, *, min_conf: float = 0.35, model: Path | Non
     return people
 
 
+def check_indoors(frame: Frame, bearing_deg: float, *, output_dir: str | Path,
+                  config: dict | None = None, sensors: dict | None = None) -> dict:
+    """Measure the viewed direction, not the camera's location, using only its depth.
+
+    Optical depth is z, x is right and y is down. Rotate by the mast pitch
+    before computing height above the floor. Missing upward depth alone is
+    insufficient evidence of outdoors because smoke also removes returns.
+    """
+    if not math.isfinite(bearing_deg):
+        raise ValueError("bearing must be finite")
+    root = Path(__file__).resolve().parents[3] / "config"
+    config = dict(config) if config is not None else json.loads((root / "perception.json").read_text())
+    sensors = sensors if sensors is not None else json.loads((root / "sensors.json").read_text())
+    mount, depth_sensor = sensors["camera"]["mount"], sensors["depth"]
+    tolerance = float(config["bearing_tolerance_deg"])
+    step = int(config["normal_offset_px"])
+    if tolerance <= 0 or step < 1:
+        raise ValueError("bearing tolerance and normal baseline must be positive")
+    pitch = math.radians(float(mount["pitch_down_deg"]))
+    sin_pitch, cos_pitch = math.sin(pitch), math.cos(pitch)
+    depth = frame.depth_m.copy()
+    valid = np.isfinite(depth) & (depth >= depth_sensor["min_m"]) & (depth < depth_sensor["max_m"])
+    depth[~valid] = np.nan
+    points = cv2.depthTo3d(depth, frame.K)[:, :, :3]
+    heights = float(mount["height_m"]) - sin_pitch * points[:, :, 2] - cos_pitch * points[:, :, 1]
+    h, w = depth.shape
+    up = -sin_pitch - (np.arange(h)[:, None] - frame.K[1, 2]) / frame.K[1, 1] * cos_pitch
+    columns = np.degrees(np.arctan2(np.arange(w) - frame.K[0, 2], frame.K[0, 0]))[None, :]
+    normals = np.full_like(points, np.nan)
+    if h > 2 * step and w > 2 * step:
+        horizontal = points[step:-step, 2*step:] - points[step:-step, :-2*step]
+        vertical = points[2*step:, step:-step] - points[:-2*step, step:-step]
+        cross = np.cross(horizontal, vertical)
+        length = np.linalg.norm(cross, axis=2, keepdims=True)
+        np.divide(cross, length, out=normals[step:-step, step:-step], where=length > 0)
+    normal_up = np.abs(-sin_pitch * normals[:, :, 2] - cos_pitch * normals[:, :, 1])
+    tilt = math.radians(float(config["surface_tilt_tolerance_deg"]))
+    horizontal_surface = normal_up >= math.cos(tilt)
+    vertical_surface = normal_up <= math.sin(tilt)
+    band = np.broadcast_to(np.abs(columns - bearing_deg) <= tolerance, depth.shape)
+    upward, lower = band & (up > 0), band & (up < 0)
+    ceiling = (upward & valid & horizontal_surface &
+               (heights >= float(mount["height_m"]) + config["overhead_clearance_m"]))
+
+    def fraction(mask, region):
+        count = int(region.sum())
+        return float(np.count_nonzero(mask & region) / count) if count else 0.
+
+    def median(array, mask):
+        return _number(np.median(array[mask])) if mask.any() else None
+
+    walls = []
+    for offset in (-config["wall_side_offset_deg"], 0., config["wall_side_offset_deg"]):
+        wall_band = np.broadcast_to(np.abs(columns - bearing_deg - offset) <= tolerance, depth.shape)
+        wall = wall_band & valid & vertical_surface
+        walls.append({"bearing_deg": float(bearing_deg + offset), "hit_fraction": fraction(wall, wall_band),
+                      "range_m": median(depth, wall)})
+    ceiling_share = fraction(ceiling, upward)
+    void_share = fraction(~valid, upward)
+    lower_share = fraction(valid, lower)
+    verdict, reasons = "unknown", []
+    if not upward.any() or not lower.any():
+        reasons.append("The bearing has no upward and lower rays in this frame.")
+    elif (ceiling_share >= config["min_ceiling_upward_fraction"] and
+          lower_share >= config["min_lower_return_fraction"] and
+          any(wall["hit_fraction"] >= config["min_wall_fraction"] for wall in walls)):
+        verdict = "indoors"
+        reasons.append("Horizontal overhead returns and vertical wall returns bound this direction; lower rays also return depth.")
+    elif (void_share >= config["min_upward_void_fraction"] and
+          lower_share >= config["min_lower_return_fraction"] and
+          ceiling_share < config["min_ceiling_upward_fraction"] and
+          all(wall["hit_fraction"] < config["min_wall_fraction"] for wall in walls)):
+        verdict = "outdoors"
+        reasons.append("Most upward rays have no return within sensor range while lower rays return depth, without enclosing wall evidence.")
+    else:
+        reasons.append("The frame does not establish an overhead enclosure or open sky; walls alone cannot distinguish a facade from an indoor wall.")
+    params = {"bearing_deg": float(bearing_deg), "bearing_tolerance_deg": tolerance,
+              "config": config, "mount": mount, "depth_sensor": depth_sensor}
+    result = _base("check_indoors", frame, params, bearing_deg=float(bearing_deg),
+                   bearing_tolerance_deg=tolerance, verdict=verdict, reasons=reasons,
+                   ceiling={"height_above_floor_m": median(heights, ceiling),
+                            "upward_hit_fraction": ceiling_share, "range_m": median(depth, ceiling)},
+                   walls=walls, void={"upward_no_return_fraction": void_share,
+                                     "lower_return_fraction": lower_share,
+                                     "max_range_m": float(depth_sensor["max_m"])},
+                   evidence=["OpenCV depthTo3d on this robot's RGB-D frame, with gravity-aligned normals from the configured mast pitch.",
+                             "Ceiling height is relative to the configured camera mount's floor datum; no ceiling height band or map is used."],
+                   debug_crop=None)
+    debug = cv2.cvtColor(frame.rgb, cv2.COLOR_RGB2BGR)
+    debug[upward & ~valid] = (255, 80, 0)
+    debug[band & valid & vertical_surface] = (0, 200, 255)
+    debug[ceiling] = (0, 255, 0)
+    contours, _ = cv2.findContours(band.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    cv2.drawContours(debug, contours, -1, (255, 255, 255), 1)
+    cv2.putText(debug, f"{verdict}: green ceiling, yellow wall, blue void", (8, 20),
+                cv2.FONT_HERSHEY_SIMPLEX, .45, (255, 255, 255), 1)
+    path = Path(output_dir) / f"{result['id']}.png"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not cv2.imwrite(str(path), debug):
+        raise OSError("cannot write indoor evidence image")
+    result["debug_crop"] = str(path)
+    return result
+
+
 def assess_visibility(frame: Frame) -> dict:
     """RGB usable if Laplacian variance>=20, RMS contrast>=12 and haze<=0.8.
 
