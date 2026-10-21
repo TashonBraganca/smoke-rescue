@@ -136,6 +136,23 @@ def test_third_close_look_at_one_spot_is_refused(tmp_path, monkeypatch):
     assert out["orders"] == [] and "already looked" in out["refusals"][0]["reason"]
 
 
+def test_walking_to_a_person_the_inspection_saw_is_never_refused_as_another_look(tmp_path, monkeypatch):
+    # Held-out seed 914 run 4: two close looks at a spot, then a "person" verdict and confirmation; approach_candidate
+    # refused, so robot B never reached the arm's range. The control: the same calls with an "uncertain" verdict.
+    for verdict, refused in (("person", False), ("uncertain", True)):
+        fake_vision(monkeypatch, verdict)
+        T.ToolRegistry._looks.clear(); T.ToolRegistry._pending.clear()
+        for k in range(3):
+            req = request(tmp_path) | {"t": 30.0 + k}
+            out = RobotAgent(Scripted([[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": 5})],
+                                       [ToolCall("approach_candidate", {"evidence_id": "ev1"})]]), tmp_path / "t.jsonl").step(req)
+        assert bool(out["refusals"]) is refused, verdict
+        if not refused:
+            (o,) = out["orders"]
+            assert o["type"] == "go_to" and (o["face_x"], o["face_y"]) == pytest.approx((5.0, 10.0))
+            assert T.ToolRegistry._pending.get("robot_A") is None   # nothing left to resolve: exploring stays allowed
+
+
 def test_explore_frontier_uses_the_offered_coordinates_and_refuses_invented_ids(tmp_path, monkeypatch):
     fake_vision(monkeypatch)
     frontiers = [{"id": 0, "x": 7.5, "y": 3.2, "path_m": 4.0, "unsearched_m2": 6.0, "in_my_sector": True},

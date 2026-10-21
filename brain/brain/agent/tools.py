@@ -422,7 +422,20 @@ class ToolRegistry:
         elif name == "approach_candidate":
             refusal = self._need(args, ("inspect_candidate",), lambda ev: ev.get("x") is not None,
                                  "the cited inspection has no position")
-            if refusal is None:
+            if refusal is None and self.evidence[args["evidence_id"]].get("verdict") == "person":
+                # Walking to a person the cited inspection saw is the way to the arm's reach, not another uncertain look, so
+                # the close-look limit does not apply and nothing is left pending (held-out seed 914 run 4: robot B confirmed
+                # a woman 3 m away, confirm_survivor said "approach_candidate, then extract", and approach_candidate refused
+                # after two earlier looks at that spot; B never came within reach in the 145 s left).
+                ev = self.evidence[args["evidence_id"]]
+                dx, dy = ev["x"] - self.ctx.x, ev["y"] - self.ctx.y
+                dist = max(1e-6, (dx * dx + dy * dy) ** 0.5)
+                k = max(0.0, dist - APPROACH_STANDOFF_M) / dist
+                args = {**args, "x": round(self.ctx.x + dx * k, 2), "y": round(self.ctx.y + dy * k, 2),
+                        "face_x": ev["x"], "face_y": ev["y"],
+                        "reason": f"reach the person seen at ({ev['x']}, {ev['y']}) to lift them"}
+                name = "go_to"
+            elif refusal is None:
                 ev = self.evidence[args["evidence_id"]]
                 key = (self.ctx.robot, round(ev["x"] / self.LOOK_CELL_M), round(ev["y"] / self.LOOK_CELL_M))
                 looks = [s for s in self._looks.get(key, []) if self.ctx.t - s < self.LOOK_MEMORY_S]
