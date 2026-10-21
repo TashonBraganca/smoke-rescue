@@ -143,7 +143,9 @@ class RobotAgent:
         messages = [{"role": "system", "content": SYSTEM},
                     {"role": "user", "content": "Decision needed. Context:\n" + json.dumps(context, default=str)}]
         step_id = f"{req['robot']}@{float(req['t']):.3f}"
-        self._trace({"kind": "step_start", "step": step_id, "t": req["t"], "robot": req["robot"], "event": req.get("event")})
+        # The full context the model saw, so every decision can be audited against what the robot knew at that moment.
+        self._trace({"kind": "step_start", "step": step_id, "t": req["t"], "robot": req["robot"], "event": req.get("event"),
+                     "context": context})
         rounds = 0
         while rounds < self.max_rounds and tools.finished is None:
             if time.perf_counter() - start > STEP_DEADLINE_S:
