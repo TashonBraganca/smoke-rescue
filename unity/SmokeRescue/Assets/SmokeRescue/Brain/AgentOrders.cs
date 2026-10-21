@@ -55,6 +55,20 @@ namespace SmokeRescue.Brain
             return list;
         }
 
+        /// <summary>For the agent: the nearest unsearched floor this robot's map shows but cannot reach, with its bearing
+        /// (degrees, right positive, from the robot's heading), distance, area and a reachable approach point, so the model
+        /// can look at what blocks it (measure_opening) and clear debris or open a door. Null when there is none.
+        /// Run 13: robot B gave up 2 m short of the hallway debris without looking at it.</summary>
+        public BrainBlockedFloor? BlockedUnsearched()
+        {
+            var found = planner.NearestBlocked(motion.Pose.position, InSearchArea);
+            if (!found.HasValue) return null;
+            Vector2 d = found.Value.point - motion.Pose.position;
+            float bearingRight = -BrainMath.Angle(motion.Pose.yawRad, Mathf.Atan2(-d.x, d.y));
+            return new BrainBlockedFloor { point = found.Value.point, approach = found.Value.approach, bearingDegRight = bearingRight,
+                distanceM = d.magnitude, areaM2 = found.Value.cells * grid.CellM * grid.CellM };
+        }
+
         /// <summary>Agent order: search this frontier next. It is driven like a go_to, and on arrival the robot sweeps
         /// and marks it visited exactly as for a frontier it chose itself.</summary>
         public void AgentExplore(Vector2 target, double t, double holdS, string reason)

@@ -182,3 +182,18 @@ def test_a_survivor_is_confirmed_only_from_a_close_inspection(tmp_path, monkeypa
     near, _ = run(tmp_path, [[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": 3})],
                              [ToolCall("confirm_survivor", {"x": 5, "y": 8, "evidence_id": "ev3"})]])
     assert [o["type"] for o in near["orders"]] == ["confirm_survivor"], "control: 3 m"
+
+
+def test_blocked_unsearched_floor_reaches_the_model(tmp_path, monkeypatch):
+    fake_vision(monkeypatch)
+    seen = []
+
+    class Capture(Scripted):
+        def chat(self, messages, tools):
+            seen.append(messages[1]["content"])
+            return super().chat(messages, tools)
+
+    blocked = {"bearing_deg": 4.0, "distance_m": 2.1, "unsearched_m2": 6.5, "approach": {"x": 5.0, "y": 6.2}}
+    req = {**request(tmp_path), "event": {"kind": "no_frontier"}, "frontiers": [], "blocked_unsearched": blocked}
+    RobotAgent(Capture([]), tmp_path / "t.jsonl").step(req)
+    assert seen and '"blocked_unsearched": {"bearing_deg": 4.0' in seen[0]

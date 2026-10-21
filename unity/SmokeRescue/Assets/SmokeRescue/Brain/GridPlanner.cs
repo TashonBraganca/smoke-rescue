@@ -144,6 +144,32 @@ namespace SmokeRescue.Brain
             var sorted = new List<FrontierChoice>(); foreach (int i in order) sorted.Add(choices[i]);
             return sorted;
         }
+        /// <summary>Unsearched walkable floor in the search area that no known path reaches (behind debris, a closed door or
+        /// fire): the nearest such cell, the reachable walkable cell nearest to it, and how many such cells there are.</summary>
+        internal (Vector2 point, Vector2 approach, int cells)? NearestBlocked(Vector2 from, Func<Vector2, bool> inSearchArea)
+        {
+            grid.PrepareNavigation();
+            if (!Lead(from, out int start, out _)) return null;
+            Search(start, -1, out var distance, out _);
+            int best = -1, count = 0; float bestM = float.PositiveInfinity;
+            for (int i = 0; i < grid.Count; i++)
+            {
+                // Walkable floor the paths cannot reach: a separate pocket of floor. Free cells too close to a wall are left
+                // out, since every wall has a strip of them.
+                if (!float.IsPositiveInfinity(distance[i]) || !grid.Walkable(i) || !grid.Unsearched(i) || !inSearchArea(grid.Centre(i))) continue;
+                count++; float m = Vector2.Distance(from, grid.Centre(i));
+                if (m < bestM) { bestM = m; best = i; }
+            }
+            if (best < 0 || count < c.frontier_min_information_cells) return null;
+            int approach = -1; float approachM = float.PositiveInfinity;
+            for (int i = 0; i < grid.Count; i++)
+            {
+                if (float.IsPositiveInfinity(distance[i]) || !grid.Walkable(i)) continue;
+                float m = Vector2.Distance(grid.Centre(i), grid.Centre(best));
+                if (m < approachM) { approachM = m; approach = i; }
+            }
+            return approach < 0 ? ((Vector2, Vector2, int)?)null : (grid.Centre(best), grid.Centre(approach), count);
+        }
         internal List<Vector2> ApproachPath(Vector2 from, Vector2 person)
         {
             grid.PrepareNavigation();
