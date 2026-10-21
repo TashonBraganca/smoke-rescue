@@ -231,6 +231,7 @@ namespace SmokeRescue.Recording
                     break;
                 case "confirm_survivor": brain.AgentConfirmSurvivor(P(), t, ev); break;
                 case "reject_candidate": brain.AgentRejectCandidate(P(), t, ev); break;
+                case "withdraw_survivor": brain.AgentWithdrawSurvivor(P(), t, ev); break;
                 case "avoid_area": brain.AgentAvoidArea(P(), o.Value<float?>("radius_m") ?? 1.5f, t, o.Value<double?>("seconds") ?? 30, ev); break;
                 case "set_torch":
                     try

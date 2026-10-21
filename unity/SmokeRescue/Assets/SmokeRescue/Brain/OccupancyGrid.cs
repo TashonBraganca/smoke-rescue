@@ -589,8 +589,11 @@ namespace SmokeRescue.Brain
         /// free floor.</summary>
         /// <summary>
         /// Floor beyond a frontier as far as this robot's map knows: cells mapped free by its own sensors that no camera on
-        /// the team has searched, joined to p through such cells and within maxM of it. With search_requires_ceiling only
-        /// cells under seen ceiling count (the fill still crosses the rest), so the yard past a front door adds nothing.
+        /// the team has searched, joined to p through such cells and within maxM of it. The fill starts from such cells within
+        /// frontier_peek_m of p, the reach the planner gives a frontier's information (held-out seed 914 run 3: every
+        /// frontier read 0 when it started only from cells beside p, because past furniture the unsearched floor begins up
+        /// to that far away). With search_requires_ceiling only floor proven indoors counts (the fill still crosses the
+        /// rest), so the yard past a front door adds nothing.
         /// The frontier's own unsearched_m2 counts only cells beside the frontier, so a doorway onto a whole unsearched
         /// hallway read 1.5 m2 (held-out seed 914 run 1, robot B, which chose the kitchen at 8.5 m2 instead).
         /// </summary>
@@ -599,13 +602,13 @@ namespace SmokeRescue.Brain
             int start = Cell(p); if (start < 0) return 0;
             var mark = new HashSet<int>(); var queue = new Queue<int>(); int count = 0;
             bool Open(int n) => OwnOccupancy(n) == 1 && Unsearched(n) && Vector2.Distance(Centre(n), p) <= maxM;
-            int sx = start % Size, sy = start / Size;
-            for (int dy = -2; dy <= 2; dy++) for (int dx = -2; dx <= 2; dx++)
-                if (Inside(sx + dx, sy + dy)) { int n = (sy + dy) * Size + sx + dx; if (Open(n) && mark.Add(n)) queue.Enqueue(n); }
+            int sx = start % Size, sy = start / Size, reach = Mathf.Max(2, Mathf.CeilToInt(c.frontier_peek_m / CellM));
+            for (int dy = -reach; dy <= reach; dy++) for (int dx = -reach; dx <= reach; dx++)
+                if (dx * dx + dy * dy <= reach * reach && Inside(sx + dx, sy + dy)) { int n = (sy + dy) * Size + sx + dx; if (Open(n) && mark.Add(n)) queue.Enqueue(n); }
             while (queue.Count > 0)
             {
                 int cell = queue.Dequeue();
-                if (!c.search_requires_ceiling || UnderCeiling(Centre(cell))) count++;
+                if (!c.search_requires_ceiling || Indoors(Centre(cell))) count++;
                 int x = cell % Size, y = cell / Size;
                 for (int k = 0; k < 4; k++)
                 {

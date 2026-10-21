@@ -201,3 +201,39 @@ def test_perception_schema_exposes_bearing_and_optional_action_evidence():
     assert by_name['check_indoors']['parameters']['required'] == ['bearing_deg']
     action = by_name['explore_frontier']['parameters']
     assert 'evidence_id' in action['properties'] and 'evidence_id' not in action['required']
+
+
+def withdraw_registry(tmp_path, monkeypatch, *, depth_m=3., warm=False, survivor=(0., 2.5)):
+    # Robot at the origin facing +y; a confirmed survivor 2.5 m ahead. The frame shows open floor to depth_m and, if warm,
+    # a body-temperature patch straight ahead.
+    k = np.array([[120., 0, 79.5], [0, 120., 59.5], [0, 0, 1.]])
+    thermal = np.full((120, 160), 2932, np.uint16)
+    depth = np.full((120, 160), depth_m, np.float32)
+    if warm:
+        yy, xx = np.mgrid[50:90, 70:90]
+        depth[50:90, 70:90] = 2.5 - .2 * np.sin((xx - 69) / 21 * np.pi) * np.sin((yy - 49) / 41 * np.pi)   # a body at 2.5 m
+        thermal[50:90, 70:90] = np.round((303.15 + 5 * (yy - 50) / 40) * 10).astype(np.uint16)
+    frame = v.Frame(t=10., rgb=np.full((120, 160, 3), 70, np.uint8), depth_m=depth,
+                         thermal=thermal, K=k, thermal_K=k, rgb_to_thermal=np.eye(4), stamps={"rgb": 10., "depth": 10., "thermal": 10.})
+    ctx = T.AgentContext('robot_A', 10., 0., 0., 0.)
+    ctx.survivors = [list(survivor)]
+    reg = T.ToolRegistry(tmp_path, ctx, tmp_path / 'debug')
+    monkeypatch.setattr(reg, '_frame', lambda: frame)
+    monkeypatch.setattr(v, "detect_people_rgb", lambda f, **k: [])
+    return reg
+
+
+@pytest.mark.parametrize('case,allowed', [('empty', True), ('blocked', False), ('warm', False), ('elsewhere', False),
+                                          ('far', False), ('no_survivor', False)])
+def test_withdraw_needs_a_close_unblocked_look_that_finds_nobody(case, allowed, tmp_path, monkeypatch):
+    # Run 3: robot B confirmed a person from a colour sliver at the image edge and spent over a minute trying to reach
+    # them. A confirmation is withdrawn only on a fresh look aimed at the spot, from within confirmation range, with depth
+    # reaching it, that finds no warm body and no whole colour detection.
+    survivor = {'far': (0., 5.5), 'no_survivor': (3., 3.)}.get(case, (0., 2.5))
+    reg = withdraw_registry(tmp_path, monkeypatch, depth_m=1.0 if case == 'blocked' else 7., warm=case == 'warm', survivor=survivor)
+    aim = {'elsewhere': (25., 2.5), 'far': (0., 5.5)}.get(case, (0., 2.5))
+    ev = reg.call('inspect_candidate', {'bearing_deg': aim[0], 'range_m': aim[1]})
+    target = (0., 5.5) if case == 'far' else (0., 2.5)
+    r = reg.call('withdraw_survivor', {'x': target[0], 'y': target[1], 'evidence_id': ev['id']})
+    assert bool(r.get('ok')) == allowed, r
+    assert bool(reg.orders) == allowed
