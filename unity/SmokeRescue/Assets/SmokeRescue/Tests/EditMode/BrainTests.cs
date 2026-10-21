@@ -1867,6 +1867,89 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(Order(null), Does.StartWith("Refused go_to"), "control: no evidence, refused");
         }
 
+        /// <summary>A map built only from LiDAR sweeps of wall segments, taken at each true position (yaw 0).</summary>
+        static OccupancyGrid LidarMap(BrainConfig c, (Vector2, Vector2)[] walls, params Vector2[] from)
+        {
+            var g = new OccupancyGrid(c);
+            foreach (var p in from) g.IntegrateLidar(SegmentScan(0, p, 0, walls), new BrainPose { position = p });
+            return g;
+        }
+
+        [Test]
+        public void TheYardBesideAFacadeIsNotWalledInWhateverStandsThere()
+        {
+            // Held-out run 2: robot B set the person it carried out down 2.5 m in front of the 40 m south wall. On its own
+            // map the wall closed the north half of every ray fan from the strip between, the person closed a few more,
+            // and rays into the empty yard ended in unmapped ground as unknown: 787 yard cells were walled in, and B
+            // searched along the outside of the wall for two minutes. Wide LiDAR spans with no return are open ground and
+            // the rays run on across it. Control: with the open-ground span wider than a full turn the same map is walled
+            // in again, so the test exercises the rule.
+            var facade = new[] { (new Vector2(-20, 3), new Vector2(20, 3)) };
+            var scene = facade.Concat(Box(-.3f, .8f, .3f, 2.5f)).ToArray();          // a person 1.7 m long, 0.5 m from the wall
+            var stops = new[] { new Vector2(1.2f, .5f), new Vector2(-1.2f, .5f), new Vector2(0, -1.5f) };
+            (bool cell, int yard) Walled(float spanDeg)
+            {
+                var c = Settings(); c.grid_size_m = 40; c.lidar_open_span_deg = spanDeg;
+                var g = LidarMap(c, scene, stops);
+                var p = new Vector2(.55f, 1.8f);                                       // 0.25 m beside the person, 1.2 m from the wall
+                Assert.That(g.OccupancyAt(p), Is.EqualTo(1), "the probe is mapped free floor");
+                var layer = g.CopyIndoors(); int yard = 0;
+                for (int i = 0; i < g.Count; i++) if (layer[i] == 3 && g.Centre(i).y < 2.9f) yard++;
+                return (g.Indoors(p), yard);
+            }
+            var fixedRule = Walled(30);
+            var control = Walled(400);
+            Assert.That(control.cell, Is.True, "control: without open ground the strip beside the person is walled in");
+            Assert.That(fixedRule.cell, Is.False, "the strip beside the person is yard");
+            Assert.That(fixedRule.yard, Is.LessThan(control.yard / 10 + 1), $"walled-in yard cells: {fixedRule.yard} with open ground, {control.yard} without");
+        }
+
+        [Test]
+        public void ARoomStaysWalledInWhenItsLidarLooksOutOfAnOpenDoor()
+        {
+            // Open ground is marked through an outside door the robot stands close to (0.8 m: the 1 m door spans 64
+            // degrees). A cell 2 m inside sees the door in 3 of 36 directions and must stay walled in.
+            var room = new[]
+            {
+                (new Vector2(-3.2f, -2), new Vector2(.8f, -2)), (new Vector2(-3.2f, 2), new Vector2(.8f, 2)), (new Vector2(-3.2f, -2), new Vector2(-3.2f, 2)),
+                (new Vector2(.8f, -2), new Vector2(.8f, -.5f)), (new Vector2(.8f, .5f), new Vector2(.8f, 2)),
+            };
+            var c = Settings(); c.grid_size_m = 30;
+            var g = LidarMap(c, room, Vector2.zero);
+            var open = (bool[])typeof(OccupancyGrid).GetField("openGround", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(g);
+            Assert.That(open[g.Cell(new Vector2(5, 0))], Is.True, "the yard seen through the door is open ground");
+            Assert.That(open[g.Cell(new Vector2(-1.2f, 1.2f))], Is.False, "no open ground inside the walls away from the door");
+            Assert.That(g.Indoors(new Vector2(-1.2f, 0)), Is.True, "the room 2 m inside the door is walled in");
+        }
+
+        [Test]
+        public void TheTopOfAWallFaceDrawsNoCeilingSightLines()
+        {
+            // Held-out run 2: from the yard, 98 % of robot B's ceiling-height depth points (2.5 to 2.9 m) lay within 0.4 m of
+            // the south wall, on the top of its outside face, and sight lines to them made the floor along the facade
+            // indoors. Sight lines now need ceiling evidence 0.4 m clear of walls, as ceiling seeds do. The camera is made to
+            // count as indoors (ceiling evidence put under it), so only that margin decides. Control: a real ceiling at
+            // the same wall distance still draws them.
+            int Marked(float ceilingM)
+            {
+                var c = Settings(); c.search_requires_ceiling = true; c.ceiling_min_hits = 1;
+                var a = new RobotBrain(Calibration(), c, "A", 0);
+                Motion(a, 0); a.OnAirTemperature(0, 20); a.OnLidar(RoomScan(0, Vector2.zero, 0, 9f, 720)); a.Step(0, 1f / 60);
+                var g = Map(a); var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+                var roof = (byte[])typeof(OccupancyGrid).GetField("roofHits", flags).GetValue(g);
+                for (float y = -.5f; y <= .5f; y += .1f) roof[g.Cell(new Vector2(0, y))] = 255;
+                typeof(OccupancyGrid).GetField("roofDirty", flags).SetValue(g, true);
+                Assert.That(g.UnderCeiling(new Vector2(0, .25f)), Is.True, "the camera stands indoors");
+                Motion(a, .1); a.OnAirTemperature(.1, 20); a.OnRgbd(RoomImage(.1, 5f, ceilingM)); a.OnLidar(RoomScan(.1, Vector2.zero, 0, 9f, 720)); a.Step(.1, .1f);
+                var sight = (bool[])typeof(OccupancyGrid).GetField("sightIndoors", flags).GetValue(g);
+                int marked = 0;
+                for (float x = -1; x <= 1; x += .1f) for (float y = 1.5f; y <= 4.5f; y += .1f) if (sight[g.Cell(new Vector2(x, y))]) marked++;
+                return marked;
+            }
+            Assert.That(Marked(60f), Is.Zero, "a wall face 5 m ahead with no ceiling over the floor: no sight lines");
+            Assert.That(Marked(2.8f), Is.GreaterThan(0), "control: a ceiling clear of the wall still draws them");
+        }
+
         [Test]
         public void ARoomWithAnOpenOutsideDoorIsWalledInButNotTheGroundOutside()
         {

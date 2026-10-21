@@ -20,6 +20,8 @@ namespace SmokeRescue.Brain
         readonly byte[] roofHits;
         // Floor on a clear sight line from an indoor camera to ceiling it saw (see MarkCeilingSightLines).
         readonly bool[] sightIndoors;
+        // Ground the LiDAR looked across inside a wide span of beams with no return: nothing there within its range.
+        readonly bool[] openGround;
         readonly List<int> frameRoof = new List<int>(); readonly int[] roofFrame; int depthFrames;
         float[] roofDistance; bool roofDirty = true;
         int[] enclosureGeneration; bool[] enclosureValue; int generation;
@@ -45,7 +47,7 @@ namespace SmokeRescue.Brain
             odds = new float[Count]; lidarOdds = new float[Count]; heat = new float[Count]; rise = new float[Count]; heatTime = new double[Count];
             hits = new bool[Count]; frees = new bool[Count]; observed = new bool[Count];
             localTime = new double[Count]; peer = new byte[Count]; roofHits = new byte[Count];
-            sightIndoors = new bool[Count]; roofFrame = new int[Count];
+            sightIndoors = new bool[Count]; openGround = new bool[Count]; roofFrame = new int[Count];
             ownHeat = new float[Count]; ownHeatTime = new double[Count]; externalHeat = new float[Count]; externalTime = new double[Count];
             for (int i = 0; i < Count; i++)
             {
@@ -285,8 +287,9 @@ namespace SmokeRescue.Brain
             MarkCeilingSightLines(start);
             localObservationTime = time;
         }
-        /// <summary>One LiDAR sweep at its capture pose: free along each beam, occupied at its end. A beam with no
-        /// return carries no evidence, because smoke can swallow a pulse in front of a wall.</summary>
+        /// <summary>One LiDAR sweep at its capture pose: free along each beam, occupied at its end. A single beam with no
+        /// return carries no evidence, because smoke can swallow a pulse in front of a wall; a wide span of them is open
+        /// ground (MarkOpenGround).</summary>
         public void IntegrateLidar(LidarScan scan, BrainPose pose)
         {
             Array.Clear(hits, 0, Count); Array.Clear(frees, 0, Count);
@@ -304,6 +307,46 @@ namespace SmokeRescue.Brain
             {
                 if (hits[i]) { lidarOdds[i] = Mathf.Min(c.log_odds_cap, Mathf.Max(0, lidarOdds[i]) + c.occupied_log_odds); dirty = roofDirty = true; }
                 else if (frees[i]) { lidarOdds[i] = Mathf.Max(-c.log_odds_cap, lidarOdds[i] + c.free_log_odds); dirty = roofDirty = true; }
+            }
+            MarkOpenGround(scan, origin, pose.yawRad);
+        }
+        static bool NoReturn(LidarScan scan, int i) { float r = scan.RangesM[i]; return !(r >= scan.MinM) || r > scan.MaxM; }
+        /// <summary>
+        /// Open ground from beams with no return. A pulse lost in smoke also reads 0, but each pulse is lost on its own
+        /// (at most half of them, sensors.json smoke_dropout.max), so lidar_open_span_deg of neighbouring beams all empty
+        /// is not smoke: nothing stands within the LiDAR's range that way. The cells those beams cross are open ground, up
+        /// to the first cell the LiDAR has mapped as a wall. The enclosure test read such rays as unknown, so one long
+        /// facade plus the person a robot had just carried out made the yard "walled in" (held-out run 2: robot B searched
+        /// along the outside of the south wall for two minutes and lost its localisation there).
+        /// </summary>
+        void MarkOpenGround(LidarScan scan, Vector2 origin, float yawRad)
+        {
+            int n = scan.RangesM.Length;
+            if (n == 0 || !(scan.AngleIncrementRad > 0)) return;
+            int need = Mathf.Max(1, Mathf.CeilToInt(c.lidar_open_span_deg * Mathf.Deg2Rad / scan.AngleIncrementRad - 1e-3f));
+            if (need > n) return;
+            // A full circle wraps: start after a beam with a return so a span is not cut in two at the seam.
+            int first = 0;
+            if (n * scan.AngleIncrementRad >= 2 * Mathf.PI - scan.AngleIncrementRad * .5f)
+                for (int i = 0; i < n; i++) if (!NoReturn(scan, i)) { first = i; break; }
+            int runStart = 0, runLength = 0;
+            for (int k = 0; k <= n; k++)
+            {
+                if (k < n && NoReturn(scan, (first + k) % n)) { if (runLength++ == 0) runStart = k; continue; }
+                if (runLength >= need)
+                    for (int j = runStart; j < runStart + runLength; j++) OpenBeam(origin, yawRad + scan.Angle((first + j) % n), scan.MaxM);
+                runLength = 0;
+            }
+        }
+        void OpenBeam(Vector2 from, float angle, float rangeM)
+        {
+            var dir = new Vector2(-Mathf.Sin(angle), Mathf.Cos(angle)); float step = CellM * .5f;
+            int steps = Mathf.FloorToInt(rangeM / step);
+            for (int s = 0; s <= steps; s++)
+            {
+                int cell = Cell(from + dir * (s * step));
+                if (cell < 0 || lidarOdds[cell] >= c.occupied_threshold) return;
+                if (!openGround[cell]) { openGround[cell] = true; roofDirty = true; }
             }
         }
         /// <summary>Distance in metres from each cell of a square window to the nearest LiDAR-occupied cell, for scan
@@ -437,10 +480,15 @@ namespace SmokeRescue.Brain
             bool cameraIndoors = sightIndoors[camera] || (roofDistance != null && roofDistance[camera] <= c.ceiling_radius_m) ||
                 (OwnOccupancy(camera) == 1 && Enclosed(camera));
             if (!cameraIndoors) return;
+            PrepareNavigation();
             Vector2 from = Centre(camera); float step = CellM * .5f;
             foreach (int roof in frameRoof)
             {
                 if (roofHits[roof] < c.ceiling_min_hits) continue;
+                // Only ceiling evidence clear of walls, as for ceiling seeds (RoofDistances): the top of a wall face is in
+                // the ceiling height band too. Seen from the yard it drew sight lines along the outside of the facade
+                // (held-out run 2: 98 % of robot B's ceiling-height points at 50 to 56 s lay within 0.4 m of a wall).
+                if (OwnOccupancy(roof) == 255 || obstacleDistance[roof] < c.ceiling_wall_margin_m) continue;
                 Vector2 to = Centre(roof); int steps = Mathf.CeilToInt(Vector2.Distance(from, to) / step);
                 for (int k = 0; k <= steps; k++)
                 {
@@ -478,8 +526,9 @@ namespace SmokeRescue.Brain
         /// <summary>
         /// Free floor walled in on this robot's own map: of enclosure_rays rays cast from the cell, at least
         /// enclosure_min_closed_share reach a mapped wall within enclosure_range_m and at most enclosure_max_open_share run
-        /// that far over floor mapped free (rays into unmapped space count as neither). A room is walled in even when
-        /// its ceiling was never seen; the yard is not, since the LiDAR maps open ground there. The ceiling rule alone
+        /// that far over floor mapped free or LiDAR open ground (rays into other unmapped space count as neither). A room
+        /// is walled in even when its ceiling was never seen; the yard is not, since its LiDAR beams come back empty in
+        /// wide spans (MarkOpenGround), whatever stands beside the facade. The ceiling rule alone
         /// left rooms outside the search area: the camera's top edge is about 12 degrees above horizontal, so ceiling
         /// points are seen only 4.5 m and more away, beyond the far wall of most rooms (house reflex check: robot B
         /// gave up at 27 s with 27 percent searched; agent run 9, robot A offered one 0.5 m2 frontier at 20 s).
@@ -499,7 +548,8 @@ namespace SmokeRescue.Brain
                     byte occupancy = cell < 0 ? (byte)1 : OwnOccupancy(cell);
                     if (cell < 0) { open++; ended = true; }
                     else if (occupancy == 255) { closed++; ended = true; }
-                    else if (occupancy == 0) ended = true;
+                    // Unmapped counts as neither, except where the LiDAR looked across it and saw nothing: the ray goes on.
+                    else if (occupancy == 0 && !openGround[cell]) ended = true;
                 }
                 if (!ended) open++;
             }
