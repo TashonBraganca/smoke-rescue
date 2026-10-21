@@ -703,7 +703,8 @@ namespace SmokeRescue.Brain
         {
             if (!(speedMps > 0)) throw new ArgumentOutOfRangeException(nameof(speedMps));
             if (!(towOffsetM >= 0)) throw new ArgumentOutOfRangeException(nameof(towOffsetM));
-            carryingSpeed = speedMps; carryTowM = towOffsetM; carryClearFrom = new Vector2(float.NaN, float.NaN); canReenter = false; completed = false; retreating = false; emergencyExit = false;
+            carryingSpeed = speedMps; carryTowM = towOffsetM; carryClearFrom = new Vector2(float.NaN, float.NaN);
+            MarkCarried(t); canReenter = false; completed = false; retreating = false; emergencyExit = false;
             Emit(t, "carrying_out", "Person strapped onto the sled; taking them to the nearest known way out.", "speed_mps", speedMps);
             BeginReturn(t, CarryingOut);
         }

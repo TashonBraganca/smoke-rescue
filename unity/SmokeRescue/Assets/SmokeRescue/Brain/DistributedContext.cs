@@ -21,6 +21,24 @@ namespace SmokeRescue.Brain
         }
         readonly SortedDictionary<string, PeerState> peers = new SortedDictionary<string, PeerState>(StringComparer.Ordinal);
         readonly List<BrainSurvivor> confirmed = new List<BrainSurvivor>();
+        readonly List<BrainCarried> carriedOut = new List<BrainCarried>();
+        /// <summary>A person was strapped onto this robot's sled: the nearest confirmed person goes off the to-rescue list
+        /// here and, by radio, on linked partners.</summary>
+        void MarkCarried(double t)
+        {
+            int best = -1; float bestM = float.PositiveInfinity;
+            for (int i = 0; i < survivors.Count; i++) { float m = Vector2.Distance(survivors[i], motion.Pose.position); if (m < bestM) { bestM = m; best = i; } }
+            if (best < 0) return;
+            var p = survivors[best];
+            carriedOut.Add(new BrainCarried { position = p, at = t, sourceRobot = id });
+            ForgetSurvivorNear(p);
+            Emit(t, "survivor_carried", "The person confirmed here is on this robot's sled; off the to-rescue list.", "x_m", p.x, "y_m", p.y);
+        }
+        void ForgetSurvivorNear(Vector2 p)
+        {
+            survivors.RemoveAll(s => Vector2.Distance(s, p) <= c.survivor_merge_m);
+            confirmed.RemoveAll(s => Vector2.Distance(s.position, p) <= c.survivor_merge_m);
+        }
         readonly long[] observedSequence;
         Vector2 home, frontierCentre;
         float frontierRadius;
@@ -60,7 +78,7 @@ namespace SmokeRescue.Brain
             int cells = SharedSize * SharedSize, bytes = (cells + 7) / 8;
             var m = new BrainMessage { Sender = id, BaseSequence = full ? 0 : baseline, GridSize = SharedSize,
                 Origin = grid.Origin, Pose = motion.Pose, Goal = goal,
-                Explored = new byte[bytes], Occupied = new byte[bytes], Survivors = confirmed.ToArray(), Keyframes = KeyframesToSend() };
+                Explored = new byte[bytes], Occupied = new byte[bytes], Survivors = confirmed.ToArray(), Keyframes = KeyframesToSend(), CarriedOut = carriedOut.ToArray() };
             if (frontierGoal && frontierRadius > 0 && goal.HasValue && !completed && !returning && !retreating && active == null)
                 m.Claim = new BrainClaim { centre = frontierCentre, radiusM = frontierRadius, expiresAt = t + c.peer_claim_s };
             for (int i = 0; i < grid.Count; i++)
@@ -143,10 +161,20 @@ namespace SmokeRescue.Brain
                 for (float y = -half; y <= half; y += grid.CellM) for (float x = -half; x <= half; x += grid.CellM)
                     grid.ObservePeerHeat(grid.Cell(centre + new Vector2(x, y)), hot.temperatureC, hot.observedAt, t);
             }
+            foreach (var carried in m.CarriedOut)
+            {
+                var p = link.Transform(carried.position.x, carried.position.y);
+                bool known = false; foreach (var k in carriedOut) if (Vector2.Distance(k.position, p) <= c.survivor_merge_m) known = true;
+                if (known) continue;
+                carriedOut.Add(new BrainCarried { position = p, at = carried.at, sourceRobot = carried.sourceRobot });
+                ForgetSurvivorNear(p);
+                Emit(t, "survivor_carried_by_peer", carried.sourceRobot + " carried out the person confirmed here.", "x_m", p.x, "y_m", p.y);
+            }
             foreach (var survivor in m.Survivors)
             {
                 var s = survivor; s.position = link.Transform(survivor.position.x, survivor.position.y);
-                ReceiveSurvivor(s, sender, t);
+                bool gone = false; foreach (var k in carriedOut) if (Vector2.Distance(k.position, s.position) <= c.survivor_merge_m) gone = true;
+                if (!gone) ReceiveSurvivor(s, sender, t);
             }
             InvalidatePeerGoal(t); CheckMapOverlap(t);
         }
