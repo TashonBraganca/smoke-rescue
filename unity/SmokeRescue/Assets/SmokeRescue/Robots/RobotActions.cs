@@ -94,10 +94,15 @@ namespace SmokeRescue.Robots
                 var col = person.GetComponent<Collider>(); if (col == null || !col.enabled) continue;
                 var near = col.ClosestPoint(position + Vector3.up * .3f);
                 var flat = new Vector3(near.x - position.x, 0f, near.z - position.z);
-                if (flat.magnitude > rescue.reach_m || (flat.magnitude > .05f && Vector3.Angle(forward, flat) > 60f)) continue;
-                if (flat.magnitude < bestDistance) { bestDistance = flat.magnitude; best = person; bestPoint = col.bounds.center; }
+                if (flat.magnitude > .05f && Vector3.Angle(forward, flat) > 60f) continue;
+                // Whether the strap can go on, from the arm's own link lengths: the nearest part of the body to the arm.
+                if (!robot.Arm.CanReach(col.ClosestPoint(robot.Arm.Root.position))) continue;
+                // The strap goes on the nearest part of the body (a shoulder or limb), the point closest to the arm. The
+                // centre of a lying person's bounds is a metre past their near edge, beyond the arm (run 26: robot A's lift
+                // of s1 failed with "contact point is out of the arm's reach" while their near edge was within reach_m).
+                if (flat.magnitude < bestDistance) { bestDistance = flat.magnitude; best = person; bestPoint = col.ClosestPoint(robot.Arm.Root.position); }
             }
-            if (best == null) return Refuse($"nobody within {rescue.reach_m:0.0} m ahead");
+            if (best == null) return Refuse("nobody within the arm's reach ahead; move closer, facing them");
             contact = bestPoint; TargetId = best.name; pushed = best;
             Action = "extract_survivor"; Status = "running"; FailureReason = null;
             Enter(Phase.Reach);
