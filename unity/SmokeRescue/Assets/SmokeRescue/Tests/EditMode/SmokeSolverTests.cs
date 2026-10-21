@@ -1,3 +1,4 @@
+using System.Linq;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -286,6 +287,24 @@ namespace SmokeRescue.Tests.EditMode
             smoke.AdvanceTo(3);
             Assert.That(smoke.TotalInjectedKg, Is.EqualTo(injected));
             Assert.That(smoke.TotalMassKg, Is.EqualTo(injected).Within(1e-12));
+        }
+
+        [Test]
+        public void ParallelSamplesAtOneStepMatchSerialSamplesExactly()
+        {
+            // Lock-free reads at the current step (the RGB-D noise model samples from parallel rows): every value read by
+            // 8 threads at once equals the serial locked read of the same point.
+            var smoke = SmokeSolver.Load(FloorPlan.Load(), Path.Combine(FloorPlan.ConfigDir, "fire.json"), smokePath, 7);
+            const float t = 40f;
+            var points = new System.Collections.Generic.List<UnityEngine.Vector3>();
+            for (float x = .2f; x < 20f; x += .37f) for (float z = .2f; z < 14f; z += .41f) points.Add(new UnityEngine.Vector3(x, 2.4f, z));
+            var serial = new float[points.Count];
+            for (int i = 0; i < points.Count; i++) serial[i] = smoke.Density(points[i], t);
+            Assert.That(serial.Max(), Is.GreaterThan(0f), "smoke exists at 40 s");
+            var parallel = new float[points.Count];
+            System.Threading.Tasks.Parallel.For(0, points.Count, new System.Threading.Tasks.ParallelOptions { MaxDegreeOfParallelism = 8 },
+                i => parallel[i] = smoke.Density(points[i], t));
+            CollectionAssert.AreEqual(serial, parallel);
         }
 
         [Test]
