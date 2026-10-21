@@ -119,6 +119,31 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(LiveDrops(drops), Is.GreaterThan(count), "reopening must resume emission");
         }
 
+        [Test] public void NearNozzleDropsStayNarrowAndShortAtTheConfiguredThrowSpeed()
+        {
+            var water = Water(out var drops);
+            // Use the capture's 1 m nozzle height, rather than the elevated impact-test fixture.
+            water.Begin(new Vector3(origin.x, 1f, origin.z), 0f);
+            water.Step(.1f);
+            var particles = new ParticleSystem.Particle[drops.main.maxParticles];
+            int n = drops.GetParticles(particles);
+            Assert.That(n, Is.GreaterThan(0));
+            var renderer = drops.GetComponent<ParticleSystemRenderer>();
+            Assert.That(renderer.renderMode, Is.EqualTo(ParticleSystemRenderMode.Stretch));
+            for (int i = 0; i < n; i++)
+            {
+                float width = particles[i].GetCurrentSize(drops);
+                // Bound the unprojected card, including both size and speed contributions to stretch.
+                float length = width * renderer.lengthScale + particles[i].velocity.magnitude * renderer.velocityScale;
+                Assert.That(width, Is.LessThan(.024f), "a drop must be narrower than the nozzle diameter");
+                Assert.That(length, Is.LessThan(.15f), "near-camera drops must not span tens of centimetres");
+            }
+            float alpha = renderer.sharedMaterial.GetColor("_Tint").a;
+            Assert.That(1f - Mathf.Pow(1f - alpha, 4f), Is.LessThan(.9f),
+                "four overlapping dot centres must still transmit some of the fire behind them");
+            water.End();
+        }
+
         [Test] public void SweptDropDiesAtThinBoxAndEmitsReflectedSplashAfterNozzleCloses()
         {
             // Crossing the whole 10 cm box in one step catches endpoint-only collision checks.
@@ -188,10 +213,12 @@ namespace SmokeRescue.Tests.EditMode
             first.Step(.04f); second.Step(.04f);
             Assert.That(first.Counts.splash, Is.GreaterThan(0));
             Assert.That(first.Counts, Is.EqualTo(second.Counts));
-            var pa = new ParticleSystem.Particle[1500];
-            var pb = new ParticleSystem.Particle[1500];
-            int n = a.transform.parent.Find("Splash").GetComponent<ParticleSystem>().GetParticles(pa);
-            Assert.That(b.transform.parent.Find("Splash").GetComponent<ParticleSystem>().GetParticles(pb), Is.EqualTo(n));
+            var sa = a.transform.parent.Find("Splash").GetComponent<ParticleSystem>();
+            var sb = b.transform.parent.Find("Splash").GetComponent<ParticleSystem>();
+            var pa = new ParticleSystem.Particle[sa.main.maxParticles];
+            var pb = new ParticleSystem.Particle[sb.main.maxParticles];
+            int n = sa.GetParticles(pa);
+            Assert.That(sb.GetParticles(pb), Is.EqualTo(n));
             for (int i = 0; i < n; i++)
             {
                 Assert.That(pa[i].position, Is.EqualTo(pb[i].position));
@@ -212,7 +239,29 @@ namespace SmokeRescue.Tests.EditMode
             water.Step(.12f);
             water.Step(.01f);
             Assert.That(LiveDrops(drops), Is.Zero);
-            Assert.That(water.Counts.splash, Is.GreaterThan(0));
+            Assert.That(water.Counts.splash, Is.EqualTo(1800), "all 600 impacts must retain their three splash drops");
+        }
+
+        [Test] public void SplashCapacityRetainsAFullDeferredFlightOfImpacts()
+        {
+            Box(LayerMask.NameToLayer("Props"));
+            var water = Water(out var drops);
+            // Fill a whole flight, then drain the ray budget before any 150 ms splash can expire.
+            int count = drops.main.maxParticles;
+            for (uint i = 1; i <= count; i++) Drop(drops, origin, Vector3.forward * 10f, i);
+            water.Step(.12f);
+            for (int i = 0; i < 8; i++) water.Step(.001f);
+            Assert.That(LiveDrops(drops), Is.Zero);
+            Assert.That(water.Counts.splash, Is.EqualTo(3 * count), "the deferred impacts must not lose secondary drops");
+            // Add the 770 further impacts that can arrive during a 350 ms life at 2200 drops/s.
+            // Compress their arrival so even the shortest-lived existing splash must remain in the pool.
+            for (uint i = 1; i <= 770; i++) Drop(drops, origin + Vector3.forward * .94f, Vector3.forward * 10f, i);
+            water.Step(.002f);
+            water.Step(.001f);
+            water.Step(.001f);
+            Assert.That(LiveDrops(drops), Is.Zero);
+            Assert.That(water.Counts.splash, Is.EqualTo(3 * count + 2310),
+                "a deferred flight plus continued arrivals must retain every splash drop");
         }
     }
 }
