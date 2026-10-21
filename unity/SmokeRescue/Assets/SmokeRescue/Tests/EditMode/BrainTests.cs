@@ -850,6 +850,37 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void AnExhaustedRobotTakesAnEmergencyExitPastTheFire()
+        {
+            // 2x2 building run: robot A sat beside its entry door with its heat budget at 0, every route out closed by the
+            // 1.2 m fire margin. Fire on both sides of a 1.4 m gap between the robot and its start: with the budget nearly
+            // spent it must leave through the gap. Control: emergency clearance as large as the normal one, it cannot.
+            string Final(float emergencyClearance, out int exits)
+            {
+                var c = Settings(); c.grid_size_m = 12; c.robot_radius_m = .25f; c.emergency_fire_clearance_m = emergencyClearance;
+                var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -3, 3, -2, 6);
+                exits = 0;
+                for (int i = 0; i < 150; i++)
+                {
+                    double t = i / 15.0; Motion(b, t, t < 3 ? 1f : 0); b.OnRgbd(Image(t, true)); b.OnAirTemperature(t, t < 3.2 ? 20 : 150);
+                    var g = Map(b);
+                    if (t >= 3.2)
+                        for (float y = 1.3f; y <= 1.7f; y += .1f)
+                        {
+                            for (float x = -3f; x <= -.7f; x += .1f) g.ObserveHeat(g.Cell(new Vector2(x, y)), 500, t);
+                            for (float x = .7f; x <= 3f; x += .1f) g.ObserveHeat(g.Cell(new Vector2(x, y)), 500, t);
+                        }
+                    b.Step(t, 1f / 15); exits += b.DrainEvents().Count(e => e.kind == "emergency_exit");
+                }
+                return b.Snapshot().state;
+            }
+            Assert.That(Final(.5f, out int taken), Is.EqualTo("return"), "leaving by the emergency route");
+            Assert.That(taken, Is.EqualTo(1));
+            Assert.That(Final(1.2f, out int none), Is.Not.EqualTo("return"), "control: no route at the normal clearance");
+            Assert.That(none, Is.Zero);
+        }
+
+        [Test]
         public void AReturnEndsWithinHalfAMetreOfADoorwayStart()
         {
             // House reflex check: robot B stopped 0.3 m from its doorway start, where the return path ended, and replanned
