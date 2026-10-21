@@ -105,6 +105,31 @@ namespace SmokeRescue.Editor
             return scenario.obstacles.Count;
         }
 
+        /// <summary>
+        /// Warm objects that are not people (review: survivors were the only warm things, so the thermal check was too
+        /// easy): the scenario file's "warm_objects" list, each naming a placed landmark or obstacle by room and kind and
+        /// giving its surface temperature (with a reason in the file). Returns how many were warmed; a name that matches
+        /// nothing is an error, so a typo cannot silently drop a distractor.
+        /// </summary>
+        public static int ApplyWarmObjects(string scenarioFile)
+        {
+            var json = JObject.Parse(File.ReadAllText(Path.Combine(FloorPlan.ConfigDir, scenarioFile)));
+            if (!(json["warm_objects"] is JArray list) || list.Count == 0) return 0;
+            var furniture = GameObject.Find(RootName);
+            if (furniture == null) throw new System.InvalidOperationException("Place Furniture first.");
+            int warmed = 0;
+            foreach (JObject w in list)
+            {
+                string name = $"{(string)w["room"]}_{(string)w["kind"]}";
+                float c = (float)w["temperature_c"];
+                bool found = false;
+                foreach (Transform t in furniture.GetComponentsInChildren<Transform>(true))
+                    if (t.name == name) { SmokeRescue.World.ThermalBody.Add(t.gameObject, c); found = true; warmed++; }
+                if (!found) throw new System.InvalidOperationException($"warm object {name} is not placed in this scene");
+            }
+            return warmed;
+        }
+
         /// <summary>The quadruped body model named by props.json "robot_body", imported like furniture. Null if absent.</summary>
         public static GameObject RobotBodyPrefab()
         {

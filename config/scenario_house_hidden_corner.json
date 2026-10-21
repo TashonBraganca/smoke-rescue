@@ -175,5 +175,31 @@
       ],
       "yaw": 315
     }
+  ],
+  "warm_objects": [
+    {
+      "room": "kitchen",
+      "kind": "tall_steel_fridge",
+      "temperature_c": 38.0,
+      "temperature_c_reason": "A running fridge's condenser coils and compressor housing sit around 35 to 45 C, overlapping skin and clothed-body temperatures (about 30 to 35 C); the hardest distractor for a temperature-band test."
+    },
+    {
+      "room": "kitchen",
+      "kind": "stove_and_hood",
+      "temperature_c": 120.0,
+      "temperature_c_reason": "A hob left on: cooktop surfaces run from about 100 C to several hundred; 120 C is a low-setting, partly cooled surface, far above body temperature but below flame."
+    },
+    {
+      "room": "laundry",
+      "kind": "washer_and_dryer",
+      "temperature_c": 42.0,
+      "temperature_c_reason": "A tumble dryer's drum and front panel reach about 40 to 50 C while running; near body temperature and person-sized."
+    },
+    {
+      "room": "laundry",
+      "kind": "water_heater_and_pipes",
+      "temperature_c": 48.0,
+      "temperature_c_reason": "An electric water heater set to 50 to 60 C shows a jacket and pipe surface of about 40 to 55 C."
+    }
   ]
 }
