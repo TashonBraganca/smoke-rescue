@@ -78,7 +78,7 @@ namespace SmokeRescue.Brain
             int cells = SharedSize * SharedSize, bytes = (cells + 7) / 8;
             var m = new BrainMessage { Sender = id, BaseSequence = full ? 0 : baseline, GridSize = SharedSize,
                 Origin = grid.Origin, Pose = motion.Pose, Goal = goal,
-                Explored = new byte[bytes], Occupied = new byte[bytes], Survivors = confirmed.ToArray(), Keyframes = KeyframesToSend(), CarriedOut = carriedOut.ToArray() };
+                Explored = new byte[bytes], Occupied = new byte[bytes], Survivors = confirmed.ToArray(), Keyframes = KeyframesToSend(), CarriedOut = carriedOut.ToArray(), VisualKeyframes = VisualKeyframesToSend() };
             if (frontierGoal && frontierRadius > 0 && goal.HasValue && !completed && !returning && !retreating && active == null)
                 m.Claim = new BrainClaim { centre = frontierCentre, radiusM = frontierRadius, expiresAt = t + c.peer_claim_s };
             for (int i = 0; i < grid.Count; i++)
@@ -138,6 +138,7 @@ namespace SmokeRescue.Brain
             lastPeerReceived = tReceived;
             grid.DecayTo(tReceived);
             ReceiveKeyframes(m.Sender, m, tReceived);
+            ReceiveVisualKeyframes(m.Sender, m);
             Emit(tReceived, "peer_message_received", "Accepted sensor-derived state from " + m.Sender + (TryPartnerLink(m.Sender, out _) ? "." : "; frames not linked yet, so only its fingerprints are used."),
                 "sequence", m.Sequence, "age_s", Math.Max(0, tReceived - m.SentAt), "bytes", bytes.Length, "keyframes", m.Keyframes.Length);
             ApplyPeerContent(m.Sender, peer, tReceived);

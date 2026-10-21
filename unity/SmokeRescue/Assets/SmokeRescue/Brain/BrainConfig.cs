@@ -109,6 +109,8 @@ namespace SmokeRescue.Brain
         public bool frames_shared_at_start = true;
         public float keyframe_spacing_m = 1.0f, keyframe_turn_deg = 45f;
         public int keyframe_beams = 360, keyframe_max = 400, keyframes_per_message = 2;
+        public int visual_keyframe_max = 200, visual_keyframes_per_message = 1, visual_link_min_inliers = 12;
+        public float visual_keyframe_period_s = 2f;
         public int link_shortlist = 5, link_max_candidates = 20, link_turn_candidates = 3, link_verifications_per_step = 4;
         public float link_max_descriptor_distance = 0.3f, link_window_m = 0.8f, link_step_m = 0.1f, link_window_deg = 12f, link_step_deg = 2f;
         public float link_min_fit = 0.6f, link_agree_m = 0.3f, link_agree_deg = 4f, link_min_separation_m = 1.0f;
@@ -200,7 +202,7 @@ namespace SmokeRescue.Brain
                 throw new ArgumentException("Invalid route watch configuration.");
             if (scan_yaw_gain < 0 || scan_yaw_gain > 1 || collision_margin_m < 0 || lead_max_m < cell_m || agent_avoid_min_radius_m < cell_m || agent_avoid_max_radius_m < agent_avoid_min_radius_m || frontier_cluster_max_m < cell_m * 2 || ceiling_min_height_m <= obstacle_max_height_m || ceiling_radius_m < 0 || ceiling_min_hits < 1 || ceiling_wall_margin_m < 0 ||
                 enclosure_rays < 8 || enclosure_range_m <= cell_m || enclosure_min_closed_share <= 0 || enclosure_min_closed_share > 1 || enclosure_max_open_share < 0 || enclosure_max_open_share >= 1 || lidar_open_span_deg <= 0 || frontier_peek_m < 0 || see_over_clearance_m < 0 || carried_person_radius_m <= 0 || search_max_range_m <= 0 ||
-                keyframe_spacing_m <= 0 || keyframe_turn_deg <= 0 || keyframe_beams < 36 || keyframe_max < 2 || keyframes_per_message < 1 || keyframes_per_message > 16 ||
+                keyframe_spacing_m <= 0 || keyframe_turn_deg <= 0 || keyframe_beams < 36 || keyframe_max < 2 || keyframes_per_message < 1 || keyframes_per_message > 16 || visual_keyframe_max < 1 || visual_keyframes_per_message < 0 || visual_keyframes_per_message > 16 || visual_link_min_inliers < 3 || !(visual_keyframe_period_s > 0) ||
                 link_shortlist < 1 || link_max_candidates < 2 || link_turn_candidates < 1 || link_verifications_per_step < 1 || link_max_descriptor_distance <= 0 || link_window_m < 0 || link_step_m <= 0 ||
                 link_window_deg < 0 || link_step_deg <= 0 || link_min_fit <= 0 || link_min_fit > 1 || link_agree_m <= 0 || link_agree_deg <= 0 || link_min_separation_m < 0 ||
                 keyframe_min_return_share < 0 || keyframe_min_return_share > 1 || link_unique_shift_m <= 0 || link_unique_ratio <= 0 || link_unique_ratio >= 1 || link_coarse_min_fit <= 0 || link_coarse_min_fit > link_min_fit ||
