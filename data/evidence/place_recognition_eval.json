@@ -1,0 +1,529 @@
+{
+ "settings": {
+  "place_features_per_keyframe": 96,
+  "place_detect_features": 1000,
+  "place_orb_scale_factor": 1.5,
+  "place_orb_levels": 5,
+  "place_min_features": 24,
+  "place_max_depth_m": 5.0,
+  "place_ratio_test": 0.75,
+  "place_ransac_threshold_m": 0.1,
+  "place_height_tolerance_m": 0.2,
+  "place_min_inliers": 16,
+  "place_max_rmse_m": 0.06,
+  "place_keyframes_kept": 300,
+  "place_shortlist": 5,
+  "place_ransac_iterations": 500,
+  "place_ransac_seed": 0,
+  "place_ransac_min_baseline_m": 0.4,
+  "place_refine_iterations": 5,
+  "place_worker_timeout_s": 30.0
+ },
+ "payload_bytes": 3653,
+ "identity_check": {
+  "true_relative_same_frame": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "matcher_self_match": {
+   "matched": true,
+   "mine_id": 0,
+   "dx_m": 0.0,
+   "dy_m": 0.0,
+   "dyaw_deg": 0.0,
+   "inliers": 96,
+   "rmse_m": 0.0
+  }
+ },
+ "definitions": "positive: true camera positions within 1.5 m and floor viewing directions within 30 deg; negative: more than 6 m apart; same-robot pairs at least 10 s apart; truth read through brain.oracle",
+ "keyframes": {
+  "unity_house_hidden_run1/robot_A": {
+   "sampled": 201,
+   "rejected_too_few_features": 0
+  },
+  "unity_house_hidden_run1/robot_B": {
+   "sampled": 201,
+   "rejected_too_few_features": 1
+  },
+  "unity_house_hidden_run3/robot_A": {
+   "sampled": 201,
+   "rejected_too_few_features": 13
+  },
+  "unity_house_hidden_run3/robot_B": {
+   "sampled": 201,
+   "rejected_too_few_features": 18
+  },
+  "unity_house_heldout_run1/robot_A": {
+   "sampled": 201,
+   "rejected_too_few_features": 14
+  },
+  "unity_house_heldout_run1/robot_B": {
+   "sampled": 201,
+   "rejected_too_few_features": 18
+  }
+ },
+ "pair_mode": {
+  "min_inliers=7/dev_run1_run3/cross_B_to_A": {
+   "n_pos": 257,
+   "n_neg": 40719,
+   "accepted_pos": 38,
+   "recall": 0.1479,
+   "recall_ci95": [
+    0.1097,
+    0.1964
+   ],
+   "false_accepts": 0,
+   "false_accept_rate": 0.0,
+   "false_accept_ci95_upper": 0.0001,
+   "accepted_pos_correct": 38,
+   "accepted_pos_wrong_pose": 0,
+   "trans_err_m_median": 0.021,
+   "trans_err_m_p95": 0.109,
+   "rot_err_deg_median": 0.37,
+   "rot_err_deg_p95": 1.683
+  },
+  "min_inliers=7/dev_run1_run3/cross_A_to_B": {
+   "n_pos": 257,
+   "n_neg": 40719,
+   "accepted_pos": 39,
+   "recall": 0.1518,
+   "recall_ci95": [
+    0.113,
+    0.2007
+   ],
+   "false_accepts": 0,
+   "false_accept_rate": 0.0,
+   "false_accept_ci95_upper": 0.0001,
+   "accepted_pos_correct": 39,
+   "accepted_pos_wrong_pose": 0,
+   "trans_err_m_median": 0.025,
+   "trans_err_m_p95": 0.121,
+   "rot_err_deg_median": 0.383,
+   "rot_err_deg_p95": 1.528
+  },
+  "min_inliers=7/dev_run1_run3/same_robot_revisit": {
+   "n_pos": 1133,
+   "n_neg": 23009,
+   "accepted_pos": 209,
+   "recall": 0.1845,
+   "recall_ci95": [
+    0.163,
+    0.2081
+   ],
+   "false_accepts": 0,
+   "false_accept_rate": 0.0,
+   "false_accept_ci95_upper": 0.0002,
+   "accepted_pos_correct": 206,
+   "accepted_pos_wrong_pose": 3,
+   "trans_err_m_median": 0.025,
+   "trans_err_m_p95": 0.176,
+   "rot_err_deg_median": 0.426,
+   "rot_err_deg_p95": 2.749
+  },
+  "min_inliers=7/heldout_run1/cross_B_to_A": {
+   "n_pos": 350,
+   "n_neg": 17097,
+   "accepted_pos": 45,
+   "recall": 0.1286,
+   "recall_ci95": [
+    0.0975,
+    0.1677
+   ],
+   "false_accepts": 0,
+   "false_accept_rate": 0.0,
+   "false_accept_ci95_upper": 0.0002,
+   "accepted_pos_correct": 45,
+   "accepted_pos_wrong_pose": 0,
+   "trans_err_m_median": 0.032,
+   "trans_err_m_p95": 0.184,
+   "rot_err_deg_median": 0.55,
+   "rot_err_deg_p95": 2.353
+  },
+  "min_inliers=7/heldout_run1/cross_A_to_B": {
+   "n_pos": 350,
+   "n_neg": 17097,
+   "accepted_pos": 44,
+   "recall": 0.1257,
+   "recall_ci95": [
+    0.095,
+    0.1646
+   ],
+   "false_accepts": 0,
+   "false_accept_rate": 0.0,
+   "false_accept_ci95_upper": 0.0002,
+   "accepted_pos_correct": 44,
+   "accepted_pos_wrong_pose": 0,
+   "trans_err_m_median": 0.027,
+   "trans_err_m_p95": 0.151,
+   "rot_err_deg_median": 0.501,
+   "rot_err_deg_p95": 1.896
+  },
+  "min_inliers=7/heldout_run1/same_robot_revisit": {
+   "n_pos": 600,
+   "n_neg": 10241,
+   "accepted_pos": 71,
+   "recall": 0.1183,
+   "recall_ci95": [
+    0.0949,
+    0.1466
+   ],
+   "false_accepts": 0,
+   "false_accept_rate": 0.0,
+   "false_accept_ci95_upper": 0.0004,
+   "accepted_pos_correct": 71,
+   "accepted_pos_wrong_pose": 0,
+   "trans_err_m_median": 0.027,
+   "trans_err_m_p95": 0.169,
+   "rot_err_deg_median": 0.522,
+   "rot_err_deg_p95": 2.295
+  },
+  "min_inliers=7/all/cross_B_to_A": {
+   "n_pos": 607,
+   "n_neg": 57816,
+   "accepted_pos": 83,
+   "recall": 0.1367,
+   "recall_ci95": [
+    0.1117,
+    0.1664
+   ],
+   "false_accepts": 0,
+   "false_accept_rate": 0.0,
+   "false_accept_ci95_upper": 0.0001,
+   "accepted_pos_correct": 83,
+   "accepted_pos_wrong_pose": 0,
+   "trans_err_m_median": 0.024,
+   "trans_err_m_p95": 0.162,
+   "rot_err_deg_median": 0.451,
+   "rot_err_deg_p95": 2.288
+  },
+  "min_inliers=7/all/cross_A_to_B": {
+   "n_pos": 607,
+   "n_neg": 57816,
+   "accepted_pos": 83,
+   "recall": 0.1367,
+   "recall_ci95": [
+    0.1117,
+    0.1664
+   ],
+   "false_accepts": 0,
+   "false_accept_rate": 0.0,
+   "false_accept_ci95_upper": 0.0001,
+   "accepted_pos_correct": 83,
+   "accepted_pos_wrong_pose": 0,
+   "trans_err_m_median": 0.026,
+   "trans_err_m_p95": 0.141,
+   "rot_err_deg_median": 0.463,
+   "rot_err_deg_p95": 1.843
+  },
+  "min_inliers=7/all/same_robot_revisit": {
+   "n_pos": 1733,
+   "n_neg": 33250,
+   "accepted_pos": 280,
+   "recall": 0.1616,
+   "recall_ci95": [
+    0.145,
+    0.1796
+   ],
+   "false_accepts": 0,
+   "false_accept_rate": 0.0,
+   "false_accept_ci95_upper": 0.0001,
+   "accepted_pos_correct": 277,
+   "accepted_pos_wrong_pose": 3,
+   "trans_err_m_median": 0.025,
+   "trans_err_m_p95": 0.171,
+   "rot_err_deg_median": 0.446,
+   "rot_err_deg_p95": 2.521
+  },
+  "min_inliers=16/dev_run1_run3/cross_B_to_A": {
+   "n_pos": 257,
+   "n_neg": 40719,
+   "accepted_pos": 6,
+   "recall": 0.0233,
+   "recall_ci95": [
+    0.0107,
+    0.05
+   ],
+   "false_accepts": 0,
+   "false_accept_rate": 0.0,
+   "false_accept_ci95_upper": 0.0001,
+   "accepted_pos_correct": 6,
+   "accepted_pos_wrong_pose": 0,
+   "trans_err_m_median": 0.027,
+   "trans_err_m_p95": 0.1,
+   "rot_err_deg_median": 0.429,
+   "rot_err_deg_p95": 1.426
+  },
+  "min_inliers=16/dev_run1_run3/cross_A_to_B": {
+   "n_pos": 257,
+   "n_neg": 40719,
+   "accepted_pos": 7,
+   "recall": 0.0272,
+   "recall_ci95": [
+    0.0133,
+    0.0551
+   ],
+   "false_accepts": 0,
+   "false_accept_rate": 0.0,
+   "false_accept_ci95_upper": 0.0001,
+   "accepted_pos_correct": 7,
+   "accepted_pos_wrong_pose": 0,
+   "trans_err_m_median": 0.023,
+   "trans_err_m_p95": 0.109,
+   "rot_err_deg_median": 0.356,
+   "rot_err_deg_p95": 1.429
+  },
+  "min_inliers=16/dev_run1_run3/same_robot_revisit": {
+   "n_pos": 1133,
+   "n_neg": 23009,
+   "accepted_pos": 113,
+   "recall": 0.0997,
+   "recall_ci95": [
+    0.0836,
+    0.1186
+   ],
+   "false_accepts": 0,
+   "false_accept_rate": 0.0,
+   "false_accept_ci95_upper": 0.0002,
+   "accepted_pos_correct": 113,
+   "accepted_pos_wrong_pose": 0,
+   "trans_err_m_median": 0.016,
+   "trans_err_m_p95": 0.111,
+   "rot_err_deg_median": 0.269,
+   "rot_err_deg_p95": 1.575
+  },
+  "min_inliers=16/heldout_run1/cross_B_to_A": {
+   "n_pos": 350,
+   "n_neg": 17097,
+   "accepted_pos": 22,
+   "recall": 0.0629,
+   "recall_ci95": [
+    0.0419,
+    0.0933
+   ],
+   "false_accepts": 0,
+   "false_accept_rate": 0.0,
+   "false_accept_ci95_upper": 0.0002,
+   "accepted_pos_correct": 22,
+   "accepted_pos_wrong_pose": 0,
+   "trans_err_m_median": 0.023,
+   "trans_err_m_p95": 0.079,
+   "rot_err_deg_median": 0.272,
+   "rot_err_deg_p95": 1.193
+  },
+  "min_inliers=16/heldout_run1/cross_A_to_B": {
+   "n_pos": 350,
+   "n_neg": 17097,
+   "accepted_pos": 20,
+   "recall": 0.0571,
+   "recall_ci95": [
+    0.0373,
+    0.0866
+   ],
+   "false_accepts": 0,
+   "false_accept_rate": 0.0,
+   "false_accept_ci95_upper": 0.0002,
+   "accepted_pos_correct": 20,
+   "accepted_pos_wrong_pose": 0,
+   "trans_err_m_median": 0.013,
+   "trans_err_m_p95": 0.088,
+   "rot_err_deg_median": 0.192,
+   "rot_err_deg_p95": 1.369
+  },
+  "min_inliers=16/heldout_run1/same_robot_revisit": {
+   "n_pos": 600,
+   "n_neg": 10241,
+   "accepted_pos": 33,
+   "recall": 0.055,
+   "recall_ci95": [
+    0.0394,
+    0.0762
+   ],
+   "false_accepts": 0,
+   "false_accept_rate": 0.0,
+   "false_accept_ci95_upper": 0.0004,
+   "accepted_pos_correct": 33,
+   "accepted_pos_wrong_pose": 0,
+   "trans_err_m_median": 0.021,
+   "trans_err_m_p95": 0.135,
+   "rot_err_deg_median": 0.38,
+   "rot_err_deg_p95": 2.235
+  },
+  "min_inliers=16/all/cross_B_to_A": {
+   "n_pos": 607,
+   "n_neg": 57816,
+   "accepted_pos": 28,
+   "recall": 0.0461,
+   "recall_ci95": [
+    0.0321,
+    0.0659
+   ],
+   "false_accepts": 0,
+   "false_accept_rate": 0.0,
+   "false_accept_ci95_upper": 0.0001,
+   "accepted_pos_correct": 28,
+   "accepted_pos_wrong_pose": 0,
+   "trans_err_m_median": 0.024,
+   "trans_err_m_p95": 0.103,
+   "rot_err_deg_median": 0.284,
+   "rot_err_deg_p95": 1.507
+  },
+  "min_inliers=16/all/cross_A_to_B": {
+   "n_pos": 607,
+   "n_neg": 57816,
+   "accepted_pos": 27,
+   "recall": 0.0445,
+   "recall_ci95": [
+    0.0307,
+    0.0639
+   ],
+   "false_accepts": 0,
+   "false_accept_rate": 0.0,
+   "false_accept_ci95_upper": 0.0001,
+   "accepted_pos_correct": 27,
+   "accepted_pos_wrong_pose": 0,
+   "trans_err_m_median": 0.021,
+   "trans_err_m_p95": 0.091,
+   "rot_err_deg_median": 0.268,
+   "rot_err_deg_p95": 1.45
+  },
+  "min_inliers=16/all/same_robot_revisit": {
+   "n_pos": 1733,
+   "n_neg": 33250,
+   "accepted_pos": 146,
+   "recall": 0.0842,
+   "recall_ci95": [
+    0.0721,
+    0.0983
+   ],
+   "false_accepts": 0,
+   "false_accept_rate": 0.0,
+   "false_accept_ci95_upper": 0.0001,
+   "accepted_pos_correct": 146,
+   "accepted_pos_wrong_pose": 0,
+   "trans_err_m_median": 0.018,
+   "trans_err_m_p95": 0.115,
+   "rot_err_deg_median": 0.297,
+   "rot_err_deg_p95": 1.935
+  }
+ },
+ "database_mode": {
+  "min_inliers=16/dev_run1_run3": {
+   "queries": 772,
+   "place": {
+    "n": 108,
+    "accepted_correct": 9,
+    "accepted_wrong": 0,
+    "rate_correct": 0.0833,
+    "rate_correct_ci95": [
+     0.0445,
+     0.1508
+    ],
+    "rate_wrong": 0.0
+   },
+   "none": {
+    "n": 125,
+    "accepted_correct": 0,
+    "accepted_wrong": 0,
+    "rate_correct": 0.0,
+    "rate_correct_ci95": [
+     0.0,
+     0.0298
+    ],
+    "rate_wrong": 0.0
+   },
+   "between": {
+    "n": 539,
+    "accepted_correct": 0,
+    "accepted_wrong": 0,
+    "rate_correct": 0.0,
+    "rate_correct_ci95": [
+     0.0,
+     0.0071
+    ],
+    "rate_wrong": 0.0
+   },
+   "accepted_wrong_total": 0
+  },
+  "min_inliers=16/heldout_run1": {
+   "queries": 370,
+   "place": {
+    "n": 94,
+    "accepted_correct": 26,
+    "accepted_wrong": 0,
+    "rate_correct": 0.2766,
+    "rate_correct_ci95": [
+     0.1963,
+     0.3744
+    ],
+    "rate_wrong": 0.0
+   },
+   "none": {
+    "n": 49,
+    "accepted_correct": 0,
+    "accepted_wrong": 0,
+    "rate_correct": 0.0,
+    "rate_correct_ci95": [
+     0.0,
+     0.0727
+    ],
+    "rate_wrong": 0.0
+   },
+   "between": {
+    "n": 227,
+    "accepted_correct": 0,
+    "accepted_wrong": 0,
+    "rate_correct": 0.0,
+    "rate_correct_ci95": [
+     0.0,
+     0.0166
+    ],
+    "rate_wrong": 0.0
+   },
+   "accepted_wrong_total": 0
+  },
+  "min_inliers=16/all": {
+   "queries": 1142,
+   "place": {
+    "n": 202,
+    "accepted_correct": 35,
+    "accepted_wrong": 0,
+    "rate_correct": 0.1733,
+    "rate_correct_ci95": [
+     0.1273,
+     0.2314
+    ],
+    "rate_wrong": 0.0
+   },
+   "none": {
+    "n": 174,
+    "accepted_correct": 0,
+    "accepted_wrong": 0,
+    "rate_correct": 0.0,
+    "rate_correct_ci95": [
+     0.0,
+     0.0216
+    ],
+    "rate_wrong": 0.0
+   },
+   "between": {
+    "n": 766,
+    "accepted_correct": 0,
+    "accepted_wrong": 0,
+    "rate_correct": 0.0,
+    "rate_correct_ci95": [
+     -0.0,
+     0.005
+    ],
+    "rate_wrong": 0.0
+   },
+   "accepted_wrong_total": 0
+  }
+ },
+ "keyframes_total": {
+  "sampled": 1206,
+  "rejected": 64
+ },
+ "max_inliers_among_negatives": 4,
+ "database_mode_note": "Database mode was run at the configured min_inliers=16 only. A separate run at 7 (not saved) gave 8 wrong-pose accepts on heldout_run1 in a white-tile and checkerboard room, 0 on the other two recordings."
+}

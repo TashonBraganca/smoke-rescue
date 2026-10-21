@@ -6,6 +6,8 @@
 Endpoints: GET /health; POST /robot/{robot}/step; POST /commander/step; POST /approval (ask), GET /approvals,
 POST /approvals/{id} (a person answers); POST /vision/{tool} with a PNG body for the judge demo; GET /trace.
 POST /map3d/{robot}/integrate, /layers, /export fuse each robot's own depth and estimated pose.
+POST /place/{robot}/keyframe stores a visual place keyframe from the robot's own frame and returns its radio payload;
+POST /place/{robot}/match recognises a partner's payload among the robot's own keyframes.
 """
 
 from __future__ import annotations
@@ -28,6 +30,7 @@ from starlette.concurrency import run_in_threadpool
 from brain.agent.commander import Commander, simulated_operator
 from brain.agent.llm import make_backend
 from brain.agent.robot_agent import RobotAgent
+from brain.agent import place
 from brain.agent.map3d import RobotMap3D
 
 RUN_DIR = Path(os.environ.get("AGENT_RUN_DIR", "/tmp/smoke-rescue-agent"))
@@ -48,6 +51,7 @@ async def lifespan(app):
             for volume in _maps3d.values():
                 volume.close()
             _maps3d.clear()
+        place.close_all()
 
 
 app = FastAPI(title="Smoke Rescue agents", lifespan=lifespan)
@@ -213,3 +217,27 @@ async def map3d_layers(robot: str, request: Request):
 @app.post('/map3d/{robot}/export')
 async def map3d_export(robot: str, request: Request):
     return await run_in_threadpool(_map3d_request, robot, 'export', await request.json())
+
+
+def _place_request(operation, robot, req):
+    try:
+        if operation == 'keyframe':
+            return place.keyframe(robot, req['robot_dir'], float(req['t']))
+        return place.match(robot, req['payload_b64'], req['robot_dir'], float(req['t']))
+    except (ValueError, KeyError, TypeError, OSError) as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc)) from exc
+
+
+@app.post('/place/{robot}/keyframe')
+async def place_keyframe(robot: str, request: Request):
+    """Store a keyframe from this robot's frame at t. Returns {ok, id, features, payload_b64} or {ok: false, reason}."""
+    return await run_in_threadpool(_place_request, 'keyframe', robot, await request.json())
+
+
+@app.post('/place/{robot}/match')
+async def place_match(robot: str, request: Request):
+    """Match a partner keyframe payload against this robot's keyframes. Returns the partner body pose in the matched
+    own keyframe's body frame, or {matched: false, reason}."""
+    return await run_in_threadpool(_place_request, 'match', robot, await request.json())
