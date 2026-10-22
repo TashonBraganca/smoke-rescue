@@ -90,7 +90,7 @@ Facts about your robot and the context:
   its recent reports; your_last_intent is what you set out to do at your previous step. propose_plan suggests a
   division of work. Until your maps are linked, a place in your partner's words is not a position in your frame.
 - spray_option, when present: the fire your own thermal map measures where it cuts your way out (or to unsearched
-  floor): bearing, distance, whether it is in the camera's view now (spray_water needs a scan_thermal hot spot within its
+  floor), or, with blocks "near", the nearest fire within the nozzle's reach while your own air is warm: bearing, distance, whether it is in the camera's view now (spray_water needs a scan_thermal hot spot within its
   aim tolerance) and within the nozzle's reach, its burning area and estimated heat release, the heat one stream removes,
   water left, and code's comparison of the two.
 
@@ -140,6 +140,7 @@ class RobotAgent:
         append_jsonl(self.trace_path, rec)
 
     _recent: dict = {}
+    _ordered: dict = {}   # robot -> time of the last step that gave the brain an order
 
     def _repeat(self, req: dict) -> bool:
         ev = req.get("event") or {}
@@ -154,6 +155,11 @@ class RobotAgent:
         # An event with a position repeats only at the same spot: arriving at a second place within the window is a new
         # decision (held-out seed 914 runs 1 to 3: five agent_goal_reached events at new places were dropped, so the reflex
         # chose the next frontier alone). Events without a position repeat by time alone.
+        # An arrival answers the order that sent the robot there. After a new order it is a new decision even at the same
+        # spot (seed 929, robot A: ordered at 44.0 s to turn and face s4 again, arrived at 46.8 s, and the arrival was
+        # dropped as a repeat of the one at 38.2 s that faced the same point; the agent never inspected her again).
+        if ev.get("kind") == "agent_goal_reached" and self._ordered.get(req["robot"], float("-inf")) > lt:
+            return False
         positional = None not in here and None not in lpos
         near = positional and ((here[0] - lpos[0]) ** 2 + (here[1] - lpos[1]) ** 2) ** 0.5 < 1.5
         return float(req["t"]) - lt < REPEAT_WINDOW_S and (near if positional else ev.get("kind") != "survivor_candidate")
@@ -173,7 +179,7 @@ class RobotAgent:
         cls._last_t[robot] = t
         if run != cls._run or restarted:
             cls._run = run; cls._last_t = {robot: t}
-            cls._recent.clear(); ToolRegistry._looks.clear(); ToolRegistry._lifted.clear(); ToolRegistry._confirmed.clear()
+            cls._recent.clear(); cls._ordered.clear(); ToolRegistry._looks.clear(); ToolRegistry._lifted.clear(); ToolRegistry._confirmed.clear()
             ToolRegistry._pending.clear(); ToolRegistry._unfinished.clear(); TeamState.reset()
             ToolRegistry._inspection_histories.clear()
 
@@ -249,6 +255,7 @@ class RobotAgent:
                              "refused": result.get("refused", False), "reason": result.get("reason"), "error": result.get("error")})
                 messages.append({"role": "tool", "name": call.name, "content": json.dumps(_compact(result), default=str)})
         team.note_intent(ctx.t, tools.finished, tools.orders)
+        if tools.orders: self._ordered[req["robot"]] = ctx.t
         out = {"step": step_id, "orders": tools.orders, "refusals": tools.refusals, "summary": tools.finished,
                "rounds": rounds, "evidence_ids": list(tools.evidence), "latency_s": round(time.perf_counter() - start, 3)}
         self._trace({"kind": "step_end", **out})

@@ -153,6 +153,38 @@ def match_component(comp, vis):
     return comp["range_m"] is None or abs(comp["range_m"] - vis["range_m"]) <= MATCH_RANGE_M
 
 
+def inspection_selection(result, frame, pose, survivors, visibility):
+    """Label the object the tool returned, independently of the requested warm patch.
+
+    A colour fallback can select a different body. Counting its person verdict
+    against the original wall patch creates a false positive in the evaluator.
+    Preserve that change of selection in each negative row.
+    """
+    candidate = result.get("candidate") or {}
+    if "bbox" in candidate:
+        matches = [s["id"] for s in survivors if match_component(candidate,visibility[s["id"]])]
+    else:
+        hits = result.get("cues",{}).get("rgb_dnn",{}).get("hits",[])
+        if candidate.get("bbox_rgb"):
+            hits = [h for h in hits if h["bbox_rgb"]==candidate["bbox_rgb"]]
+        elif candidate.get("source")=="rgb_dnn":
+            hits = [h for h in hits if h.get("bearing_deg")==candidate.get("bearing_deg") and h.get("range_m")==candidate.get("range_m")]
+        matches = []
+        for survivor in survivors:
+            vis = visibility[survivor["id"]]
+            if vis is None or not vis.get("line_of_sight",False):
+                continue
+            points = _body_points(survivor["position_house"],survivor.get("pose"))
+            cam = (pose[:3,:3].T @ (points-pose[:3,3]).T).T
+            cam = cam[cam[:,2]>0]
+            uv = cam @ frame.K.T
+            uv = uv[:,:2]/uv[:,2,None]
+            if any(match_component({"bbox":hit["bbox_rgb"],"range_m":None},vis | {"uv_thermal":uv}) for hit in hits):
+                matches.append(survivor["id"])
+    visible = [sid for sid in matches if visibility[sid]["visible"]]
+    return (visible[0] if visible else None), bool(matches and not visible)
+
+
 def _rate(k, n):
     return None if n == 0 else k / n
 
@@ -205,8 +237,10 @@ def label_frame(frame, pose, survivors, floorplan, run, robot, t, out_dir):
     comps = []
     for comp in scan["people"]:
         call = V.inspect_candidate(frame, comp["bearing_deg"], comp["range_m"] or 3., output_dir=out_dir)
-        same = call["candidate"] is not None and call["candidate"]["bbox"] == comp["bbox"]
+        same = call["candidate"] is not None and call["candidate"].get("bbox") == comp["bbox"]
+        selected, ambiguous_selection = inspection_selection(call,frame,pose,survivors,visibility)
         comps.append({"comp": comp, "verdict": call["verdict"], "same_component": same,
+                      "selected_person":selected,"ambiguous_selection":ambiguous_selection,
                       "size": bool(comp.get("size_plausible"))})
     rows, block = [], int(t // 10)
     hit_by = {s["id"]: [] for s in survivors}
@@ -238,12 +272,16 @@ def label_frame(frame, pose, survivors, floorplan, run, robot, t, out_dir):
         rows.append({**base, "apparent_p90_c": apparent, "aimed_verdict": aimed["verdict"],
                      "aimed_reason": aimed["reasons"][:1], "group": f"{run}/{robot}/{s['id']}/{block}", "label": True, "survivor": s["id"],
                      "raw": bool(matched), "size": any(c["size"] for c in matched),
-                     "inspect": any(c["verdict"] == "person" for c in matched),
+                     "inspect": any(c["verdict"] == "person" and
+                                    (c["same_component"] or c["selected_person"]==s["id"]) for c in matched) or
+                                any(c["verdict"]=="person" and c["selected_person"]==s["id"] for c in comps),
                      "verdicts": [c["verdict"] for c in matched],
                      "bboxes": [c["comp"]["bbox"] for c in matched], "range_m": vis["range_m"]})
     for c in negatives:
         rows.append({**base, "group": f"{run}/{robot}/neg/{block}", "label": False, "survivor": None,
-                     "raw": True, "size": c["size"], "inspect": c["verdict"] == "person",
+                     "raw": True, "size": c["size"], "inspect": c["verdict"] == "person" and not c["selected_person"] and not c["ambiguous_selection"],
+                     "returned_person":c["verdict"]=="person","selected_person":c["selected_person"],
+                     "ambiguous_selection":c["ambiguous_selection"],
                      "verdicts": [c["verdict"]], "bboxes": [c["comp"]["bbox"]],
                      "range_m": c["comp"]["range_m"], "mean_c": c["comp"]["mean_c"],
                      "same_component": c["same_component"]})

@@ -261,22 +261,35 @@ namespace SmokeRescue.Brain
             }
             return approach < 0 ? ((Vector2, Vector2, int)?)null : (grid.Centre(best), grid.Centre(approach), count);
         }
-        internal List<Vector2> ApproachPath(Vector2 from, Vector2 person)
+        /// <summary>A standable viewing spot with a clear line to the person, nearest by path. The survivor_standoff_m ring
+        /// is tried first, then the other radii of the viewing band (survivor_stop_min_m to survivor_stop_max_m), nearest
+        /// to the standoff first. One ring alone failed whenever furniture, unmapped floor or a fire margin covered it: seed
+        /// 929, robot B saw a person in a burning living room from 5.3 m and logged "No safe known survivor approach".</summary>
+        public List<Vector2> ApproachPath(Vector2 from, Vector2 person)
         {
             grid.PrepareNavigation();
             if (!Lead(from, out int start, out var lead)) return new List<Vector2>();
             Search(start, -1, out var distance, out var parent);
-            int best = -1; float score = float.PositiveInfinity;
-            for (int sample = 0; sample < c.standoff_samples; sample++)
+            var radii = new List<float> { c.survivor_standoff_m };
+            float step = 2 * grid.CellM;
+            for (float r = c.survivor_stop_min_m; r <= c.survivor_stop_max_m + 1e-4f; r += step)
+                if (Mathf.Abs(r - c.survivor_standoff_m) > grid.CellM * .5f) radii.Add(r);
+            radii.Sort((x, y) => Mathf.Abs(x - c.survivor_standoff_m).CompareTo(Mathf.Abs(y - c.survivor_standoff_m)));
+            foreach (float radius in radii)
             {
-                float a = sample * 2 * Mathf.PI / c.standoff_samples;
-                int cell = grid.Cell(person + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * c.survivor_standoff_m);
-                if (cell < 0 || !grid.Walkable(cell) || distance[cell] >= score) continue;
-                float range = Vector2.Distance(grid.Centre(cell), person);
-                if (range < c.survivor_stop_min_m || range > c.survivor_stop_max_m || !ClearView(grid.Centre(cell), person)) continue;
-                score = distance[cell]; best = cell;
+                int best = -1; float score = float.PositiveInfinity;
+                for (int sample = 0; sample < c.standoff_samples; sample++)
+                {
+                    float a = sample * 2 * Mathf.PI / c.standoff_samples;
+                    int cell = grid.Cell(person + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * radius);
+                    if (cell < 0 || !grid.Walkable(cell) || distance[cell] >= score) continue;
+                    float range = Vector2.Distance(grid.Centre(cell), person);
+                    if (range < c.survivor_stop_min_m || range > c.survivor_stop_max_m || !ClearView(grid.Centre(cell), person)) continue;
+                    score = distance[cell]; best = cell;
+                }
+                if (best >= 0) return Join(lead, Reconstruct(parent, start, best));
             }
-            return best < 0 ? new List<Vector2>() : Join(lead, Reconstruct(parent, start, best));
+            return new List<Vector2>();
         }
         /// <summary>No mapped wall on the straight line from a standpoint to a person, ignoring the last
         /// survivor_view_clear_m before the person (a body against a wall, or the body itself, may be mapped there). A
@@ -290,7 +303,7 @@ namespace SmokeRescue.Brain
         }
         /// <summary>The coolest reachable known cell. allowed, when given, limits the candidates (stay_inside: floor proven
         /// indoors only), and preferStart false drops the pull toward the start, which is outside the house.</summary>
-        internal List<Vector2> CoolestPath(Vector2 from, Func<Vector2, bool> allowed = null, bool preferStart = true)
+        internal List<Vector2> CoolestPath(Vector2 from, Func<Vector2, bool> allowed = null, bool preferStart = true, Func<int, float> airCost = null)
         {
             grid.PrepareNavigation();
             if (!Lead(from, out int start, out var lead)) return new List<Vector2>();
@@ -301,7 +314,8 @@ namespace SmokeRescue.Brain
                 if (float.IsPositiveInfinity(distance[i]) || Vector2.Distance(from, grid.Centre(i)) < c.retreat_min_distance_m) continue;
                 if (allowed != null && !allowed(grid.Centre(i))) continue;
                 // Heat dominates, then prefer the start and a short escape. All candidates are known and reachable.
-                float score = grid.Heat(i) + (preferStart ? Vector2.Distance(grid.Centre(i), Home) * c.retreat_start_weight : 0) + distance[i] * c.retreat_path_weight;
+                float score = grid.Heat(i) + (airCost != null ? airCost(i) : 0) +
+                    (preferStart ? Vector2.Distance(grid.Centre(i), Home) * c.retreat_start_weight : 0) + distance[i] * c.retreat_path_weight;
                 if (score < bestScore) { bestScore = score; best = i; }
             }
             return best < 0 ? (allowed != null ? new List<Vector2>() : Plan(from, Home)) : Join(lead, Reconstruct(parent, start, best));

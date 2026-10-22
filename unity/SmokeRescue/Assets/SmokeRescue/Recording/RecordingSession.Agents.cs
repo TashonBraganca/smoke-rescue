@@ -204,6 +204,11 @@ namespace SmokeRescue.Recording
                         ["bearing_deg"] = Math.Round(fx.bearingDegRight, 1), ["distance_m"] = Math.Round(fx.distanceM, 2),
                         ["exit_path_m"] = Math.Round(fx.frontierPathM, 1), ["burning_m2"] = Math.Round(fx.burningM2, 2),
                     } : null,
+                    ["fire_near_robot"] = rig.brain.FireNearRobot(t) is Brain.BrainFireBlock fn ? new JObject
+                    {
+                        ["bearing_deg"] = Math.Round(fn.bearingDegRight, 1), ["distance_m"] = Math.Round(fn.distanceM, 2),
+                        ["burning_m2"] = Math.Round(fn.burningM2, 2),
+                    } : null,
                     ["lidar"] = LidarSummary(rig.lastScan),
                     ["water_l"] = Math.Round(rig.actions?.WaterLitres ?? 0, 2),
                     ["carrying_person"] = rig.actions?.Carrying != null,

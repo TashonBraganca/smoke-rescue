@@ -58,7 +58,9 @@ def inspect(frame, folder, bearing=0.):
 def test_lidar_body_at_two_metres_matches_registered_depth(tmp_path):
     measured = inspect(recording(tmp_path / 'depth', real_depth=True), tmp_path / 'debug')
     fallback = inspect(recording(tmp_path / 'lidar'), tmp_path / 'debug')
-    assert fallback['verdict'] == measured['verdict'] == 'person'
+    assert measured['verdict'] == 'person'
+    assert fallback['verdict'] == 'uncertain', 'a planar scanner cannot measure vertical body shape'
+    assert not fallback['cues']['depth']['body_shape_supported']
     assert fallback['cues']['range_source'] == 'lidar'
     assert fallback['cues']['lidar']['beam_range_m'] == pytest.approx(2., abs=.1)
     assert fallback['candidate']['range_m'] == pytest.approx(measured['candidate']['range_m'], abs=.002)
@@ -103,7 +105,8 @@ def test_valid_registered_depth_ignores_conflicting_lidar(tmp_path):
 def test_off_axis_lidar_uses_left_positive_beams_and_pitch(tmp_path, bearing):
     frame = recording(tmp_path / 'off_axis', bearing=bearing)
     result = inspect(frame, tmp_path / 'debug', bearing)
-    assert result['verdict'] == 'person'
+    assert result['verdict'] == 'uncertain'
+    assert not result['cues']['depth']['body_shape_supported']
     assert result['cues']['range_source'] == 'lidar'
     assert result['cues']['lidar']['beam_range_m'] < 2.2
 
@@ -131,7 +134,7 @@ def test_nearest_scan_ties_earlier_and_refreshes_after_append(tmp_path):
     path.write_text(first + '.5 ' + ' '.join(['7000'] * 720) + '\n')
     v.load_frame.cache_clear()
     earlier = v.load_frame(folder, 0.)
-    assert inspect(earlier, tmp_path / 'debug')['verdict'] == 'person'
+    assert inspect(earlier, tmp_path / 'debug')['verdict'] == 'uncertain'
     assert earlier['stamps']['lidar'] == -.5
     path.write_text(first + '.1 ' + ' '.join(['7000'] * 720) + '\n')
     v.load_frame.cache_clear()

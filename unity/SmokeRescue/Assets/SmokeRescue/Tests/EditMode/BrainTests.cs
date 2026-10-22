@@ -846,6 +846,113 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void AViewingSpotIsFoundAnywhereInTheViewingBandWhenTheStandoffRingIsBlocked()
+        {
+            // Seed 929, robot B at 55 s saw a person in a burning living room from 5.3 m and logged "No safe known survivor
+            // approach": only the 3.3 m ring was tried, though stops from 3.0 to 4.0 m count. Here floor between 3.0 and
+            // 3.45 m from the person is unmapped, so no 3.3 m spot is standable; the band still offers spots near 4 m.
+            // Control: with the band collapsed to the standoff alone there is no spot, as before.
+            List<Vector2> Spot(bool band)
+            {
+                var c = Settings(); c.survivor_standoff_m = 3.3f; c.survivor_stop_min_m = 3.0f; c.survivor_stop_max_m = 4.0f;   // shipped values
+                if (!band) { c.survivor_stop_min_m = c.survivor_standoff_m; c.survivor_stop_max_m = c.survivor_standoff_m; }
+                var b = new RobotBrain(Calibration(), c, "A", 0); var g = Map(b);
+                var person = new Vector2(0, 4);
+                for (int i = 0; i < g.Count; i++)
+                {
+                    var p = g.Centre(i); float r = Vector2.Distance(p, person);
+                    if (Mathf.Abs(p.x) < 4 && p.y > -2 && p.y < 9 && (r < 3.0f || r > 3.45f)) g.ObserveFree(i);
+                }
+                var planner = (GridPlanner)typeof(RobotBrain).GetField("planner", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(b);
+                return planner.ApproachPath(new Vector2(0, -.5f), person);
+            }
+            var path = Spot(true);
+            Assert.That(path, Is.Not.Empty, "a viewing spot in the band");
+            float range = Vector2.Distance(path[path.Count - 1], new Vector2(0, 4));
+            Assert.That(range, Is.InRange(3.45f, 4.0f + .1f), "beyond the unmapped ring, inside the viewing band");
+            Assert.That(Spot(false), Is.Empty, "control: the standoff ring alone has no standable spot");
+        }
+
+        [Test]
+        public void AFireHeatingTheRobotIsReportedForSprayingEvenWhenItBlocksNoRoute()
+        {
+            // Seed 929, robot B: air 30 to 211 C beside a fire in its own room; the agent's spray option existed only for a
+            // fire blocking a way out or a frontier, so it never used its 12 L. Controls: cool air, or a fire beyond the
+            // nozzle's 5 m throw, report nothing.
+            BrainFireBlock? Near(float air, float fireY)
+            {
+                var b = new RobotBrain(Calibration(), Settings(), "A", 0); Room(b, -3, 3, -3, 9); var g = Map(b);
+                for (float x = -.3f; x <= .3f; x += .1f) g.ObserveHeat(g.Cell(new Vector2(x, fireY)), 500, 0);
+                Motion(b, 0); b.OnRgbd(Image(0, true, 0)); b.OnAirTemperature(0, air); b.Step(0, .05f);
+                Motion(b, .1); b.OnRgbd(Image(.1, true, 0)); b.OnAirTemperature(.1, air); b.Step(.1, .1f);
+                return b.FireNearRobot(.1);
+            }
+            var hot = Near(60, 3);
+            Assert.That(hot.HasValue, Is.True, "a fire 3 m ahead heating the robot");
+            Assert.That(hot.Value.distanceM, Is.InRange(2.8f, 3.2f));
+            Assert.That(Mathf.Abs(hot.Value.bearingDegRight), Is.LessThan(5f), "straight ahead");
+            Assert.That(hot.Value.burningM2, Is.GreaterThan(0));
+            Assert.That(Near(20, 3).HasValue, Is.False, "control: cool air, nothing to report");
+            Assert.That(Near(60, 7).HasValue, Is.False, "control: beyond the nozzle's throw");
+        }
+
+        [Test]
+        public void StayingInsideTheRetreatGoesBackToAirTheRobotMeasuredCool()
+        {
+            // Seed 929, robot B at 60 to 90 s: retreating to the coolest floor by surface heat alone, it stood still in the living
+            // room while its air rose to 47 C; it had measured 20 C in the foyer 40 s earlier. The hot gas layer heats the air,
+            // not the floor the thermal camera maps. The robot walks 3 m through 20 C air into 45 C air; its retreat must lead
+            // back to where it measured cool air. Control: with retreat_air_weight 0 it picks floor beside where it stands.
+            float RetreatEndY(float weight)
+            {
+                var c = Settings(); c.stay_inside = true; c.mission_time_limit_s = 1000; c.retreat_air_weight = weight;
+                var b = new RobotBrain(Calibration(), c, "B", 0); Room(b, -3, 3, -3, 6);
+                double last = 0;
+                for (int i = 0; i <= 15 * 6; i++)
+                {
+                    double t = i / 15.0; float air = t < 3 ? 20 : 45;
+                    Motion(b, t, .5f); b.OnRgbd(Image(t, true, 0)); b.OnAirTemperature(t, air);
+                    b.Step(t, i == 0 ? .05f : (float)(t - last)); last = t;
+                }
+                Assert.That(b.Snapshot().pose.position.y, Is.GreaterThan(2.5f), "control: the robot walked into the hot air");
+                var path = (List<Vector2>)typeof(RobotBrain).GetMethod("RetreatPath", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).Invoke(b, null);
+                Assert.That(path.Count, Is.GreaterThan(0), "a retreat route exists");
+                return path[path.Count - 1].y;
+            }
+            Assert.That(RetreatEndY(1), Is.LessThan(1.6f), "back to floor where it measured 20 C");
+            Assert.That(RetreatEndY(0), Is.GreaterThan(1.6f), "control: by surface heat alone it stays in the hot air");
+        }
+
+        [Test]
+        public void StayingInsideNoisyAirAtTheRiseThresholdStartsOneRetreat()
+        {
+            // Seed 929, robot B at 42.5 to 44 s: the air rose about 5 C in 10 s near a fire, and the +5 C test flickered with
+            // a few tenths of a degree of sensor noise, so the retreat ended and restarted 4 times in 1.5 s at 24 C. A rise now
+            // counts for one more air_rise_window_s once seen. Control: with that window 0 the retreats repeat.
+            int Retreats(float windowS)
+            {
+                var c = Settings(); c.stay_inside = true; c.mission_time_limit_s = 1000; c.air_rise_window_s = 10;
+                var b = new RobotBrain(Calibration(), c, "B", 0); Room(b, -3, 3, -3, 3);
+                var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+                int n = 0; double last = 0;
+                for (int i = 0; i <= 15 * 40; i++)
+                {
+                    double t = i / 15.0;
+                    // 20 C, then 0.5 C/s to 24.6 C, then held there with +-0.4 C alternating noise.
+                    float air = t < 20 ? 20 : (float)Math.Min(20 + (t - 20) * .5, 24.6) + (t >= 20 ? (i % 2 == 0 ? .4f : -.4f) : 0);
+                    Motion(b, t); b.OnRgbd(Image(t, true, 0)); b.OnAirTemperature(t, air);
+                    if (windowS <= 0) typeof(RobotBrain).GetField("heatRisingUntil", flags).SetValue(b, double.NegativeInfinity);
+                    b.Step(t, i == 0 ? .05f : (float)(t - last)); last = t;
+                    n += b.DrainEvents().Count(e => e.kind == "retreat");
+                    if (windowS <= 0) typeof(RobotBrain).GetField("heatRisingUntil", flags).SetValue(b, double.NegativeInfinity);
+                }
+                return n;
+            }
+            Assert.That(Retreats(10), Is.EqualTo(1), "one retreat for one rise");
+            Assert.That(Retreats(0), Is.GreaterThan(2), "control: without the hold the noise restarts it");
+        }
+
+        [Test]
         public void StayingInsideWarmAirWithNothingLeftDoesNotPingPongRetreats()
         {
             // Seed 927, robot B: with nothing left to search and the air at 24 to 31 C, the "leave while the way out is open"
@@ -1025,6 +1132,18 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void ColourPersonRangeIsAlreadyMeasuredFromTheRobotBody()
+        {
+            // Recorded 922 A at 37.417 s. Python _body_point and the LiDAR
+            // fallback return bearing and horizontal range from the body centre.
+            var pose = new BrainPose { position = new Vector2(-1.05747521f, 3.8536f), yawRad = 88.74788f * Mathf.Deg2Rad };
+            var spot = RobotBrain.PersonSightingPosition(pose, -2.985064f, 2.80884f);
+            Assert.That(Vector2.Distance(spot, new Vector2(-3.86503f, 3.76865f)), Is.LessThan(.002f));
+            // Reverting to camera + direction * range adds the 0.25 m mount
+            // offset again and fails this assertion by 0.25 m.
+        }
+
+        [Test]
         public void ColourPersonSightingsBecomeACandidateWhereThePersonIs()
         {
             // Thermal saturates in fire rooms (warm_eval: 0 of 161 visible survivors); the colour dnn detector still sees
@@ -1041,8 +1160,8 @@ namespace SmokeRescue.Tests.EditMode
                 }
                 var events = all.Where(e => e.kind == "survivor_candidate").ToList(); candidates = events.Count;
                 if (candidates == 0) return float.NaN;
-                // Camera 0.25 m ahead of the body; bearing 10 degrees right.
-                var expected = new Vector2(0, .25f) + new Vector2(Mathf.Sin(10 * Mathf.Deg2Rad), Mathf.Cos(10 * Mathf.Deg2Rad)) * 2.4f;
+                // The vision service has already expressed both bearing and range at the body centre.
+                var expected = new Vector2(Mathf.Sin(10 * Mathf.Deg2Rad), Mathf.Cos(10 * Mathf.Deg2Rad)) * 2.4f;
                 return Vector2.Distance(new Vector2((float)events[0].numbers["x_m"], (float)events[0].numbers["y_m"]), expected);
             }
             float error = Spot(.8f, out int confident);
