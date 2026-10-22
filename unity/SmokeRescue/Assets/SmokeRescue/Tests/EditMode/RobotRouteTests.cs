@@ -14,6 +14,38 @@ namespace SmokeRescue.Tests.EditMode
         const float Dt = 1f / 60f;
 
         [Test]
+        public void OneGateGivesTheBrainsThePadsNeverTheHouseCoordinates()
+        {
+            // One entrance (22 Oct): both brains start in the gate frame from their pads. The spawn's house coordinates
+            // (10, -2.4 here, plus placement error) must never reach a brain. Controls: a robot without a pad is not a gate
+            // launch, and asking for its gate pose fails rather than falling back to house coordinates.
+            var a = new SmokeRescue.World.Scenario.Robot { id = "robot_A", spawn = new SmokeRescue.World.Scenario.Spawn { at = new[] { 10f, -1.2f }, yaw = 0 }, launch_pad = new[] { 0f, 0f, 0f } };
+            var b = new SmokeRescue.World.Scenario.Robot { id = "robot_B", spawn = new SmokeRescue.World.Scenario.Spawn { at = new[] { 10.04f, -2.43f }, yaw = 1.3f }, launch_pad = new[] { 0f, -1.2f, 0f } };
+            Assert.That(SmokeRescue.Recording.RecordingSession.GateLaunch(new[] { a, b }), Is.True);
+            var pose = SmokeRescue.Recording.RecordingSession.EntryFor(b).pose;
+            Assert.That(pose.position.x, Is.EqualTo(0f).Within(1e-6f)); Assert.That(pose.position.y, Is.EqualTo(-1.2f).Within(1e-6f));
+            Assert.That(pose.yawRad, Is.EqualTo(0f).Within(1e-6f), "the pad's heading, not the placement error");
+            var c = new SmokeRescue.World.Scenario.Robot { id = "robot_C", spawn = new SmokeRescue.World.Scenario.Spawn { at = new[] { 3f, 4f }, yaw = 0 } };
+            Assert.That(SmokeRescue.Recording.RecordingSession.GateLaunch(new[] { a, c }), Is.False, "control: separate launches");
+            Assert.Throws<System.ArgumentException>(() => SmokeRescue.Recording.RecordingSession.EntryFor(c));
+        }
+
+        [Test]
+        public void ARadioMessageAsksForADecisionUnlessSomethingMoreUrgentWaits()
+        {
+            // Codex design review (22 Oct): a partner's proposal or report waited in the inbox for some other event or the
+            // 20 s period. Now it asks for a decision; a waiting person or heat event keeps its place (control).
+            var message = new Newtonsoft.Json.Linq.JObject { ["from"] = "robot_B", ["kind"] = "proposal", ["text"] = "split" };
+            var asked = SmokeRescue.Recording.RecordingSession.MessageTrigger(null, message);
+            Assert.That(asked.Value<string>("kind"), Is.EqualTo("team_message"));
+            Assert.That(asked.Value<string>("reason"), Does.Contain("robot_B").And.Contain("proposal"));
+            var urgent = Newtonsoft.Json.Linq.JObject.FromObject(new { kind = "avoid_fire", reason = "heat", numbers = new { } });
+            Assert.That(SmokeRescue.Recording.RecordingSession.MessageTrigger(urgent, message), Is.SameAs(urgent), "control: heat first");
+            var periodic = Newtonsoft.Json.Linq.JObject.FromObject(new { kind = "no_progress", reason = "x", numbers = new { } });
+            Assert.That(SmokeRescue.Recording.RecordingSession.MessageTrigger(periodic, message).Value<string>("kind"), Is.EqualTo("team_message"));
+        }
+
+        [Test]
         public void AnArrivalTheAgentAskedForIsDecidedAtOnceOtherEventsWaitTheGap()
         {
             // Held-out seeds 915 to 917: robots stood 28 to 58 s per run after agent turns, waiting out the 4 s gap between

@@ -71,6 +71,8 @@ namespace SmokeRescue.Editor
         public static void HouseHeldOut920() => WithAgents(() => Run("scenario_house_heldout_seed920.json", "unity_house_heldout_seed920"));
         [MenuItem("Tools/Smoke Rescue/Record/House held-out seed 921 run (agents, random people)")]
         public static void HouseHeldOut921() => WithAgents(() => Run("scenario_house_heldout_seed921.json", "unity_house_heldout_seed921"));
+        [MenuItem("Tools/Smoke Rescue/Record/House one-door seed 922 run (agents, random people)")]
+        public static void HouseOneDoor922() => WithAgents(() => Run("scenario_house_onedoor_seed922.json", "unity_house_onedoor_seed922"));
 
         [MenuItem("Tools/Smoke Rescue/Record/House hidden corner run (agents)")]
         public static void HouseHiddenCorner() => WithAgents(() => Run("scenario_house_hidden_corner.json", "unity_house_hidden_v1"));
@@ -123,6 +125,9 @@ namespace SmokeRescue.Editor
             ScenePreview.PlaceSurvivors(sc);
             ThermalPreview.TagSurvivors();
             if (running != null) { RecordingSession.AgentUrl = null; throw new System.InvalidOperationException("A recording is already running."); }
+            // No asset refresh or script reload while recording: the recording lives in this editor's update loop, and a
+            // forced recompile at 12:19 on 22 Oct reloaded the domain and ended held-out seed 921 at 139.9 s.
+            UnityEditor.AssetDatabase.DisallowAutoRefresh(); UnityEditor.EditorApplication.LockReloadAssemblies();
             var steps = RecordingSession.RecordSteps(scenario, runId, maxSeconds, noise, msg => Debug.Log($"[SmokeRescue] {runId} {msg}")).GetEnumerator();
             running = () =>
             {
@@ -131,6 +136,7 @@ namespace SmokeRescue.Editor
                 catch (System.Exception e) { Debug.LogException(e); more = false; }
                 if (more && done == null) return;
                 UnityEditor.EditorApplication.update -= running; running = null; RecordingSession.AgentUrl = null; steps.Dispose();
+                UnityEditor.EditorApplication.UnlockReloadAssemblies(); UnityEditor.AssetDatabase.AllowAutoRefresh();
                 Debug.Log(done != null ? $"[SmokeRescue] Recording done: {done.dir}" : $"[SmokeRescue] Recording {runId} stopped without a result");
             };
             UnityEditor.EditorApplication.update += running;

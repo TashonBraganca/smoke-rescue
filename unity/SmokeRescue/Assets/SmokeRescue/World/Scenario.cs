@@ -65,6 +65,10 @@ namespace SmokeRescue.World
             public string id;
             public string color;
             public Spawn spawn;
+            // Gate frame pose the team set this robot on: x right and y ahead of the launch line (m), heading (deg). The
+            // gate frame is defined by the pads, so the brains share it without knowing the house's coordinates. null
+            // when robots launch separately (each brain then starts in its own frame).
+            public float[] launch_pad;
             public string control;
             public float cruise_speed = 0.5f;
             public string torch = "wide";                      // starting torch mode: wide, narrow, low, off

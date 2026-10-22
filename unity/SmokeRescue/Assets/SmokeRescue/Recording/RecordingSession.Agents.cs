@@ -139,6 +139,20 @@ namespace SmokeRescue.Recording
             return sinceLastS >= AgentMinGapS;
         }
 
+        /// <summary>The decision trigger after a radio message arrives: a safety or person event already waiting keeps its
+        /// place; otherwise the message asks for a decision (after the usual gap, AgentDue). Messages only reached the inbox
+        /// and waited for some other event or the 20 s period (Codex design review, 22 Oct).</summary>
+        public static JObject MessageTrigger(JObject held, JObject message)
+        {
+            string kind = held?.Value<string>("kind");
+            if (kind == "survivor_candidate" || kind == "survivor_view_ready" || kind == "avoid_fire" || kind == "retreat" ||
+                kind == "escape_closing" || kind == "agent_goal_reached")
+                return held;
+            return JObject.FromObject(new { kind = "team_message",
+                reason = $"Radio from {message.Value<string>("from")}: {message.Value<string>("kind") ?? "message"}.",
+                numbers = new { } });
+        }
+
         static void NoteAgentTrigger(RobotRig rig, Brain.BrainEvent e)
         {
             if (!AgentTriggers.Contains(e.kind)) return;
@@ -201,7 +215,6 @@ namespace SmokeRescue.Recording
                     ["partners"] = new JArray(s.peers.Select(p => (object)new JObject { ["robot"] = p.robot, ["maps_linked"] = p.linked,
                         ["position"] = p.linked ? new JArray(Math.Round(p.pose.position.x, 2), Math.Round(p.pose.position.y, 2)) : null })),
                 };
-                rig.inbox.Clear();
                 calls.Add((rig, req));
             }
             // Every due robot's step goes out at once, so the sim waits for the slowest model call, not their sum.
@@ -211,7 +224,11 @@ namespace SmokeRescue.Recording
             {
                 var rig = calls[i].rig; var reply = replies[i];
                 w.steps++;
+                // The messages this step was shown leave the inbox only once the step answered; a failed call keeps them for
+                // the next one (they were cleared before the call; Codex design review, 22 Oct). The sim is paused during
+                // the call, so nothing arrived meanwhile and the first ones are exactly those shown.
                 if (reply == null) { w.errors++; continue; }
+                rig.inbox.RemoveRange(0, Math.Min(((JArray)calls[i].req["inbox"]).Count, rig.inbox.Count));
                 rig.agentLog.Append(reply.ToString(Formatting.None)).Append('\n');
                 w.refusals += (reply["refusals"] as JArray)?.Count ?? 0;
                 foreach (JObject order in (reply["orders"] as JArray) ?? new JArray()) { w.orders++; Apply(w, rig, order, t); }
@@ -289,8 +306,12 @@ namespace SmokeRescue.Recording
                     brain.LogAgentAction(t, begun ? $"{type} started on {rig.actions.TargetId}, OpenCV evidence {ev}." : $"{type} refused: {rig.actions.FailureReason}");
                     break;
                 case "send_team_message":
-                    var msg = new JObject { ["from"] = rig.robot.RobotId, ["t"] = t, ["text"] = o.Value<string>("text"),
-                        ["x"] = brain.Snapshot().pose.position.x, ["y"] = brain.Snapshot().pose.position.y };
+                    // Every field the agent server stamped (message_id, kind, proposal_id, reply_to, expires_t, my_part,
+                    // your_part) travels with the text; the recorder adds sender, time and the sender's own-frame position.
+                    var msg = new JObject();
+                    foreach (var p in o.Properties()) if (p.Name != "type" && p.Name != "robot") msg[p.Name] = p.Value.DeepClone();
+                    msg["from"] = rig.robot.RobotId; msg["t"] = t;
+                    msg["x"] = brain.Snapshot().pose.position.x; msg["y"] = brain.Snapshot().pose.position.y;
                     rig.outbox.Add(new Outgoing { message = msg });
                     if (rig.outbox.Count > 5) rig.outbox.RemoveAt(0);
                     brain.Log(t, "team_message_sent", o.Value<string>("text") ?? "");
@@ -323,6 +344,7 @@ namespace SmokeRescue.Recording
                         { copy["x"] = Math.Round(own.x, 2); copy["y"] = Math.Round(own.y, 2); copy["position"] = "converted into your frame"; }
                         else { copy.Remove("x"); copy.Remove("y"); copy["position"] = "unknown: your frames are not linked yet"; }
                         to.inbox.Add(copy); to.brain.Log(t, "team_message_received", $"{copy["from"]}: {copy["text"]}");
+                        to.trigger = MessageTrigger(to.trigger, copy);
                     }
                 }
                 var toPost = radio.Evaluate(from.robot.transform.position, w.post);
@@ -344,16 +366,22 @@ namespace SmokeRescue.Recording
             for (int i = w.postOutbox.Count - 1; i >= 0; i--)
             {
                 var (to, order) = w.postOutbox[i];
-                bool sent = false;
                 foreach (var rig in rigs.Where(r => r.brain != null && (to == "*" || to == r.robot.RobotId)))
                 {
                     if (!radio.Evaluate(w.post, rig.robot.transform.position).delivered) continue;
                     // The commander only talks: it has no map and assigns no areas (Tashon, 2026-10-20).
-                    rig.inbox.Add(new JObject { ["from"] = "commander", ["t"] = t, ["text"] = order.Value<string>("text") });
+                    // Once per robot: a broadcast stays queued until every robot it is for has heard it (it was dropped
+                    // after the first one, so the other never heard it; Codex design review, 22 Oct).
+                    var heard = order["heard_by"] as JArray ?? (JArray)(order["heard_by"] = new JArray());
+                    if (heard.Any(h => (string)h == rig.robot.RobotId)) continue;
+                    heard.Add(rig.robot.RobotId);
+                    var said = new JObject { ["from"] = "commander", ["t"] = t, ["text"] = order.Value<string>("text") };
+                    rig.inbox.Add(said); rig.trigger = MessageTrigger(rig.trigger, said);
                     rig.brain.Log(t, "team_message_received", "commander: " + order.Value<string>("text"));
-                    sent = true;
                 }
-                if (sent) w.postOutbox.RemoveAt(i);
+                var meant = rigs.Where(r => r.brain != null && (to == "*" || to == r.robot.RobotId)).Select(r => r.robot.RobotId);
+                var got = (order["heard_by"] as JArray)?.Select(h => (string)h) ?? Enumerable.Empty<string>();
+                if (meant.All(id => got.Contains(id))) w.postOutbox.RemoveAt(i);
             }
         }
 

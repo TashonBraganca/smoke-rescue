@@ -46,6 +46,8 @@ namespace SmokeRescue.Brain
         long sequence;
         double lastFull = double.NegativeInfinity, lastBuild = double.NegativeInfinity;
         double lastPeerReceived = double.NegativeInfinity;
+        /// <summary>Where this robot stood when it last heard a partner: the radio reached between there and the partner.</summary>
+        Vector2? contactAt;
         byte[] lastState;
         int SharedSize => Mathf.CeilToInt(grid.Size * grid.CellM / BrainMessage.ResolutionM);
 
@@ -65,6 +67,15 @@ namespace SmokeRescue.Brain
         /// <summary>Call after Step at each 2-second broadcast boundary. The recorder alone decides
         /// delivery and queues newest pending state per sender/receiver. This method never reads radio geometry.
         /// Acknowledgements travel inside received peer messages; no recorder ACK call is needed.</summary>
+        /// <summary>Own map cells (shared grid) observed since the oldest partner acknowledgement: what a partner has not got.</summary>
+        int UnsharedCells()
+        {
+            long baseline = sequence;
+            foreach (var peer in peers.Values) baseline = Math.Min(baseline, peer.acknowledgedOurs);
+            int n = 0; foreach (long s in observedSequence) if (s > baseline) n++;
+            return n;
+        }
+
         public BrainMessage BuildMessage(double t)
         {
             BrainMath.Time(t);
@@ -147,6 +158,7 @@ namespace SmokeRescue.Brain
             foreach (var ack in m.Acknowledgements)
                 if (ack.sender == id && ack.sequence <= sequence) peer.acknowledgedOurs = Math.Max(peer.acknowledgedOurs, ack.sequence);
             lastPeerReceived = tReceived;
+            contactAt = motion.Pose.position;
             grid.DecayTo(tReceived);
             ReceiveKeyframes(m.Sender, m, tReceived);
             ReceiveVisualKeyframes(m.Sender, m);

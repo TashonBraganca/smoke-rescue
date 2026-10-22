@@ -380,6 +380,8 @@ namespace SmokeRescue.Brain
                 ClearPath();
                 if (wasFrontier) OnFrontierReached(reached, t);
             }
+            var meet = RendezvousStep(t, dt);
+            if (meet.HasValue) return meet.Value;
             if (sweeping && !returning) return SweepStep(t, dt);
             CheckProgress(t);
             var face = FaceStep(t, dt);
@@ -1036,6 +1038,61 @@ namespace SmokeRescue.Brain
         /// robots stood at their own blocked door for 106 to 124 s. Never open yard: the wall keeps the robot's LiDAR
         /// localisation anchored (held-out run 2: robot B lost its position searching an open yard).
         /// </summary>
+        Vector2? meetGoal; double meetSince = double.NaN, meetArrived = double.NaN, nextMeet;
+        /// <summary>Back into radio contact. The radio reaches 12 m through at most one wall, so in the house the robots were out
+        /// of contact for 168 to 184 s of 200 (held-out seeds 919, 920) and each searched blind to the other's map. Out of
+        /// contact for rendezvous_after_s, with at least rendezvous_min_unshared_cells of own map the partner has not
+        /// acknowledged, the robot walks back to where it last heard the partner: the link reached between there and the
+        /// partner, and the partner, out of contact over the same interval, does the same, so no meeting has to be agreed
+        /// while apart (the robots cannot talk then). Messages queue while out of contact and carry everything since the
+        /// partner's last acknowledgement, so one heard message syncs the maps. Contact ends the meeting; after
+        /// rendezvous_hold_s at the spot without contact the robot searches on. The return must still leave time to get out.
+        /// Uses only this robot's own memory: no map of the house, no partner position it has not heard.</summary>
+        BrainCommand? RendezvousStep(double t, float dt)
+        {
+            if (c.rendezvous_after_s <= 0 || !contactAt.HasValue || peers.Count == 0) return null;
+            if (meetGoal.HasValue)
+            {
+                if (lastPeerReceived > meetSince)
+                {
+                    Emit(t, "rendezvous_done", "Radio contact with the partner again: maps exchanged; search on.", "out_of_contact_s", t - meetSince);
+                    meetGoal = null; ClearPath(); nextMeet = t + c.rendezvous_after_s; return null;
+                }
+                if (Vector2.Distance(motion.Pose.position, meetGoal.Value) <= c.return_arrive_m || (path.Count == 0 && !double.IsNaN(meetArrived)))
+                {
+                    if (double.IsNaN(meetArrived)) { meetArrived = t; ClearPath(); }
+                    if (t - meetArrived < c.rendezvous_hold_s) return Command(0, 0, dt, true);
+                    Emit(t, "rendezvous_done", "No contact where the partner was last heard; search on.", "waited_s", t - meetArrived);
+                    meetGoal = null; nextMeet = t + c.rendezvous_after_s; return null;
+                }
+                if (path.Count == 0 || !planner.PathSafe(path, cursor))
+                {
+                    var again = planner.Plan(motion.Pose.position, meetGoal.Value);
+                    if (again.Count == 0)
+                    {
+                        Emit(t, "rendezvous_done", "The way back to where the partner was last heard is closed; search on.");
+                        meetGoal = null; nextMeet = t + c.rendezvous_after_s; return null;
+                    }
+                    SetPath(again); lastPlan = t;
+                }
+                return FollowOrHold(t, dt);
+            }
+            if (t - lastPeerReceived < c.rendezvous_after_s || t < nextMeet || sweeping || AgentGoalActive(t) || active != null ||
+                facing.HasValue || t < agentHoldUntil) return null;
+            int unshared = UnsharedCells();
+            if (unshared < c.rendezvous_min_unshared_cells) return null;
+            var route = planner.Plan(motion.Pose.position, contactAt.Value);
+            float routeM = 0; for (int i = 1; i < route.Count; i++) routeM += Vector2.Distance(route[i - 1], route[i]);
+            float outM = Vector2.Distance(contactAt.Value, home);
+            if (route.Count == 0 || t + (routeM + outM) / c.open_speed_mps * c.escape_time_factor + c.rendezvous_hold_s >= c.mission_time_limit_s)
+            { nextMeet = t + c.escape_check_s; return null; }
+            meetGoal = contactAt; meetSince = lastPeerReceived; meetArrived = double.NaN; frontierGoal = false;
+            SetPath(route); lastPlan = t;
+            Emit(t, "rendezvous", "Out of radio contact with much of the map unshared: walk back to where the partner was last heard; it does the same.",
+                "x_m", contactAt.Value.x, "y_m", contactAt.Value.y, "out_of_contact_s", t - lastPeerReceived, "unshared_cells", unshared, "route_m", routeM);
+            return FollowOrHold(t, dt);
+        }
+
         BrainCommand? RelocateStep(double t, float dt)
         {
             if (!canReenter || c.exterior_dwell_s <= 0 || t >= c.mission_time_limit_s) return null;

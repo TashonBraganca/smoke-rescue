@@ -29,6 +29,20 @@ namespace SmokeRescue.Recording
     /// </summary>
     public static partial class RecordingSession
     {
+        /// <summary>True when every robot launches from a pad at one gate (Scenario.Robot.launch_pad), so their brains share
+        /// the gate frame from the start.</summary>
+        public static bool GateLaunch(IEnumerable<Scenario.Robot> robots) =>
+            robots != null && robots.Any() && robots.All(r => r.launch_pad != null && r.launch_pad.Length == 3);
+
+        /// <summary>A robot's start in the shared gate frame: its pad, as the team set it, not where it really stands (the
+        /// placement error stays in the world) and never the house's coordinates.</summary>
+        public static EntryPose EntryFor(Scenario.Robot spec)
+        {
+            if (spec.launch_pad == null || spec.launch_pad.Length != 3)
+                throw new ArgumentException($"{spec.id}: a shared frame needs a launch pad (gate frame), not house coordinates.");
+            return new EntryPose(spec.launch_pad[0], spec.launch_pad[1], spec.launch_pad[2]);
+        }
+
         public const int ClockHz = 600;
 
         public sealed class Result
@@ -181,8 +195,11 @@ namespace SmokeRescue.Recording
                     // stop at 200 s, and an agent was told it had 44 s left at 196 s (Codex review, 22 Oct).
                     float missionS = Mathf.Min(scenario.duration_s, maxSeconds);
                     if (missionS > 0 && !float.IsInfinity(missionS)) brainCfg.mission_time_limit_s = missionS;
+                    // One launch gate: every robot's brain starts at its pad in the shared gate frame. Never the spawn's house
+                    // coordinates, which would hand the brains the building's own frame.
+                    brainCfg.frames_shared_at_start = GateLaunch(scenario.robots);
                     rig.brain = brainCfg.frames_shared_at_start
-                        ? new RobotBrain(sensorCfg, brainCfg, spec.id, scenario.seed * 1000 + i * 10 + 6, new EntryPose(spec.spawn.at[0], spec.spawn.at[1], spec.spawn.yaw))
+                        ? new RobotBrain(sensorCfg, brainCfg, spec.id, scenario.seed * 1000 + i * 10 + 6, EntryFor(spec))
                         : new RobotBrain(sensorCfg, brainCfg, spec.id, scenario.seed * 1000 + i * 10 + 6);
                     rig.brain.AgentConfirms = AgentUrl != null;
                     var r0 = rig;

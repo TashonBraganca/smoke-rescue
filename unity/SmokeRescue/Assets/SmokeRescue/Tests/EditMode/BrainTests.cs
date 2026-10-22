@@ -2273,6 +2273,43 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void OutOfContactTooLongTheRobotWalksBackToWhereItLastHeardItsPartner()
+        {
+            // Held-out seeds 919 and 920: out of radio contact 168 to 184 s of 200. Robot B hears A at the start, walks 4 m on
+            // mapping new floor, then hears nothing: after rendezvous_after_s it walks back toward where it last heard A, and
+            // a message from A ends the meeting. Control: in range of A (its full snapshot arrives every 10 s, the heartbeat), it
+            // never walks back.
+            (int meets, int done, Vector2? goal) Run(bool silent)
+            {
+                var c = Settings(); c.grid_size_m = 16; c.robot_radius_m = .25f; c.frames_shared_at_start = true;
+                c.rendezvous_after_s = 14; c.rendezvous_min_unshared_cells = 20; c.rendezvous_hold_s = 4; c.mission_time_limit_s = 1000;
+                var b = new RobotBrain(Calibration(), c, "B", 0); Room(b, -5, 5, -2, 10);
+                var partner = new RobotBrain(Calibration(), c, "A", 0); Motion(partner, 0); partner.OnAirTemperature(0, 20); partner.Step(0, .05f);
+                var events = new List<BrainEvent>(); Vector2? goal = null; double partnerT = 0;
+                for (int i = 0; i < 15 * 24; i++)
+                {
+                    double t = i / 15.0; Motion(b, t, t > .5 && t < 8.5 ? .5f : 0); b.OnRgbd(Image(t, true)); b.OnAirTemperature(t, 20);
+                    bool hear = i == 3 || (!silent && i % 30 == 0 && i > 0) || (silent && i == 15 * 22);
+                    if (hear)
+                    {
+                        Motion(partner, t); partner.OnAirTemperature(t, 20); partner.Step(t, (float)(t - partnerT)); partnerT = t;
+                        // A partner with nothing new sends nothing; its full snapshot every full_snapshot_s (10 s) is the heartbeat.
+                        var sent = partner.BuildMessage(t); if (sent != null) b.OnPeerMessage(Wire(sent), t);
+                    }
+                    b.Step(t, 1f / 15); var e = b.DrainEvents(); events.AddRange(e);
+                    if (e.Any(x => x.kind == "rendezvous")) goal = b.Snapshot().goal;
+                    if (i % 30 == 0) b.BuildMessage(t);
+                }
+                return (events.Count(e => e.kind == "rendezvous"), events.Count(e => e.kind == "rendezvous_done"), goal);
+            }
+            var silent = Run(true);
+            Assert.That(silent.meets, Is.EqualTo(1), "walks back once");
+            Assert.That(silent.goal.HasValue && silent.goal.Value.magnitude < 1f, Is.True, "toward where it last heard A (near the start): " + silent.goal);
+            Assert.That(silent.done, Is.EqualTo(1), "hearing A again ends it");
+            Assert.That(Run(false).meets, Is.Zero, "control: in contact, no walking back");
+        }
+
+        [Test]
         public void LeavingBecauseOfHeatDoesNotCrawlPastWalls()
         {
             // Held-out seed 920, robot B: leaving a heating house, it walked at the 0.3 m/s near-wall speed through every
