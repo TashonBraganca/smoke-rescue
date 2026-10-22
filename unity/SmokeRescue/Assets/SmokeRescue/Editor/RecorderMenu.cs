@@ -73,6 +73,8 @@ namespace SmokeRescue.Editor
         public static void HouseHeldOut921() => WithAgents(() => Run("scenario_house_heldout_seed921.json", "unity_house_heldout_seed921"));
         [MenuItem("Tools/Smoke Rescue/Record/House one-door seed 922 run (agents, random people)")]
         public static void HouseOneDoor922() => WithAgents(() => Run("scenario_house_onedoor_seed922.json", "unity_house_onedoor_seed922"));
+        [MenuItem("Tools/Smoke Rescue/Record/House one-door seed 923 run (agents, random people)")]
+        public static void HouseOneDoor923() => WithAgents(() => Run("scenario_house_onedoor_seed923.json", "unity_house_onedoor_seed923"));
 
         [MenuItem("Tools/Smoke Rescue/Record/House hidden corner run (agents)")]
         public static void HouseHiddenCorner() => WithAgents(() => Run("scenario_house_hidden_corner.json", "unity_house_hidden_v1"));

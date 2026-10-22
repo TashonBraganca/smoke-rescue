@@ -76,12 +76,13 @@ namespace SmokeRescue.Brain
         }
         internal sealed class FrontierChoice
         { public Vector2 position, claimCentre; public List<Vector2> path; public float cost, score, claimRadius; public int information; }
-        internal FrontierChoice Frontier(Vector2 from, Func<Vector2, bool> excluded = null)
+        internal FrontierChoice Frontier(Vector2 from, Func<Vector2, bool> excluded = null, bool partnerSearchedToo = false)
         {
-            var all = Frontiers(from, excluded); return all.Count > 0 ? all[0] : null;
+            var all = Frontiers(from, excluded, partnerSearchedToo); return all.Count > 0 ? all[0] : null;
         }
-        /// <summary>Every worthwhile reachable frontier cluster, best score first.</summary>
-        internal List<FrontierChoice> Frontiers(Vector2 from, Func<Vector2, bool> excluded = null)
+        /// <summary>Every worthwhile reachable frontier cluster, best score first. partnerSearchedToo keeps frontier cells a
+        /// partner's camera has searched (normally dropped), for following a partner through the one way on.</summary>
+        internal List<FrontierChoice> Frontiers(Vector2 from, Func<Vector2, bool> excluded = null, bool partnerSearchedToo = false)
         {
             var choices = new List<FrontierChoice>();
             grid.PrepareNavigation();
@@ -91,7 +92,7 @@ namespace SmokeRescue.Brain
             var peek = PeekCells();
             for (int i = 0; i < grid.Count; i++)
             {
-                if (float.IsPositiveInfinity(distance[i]) || !grid.Walkable(i) || grid.PeerExplored(i)) continue;
+                if (float.IsPositiveInfinity(distance[i]) || !grid.Walkable(i) || (!partnerSearchedToo && grid.PeerExplored(i))) continue;
                 int x = i % grid.Size, y = i / grid.Size;
                 for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++)
                     if (Math.Abs(dx) + Math.Abs(dy) == 1 && grid.Inside(x + dx, y + dy) && grid.Unsearched((y + dy) * grid.Size + x + dx))

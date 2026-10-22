@@ -130,6 +130,7 @@ namespace SmokeRescue.Brain
                 ResetStuckRecovery(); retreating = false; ClearPath();
                 Emit(t, "goal", "Cool air and a recovered heat budget permit travel again.", "air_c", airC, "heat_budget", budget);
             }
+            NoteBodyTrack();
             CheckReenter(t);
             if (doorwayProbeGoal.HasValue && (returning || retreating || completed || nearFire || active != null ||
                 AgentGoalActive(t) || recoveryPhase != 0 || t - doorwayProbeStarted >= c.sweep_max_s))
@@ -449,7 +450,19 @@ namespace SmokeRescue.Brain
                     System.Func<Vector2, bool> excluded = p => ClaimBlocks(p, t) || GoalBlacklisted(p, t) || VisitedGoal(p, t) || !InSearchArea(p);
                     var frontier = planner.Frontier(motion.Pose.position, excluded);
                     lastPlan = t;
-                    if (frontier != null)
+                    // Only the partner stands between this robot and unsearched floor (its claim or the floor its camera
+                    // searched): follow through, without claiming, rather than end the search. One-door seed 922, robot B:
+                    // behind A at the one door, it yielded the door frontier 120 times in 2 s, found nothing else, and
+                    // declared its mission complete at 16.6 s. Beyond the partner's floor its own frontiers take over.
+                    var through = frontier == null && peers.Count > 0
+                        ? planner.Frontier(motion.Pose.position, p => GoalBlacklisted(p, t) || VisitedGoal(p, t) || !InSearchArea(p), true) : null;
+                    if (through != null)
+                    {
+                        SetPath(through.path, false); scanSince = double.NaN; noFrontierAt = double.NaN;
+                        Emit(t, "goal", "Only the partner's claimed or searched floor leads on: follow through it to unsearched floor beyond.",
+                            "x_m", through.position.x, "y_m", through.position.y, "path_cost", through.cost);
+                    }
+                    else if (frontier != null)
                     {
                         SetPath(frontier.path, true); frontierCentre = frontier.claimCentre; frontierRadius = frontier.claimRadius;
                         scanSince = double.NaN; noFrontierAt = double.NaN;
@@ -682,7 +695,37 @@ namespace SmokeRescue.Brain
         bool GoalBlacklisted(Vector2 point, double t)
         {
             blockedGoals.RemoveAll(g => t >= g.until);
-            return blockedGoals.Exists(g => Vector2.Distance(point, g.position) <= (g.radius > 0 ? g.radius : c.stuck_repeat_radius_m));
+            return blockedGoals.Exists(g => Vector2.Distance(point, g.position) <= (g.radius > 0 ? g.radius : c.stuck_repeat_radius_m) &&
+                                            SameSideOfWalls(point, g.position));
+        }
+        /// <summary>No mapped wall cell lies on the straight line from a to b. Exclusion circles (blacklisted and visited
+        /// goals, up to 2.5 m) reached through walls and hid unrelated frontiers in the next room (#27, Codex review).</summary>
+        /// <summary>Where this robot's body has stood: a pose every cell of travel, the most recent body_track_poses.</summary>
+        readonly List<BrainPose> bodyTrack = new List<BrainPose>();
+        void NoteBodyTrack()
+        {
+            var pose = motion.Pose;
+            if (bodyTrack.Count > 0 && Vector2.Distance(bodyTrack[bodyTrack.Count - 1].position, pose.position) < grid.CellM) return;
+            bodyTrack.Add(pose); if (bodyTrack.Count > c.body_track_poses) bodyTrack.RemoveAt(0);
+        }
+        /// <summary>p lies inside this robot's body (the capsule, body_half_length_m and body_radius_m) at a pose it has held.</summary>
+        bool OwnBodyWasAt(Vector2 p)
+        {
+            float half = Mathf.Max(0, c.body_half_length_m - c.body_radius_m), r = c.body_radius_m + grid.CellM * .5f;
+            foreach (var pose in bodyTrack)
+            {
+                Vector2 d = p - pose.position, f = pose.Forward;
+                float along = Vector2.Dot(d, f), lateral = f.x * d.y - f.y * d.x, beyond = Mathf.Max(0, Mathf.Abs(along) - half);
+                if (beyond * beyond + lateral * lateral <= r * r) return true;
+            }
+            return false;
+        }
+        bool SameSideOfWalls(Vector2 a, Vector2 b)
+        {
+            int steps = Mathf.CeilToInt(Vector2.Distance(a, b) / (grid.CellM * .5f));
+            for (int i = 1; i < steps; i++)
+                if (grid.OwnOccupancy(grid.Cell(Vector2.Lerp(a, b, i / (float)steps))) == 255) return false;
+            return true;
         }
         void BlacklistGoal(Vector2 point, double t, int repeats, double forS = double.NaN, string why = null, float radius = 0)
         {
@@ -971,7 +1014,12 @@ namespace SmokeRescue.Brain
             // one is clear (Codex review, 22 Oct: robot B stood at its door for 119 s of held-out seed 916 while the only
             // frontier checked was the one beside the burning foyer).
             GridPlanner.FrontierChoice frontier = null; float closest = float.PositiveInfinity;
-            foreach (var candidate in planner.Frontiers(motion.Pose.position, excluded))
+            // Behind a partner at one door, its claim and searched floor can be the only way in: go back in through them
+            // (one-door seed 922, robot B walked the outside wall at 31 s while A searched inside).
+            var candidates = planner.Frontiers(motion.Pose.position, excluded);
+            if (candidates.Count == 0 && peers.Count > 0)
+                candidates = planner.Frontiers(motion.Pose.position, p => GoalBlacklisted(p, t) || VisitedGoal(p, t) || !InSearchArea(p), true);
+            foreach (var candidate in candidates)
             {
                 float near = ReentryFireDistance(candidate.path);
                 if (near < c.escape_fire_margin_m) continue;

@@ -59,6 +59,9 @@ namespace SmokeRescue.Brain
     {
         public Vector2 blockAt, frontier;
         public float bearingDegRight, distanceM, frontierPathM, unsearchedM2;
+        /// <summary>Floor this robot measured burning (heat at or above fire_c, not forecast) within burning_radius_m of
+        /// blockAt: the fire water would have to knock down to open the way.</summary>
+        public float burningM2;
     }
     /// <summary>A search target offered to the agent (RobotBrain.FrontierOptions).</summary>
     public struct BrainFrontier
