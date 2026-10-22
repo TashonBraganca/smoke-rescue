@@ -60,5 +60,7 @@
   "place_orb_levels": 5,
   "place_orb_levels_reason": "Paired with scale 1.5 (1.5 scale over 5 levels spans 5x); same dev sweep.",
   "place_http_timeout_s": 2.0,
-  "place_http_timeout_s_reason": "Keyframe extraction measured at most 0.35 s and matching about 10 ms in tools/place_eval.py. A 2 s client deadline allows over five times the measured extraction time. The recorder polls asynchronously and continues after timeout; the worker process has its own 30 s recovery bound."
+  "place_http_timeout_s_reason": "Keyframe extraction measured at most 0.35 s and matching about 10 ms in tools/place_eval.py. A 2 s client deadline allows over five times the measured extraction time. The recorder polls asynchronously and continues after timeout; the worker process has its own 30 s recovery bound.",
+  "burning_kw_per_m2": 324.0,
+  "burning_kw_per_m2_reason": "Heat release the robot assumes per square metre of floor it measures burning: a burning rate of about 0.018 kg/m2/s for furniture and wood times about 18 MJ/kg heat of combustion (fire-engineering handbook values). Used only to judge whether its water can knock a blocking fire down."
 }

@@ -67,7 +67,8 @@ class TeamState:
                     "proposal_id": str(m["proposal_id"]), "from": sender, "t": float(m.get("t", t)),
                     "expires_t": float(m.get("expires_t", float(m.get("t", t)) + PROPOSAL_TTL_S)),
                     # Swapped: what the partner will do, and what it asks of this robot.
-                    "partner_part": m.get("my_part"), "your_part": m.get("your_part"), "why": m.get("text"), "status": "pending"}
+                    "partner_part": m.get("my_part"), "your_part": m.get("your_part"), "why": m.get("text"), "status": "pending",
+                    "target": m.get("target")}
             elif kind in ("accept", "reject") and str(m.get("reply_to")) in self.sent:
                 p = self.sent[str(m["reply_to"])]
                 if p["status"] == "pending" and t <= p["expires_t"]:
@@ -85,12 +86,12 @@ class TeamState:
         msg.update({k: v for k, v in fields.items() if v is not None})
         return msg
 
-    def propose(self, my_part: str, your_part: str, why: str, t: float) -> dict:
+    def propose(self, my_part: str, your_part: str, why: str, t: float, target: dict | None = None) -> dict:
         pid = f"{self.robot}-p{next(self._ids)}"
         self.sent[pid] = {"proposal_id": pid, "t": t, "expires_t": t + PROPOSAL_TTL_S, "my_part": my_part,
-                          "your_part": your_part, "status": "pending"}
+                          "your_part": your_part, "status": "pending", "target": target}
         return self.message("proposal", why, t, proposal_id=pid, expires_t=round(t + PROPOSAL_TTL_S, 2),
-                            my_part=str(my_part)[:TEXT_MAX], your_part=str(your_part)[:TEXT_MAX])
+                            my_part=str(my_part)[:TEXT_MAX], your_part=str(your_part)[:TEXT_MAX], target=target)
 
     def answer_refusal(self, proposal_id: str, t: float) -> str | None:
         p = self.received.get(str(proposal_id))
@@ -114,15 +115,15 @@ class TeamState:
         for p in self.sent.values():
             if p["status"] == "accepted" and t - p.get("answered_t", p["t"]) <= AGREEMENT_TTL_S:
                 out.append({"proposal_id": p["proposal_id"], "proposed_by": "you", "your_part": p["my_part"],
-                            "partner_part": p["your_part"], "since_t": p.get("answered_t")})
+                            "partner_part": p["your_part"], "target": p.get("target"), "since_t": p.get("answered_t")})
         for p in self.received.values():
             if p["status"] == "accepted" and t - p.get("answered_t", p["t"]) <= AGREEMENT_TTL_S:
                 out.append({"proposal_id": p["proposal_id"], "proposed_by": p["from"], "your_part": p["your_part"],
-                            "partner_part": p["partner_part"], "since_t": p.get("answered_t")})
+                            "partner_part": p["partner_part"], "target": p.get("target"), "since_t": p.get("answered_t")})
         return sorted(out, key=lambda a: a["since_t"] or 0)[-2:]
 
     def context(self, t: float) -> dict:
-        awaiting = [{k: p[k] for k in ("proposal_id", "from", "your_part", "partner_part", "why")} |
+        awaiting = [{k: p[k] for k in ("proposal_id", "from", "your_part", "partner_part", "why", "target")} |
                     {"expires_in_s": round(p["expires_t"] - t, 1)}
                     for p in self.received.values() if p["status"] == "pending" and t <= p["expires_t"]]
         mine = [{"proposal_id": p["proposal_id"], "status": p["status"] if p["status"] != "pending" or t <= p["expires_t"] else "expired",

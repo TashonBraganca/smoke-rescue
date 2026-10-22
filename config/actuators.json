@@ -11,7 +11,11 @@
     "max_spray_s": 6.0,
     "max_spray_s_reason": "Longest single spray an agent may order, so one order cannot empty the tank; it can order again after the robot looks again.",
     "aim_tolerance_deg": 15.0,
-    "aim_tolerance_deg_reason": "An agent may spray only toward a hot spot its cited thermal scan found within this bearing of the requested direction (half the thermal camera's 50 degree field is 25 degrees; 15 keeps the stream on the measured fire)."
+    "aim_tolerance_deg_reason": "An agent may spray only toward a hot spot its cited thermal scan found within this bearing of the requested direction (half the thermal camera's 50 degree field is 25 degrees; 15 keeps the stream on the measured fire).",
+    "cooling_kj_per_l": 2590.0,
+    "cooling_kj_per_l_reason": "Heat one litre of water takes from a fire: about 330 kJ to warm it from 20 to 100 C plus 2260 kJ to boil it (standard steam tables). The robot's engineering estimate, not read from the simulator.",
+    "application_efficiency": 0.5,
+    "application_efficiency_reason": "Share of sprayed water that reaches burning fuel and boils there; fire-service texts give roughly 0.3 to 0.7 for straight-to-fog streams, and the middle is used."
   },
   "rescue": {
     "enabled": false,
