@@ -134,6 +134,57 @@ namespace SmokeRescue.Tests.EditMode
             UnityEngine.Debug.Log("[C4 projection] " + report);
         }
         [UnityTest]
+        public IEnumerator APersonIsSolidToTheDepthCamera()
+        {
+            // One-door seed 922: a kneeling woman 2.8 m from robot A was absent from its depth image (her glTF materials
+            // imported alpha-blended, without depth write), so every depth range to a person measured what lay behind.
+            // The real s2 model 2 m in front of the camera: as imported, the nearest depth in her box is beyond her (the
+            // setup's 3 m marker or the 6 m background; control); after ScenePreview.SolidBodies it is her, about 2 m.
+            var props = Newtonsoft.Json.Linq.JObject.Parse(File.ReadAllText(Path.Combine(SmokeRescue.World.FloorPlan.ConfigDir, "props.json")));
+            var prefab = SmokeRescue.Editor.FurnitureBuilder.LoadPart((Newtonsoft.Json.Linq.JObject)props["survivors_posed"]["s2"]);
+            Assert.That(prefab, Is.Not.Null, "the s2 survivor model loads");
+            var person = (GameObject)Object.Instantiate(prefab);
+            foreach (var t in person.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = 30;   // the only layer test cameras render
+            try
+            {
+                var at = sensor.transform.position + sensor.transform.forward * 2f;
+                var bounds = SmokeRescue.Editor.FurnitureBuilder.RenderBounds(person);
+                person.transform.position += at - bounds.center;
+                var box = SmokeRescue.Editor.FurnitureBuilder.RenderBounds(person);
+                int MinDepthAtPerson(RgbdFrame f)
+                {
+                    // Nearest depth anywhere inside her projected bounding box: a slumped pose leaves the box centre empty.
+                    var k = config.camera; float u0 = float.MaxValue, u1 = float.MinValue, v0 = float.MaxValue, v1 = float.MinValue;
+                    for (int c = 0; c < 8; c++)
+                    {
+                        var corner = new Vector3((c & 1) == 0 ? box.min.x : box.max.x, (c & 2) == 0 ? box.min.y : box.max.y, (c & 4) == 0 ? box.min.z : box.max.z);
+                        var sp = sensor.Camera.WorldToScreenPoint(corner);
+                        u0 = Mathf.Min(u0, sp.x); u1 = Mathf.Max(u1, sp.x); v0 = Mathf.Min(v0, k.height - sp.y); v1 = Mathf.Max(v1, k.height - sp.y);
+                    }
+                    int best = int.MaxValue;
+                    for (int y = Mathf.Max(0, (int)v0); y <= Mathf.Min(k.height - 1, (int)v1); y++)
+                        for (int x = Mathf.Max(0, (int)u0); x <= Mathf.Min(k.width - 1, (int)u1); x++)
+                        { int d = f.Depth[y * k.width + x]; if (d > 0) best = Mathf.Min(best, d); }
+                    return best;
+                }
+                RgbdFrame before = null; yield return Capture(sensor, 0, f => before = f);
+                // Nothing in her box at her distance: the nearest return is the setup's marker at 3 m or the 6 m background.
+                Assert.That(MinDepthAtPerson(before), Is.GreaterThan(2500), "control: as imported, the depth camera sees through her");
+                Assert.That(SmokeRescue.Editor.ScenePreview.SolidBodies(person), Is.GreaterThan(0));
+                RgbdFrame after = null; yield return Capture(sensor, 1.0 / config.camera.rate_hz, f => after = f);
+                var view = new byte[after.Depth.Length * 3];
+                for (int i = 0; i < after.Depth.Length; i++) { byte g = (byte)Mathf.Clamp(after.Depth[i] / 25, 0, 255); view[i * 3] = view[i * 3 + 1] = view[i * 3 + 2] = g; }
+                var rgbPng = SensorPng.EncodeRgbAsync(after.Rgb, after.Width, after.Height); var depthPng = SensorPng.EncodeRgbAsync(view, after.Width, after.Height);
+                while (!rgbPng.IsCompleted || !depthPng.IsCompleted) yield return null;
+                Directory.CreateDirectory(EvidenceDir);
+                File.WriteAllBytes(Path.Combine(EvidenceDir, "person_depth_rgb.png"), rgbPng.GetAwaiter().GetResult());
+                File.WriteAllBytes(Path.Combine(EvidenceDir, "person_depth_depth.png"), depthPng.GetAwaiter().GetResult());
+                Assert.That(MinDepthAtPerson(after), Is.InRange(1500, 2500), "solid, she is about 2 m away in depth");
+            }
+            finally { Object.DestroyImmediate(person); }
+        }
+
+        [UnityTest]
         public IEnumerator TwoCamerasCaptureTenSimulationSecondsWithoutGaps()
         {
             var other = MakeSensor("C4 camera B", sensor.transform.position + sensor.transform.right * 0.12f, sensor.transform.rotation);

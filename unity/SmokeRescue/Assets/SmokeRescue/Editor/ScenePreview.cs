@@ -109,6 +109,35 @@ namespace SmokeRescue.Editor
 
         /// <summary>Survivors from the haze scenario, laid on their side on the floor (the downloaded figures are standing;
         /// proper lying, slumped and curled poses need rig posing and are logged as a known issue).</summary>
+        /// <summary>People are solid. The glTF importer brought skin and clothes in alpha-blended (11 of 12 survivor
+        /// sub-meshes transparent, no depth write), so the sensor depth pass saw straight through every person: one-door
+        /// seed 922, a woman kneeling 2.8 m from robot A was absent from its depth image, her colour detection took the
+        /// burning sofa behind her as its range (4.45 m), and the robot walked inside its camera's blind floor before
+        /// looking again. Each such material is replaced on this instance (the imported asset is untouched) by an opaque
+        /// copy with alpha clipping, so hair cards stay cut. Returns how many materials changed.</summary>
+        public static int SolidBodies(GameObject go)
+        {
+            int changed = 0;
+            foreach (var r in go.GetComponentsInChildren<Renderer>(true))
+            {
+                var mats = r.sharedMaterials; bool any = false;
+                for (int i = 0; i < mats.Length; i++)
+                {
+                    var m = mats[i];
+                    if (m == null || !m.HasProperty("_SurfaceType") || m.GetFloat("_SurfaceType") == 0) continue;
+                    var solid = new Material(m) { name = m.name + " (solid)" };
+                    solid.SetFloat("_SurfaceType", 0);
+                    if (solid.HasProperty("_AlphaCutoffEnable")) solid.SetFloat("_AlphaCutoffEnable", 1);
+                    if (solid.HasProperty("_ZWrite")) solid.SetFloat("_ZWrite", 1);
+                    solid.renderQueue = -1;
+                    UnityEditor.Rendering.HighDefinition.HDShaderUtils.ResetMaterialKeywords(solid);
+                    mats[i] = solid; any = true; changed++;
+                }
+                if (any) r.sharedMaterials = mats;
+            }
+            return changed;
+        }
+
         [MenuItem("Tools/Smoke Rescue/Place Survivors")]
         public static void PlaceSurvivors() => PlaceSurvivors(Scenario.Load("scenario_haze_2agents.json"));
 
@@ -132,6 +161,7 @@ namespace SmokeRescue.Editor
                 var prefab = posed != null ? posed : FurnitureBuilder.LoadPart(models[pick[i % pick.Length]]);
                 if (prefab == null) { Debug.LogWarning($"[SmokeRescue] survivor model missing for {s.id}"); continue; }
                 var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+                SolidBodies(go);
                 go.name = $"Survivor_{s.id}_{s.pose}";
                 go.transform.SetParent(root.transform, false);
                 var lay = posed != null ? Quaternion.identity : Quaternion.Euler(90f, 0f, 90f);

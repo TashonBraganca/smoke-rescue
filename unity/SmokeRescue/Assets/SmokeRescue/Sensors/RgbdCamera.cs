@@ -99,7 +99,9 @@ namespace SmokeRescue.Sensors
             passVolume = gameObject.AddComponent<CustomPassVolume>();
             passVolume.isGlobal = true;
             passVolume.targetCamera = Camera;
-            passVolume.injectionPoint = CustomPassInjectionPoint.AfterOpaqueDepthAndNormal;
+            // After every opaque object has drawn, not just the depth prepass: glTF Shader Graph bodies write depth in the
+            // opaque pass, so at AfterOpaqueDepthAndNormal the depth image had no people in it (one-door seed 922).
+            passVolume.injectionPoint = CustomPassInjectionPoint.BeforePreRefraction;
             depthPass = new LinearEyeDepthPass { name = "C4 optical depth", SensorCamera = Camera, Destination = depthTarget };
             passVolume.customPasses.Add(depthPass);
         }
