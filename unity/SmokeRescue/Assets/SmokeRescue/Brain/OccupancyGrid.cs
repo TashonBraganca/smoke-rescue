@@ -48,6 +48,7 @@ namespace SmokeRescue.Brain
                 new Vector2(-Size * c.cell_m / 2, -Size * c.cell_m / 2);
             odds = new float[Count]; lidarOdds = new float[Count]; heat = new float[Count]; rise = new float[Count]; heatTime = new double[Count];
             hits = new bool[Count]; frees = new bool[Count]; observed = new bool[Count]; lows = new bool[Count];
+            openScans = new ushort[Count]; returnScans = new ushort[Count]; openMark = new bool[Count];
             localTime = new double[Count]; peer = new byte[Count]; roofHits = new byte[Count];
             sightIndoors = new bool[Count]; openGround = new bool[Count]; roofFrame = new int[Count];
             ownHeat = new float[Count]; ownHeatTime = new double[Count]; externalHeat = new float[Count]; externalTime = new double[Count];
@@ -334,7 +335,79 @@ namespace SmokeRescue.Brain
                 else if (frees[i]) { lidarOdds[i] = Mathf.Max(-c.log_odds_cap, lidarOdds[i] + c.free_log_odds); dirty = roofDirty = true; }
             }
             MarkOpenGround(scan, origin, pose.yawRad);
+            CountOpenBeams(scan, origin, pose.yawRad);
         }
+        // Per cell, the sweeps in which a beam crossed it and came back with nothing (open) or crossed it and hit something
+        // beyond (returned). See OpenBeyond.
+        readonly ushort[] openScans, returnScans; readonly bool[] openMark;
+        void CountOpenBeams(LidarScan scan, Vector2 origin, float yawRad)
+        {
+            for (int i = 0; i < Count; i++) if (frees[i] && returnScans[i] < ushort.MaxValue) returnScans[i]++;
+            float step = CellM * .5f; int steps = Mathf.FloorToInt(scan.MaxM / step); var touched = new List<int>();
+            for (int b = 0; b < scan.RangesM.Length; b++)
+            {
+                if (!NoReturn(scan, b)) continue;
+                float angle = yawRad + scan.Angle(b); var dir = new Vector2(-Mathf.Sin(angle), Mathf.Cos(angle));
+                for (int s = 1; s <= steps; s++)
+                {
+                    int cell = Cell(origin + dir * (s * step));
+                    if (cell < 0 || lidarOdds[cell] >= c.occupied_threshold) break;
+                    if (!openMark[cell]) { openMark[cell] = true; touched.Add(cell); }
+                }
+            }
+            foreach (int cell in touched) { openMark[cell] = false; if (!frees[cell] && openScans[cell] < ushort.MaxValue) openScans[cell]++; }
+        }
+        /// <summary>
+        /// Open beyond: in at least exit_min_scans sweeps a beam crossed this cell, and in at least exit_open_share of them
+        /// it came back with nothing within the LiDAR's range. Smoke drops each pulse on its own (sensors.json caps it at
+        /// half), so a cell whose beams return off a wall reads open at most about that often, while floor past an
+        /// exterior opening reads open nearly always (held-out seed 914 run 5, robot A in the foyer: 77.7 % of beams
+        /// through the front door returned nothing, 4.2 % of beams at the wall beside it).
+        /// </summary>
+        internal bool OpenBeyond(int i)
+        {
+            int n = openScans[i] + returnScans[i];
+            return n >= c.exit_min_scans && openScans[i] >= c.exit_open_share * n;
+        }
+        /// <summary>
+        /// Ways out this robot found with its own sensors: connected patches of floor it has mapped walkable, that its own
+        /// evidence does not put indoors, and that its LiDAR sees open beyond (OpenBeyond). A door to the outside shows as
+        /// such a patch just past the doorway; a room or an enclosed courtyard within the LiDAR's range returns its beams
+        /// and does not. One point per patch (the cell seen open most purely), largest patches first, at most exit_max_count.
+        /// A hall wider than the LiDAR's range would also read open: a known limit.
+        /// </summary>
+        public List<Vector2> SensedExits()
+        {
+            PrepareNavigation();
+            var label = new int[Count]; var found = new List<(Vector2 point, int size)>(); var queue = new Queue<int>();
+            for (int s = 0; s < Count; s++)
+            {
+                if (label[s] != 0 || !ExitCell(s)) continue;
+                label[s] = 1; queue.Enqueue(s); int size = 0, best = s;
+                while (queue.Count > 0)
+                {
+                    int cell = queue.Dequeue(); size++;
+                    // The point to head for: the cell seen open most purely (floor outside reads open in nearly every sweep,
+                    // the threshold just inside a doorway slightly less), then the most sweeps.
+                    float share = OpenShare(cell), bestShare = OpenShare(best);
+                    if (share > bestShare + 1e-4f || (Mathf.Abs(share - bestShare) <= 1e-4f && openScans[cell] + returnScans[cell] > openScans[best] + returnScans[best])) best = cell;
+                    int x = cell % Size, y = cell / Size;
+                    for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++)
+                    {
+                        if ((dx == 0 && dy == 0) || !Inside(x + dx, y + dy)) continue;
+                        int n = (y + dy) * Size + x + dx;
+                        if (label[n] == 0 && ExitCell(n)) { label[n] = 1; queue.Enqueue(n); }
+                    }
+                }
+                found.Add((Centre(best), size));
+            }
+            found.Sort((a, b) => b.size.CompareTo(a.size));
+            var points = new List<Vector2>();
+            for (int k = 0; k < found.Count && k < c.exit_max_count; k++) points.Add(found[k].point);
+            return points;
+        }
+        float OpenShare(int i) { int n = openScans[i] + returnScans[i]; return n == 0 ? 0 : openScans[i] / (float)n; }
+        bool ExitCell(int i) => OpenBeyond(i) && OwnOccupancy(i) == 1 && Walkable(i) && !Indoors(Centre(i));
         static bool NoReturn(LidarScan scan, int i) { float r = scan.RangesM[i]; return !(r >= scan.MinM) || r > scan.MaxM; }
         /// <summary>
         /// Open ground from beams with no return. A pulse lost in smoke also reads 0, but each pulse is lost on its own
