@@ -137,6 +137,7 @@ namespace SmokeRescue.Tests.EditMode
             }
             Assert.That(Lift(.7f), Is.EqualTo("succeeded"), "near edge within the arm's links");
             Assert.That(Lift(1.9f), Does.StartWith("refused"), "control: near edge beyond the arm");
+            Assert.That(Lift(1.9f), Does.Contain("beyond the arm"), "the refusal names the check that failed");
         }
 
         [Test, Explicit("measurement probe, run by hand")] public void ArmReachProbe()
