@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using UnityEngine;
 
@@ -34,6 +35,31 @@ namespace SmokeRescue.Brain
             carriedOut.Add(new BrainCarried { position = p, at = t, sourceRobot = id });
             ForgetSurvivorNear(p);
             Emit(t, "survivor_carried", "The person confirmed here is on this robot's sled; off the to-rescue list.", "x_m", p.x, "y_m", p.y);
+        }
+        /// <summary>This robot's own rejections from the last reject_share_s, newest first, at most BrainMessage.MaxRejected.</summary>
+        BrainRejected[] RejectedToSend(double t) => tracks
+            .Where(k => k.rejected && !k.peerRejected && !k.confirmed && t - k.rejectedAt <= c.reject_share_s)
+            .OrderByDescending(k => k.rejectedAt).Take(BrainMessage.MaxRejected)
+            .Select(k => new BrainRejected { position = k.position, from = k.rejectedFrom, at = k.rejectedAt }).ToArray();
+        /// <summary>A partner's agent inspected this warm spot and found no person. It stays quiet here too unless this robot
+        /// sees it from reject_new_view_deg round from where the partner stood, or from half the partner's distance, until
+        /// reject_share_s after the rejection (seed 928: the two robots raised and inspected the same spot four times).
+        /// A spot this robot is inspecting, has confirmed or rejected itself is left alone.</summary>
+        void ReceiveRejected(BrainRejected rejected, string sender, BrainPose link, double t)
+        {
+            if (t - rejected.at > c.reject_share_s) return;
+            var p = link.Transform(rejected.position.x, rejected.position.y);
+            foreach (var s in survivors) if (Vector2.Distance(s, p) <= c.survivor_merge_m) return;
+            Track nearest = null; float best = c.survivor_merge_m;
+            foreach (var k in tracks) { float d = Vector2.Distance(k.position, p); if (!k.confirmed && d <= best) { best = d; nearest = k; } }
+            if (nearest == null) { nearest = new Track { position = p, lastSeen = double.NegativeInfinity }; tracks.Add(nearest); }
+            if (nearest == active || nearest.candidate || (nearest.rejected && !nearest.peerRejected) ||
+                (nearest.peerRejected && nearest.rejectedAt >= rejected.at)) return;
+            nearest.rejected = true; nearest.peerRejected = true; nearest.rejectedAt = rejected.at;
+            nearest.rejectedUntil = rejected.at + c.reject_share_s;
+            nearest.rejectedFrom = link.Transform(rejected.from.x, rejected.from.y);
+            Emit(t, "peer_rejection_received", sender + "'s agent inspected the warm spot here and found no person; it stays quiet unless seen from a new side.",
+                "x_m", p.x, "y_m", p.y);
         }
         void ForgetSurvivorNear(Vector2 p)
         {
@@ -91,7 +117,7 @@ namespace SmokeRescue.Brain
             var visual = VisualKeyframesToSend();
             var m = new BrainMessage { Sender = id, BaseSequence = full ? 0 : baseline, GridSize = SharedSize,
                 Origin = grid.Origin, Pose = motion.Pose, Goal = goal,
-                Explored = new byte[bytes], Occupied = new byte[bytes], Survivors = confirmed.ToArray(), Keyframes = KeyframesToSend(visual.Length > 0 ? c.visual_lidar_keyframes_per_message : c.keyframes_per_message, visual), CarriedOut = carriedOut.ToArray(), VisualKeyframes = visual };
+                Explored = new byte[bytes], Occupied = new byte[bytes], Survivors = confirmed.ToArray(), Keyframes = KeyframesToSend(visual.Length > 0 ? c.visual_lidar_keyframes_per_message : c.keyframes_per_message, visual), CarriedOut = carriedOut.ToArray(), VisualKeyframes = visual, Rejected = RejectedToSend(t) };
             if (frontierGoal && frontierRadius > 0 && goal.HasValue && !completed && !returning && !retreating && active == null)
                 m.Claim = new BrainClaim { centre = frontierCentre, radiusM = frontierRadius, expiresAt = t + c.peer_claim_s };
             for (int i = 0; i < grid.Count; i++)
@@ -205,6 +231,7 @@ namespace SmokeRescue.Brain
                 ForgetSurvivorNear(p);
                 Emit(t, "survivor_carried_by_peer", carried.sourceRobot + " carried out the person confirmed here.", "x_m", p.x, "y_m", p.y);
             }
+            foreach (var rejected in m.Rejected) ReceiveRejected(rejected, sender, link, t);
             foreach (var survivor in m.Survivors)
             {
                 var s = survivor; s.position = link.Transform(survivor.position.x, survivor.position.y);
@@ -310,7 +337,17 @@ namespace SmokeRescue.Brain
             // New frontier choices still exclude every peer-explored cell.
             if (keepsContested) return;
             if (grid.PeerExplored(grid.Cell(goal.Value)))
-            { Emit(t, "replan", "A peer has already observed the current frontier."); ClearPath(); }
+            {
+                Emit(t, "replan", "A peer has already observed the current frontier.");
+                // The same for an agent's frontier order on floor the partner already searched: kept, it was set again the
+                // next tick and cleared again, 290 times in 5 s while robot A stood still (one-door seed 928, 61 to 66 s).
+                if (AgentGoalActive(t) && agentGoalIsFrontier)
+                {
+                    Emit(t, "replan", "Agent goal is floor the partner already searched; back to exploring.", "x_m", agentGoal.Value.x, "y_m", agentGoal.Value.y);
+                    agentGoal = null;
+                }
+                ClearPath();
+            }
         }
         // Numeric suffixes compare numerically, so robot_2 wins over robot_10. Other IDs use ordinal order.
         static int CompareIds(string a, string b)

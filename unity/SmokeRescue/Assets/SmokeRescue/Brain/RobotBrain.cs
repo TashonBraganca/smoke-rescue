@@ -16,6 +16,8 @@ namespace SmokeRescue.Brain
             public readonly Queue<double> observations = new Queue<double>();
             public bool candidate, confirmed, rgb, onWall, rejected;
             public Vector2 rejectedFrom;   // where the robot stood when the agent rejected it
+            public double rejectedAt, rejectedUntil = double.PositiveInfinity;   // a partner's rejection lapses after reject_share_s
+            public bool peerRejected;
         }
         readonly struct AirSample
         { public readonly double t; public readonly float c; public AirSample(double time, float value) { t = time; c = value; } }
@@ -120,12 +122,17 @@ namespace SmokeRescue.Brain
             CheckWayOut(t);
             CheckEmergencyExit(t);
             CheckHeatBuilding(t);
-            if (!retreating && !emergencyExit && (airC > c.heat_retreat_c || budget < c.heat_retreat_fraction))
+            // Staying inside there is no early "leave while the way out is open", so a fast rise (the rate-of-rise detector,
+            // air_rise_c_per_min) starts the retreat to cooler floor and holds it while the rise lasts; the 70 C trigger alone
+            // came after the 60 C limit (seed 927, robot B: air 28 C at 168 s, 59 C at 172 s, retreat at 174 s, peak 169 C).
+            // Warm but steady air does not, or a robot in a warm house would never search.
+            bool heatInside = c.stay_inside && HeatRising(t);
+            if (!retreating && !emergencyExit && (airC > c.heat_retreat_c || budget < c.heat_retreat_fraction || heatInside))
             {
                 ResetStuckRecovery(); retreating = true; sweeping = false; active = null; dwell = 0; ClearPath();
                 Emit(t, "retreat", "Air temperature or remaining heat budget requires a cool reachable goal.", "air_c", airC, "heat_budget", budget);
             }
-            else if (retreating && airC < c.heat_recover_below_c && t - lastAir <= c.frame_max_age_s && budget >= c.heat_resume_fraction)
+            else if (retreating && airC < c.heat_recover_below_c && t - lastAir <= c.frame_max_age_s && budget >= c.heat_resume_fraction && !heatInside)
             {
                 ResetStuckRecovery(); retreating = false; ClearPath();
                 Emit(t, "goal", "Cool air and a recovered heat budget permit travel again.", "air_c", airC, "heat_budget", budget);
@@ -421,11 +428,17 @@ namespace SmokeRescue.Brain
                 if (blocked && frontierGoal && goal.HasValue && FireCuts(path, cursor))
                     BlacklistGoal(frontierCentre, t, 0, c.fire_cut_blacklist_s, "The fire margin cut the path to this frontier; leave it until the retry time.",
                         Mathf.Max(frontierRadius, c.frontier_peek_m + c.stuck_repeat_radius_m));
+                // The same for a frontier reached through the partner's floor, which is driven without a claim. One-door seed
+                // 928, robot A at 140 to 148 s: that goal was chosen, its path discarded within 1 to 3 s as heat appeared
+                // nearby, and chosen again, 7 times, while the robot stood still.
+                else if (blocked && throughCentre.HasValue && goal.HasValue && FireCuts(path, cursor))
+                    BlacklistGoal(throughCentre.Value, t, 0, c.fire_cut_blacklist_s, "The fire margin cut the path to this frontier beyond the partner's floor; leave it until the retry time.",
+                        c.frontier_peek_m + c.stuck_repeat_radius_m);
                 if (goal.HasValue && !blocked)
                 {
                     // Keep what the goal is: an agent go_to refreshed as a frontier sent a claim with radius 0, which the
                     // partner rejected (slow-fire run, 7 s: the recording stopped on "Invalid peer claim").
-                    SetPath(planner.Plan(motion.Pose.position, goal.Value), frontierGoal); lastPlan = t;
+                    var keepThrough = throughCentre; SetPath(planner.Plan(motion.Pose.position, goal.Value), frontierGoal); throughCentre = keepThrough; lastPlan = t;
                     Emit(t, "replan", "Periodic refresh through current free space and heat costs.", "path_points", path.Count);
                 }
                 if ((path.Count == 0 || blocked) && AgentGoalActive(t))
@@ -483,7 +496,7 @@ namespace SmokeRescue.Brain
                     }
                     else if (through != null)
                     {
-                        SetPath(through.path, false); scanSince = double.NaN; noFrontierAt = double.NaN;
+                        SetPath(through.path, false); throughCentre = through.position; scanSince = double.NaN; noFrontierAt = double.NaN;
                         Emit(t, "goal", "Only the partner's claimed or searched floor leads on: follow through it to unsearched floor beyond.",
                             "x_m", through.position.x, "y_m", through.position.y, "path_cost", through.cost);
                     }
@@ -622,7 +635,8 @@ namespace SmokeRescue.Brain
                     // A rejected track stays quiet until the robot sees it from a new viewpoint; from the same place a
                     // second look adds nothing (held-out seed 914 run 2: the next thermal frames re-armed the rejected
                     // 38 C fridge in the same second, three times).
-                    if (nearest.rejected && !NewView(nearest)) continue;
+                    // A partner's rejection counts the same way, from where the partner stood, for reject_share_s.
+                    if (nearest.rejected && t < nearest.rejectedUntil && !NewView(nearest)) continue;
                     bool again = nearest.rejected; nearest.rejected = false;
                     nearest.candidate = true;
                     // A thermal-only warm shape on a long mapped wall is almost always wall heated by the fire (15 runs: 150 of
@@ -901,8 +915,9 @@ namespace SmokeRescue.Brain
                 "path_points", path.Count);
             return Command(0, 0, dt, true);
         }
-        void SetPath(List<Vector2> value, bool isFrontier = false) { frontierGoal = isFrontier && value.Count > 0; path = value; cursor = 0; goal = path.Count > 0 ? path[path.Count - 1] : (Vector2?)null; }
-        void ClearPath() { frontierGoal = false; path.Clear(); cursor = 0; goal = null; lastPlan = double.NegativeInfinity; }
+        void SetPath(List<Vector2> value, bool isFrontier = false) { frontierGoal = isFrontier && value.Count > 0; throughCentre = null; path = value; cursor = 0; goal = path.Count > 0 ? path[path.Count - 1] : (Vector2?)null; }
+        void ClearPath() { frontierGoal = false; throughCentre = null; path.Clear(); cursor = 0; goal = null; lastPlan = double.NegativeInfinity; }
+        Vector2? throughCentre;   // the frontier a follow-through path leads to, when the path is one
         double nextWayOutCheck; bool hadWayOut;
         /// <summary>
         /// Keep a way out. Every escape_check_s while searching, plan the route home; if fire comes within
@@ -1327,6 +1342,15 @@ namespace SmokeRescue.Brain
         /// stayed safe, because robots walk from the yard into halls already at 25 to 45 C (air_rise check, 2026-10-21).
         /// No fresh reading: no decision.
         /// </summary>
+        /// <summary>The rate-of-rise half of HeatBuilding: air rising at air_rise_c_per_min or faster, by at least
+        /// air_rise_min_delta_c over its recent low.</summary>
+        bool HeatRising(double t)
+        {
+            if (t - lastAir > c.frame_max_age_s || AirSlopePerMin(t) < c.air_rise_c_per_min) return false;
+            float low = float.PositiveInfinity;
+            foreach (var sample in airHistory) if (sample.t >= t - c.air_rise_baseline_s && sample.c < low) low = sample.c;
+            return airC >= low + c.air_rise_min_delta_c;
+        }
         bool HeatBuilding(double t, out float risePerMin)
         {
             risePerMin = AirSlopePerMin(t);

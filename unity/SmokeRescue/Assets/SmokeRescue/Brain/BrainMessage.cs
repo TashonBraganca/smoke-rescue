@@ -25,6 +25,10 @@ namespace SmokeRescue.Brain
     /// <summary>A person this robot strapped onto its sled, at the position they were confirmed (sender's frame).</summary>
     [Serializable] public struct BrainCarried
     { public Vector2 position; public double at; public string sourceRobot; }
+    /// <summary>A warm spot this robot's agent inspected and rejected as not a person (sender's frame): where it is, where
+    /// the robot stood when it rejected it, and when.</summary>
+    [Serializable] public struct BrainRejected
+    { public Vector2 position, from; public double at; }
     /// <summary>A camera keyframe for visual place recognition: id and pose in the sender's own frame, and an opaque payload
     /// of ORB features with body-frame positions made by the robot's own OpenCV 5 place service (version-tagged inside).</summary>
     [Serializable] public struct BrainVisualKeyframe
@@ -41,7 +45,7 @@ namespace SmokeRescue.Brain
     [Serializable] public struct SurvivorSnapshot
     { public Vector2 position; public double confirmedAt; public string source, sourceRobot; }
 
-    /// <summary>Version 3 binary radio state (version 1 plus LiDAR keyframes, then people carried out), in the sender's own map frame. Masks are row-major,
+    /// <summary>Version 5 binary radio state (version 1 plus LiDAR keyframes, people carried out, camera keyframes and rejected warm spots), in the sender's own map frame. Masks are row-major,
     /// least-significant bit first. Explored is cumulative since BaseSequence; Occupied is always full.
     /// ToBytes is the transport format. JSON/base64 and transport headers are outside EstimatedBytes.
     /// Sequence numbers last for one run; create new brains when restarting a sender.</summary>
@@ -65,10 +69,14 @@ namespace SmokeRescue.Brain
         public BrainKeyframe[] Keyframes = Array.Empty<BrainKeyframe>();
         public BrainCarried[] CarriedOut = Array.Empty<BrainCarried>();
         public BrainVisualKeyframe[] VisualKeyframes = Array.Empty<BrainVisualKeyframe>();
+        public BrainRejected[] Rejected = Array.Empty<BrainRejected>();
         /// <summary>Version 3 adds CarriedOut after the keyframes (hidden-corner run: robot B went back for a person
         /// robot A had already carried out, because only confirmations travelled). Version 4 adds VisualKeyframes after
-        /// CarriedOut, so maps can also be linked by places the cameras recognise (run 3 never linked by LiDAR alone).</summary>
-        public const byte Version = 4;
+        /// CarriedOut, so maps can also be linked by places the cameras recognise (run 3 never linked by LiDAR alone). Version 5
+        /// adds Rejected after VisualKeyframes (seed 928: both robots raised and inspected the same warm spot four times between
+        /// them, because a rejection stayed on the robot that made it).</summary>
+        public const byte Version = 5;
+        public const int MaxRejected = 16;
         public const int MaxVisualPayloadBytes = 8192;
         public int EstimatedBytes => ToBytes().Length;
         internal static bool Bit(byte[] mask, int cell) => (mask[cell >> 3] & (1 << (cell & 7))) != 0;
@@ -111,6 +119,9 @@ namespace SmokeRescue.Brain
                     if (v.payload == null || v.payload.Length > MaxVisualPayloadBytes) throw new InvalidDataException("Invalid visual keyframe payload.");
                     w.Write(v.id); Write(w, v.pose.position); w.Write(v.pose.yawRad); w.Write((ushort)v.payload.Length); w.Write(v.payload);
                 }
+                if (Rejected.Length > MaxRejected) throw new InvalidDataException("Too many rejected spots.");
+                w.Write(Rejected.Length);
+                foreach (var x in Rejected) { Write(w, x.position); Write(w, x.from); w.Write(x.at); }
                 w.Flush();
                 if (stream.Length >= MaxBytes) throw new InvalidDataException("Brain state exceeds the 40000-byte radio limit; increase compression before using this scene.");
                 return stream.ToArray();
@@ -155,6 +166,8 @@ namespace SmokeRescue.Brain
                     v.payload = r.ReadBytes(n); if (v.payload.Length != n) throw new InvalidDataException("Truncated visual keyframe.");
                     m.VisualKeyframes[i] = v;
                 }
+                m.Rejected = new BrainRejected[ReadCount(r, MaxRejected)];
+                for (int i = 0; i < m.Rejected.Length; i++) m.Rejected[i] = new BrainRejected { position = ReadPoint(r), from = ReadPoint(r), at = r.ReadDouble() };
                 if (stream.Position != stream.Length) throw new InvalidDataException("Trailing brain packet bytes.");
                 return m;
             }

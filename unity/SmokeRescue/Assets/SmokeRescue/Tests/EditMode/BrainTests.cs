@@ -819,6 +819,33 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void StayingInsideBuildingHeatStartsTheRetreatEarlyAndHoldsIt()
+        {
+            // Seed 927, robot B: air 28 C at 168 s, 59 C at 172 s, and the retreat started only above 70 C at 174 s (peak 169 C).
+            // Staying inside, a fast rise (the rate-of-rise detector) starts the retreat, and it holds while the air is still
+            // rising. Control: without stay_inside the same air below 70 C starts no retreat.
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            (double startedAt, bool heldAt33) Run(bool stay)
+            {
+                var c = Settings(); c.stay_inside = stay; c.mission_time_limit_s = 1000;
+                var b = new RobotBrain(Calibration(), c, "B", 0); Room(b, -3, 3, -3, 3);
+                double started = double.NaN, last = 0; bool held = false;
+                for (int i = 0; i <= 900; i++)
+                {
+                    double t = i / 15.0; float air = (float)Math.Min(22 + Math.Max(0, t - 20) * .4, 33);   // 24 C per minute to 33 C
+                    Motion(b, t); b.OnRgbd(Image(t, true, 0)); b.OnAirTemperature(t, air); b.Step(t, i == 0 ? .05f : (float)(t - last)); last = t;
+                    if (double.IsNaN(started) && b.DrainEvents().Any(e => e.kind == "retreat")) started = t;
+                    if (t >= 42 && t < 43) held |= (bool)typeof(RobotBrain).GetField("retreating", flags).GetValue(b);
+                }
+                return (started, held);
+            }
+            var stay = Run(true);
+            Assert.That(stay.startedAt, Is.LessThan(46), "retreat starts while the air is still about 30 C, not at 70 C: " + stay.startedAt);
+            Assert.That(stay.heldAt33, Is.True, "the retreat holds while the air is still rising");
+            Assert.That(double.IsNaN(Run(false).startedAt), Is.True, "control: without stay_inside no retreat below 70 C");
+        }
+
+        [Test]
         public void StayingInsideWarmAirWithNothingLeftDoesNotPingPongRetreats()
         {
             // Seed 927, robot B: with nothing left to search and the air at 24 to 31 C, the "leave while the way out is open"
@@ -1340,6 +1367,57 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(left.noFrontier, Is.EqualTo(1), "one no_frontier, one scan");
             var control = Run(0);
             Assert.That(control.chosenAfterCut, Is.GreaterThan(0), "control: with no exclusion it is chosen again once the fire reads cool");
+        }
+
+        [Test]
+        public void AFollowThroughGoalWhoseRouteTheFireCutIsLeftAloneToo()
+        {
+            // One-door seed 928, robot A at 140 to 148 s: with only the partner's claimed floor leading on, the follow-through
+            // goal was chosen, its path discarded within 1 to 3 s as heat appeared nearby, and chosen again, 7 times, while
+            // the robot stood still. The fire-cut rule now covers that goal. Control: fire_cut_blacklist_s 0 chooses it again.
+            string lastLog = "";
+            (int chosenAfterCut, int blacklisted) Run(float blacklistS)
+            {
+                var c = Settings(); c.grid_size_m = 12; c.fire_cut_blacklist_s = blacklistS;
+                var b = new RobotBrain(Calibration(), c, "A", 0); var g = Map(b);
+                for (int i = 0; i < g.Count; i++)
+                {
+                    var p = g.Centre(i);
+                    bool pocket = Mathf.Abs(p.x) < .3f && p.y > 3f && p.y < 3.6f;
+                    bool wall = (Mathf.Abs(Mathf.Abs(p.x) - .7f) < .06f && p.y > .6f && p.y < 4.4f) || (Mathf.Abs(p.x) < .75f && Mathf.Abs(p.y - 4.4f) < .06f);
+                    if (wall) g.ObserveOccupied(i); else if (!pocket) g.ObserveFree(i);
+                }
+                var m = new RobotBrain(Calibration(), c, "B", 0).BuildMessage(0);
+                var events = new List<BrainEvent>(); double cutAt = double.NaN; bool cooled = false;
+                for (int k = 0; k <= 15 * 14; k++)
+                {
+                    double t = k / 15.0;
+                    if (k % 15 == 0)
+                    {
+                        // The partner claims the only unsearched floor, re-sent each second.
+                        m.Sequence = k / 15 + 1; m.SentAt = t;
+                        m.Claim = new BrainClaim { centre = new Vector2(0, 3.3f), radiusM = 1.5f, expiresAt = t + 5 };
+                        b.OnPeerMessage(Wire(m), t);
+                    }
+                    Motion(b, t); b.OnRgbd(Image(t, true, 0)); b.OnAirTemperature(t, 20);
+                    bool chosen = events.Any(e => e.kind == "goal" && e.reason.StartsWith("Only the partner's claimed"));
+                    if (chosen && double.IsNaN(cutAt)) cutAt = t;
+                    if (!double.IsNaN(cutAt) && t < cutAt + 2.5)
+                        for (float x = -.3f; x <= .3f; x += .1f) g.ObserveHeat(g.Cell(new Vector2(x, 1.6f)), 500, t);
+                    else if (!double.IsNaN(cutAt) && t >= cutAt + 5 && !cooled)
+                    { cooled = true; for (float x = -.3f; x <= .3f; x += .1f) g.ObserveHeat(g.Cell(new Vector2(x, 1.6f)), 20, t); }
+                    b.Step(t, 1f / 15); events.AddRange(b.DrainEvents());
+                }
+                lastLog = string.Join("; ", events.Where(e => e.t < 8 && e.kind != "localization")
+                    .Select(e => $"{e.t:F1} {e.kind} {e.reason.Substring(0, Math.Min(60, e.reason.Length))}"));
+                Assert.That(double.IsNaN(cutAt), Is.False, "the follow-through goal was chosen: " + lastLog);
+                return (events.Count(e => e.t > cutAt + 5 && e.kind == "goal" && e.reason.StartsWith("Only the partner's claimed")),
+                        events.Count(e => e.kind == "goal_blacklisted" && e.reason.StartsWith("The fire margin cut the path to this frontier beyond")));
+            }
+            var left = Run(20);
+            Assert.That(left.blacklisted, Is.EqualTo(1), "the cut follow-through goal is left alone once: " + lastLog);
+            Assert.That(left.chosenAfterCut, Is.Zero, "and not chosen again while the flames flicker: " + lastLog);
+            Assert.That(Run(0).chosenAfterCut, Is.GreaterThan(0), "control: with no exclusion it is chosen again: " + lastLog);
         }
 
         [Test]
@@ -3668,9 +3746,9 @@ namespace SmokeRescue.Tests.EditMode
 
         // Known floor and a wall with an opening, as if mapped by LiDAR. Only the approach side is
         // camera-searched. A ceiling observation retained behind the camera is the robot's earlier indoor evidence.
-        static RobotBrain DoorwayBrain(float bodyY, float yawDeg = 0)
+        static RobotBrain DoorwayBrain(float bodyY, float yawDeg = 0, bool stayInside = false)
         {
-            var c = Settings(); c.grid_size_m = 24; c.search_requires_ceiling = true;
+            var c = Settings(); c.grid_size_m = 24; c.search_requires_ceiling = true; c.stay_inside = stayInside;
             float angle = yawDeg * Mathf.Deg2Rad, co = Mathf.Cos(angle), si = Mathf.Sin(angle);
             var b = new RobotBrain(Calibration(), c, "A", 0, new EntryPose(-si * bodyY, co * bodyY, -yawDeg)); var g = Map(b);
             var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
@@ -3712,6 +3790,23 @@ namespace SmokeRescue.Tests.EditMode
                 Assert.That(h.UnderCeiling(pose.Transform(0, .55f)), Is.False,
                     "looking back through an exterior door at an indoor ceiling does not prove the ground outside");
             }
+        }
+
+        [Test]
+        public void StayingInsideTheEntranceGetsNoDoorwayLook()
+        {
+            // One-door seed 928, robot A at 9 s: just in, it turned back to the front door it had come through and looked out
+            // at the yard for 9.8 s. Staying inside, an opening by a known way out is not probed. The control is the test
+            // below: the same door without stay_inside gets its bounded evidence move.
+            var b = DoorwayBrain(-1.1f, 0, true); BrainCommand cmd = default; bool started = false;
+            for (int k = 0; k <= 10 * 15; k++)
+            {
+                double t = k / 15.0;
+                Motion(b, t, cmd.forwardMps, cmd.yawRateDeg * Mathf.Deg2Rad);
+                b.OnAirTemperature(t, 20); b.OnRgbd(Image(t, true, 0)); cmd = b.Step(t, 1f / 15);
+                started |= b.DrainEvents().Any(e => e.kind == "doorway_probe_started");
+            }
+            Assert.That(started, Is.False, "no look out of the entrance");
         }
 
         [Test]
@@ -3762,6 +3857,48 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(logged.Any(e => e.kind == "doorway_probe_done" && e.reason.StartsWith("One doorway look")), Is.True, "the look finishes before its timeout");
             Assert.That(g.UnderCeiling(new Vector2(0, 2)), Is.True, "the new sensor view proves floor beyond the wall");
             Assert.That(b.Snapshot().pose.position.y, Is.LessThan(0), "the evidence move keeps the body on the indoor side");
+        }
+
+        [Test]
+        public void AnExplorationOrderDuringADoorwayLookWaitsForTheLookToFinish()
+        {
+            // One-door seed 928: the agents re-sent their exploration order every 4 to 7 s. Each order cleared the evidence
+            // look's path, the look ended as "no longer safe" (8 of 18 looks) and a new one started; neither robot left the
+            // foyer and kitchen in 120 s. An exploration order now waits for the bounded look, then drives. Control: a go_to
+            // that is not exploration still takes over at once.
+            (List<BrainEvent> logged, Vector2? goalAfter) Run(bool explore)
+            {
+                var b = DoorwayBrain(-1.1f); var g = Map(b); BrainCommand cmd = default; var logged = new List<BrainEvent>();
+                var target = new Vector2(-2, -1.1f); Vector2? goalAfter = null;
+                var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+                ((bool[])typeof(OccupancyGrid).GetField("sightIndoors", flags).GetValue(g))[g.Cell(target)] = true;
+                for (int k = 0; k <= 16 * 15; k++)
+                {
+                    double t = k / 15.0;
+                    Motion(b, t, cmd.forwardMps, cmd.yawRateDeg * Mathf.Deg2Rad);
+                    b.OnAirTemperature(t, 20);
+                    var pose = b.Snapshot().pose;
+                    bool atOpening = Mathf.Abs(pose.Transform(0, .25f).y) < .15f && Mathf.Abs(pose.yawRad) < .15f;
+                    b.OnRgbd(atOpening ? RoomImage(t, 7, 2.8f) : Image(t, true, 0));
+                    bool started = logged.Any(e => e.kind == "doorway_probe_started");
+                    if (started && !logged.Any(e => e.kind == "doorway_probe_done") && k % 15 == 0)
+                    {
+                        if (explore) b.AgentExplore(target, t, 60, "search this floor");
+                        else b.AgentGoTo(target, t, 60, "look at something");
+                    }
+                    cmd = b.Step(t, 1f / 15); logged.AddRange(b.DrainEvents());
+                    if (logged.Any(e => e.kind == "doorway_probe_done")) { goalAfter = (Vector2?)typeof(RobotBrain).GetField("agentGoal", flags).GetValue(b); break; }
+                }
+                return (logged, goalAfter);
+            }
+            var (exploring, resumed) = Run(true);
+            Assert.That(exploring.Any(e => e.kind == "doorway_probe_started"), Is.True, "control: the look started");
+            Assert.That(exploring.Count(e => e.kind == "agent_order" && e.reason.StartsWith("go_to: explore")), Is.GreaterThanOrEqualTo(1), "orders arrived during the look");
+            var done = exploring.Single(e => e.kind == "doorway_probe_done");
+            Assert.That(done.reason, Does.StartWith("One doorway look"), "the look finishes despite repeated exploration orders");
+            Assert.That(resumed, Is.EqualTo((Vector2?)new Vector2(-2, -1.1f)), "the order is kept and drives after the look");
+            var (other, _) = Run(false);
+            Assert.That(other.Single(e => e.kind == "doorway_probe_done").reason, Does.Not.StartWith("One doorway look"), "control: a plain go_to still takes over");
         }
 
         [Test]
@@ -3931,6 +4068,59 @@ namespace SmokeRescue.Tests.EditMode
             }
             Assert.That(Run(45), Is.EqualTo((0, 1)), "quiet from the same view, raised again from a new one");
             Assert.That(Run(0).sameView, Is.GreaterThanOrEqualTo(1), "control: the old behaviour re-raises at once");
+        }
+
+        [Test]
+        public void AWarmSpotThePartnerRejectedStaysQuietUntilSeenFromANewSide()
+        {
+            // Seed 928: robots A and B inspected and rejected the same warm spot four times between 43 and 74 s, because a
+            // rejection stayed on the robot that made it. Version 5 radio carries the sender's recent rejections; the partner
+            // treats the spot as rejected from where the sender stood. Controls: no rejection in the message raises at once,
+            // and a rejection older than reject_share_s is ignored.
+            var spot = new Vector2(2, 2);
+            var a = new RobotBrain(Calibration(), Settings(), "A", 0);
+            var observeA = typeof(RobotBrain).GetMethod("ObservePeople", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            double ta = 0;
+            for (int k = 0; k < 5; k++)
+            {
+                ta += 1 / 15.0; Motion(a, ta); a.OnAirTemperature(ta, 20); a.Step(ta, 1f / 15);
+                observeA.Invoke(a, new object[] { ta, new List<PersonDetection> { new PersonDetection(spot, 1.9f) } });
+            }
+            a.AgentRejectCandidate(spot, ta, "ev");
+            ta += 1 / 15.0; Motion(a, ta); a.OnAirTemperature(ta, 20); a.Step(ta, 1f / 15);
+            var sent = Wire(a.BuildMessage(ta));
+            Assert.That(sent.Rejected, Has.Length.EqualTo(1), "the rejection goes out, round trip through the radio format");
+            Assert.That(Vector2.Distance(sent.Rejected[0].position, spot), Is.LessThan(.01f));
+            Assert.That(Vector2.Distance(sent.Rejected[0].from, Vector2.zero), Is.LessThan(.05f), "with where A stood");
+
+            (int sameSide, int newSide) Run(bool withRejection, double rejectedAt)
+            {
+                var b = new RobotBrain(Calibration(), Settings(), "B", 0);
+                var observe = typeof(RobotBrain).GetMethod("ObservePeople", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                double t = 0;
+                void Tick(float v, bool see)
+                {
+                    t += 1 / 15.0; Motion(b, t, v); b.OnAirTemperature(t, 20); b.Step(t, 1f / 15);
+                    if (see) observe.Invoke(b, new object[] { t, new List<PersonDetection> { new PersonDetection(spot, 1.9f) } });
+                }
+                Tick(0, false);
+                var m = new RobotBrain(Calibration(), Settings(), "A", 0).BuildMessage(0);
+                m.SentAt = t;
+                if (withRejection) m.Rejected = new[] { new BrainRejected { position = spot, from = Vector2.zero, at = rejectedAt } };
+                b.OnPeerMessage(Wire(m), t);
+                var received = b.DrainEvents();
+                Assert.That(received.Count(e => e.kind == "peer_rejection_received"), Is.EqualTo(withRejection && t - rejectedAt <= 60 ? 1 : 0));
+                for (int k = 0; k < 10; k++) Tick(0, true);
+                int same = b.DrainEvents().Count(e => e.kind == "survivor_candidate");
+                for (int k = 0; k < 60; k++) Tick(1f, false);   // 4 m on: 90 degrees round from where A stood
+                for (int k = 0; k < 5; k++) Tick(0, true);
+                return (same, b.DrainEvents().Count(e => e.kind == "survivor_candidate"));
+            }
+            var shared = Run(true, 0);
+            Assert.That(shared.sameSide, Is.Zero, "quiet from the side the partner already looked from");
+            Assert.That(shared.newSide, Is.EqualTo(1), "raised from a new side");
+            Assert.That(Run(false, 0).sameSide, Is.EqualTo(1), "control: no shared rejection, raised at once");
+            Assert.That(Run(true, -100).sameSide, Is.EqualTo(1), "control: a rejection older than reject_share_s is ignored");
         }
 
         [Test]
@@ -4129,6 +4319,29 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(events.Count(e => e.kind == "goal_yielded"), Is.EqualTo(1), "yielded once, not every tick");
             Assert.That(events.Count(e => e.kind == "goal" && e.reason.StartsWith("Agent order")), Is.Zero, "the yielded order is not set again");
             Assert.That(events.Any(e => e.kind == "replan" && e.reason.StartsWith("Agent goal is the partner's claimed frontier")), Is.True);
+        }
+
+        [Test]
+        public void AnAgentFrontierOnFloorThePartnerSearchedIsDroppedOnce()
+        {
+            // One-door seed 928, robot A at 61 to 66 s: the agent's frontier lay on floor robot B had already searched; the
+            // brain cleared it, the order set it again the next tick, 290 times in 5 s while A stood still.
+            var b = new RobotBrain(Calibration(), Settings(), "B", 0, new EntryPose(-3, 0, 90));
+            void Sense(double t) { Motion(b, t); b.OnAirTemperature(t, 20); b.OnRgbd(Image(t, true, 0)); b.OnLidar(RoomScan(t, new Vector2(-3, 0), 0, 4f, 720)); }
+            Sense(0); b.Step(0, 1f / 60);
+            Room(b, -4, 0, -4, 4);
+            var target = b.FrontierOptions(0, 10)[0].position;
+            b.AgentExplore(target, 0, 30, "largest unsearched area");
+            Sense(.05); b.Step(.05, .05f);
+            Assert.That(b.DrainEvents().Any(e => e.kind == "goal" && e.reason.StartsWith("Agent order")), Is.True, "control: the order is driven");
+            var a = new RobotBrain(Calibration(), Settings(), "A", 0); Room(a, -8, 8, -8, 8);   // the partner has searched it all
+            b.OnPeerMessage(Wire(a.BuildMessage(0)), .1);
+            double last = .05;
+            for (int i = 1; i <= 30; i++) { double t = .1 + i / 60.0; Sense(t); b.Step(t, (float)(t - last)); last = t; }
+            var events = b.DrainEvents();
+            Assert.That(events.Count(e => e.kind == "goal" && e.reason.StartsWith("Agent order")), Is.LessThanOrEqualTo(1), "the dropped order is not set again every tick");
+            Assert.That(events.Count(e => e.reason == "A peer has already observed the current frontier."), Is.LessThanOrEqualTo(1), "cleared once, not every tick");
+            Assert.That(events.Any(e => e.reason.StartsWith("Agent goal is floor the partner already searched")), Is.True, "the order was dropped for the partner's floor");
         }
 
         [Test]
