@@ -1,0 +1,10 @@
+{
+  "proposal_ttl_s": 20.0,
+  "proposal_ttl_s_reason": "A plan one robot proposes stays open this long for the partner's answer: one AgentPeriodS (20 s), so the partner decides at least once in that time even if no radio trigger reaches it. Expired proposals cannot be accepted (Codex design review, 22 Oct).",
+  "agreement_ttl_s": 60.0,
+  "agreement_ttl_s_reason": "An accepted division of work stays in force this long unless either robot cancels it or a newer agreement replaces it: about one search leg at 0.3 to 0.6 m/s through two or three rooms, short against the 200 s mission so stale plans lapse.",
+  "findings_kept": 6,
+  "findings_kept_reason": "The partner's most recent radio findings shown to the model at each step; older ones are in the trace. Six covers a 20 s period of messages at the 4 s minimum decision gap with margin.",
+  "text_max_chars": 280,
+  "text_max_chars_reason": "One radio message, as the commander's broadcast limit."
+}

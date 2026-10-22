@@ -17,6 +17,7 @@ from pathlib import Path
 from brain.agent.llm import Reply, append_jsonl, request_key
 from brain.agent import tools as _tools
 from brain.agent.tools import ALL_TOOLS, AgentContext, ToolRegistry, survivors_to_rescue
+from brain.agent.team import TeamState
 
 MAX_ROUNDS = 4
 STEP_DEADLINE_S = 75.0     # past this the step ends with what it has; the reflex layer keeps the robot safe meanwhile
@@ -81,6 +82,11 @@ Facts about your robot and the context:
 - Each perception tool returns the same result if called again in this step.
 - send_team_message reaches your partner and the commander only within radio range and through at most one wall;
   what you do not radio, they do not know.
+- team: your radio conversation with your partner, kept by code across your steps. awaiting_your_answer lists plans
+  the partner proposed that need answer_proposal before they expire; your_proposals shows the status of plans you
+  proposed; agreements_in_force are plans both robots accepted, with your part and the partner's; partner_findings are
+  its recent reports; your_last_intent is what you set out to do at your previous step. propose_plan suggests a
+  division of work. Until your maps are linked, a place in your partner's words is not a position in your frame.
 
 Finish every step with one sentence saying what you decided and why."""
 
@@ -156,12 +162,16 @@ class RobotAgent:
         if run != cls._run or restarted:
             cls._run = run; cls._last_t = {robot: t}
             cls._recent.clear(); ToolRegistry._looks.clear(); ToolRegistry._lifted.clear(); ToolRegistry._confirmed.clear()
-            ToolRegistry._pending.clear()
+            ToolRegistry._pending.clear(); TeamState.reset()
 
     def step(self, req: dict) -> dict:
         start = time.perf_counter()
         self._new_run(req)
-        if self._repeat(req):
+        team = TeamState.of(req["robot"])
+        # A radio message not seen before is always decided on, even when the event looks like a repeat: a partner's
+        # proposal or report arriving within REPEAT_WINDOW_S of the last step was dropped (Codex design review, 22 Oct).
+        new_messages = team.ingest(req.get("inbox") or [], float(req["t"]))
+        if self._repeat(req) and not new_messages:
             out = {"step": f"{req['robot']}@{float(req['t']):.3f}", "orders": [], "refusals": [], "rounds": 0,
                    "summary": None, "evidence_ids": [], "latency_s": 0.0, "repeat_of_recent_event": True}
             self._trace({"kind": "step_skipped", **out, "event": req.get("event")})
@@ -180,6 +190,7 @@ class RobotAgent:
                                        "water_l", "carrying_person") if k in req}
         if _tools.RESCUE_ENABLED:
             context["survivors_to_rescue"] = survivors_to_rescue(req["robot"], pose, req.get("survivors") or [])
+        context["team"] = team.context(ctx.t)
         pending = tools.pending()
         if pending is not None:
             context["pending_candidate"] = pending
@@ -215,6 +226,7 @@ class RobotAgent:
                              "result_id": result.get("id"), "verdict": result.get("verdict"),
                              "refused": result.get("refused", False), "reason": result.get("reason"), "error": result.get("error")})
                 messages.append({"role": "tool", "name": call.name, "content": json.dumps(_compact(result), default=str)})
+        team.note_intent(ctx.t, tools.finished, tools.orders)
         out = {"step": step_id, "orders": tools.orders, "refusals": tools.refusals, "summary": tools.finished,
                "rounds": rounds, "evidence_ids": list(tools.evidence), "latency_s": round(time.perf_counter() - start, 3)}
         self._trace({"kind": "step_end", **out})

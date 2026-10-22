@@ -8,6 +8,7 @@ import pytest
 from brain.agent import tools as T
 from brain.agent.llm import Reply, ReplayBackend, ToolCall, request_key
 from brain.agent.robot_agent import RobotAgent
+from brain.agent.team import TeamState
 
 
 class Scripted:
@@ -100,6 +101,9 @@ def test_replay_backend_reproduces_a_recorded_step(tmp_path, monkeypatch):
     turns = [[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": 3})],
              [ToolCall("confirm_survivor", {"x": 5, "y": 8, "evidence_id": "ev1"})]]
     first, _ = run(tmp_path, turns)
+    # A replay runs in a fresh process from the start of the recording, so the team conversation starts empty too: the
+    # first step's intent would otherwise change the replayed step's context and miss the recorded reply.
+    TeamState.reset()
     replay = RobotAgent(ReplayBackend(tmp_path / "trace.jsonl"), tmp_path / "replay.jsonl").step(request(tmp_path))
     assert replay["orders"] == first["orders"]
 
