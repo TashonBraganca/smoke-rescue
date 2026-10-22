@@ -558,6 +558,15 @@ class ToolRegistry:
         elif name == "approach_candidate":
             refusal = self._need(args, ("inspect_candidate",), lambda ev: ev.get("x") is not None,
                                  "the cited inspection has no position")
+            if refusal is None and not RESCUE_ENABLED and (self._confirmed_near(self.evidence[args["evidence_id"]]) or any(
+                    self.evidence[args["evidence_id"]].get("x") is not None and
+                    math.hypot(float(p[0]) - float(self.evidence[args["evidence_id"]]["x"]), float(p[1]) - float(self.evidence[args["evidence_id"]]["y"])) <= SURVIVOR_MERGE_M
+                    for p in self.ctx.survivors)):
+                # Without the rescue arm a confirmed person is reported and stays where they are: walking to them adds
+                # nothing (one-door seed 930, robot A at 50.5 s walked back toward the person it confirmed at 0 s "to lift
+                # them", and lost 6 s before the route failed).
+                refusal = {"refused": True, "reason": "this person is already confirmed and reported, and this robot has no "
+                           "rescue arm: walking to them adds nothing; search unsearched floor instead"}
             if refusal is None and (self.evidence[args["evidence_id"]].get("verdict") == "person" or self._confirmed_near(self.evidence[args["evidence_id"]])):
                 # Walking to a person the cited inspection saw is the way to the arm's reach, not another uncertain look, so
                 # the close-look limit does not apply and nothing is left pending (held-out seed 914 run 4: robot B confirmed
@@ -572,7 +581,8 @@ class ToolRegistry:
                 k = (dist - (RESCUE_APPROACH_M if RESCUE_ENABLED else APPROACH_STANDOFF_M)) / dist
                 args = {**args, "x": round(self.ctx.x + dx * k, 2), "y": round(self.ctx.y + dy * k, 2),
                         "face_x": ev["x"], "face_y": ev["y"],
-                        "reason": f"reach the person seen at ({ev['x']}, {ev['y']}) to lift them"}
+                        "reason": (f"reach the person seen at ({ev['x']}, {ev['y']}) to lift them" if RESCUE_ENABLED
+                                   else f"closer look to confirm the person seen at ({ev['x']}, {ev['y']})")}
                 name = "go_to"
             elif refusal is None:
                 ev = self.evidence[args["evidence_id"]]

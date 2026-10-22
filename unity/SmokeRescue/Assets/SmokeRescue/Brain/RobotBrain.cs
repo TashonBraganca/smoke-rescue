@@ -532,7 +532,9 @@ namespace SmokeRescue.Brain
                         if (t - scanSince >= c.no_frontier_scan_s && !cutOff)
                         {
                             if (!c.stay_inside) BeginReturn(t, NoFrontierLeft);
-                            else if (!searchedOut) { searchedOut = true; Emit(t, "goal", "Nothing reachable is left to search after a full scan: hold here, inside, until new floor appears or the agent orders a move."); }
+                            // Holding still is for a robot that is inside. Outside (seed 930, robot B at its pad) it keeps
+                            // scanning, which can bring the ceiling through the door into its camera's view.
+                            else if (!searchedOut && InSearchArea(motion.Pose.position)) { searchedOut = true; Emit(t, "goal", "Nothing reachable is left to search after a full scan: hold here, inside, until new floor appears or the agent orders a move."); }
                         }
                     }
                 }
