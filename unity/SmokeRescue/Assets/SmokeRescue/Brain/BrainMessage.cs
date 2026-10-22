@@ -29,6 +29,9 @@ namespace SmokeRescue.Brain
     /// the robot stood when it rejected it, and when.</summary>
     [Serializable] public struct BrainRejected
     { public Vector2 position, from; public double at; }
+    /// <summary>An air temperature this robot measured where it stood (sender's frame) and when.</summary>
+    [Serializable] public struct BrainAirSample
+    { public Vector2 position; public float c; public double at; }
     /// <summary>A camera keyframe for visual place recognition: id and pose in the sender's own frame, and an opaque payload
     /// of ORB features with body-frame positions made by the robot's own OpenCV 5 place service (version-tagged inside).</summary>
     [Serializable] public struct BrainVisualKeyframe
@@ -45,7 +48,7 @@ namespace SmokeRescue.Brain
     [Serializable] public struct SurvivorSnapshot
     { public Vector2 position; public double confirmedAt; public string source, sourceRobot; }
 
-    /// <summary>Version 5 binary radio state (version 1 plus LiDAR keyframes, people carried out, camera keyframes and rejected warm spots), in the sender's own map frame. Masks are row-major,
+    /// <summary>Version 6 binary radio state (version 1 plus LiDAR keyframes, people carried out, camera keyframes, rejected warm spots and air samples), in the sender's own map frame. Masks are row-major,
     /// least-significant bit first. Explored is cumulative since BaseSequence; Occupied is always full.
     /// ToBytes is the transport format. JSON/base64 and transport headers are outside EstimatedBytes.
     /// Sequence numbers last for one run; create new brains when restarting a sender.</summary>
@@ -70,13 +73,15 @@ namespace SmokeRescue.Brain
         public BrainCarried[] CarriedOut = Array.Empty<BrainCarried>();
         public BrainVisualKeyframe[] VisualKeyframes = Array.Empty<BrainVisualKeyframe>();
         public BrainRejected[] Rejected = Array.Empty<BrainRejected>();
+        public BrainAirSample[] Air = Array.Empty<BrainAirSample>();
         /// <summary>Version 3 adds CarriedOut after the keyframes (hidden-corner run: robot B went back for a person
         /// robot A had already carried out, because only confirmations travelled). Version 4 adds VisualKeyframes after
         /// CarriedOut, so maps can also be linked by places the cameras recognise (run 3 never linked by LiDAR alone). Version 5
         /// adds Rejected after VisualKeyframes (seed 928: both robots raised and inspected the same warm spot four times between
-        /// them, because a rejection stayed on the robot that made it).</summary>
-        public const byte Version = 5;
-        public const int MaxRejected = 16;
+        /// them, because a rejection stayed on the robot that made it). Version 6 adds Air after Rejected (seed 932: robot A
+        /// held in 44 C air, remembering 20 C in the foyer from 100 s earlier, while robot B stood there in 54 C).</summary>
+        public const byte Version = 6;
+        public const int MaxRejected = 16, MaxAir = 32;
         public const int MaxVisualPayloadBytes = 8192;
         public int EstimatedBytes => ToBytes().Length;
         internal static bool Bit(byte[] mask, int cell) => (mask[cell >> 3] & (1 << (cell & 7))) != 0;
@@ -122,6 +127,9 @@ namespace SmokeRescue.Brain
                 if (Rejected.Length > MaxRejected) throw new InvalidDataException("Too many rejected spots.");
                 w.Write(Rejected.Length);
                 foreach (var x in Rejected) { Write(w, x.position); Write(w, x.from); w.Write(x.at); }
+                if (Air.Length > MaxAir) throw new InvalidDataException("Too many air samples.");
+                w.Write(Air.Length);
+                foreach (var a in Air) { Write(w, a.position); w.Write(a.c); w.Write(a.at); }
                 w.Flush();
                 if (stream.Length >= MaxBytes) throw new InvalidDataException("Brain state exceeds the 40000-byte radio limit; increase compression before using this scene.");
                 return stream.ToArray();
@@ -168,6 +176,12 @@ namespace SmokeRescue.Brain
                 }
                 m.Rejected = new BrainRejected[ReadCount(r, MaxRejected)];
                 for (int i = 0; i < m.Rejected.Length; i++) m.Rejected[i] = new BrainRejected { position = ReadPoint(r), from = ReadPoint(r), at = r.ReadDouble() };
+                m.Air = new BrainAirSample[ReadCount(r, MaxAir)];
+                for (int i = 0; i < m.Air.Length; i++)
+                {
+                    m.Air[i] = new BrainAirSample { position = ReadPoint(r), c = r.ReadSingle(), at = r.ReadDouble() };
+                    if (!BrainMath.Finite(m.Air[i].c)) throw new InvalidDataException("Nonfinite air sample.");
+                }
                 if (stream.Position != stream.Length) throw new InvalidDataException("Trailing brain packet bytes.");
                 return m;
             }

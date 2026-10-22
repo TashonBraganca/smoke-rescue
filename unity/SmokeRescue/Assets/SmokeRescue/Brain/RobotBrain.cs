@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using SmokeRescue.Sensors;
 using UnityEngine;
 
@@ -1575,7 +1576,9 @@ namespace SmokeRescue.Brain
             if (c.retreat_air_weight <= 0 || airTrack.Count == 0) return null;
             var measured = new Dictionary<int, float>();
             int reach = Mathf.CeilToInt(c.air_sample_radius_m / grid.CellM);
-            foreach (var s in airTrack)   // oldest first, so a later sample overwrites an earlier one
+            // Own and partner readings together, oldest first, so the newest reading near a spot wins (seed 932: robot A
+            // held in 44 C air remembering 20 C in the foyer from 100 s before, where robot B now stood in 54 C).
+            foreach (var s in airTrack.Concat(peerAir).OrderBy(a => a.t))
             {
                 int centre = grid.Cell(s.position); if (centre < 0) continue;
                 int cx = centre % grid.Size, cy = centre / grid.Size;
@@ -1587,6 +1590,7 @@ namespace SmokeRescue.Brain
             return i => c.retreat_air_weight * Mathf.Max(0, (measured.TryGetValue(i, out var a) ? a : here) - c.ambient_c);
         }
         readonly List<(Vector2 position, float c, double t)> airTrack = new List<(Vector2, float, double)>();
+        readonly List<(Vector2 position, float c, double t)> peerAir = new List<(Vector2, float, double)>();
         void NoteAirSample(float airValue, double t)
         {
             var p = motion.Pose.position;

@@ -897,6 +897,39 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void StayingInsideTheRetreatTrustsAPartnersNewerAirReading()
+        {
+            // Seed 932: robot A held in 44 C air remembering 20 C in the foyer from 100 s before, while robot B stood there in
+            // 54 C. Radio version 6 carries recent air readings; the retreat uses the newest reading near each spot. Here the
+            // robot measured 20 C near its start, walked into 45 C, and the partner now reports 90 C at the start: the retreat
+            // no longer leads back there. Control: without the partner's reading it does (the measured-air test).
+            float RetreatEndY(bool partnerReport)
+            {
+                var c = Settings(); c.stay_inside = true; c.mission_time_limit_s = 1000;
+                var b = new RobotBrain(Calibration(), c, "B", 0); Room(b, -3, 3, -3, 6);
+                double last = 0;
+                for (int i = 0; i <= 15 * 6; i++)
+                {
+                    double t = i / 15.0; float air = t < 3 ? 20 : 45;
+                    Motion(b, t, .5f); b.OnRgbd(Image(t, true, 0)); b.OnAirTemperature(t, air);
+                    b.Step(t, i == 0 ? .05f : (float)(t - last)); last = t;
+                }
+                if (partnerReport)
+                {
+                    var m = new RobotBrain(Calibration(), c, "A", 0).BuildMessage(0);
+                    m.SentAt = last;
+                    m.Air = Enumerable.Range(0, 7).Select(k => new BrainAirSample { position = new Vector2(0, -1.5f + .5f * k), c = 90, at = last }).ToArray();
+                    b.OnPeerMessage(Wire(m), last);
+                }
+                var path = (List<Vector2>)typeof(RobotBrain).GetMethod("RetreatPath", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).Invoke(b, null);
+                Assert.That(path.Count, Is.GreaterThan(0), "a retreat route exists");
+                return path[path.Count - 1].y;
+            }
+            Assert.That(RetreatEndY(true), Is.GreaterThan(1.6f), "the floor the partner now reads at 90 C is not the retreat");
+            Assert.That(RetreatEndY(false), Is.LessThan(1.6f), "control: by its own old reading it goes back there");
+        }
+
+        [Test]
         public void StayingInsideTheRetreatGoesBackToAirTheRobotMeasuredCool()
         {
             // Seed 929, robot B at 60 to 90 s: retreating to the coolest floor by surface heat alone, it stood still in the living
