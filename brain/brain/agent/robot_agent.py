@@ -87,6 +87,10 @@ Facts about your robot and the context:
   proposed; agreements_in_force are plans both robots accepted, with your part and the partner's; partner_findings are
   its recent reports; your_last_intent is what you set out to do at your previous step. propose_plan suggests a
   division of work. Until your maps are linked, a place in your partner's words is not a position in your frame.
+- spray_option, when present: the fire your own thermal map measures where it cuts your way out (or to unsearched
+  floor): bearing, distance, whether it is in the camera's view now (spray_water needs a scan_thermal hot spot within its
+  aim tolerance) and within the nozzle's reach, its burning area and estimated heat release, the heat one stream removes,
+  water left, and code's comparison of the two.
 
 Finish every step with one sentence saying what you decided and why."""
 
@@ -184,6 +188,7 @@ class RobotAgent:
                            event_kind=(req.get("event") or {}).get("kind", ""), torch=req.get("torch", "wide"))
         ctx.frontiers = list(req.get("frontiers") or [])
         ctx.survivors = [list(p) for p in req.get("survivors") or []]
+        ctx.maps_linked = any(p.get("maps_linked") for p in req.get("partners") or [])
         tools = ToolRegistry(Path(req["robot_dir"]), ctx, Path(req.get("debug_dir") or Path(self.trace_path).parent / "agent_debug"))
         context = {k: req[k] for k in ("robot", "t", "pose", "torch", "mode", "state", "goal", "heat_budget", "air_c", "event",
                                        "inbox", "orders", "survivors", "frontiers", "lidar", "partners", "blocked_unsearched", "fire_blocks_frontier", "fire_blocks_exit", "mission_time_left_s",
@@ -191,6 +196,9 @@ class RobotAgent:
         if _tools.RESCUE_ENABLED:
             context["survivors_to_rescue"] = survivors_to_rescue(req["robot"], pose, req.get("survivors") or [])
         context["team"] = team.context(ctx.t)
+        spray = _tools.spray_option(req)
+        if spray is not None:
+            context["spray_option"] = spray
         pending = tools.pending()
         if pending is not None:
             context["pending_candidate"] = pending

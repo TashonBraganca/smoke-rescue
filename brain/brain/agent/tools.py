@@ -36,6 +36,41 @@ _CAMERA = json.loads((_Path(__file__).resolve().parents[3] / "config" / "sensors
 # Half the colour camera's horizontal view (atan of half the width over fx: 37.6 deg). A person further off the heading
 # than this is outside the picture, so an inspection there cannot see them (run 20: looks at 106 and 148 deg).
 CAMERA_HALF_HFOV_DEG = math.degrees(math.atan(_CAMERA["width"] / 2 / _CAMERA["fx"]))
+# What this robot's water can do against a fire, from its own engineering assumptions (config, each with a reason).
+BURNING_KW_PER_M2 = float(_PERCEPTION["burning_kw_per_m2"])
+ONE_ROBOT_COOLS_KW = float(_NOZZLE["flow_lps"]) * float(_NOZZLE["cooling_kj_per_l"]) * float(_NOZZLE["application_efficiency"])
+
+
+def spray_option(req: dict) -> dict | None:
+    """The fire blocking this robot's way out (or, failing that, its way to unsearched floor), judged against its water.
+
+    The brain measures the burning floor near where fire cuts the route (burning_m2, its own thermal map, measured not
+    forecast). Code compares the heat it releases with what this robot's stream removes, so the agent can choose between
+    spraying alone, asking its partner to spray with it, and going around; the agent decides. Held-out seed 921: robot A,
+    cut off by a burning wood pile, scanned at -91 deg (outside the camera's view), saw nothing and held for 25 s before it
+    turned, scanned again and sprayed.
+    """
+    which = "exit" if req.get("fire_blocks_exit") else "frontier" if req.get("fire_blocks_frontier") else None
+    block = req.get("fire_blocks_exit") or req.get("fire_blocks_frontier")
+    if which is None or block.get("burning_m2") is None:
+        return None
+    area, water_s = float(block["burning_m2"]), float(req.get("water_l") or 0.0) / float(_NOZZLE["flow_lps"])
+    kw = area * BURNING_KW_PER_M2
+    if area <= 0:
+        assessment = "no floor measured burning near the block: the margin there is heat or a forecast, not flames"
+    elif water_s <= 0:
+        assessment = "no water left"
+    elif kw <= ONE_ROBOT_COOLS_KW:
+        assessment = "this robot's stream removes more heat than the fire releases"
+    elif kw <= 2 * ONE_ROBOT_COOLS_KW:
+        assessment = "more than one stream removes; two robots spraying together remove more than it releases"
+    else:
+        assessment = "more than two robots' streams remove"
+    bearing = float(block.get("bearing_deg", 0.0))
+    return {"blocks": which, "bearing_deg": round(bearing, 1), "distance_m": block.get("distance_m"),
+            "in_camera_view": abs(bearing) <= CAMERA_HALF_HFOV_DEG, "within_nozzle_reach": float(block.get("distance_m") or 99) <= float(_NOZZLE["range_m"]),
+            "burning_m2": round(area, 2), "est_heat_release_kw": round(kw), "one_robot_stream_removes_kw": round(ONE_ROBOT_COOLS_KW),
+            "water_s_left": round(water_s, 1), "assessment": assessment}
 from pathlib import Path
 
 from brain.agent import vision
@@ -116,8 +151,10 @@ ACTIONS = [
         "lost if walls or distance block the link. kind: finding (what you sensed) or outcome (how an agreed task ended).",
         {"text": STR, "kind": {"type": "string", "enum": ["finding", "outcome"]}}, ["text"]),
     _fn("propose_plan", "Radio a proposed division of work to the partner: what you will do and what you ask of it, with why. "
-        "It stays open for the partner's answer for a limited time (team.json proposal_ttl_s).",
-        {"my_part": STR, "your_part": STR, "why": STR}, ["my_part", "your_part", "why"]),
+        "It stays open for the partner's answer for a limited time (team.json proposal_ttl_s). target (optional) is a position in "
+        "your map that both parts refer to; only with your maps linked, so it is a position in your partner's map too.",
+        {"my_part": STR, "your_part": STR, "why": STR, "target": {"type": "object", "properties": {"x": NUM, "y": NUM}, "required": ["x", "y"]}},
+        ["my_part", "your_part", "why"]),
     _fn("answer_proposal", "Accept or reject a plan your partner proposed (team.awaiting_your_answer), with the reason.",
         {"proposal_id": STR, "accept": {"type": "boolean"}, "reason": STR}, ["proposal_id", "accept", "reason"]),
     _fn("request_human_approval", "Ask the human incident commander before a risky move, citing evidence.",
@@ -149,6 +186,7 @@ class AgentContext:
     water_l: float = 0.0                                      # water left in the robot's tank
     carrying_person: bool = False                             # a person is already on the sled
     survivors: list = field(default_factory=list)             # people confirmed so far, [x, y] in this robot's frame
+    maps_linked: bool = False                                 # this robot's frame is linked with its partner's
 
 
 class ToolRegistry:
@@ -516,9 +554,14 @@ class ToolRegistry:
             args = {**args, "text": f"{str(args.get('text', '')).strip()} [robot state: {state}]"}
             kind = args.get("kind") if args.get("kind") in ("finding", "outcome") else "finding"
             args = {**args, **TeamState.of(self.ctx.robot).message(kind, args["text"], self.ctx.t)}
+        elif name == "propose_plan" and args.get("target") is not None and not self.ctx.maps_linked:
+            refusal = {"refused": True, "reason": "your maps are not linked, so a position in your map means nothing to your "
+                       "partner: describe the place in words instead"}
         elif name == "propose_plan":
+            target = args.get("target")
             msg = TeamState.of(self.ctx.robot).propose(str(args.get("my_part", "")), str(args.get("your_part", "")),
-                                                       str(args.get("why", "")), self.ctx.t)
+                                                       str(args.get("why", "")), self.ctx.t,
+                                                       target={"x": round(float(target["x"]), 2), "y": round(float(target["y"]), 2)} if target else None)
             self.orders.append({"type": "send_team_message", **msg, "robot": self.ctx.robot})
             return {"ok": True, "queued": "proposal", "proposal_id": msg["proposal_id"], "expires_t": msg["expires_t"]}
         elif name == "answer_proposal":

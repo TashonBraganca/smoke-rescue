@@ -101,3 +101,37 @@ def test_the_last_intent_is_the_orders_the_tools_accepted_not_the_words(tmp_path
     step(tmp_path, "robot_A", 30.0, [[ToolCall("explore_frontier", {"frontier_id": 3, "reason": "largest unsearched area"})]],
          frontiers=offered)
     assert TeamState.of("robot_A").intent["orders"] == [{"type": "explore_frontier", "x": 1.0, "y": 4.0, "frontier_id": 3}]
+
+
+def test_the_spray_option_compares_the_blocking_fire_with_the_water(tmp_path):
+    # Held-out seed 921: robot A, cut off by a burning wood pile, had 12 L and no measure of whether it could open the
+    # way. One stream removes flow x cooling x efficiency; the fire releases burning area x burning_kw_per_m2.
+    one = T.ONE_ROBOT_COOLS_KW
+    small = 0.5 * one / T.BURNING_KW_PER_M2; mid = 1.5 * one / T.BURNING_KW_PER_M2; big = 3 * one / T.BURNING_KW_PER_M2
+    def opt(area, water=12.0, bearing=-90.7):
+        return T.spray_option({"fire_blocks_exit": {"bearing_deg": bearing, "distance_m": 1.66, "burning_m2": area}, "water_l": water})
+    assert "this robot's stream" in opt(small)["assessment"]
+    assert "two robots" in opt(mid)["assessment"]
+    assert "more than two" in opt(big)["assessment"]
+    assert opt(small)["in_camera_view"] is False and opt(small, bearing=10)["in_camera_view"] is True
+    assert "no water" in opt(small, water=0)["assessment"]
+    assert "no floor measured burning" in opt(0.0)["assessment"]
+    assert T.spray_option({"water_l": 12}) is None, "control: nothing blocks, no option"
+
+
+def test_a_plan_names_a_place_only_when_the_maps_are_linked(tmp_path):
+    target = {"x": 2.0, "y": 6.5}
+    req = request(tmp_path, "robot_A", 20.0)
+    req["partners"] = [{"robot": "robot_B", "maps_linked": False}]
+    model = Capture([[ToolCall("propose_plan", {"my_part": "spray from the left", "your_part": "spray from the right",
+                                                "why": "fire too big for one", "target": target})]])
+    out = RobotAgent(model, tmp_path / "trace.jsonl").step(req)
+    assert out["refusals"] and "not linked" in out["refusals"][0]["reason"]
+    req = request(tmp_path, "robot_A", 22.0); req["partners"] = [{"robot": "robot_B", "maps_linked": True}]
+    model = Capture([[ToolCall("propose_plan", {"my_part": "spray from the left", "your_part": "spray from the right",
+                                                "why": "fire too big for one", "target": target})]])
+    out = RobotAgent(model, tmp_path / "trace.jsonl").step(req)
+    [proposal] = [o for o in out["orders"] if o["type"] == "send_team_message"]
+    assert proposal["target"] == target
+    _, seen_b = step(tmp_path, "robot_B", 24.0, [], inbox=[radio(proposal, "robot_A")])
+    assert seen_b[0]["team"]["awaiting_your_answer"][0]["target"] == target
