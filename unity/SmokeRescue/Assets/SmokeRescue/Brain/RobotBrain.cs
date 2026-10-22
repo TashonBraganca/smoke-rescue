@@ -799,6 +799,13 @@ namespace SmokeRescue.Brain
             // closing front (Codex review, run 23 robot A at 14 s).
             float routeM = 0; for (int i = 1; i < route.Count; i++) routeM += Vector2.Distance(route[i - 1], route[i]);
             float walkS = routeM / c.open_speed_mps, closeS = float.PositiveInfinity;
+            // Out by the deadline: leave while the walk out, with the same escape_time_factor allowance the fire test uses,
+            // still fits before mission_time_limit_s. It used to start back only at the deadline itself.
+            if (routeM > c.return_arrive_m && t + walkS * c.escape_time_factor + c.escape_check_s >= c.mission_time_limit_s)
+            {
+                BeginReturn(t, MissionTimeUp);
+                return;
+            }
             if (wayOutPoints.Count > 0)
             {
                 float now = float.PositiveInfinity; foreach (int cell in wayOutPoints) now = Mathf.Min(now, grid.FireDistance(cell));
@@ -955,12 +962,19 @@ namespace SmokeRescue.Brain
             if (burned && (t - heatExitAt < c.reenter_after_heat_s || HeatBuilding(t, out _))) return;
             grid.FireClearance = c.fire_clearance_m; grid.FirePrediction = true;
             System.Func<Vector2, bool> excluded = p => ClaimBlocks(p, t) || GoalBlacklisted(p, t) || VisitedGoal(p, t) || !InSearchArea(p);
-            var frontier = planner.Frontier(motion.Pose.position, excluded);
+            // Every frontier, in the planner's own order, not only the first: the nearest can lie by the fire while a farther
+            // one is clear (Codex review, 22 Oct: robot B stood at its door for 119 s of held-out seed 916 while the only
+            // frontier checked was the one beside the burning foyer).
+            GridPlanner.FrontierChoice frontier = null; float closest = float.PositiveInfinity;
+            foreach (var candidate in planner.Frontiers(motion.Pose.position, excluded))
+            {
+                float near = float.PositiveInfinity;
+                foreach (var p in candidate.path)
+                    if (Vector2.Distance(p, motion.Pose.position) > c.escape_ignore_m) near = Mathf.Min(near, grid.FireDistance(grid.Cell(p)));
+                if (near < c.escape_fire_margin_m) continue;
+                frontier = candidate; closest = near; break;
+            }
             if (frontier == null) return;
-            float closest = float.PositiveInfinity;
-            foreach (var p in frontier.path)
-                if (Vector2.Distance(p, motion.Pose.position) > c.escape_ignore_m) closest = Mathf.Min(closest, grid.FireDistance(grid.Cell(p)));
-            if (closest < c.escape_fire_margin_m) return;
             // The leave rule's closing test too (CheckWayOut): held-out seed 914 run 4, robot A left at 50 s because the fire
             // was closing on its way out and went back in the second it got out (75 s), along a route the front was still
             // advancing on. Go back in only where the robot would not have to leave again at once.
@@ -1043,6 +1057,7 @@ namespace SmokeRescue.Brain
         // Left once because heat was building (a heat return or an emergency exit), and when.
         bool burned; double heatExitAt = double.NegativeInfinity;
         const string HeatLeave = "No reachable frontier was left and the air was heating.";
+        const string MissionTimeUp = "Mission time is nearly up: leave now to be out by the deadline.";
         /// <summary>
         /// The hot gas layer is reaching the robot: its own air reading is at least air_warm_c, or it rises at
         /// air_rise_c_per_min or faster (least squares over air_rise_window_s) and is at least air_rise_min_delta_c above

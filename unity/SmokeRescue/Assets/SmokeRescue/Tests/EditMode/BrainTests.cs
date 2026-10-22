@@ -1607,6 +1607,57 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void ARobotLeavesInTimeToBeOutByTheMissionDeadline()
+        {
+            // The brain started back only at mission_time_limit_s itself, so it was still inside when the mission ended
+            // (and the recorder's 200 s did not match the brain's 240 s). 3 m in, a 20 s mission: the walk out with its
+            // allowance is about 3 / 0.6 * 1.5 = 7.5 s, so it leaves around 10 s, not at 20 s. Control: a long mission.
+            double LeftAt(float limit)
+            {
+                var c = Settings(); c.grid_size_m = 12; c.robot_radius_m = .25f; c.mission_time_limit_s = limit;
+                var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -5, 5, -2, 6);
+                for (int i = 0; i < 15 * 20; i++)
+                {
+                    double t = i / 15.0; Motion(b, t, t < 3 ? 1f : 0); b.OnRgbd(Image(t, true)); b.OnAirTemperature(t, 20);
+                    b.Step(t, 1f / 15);
+                    if (b.DrainEvents().Any(e => e.kind == "goal" && e.reason.StartsWith("Mission time is nearly up"))) return t;
+                }
+                return double.NaN;
+            }
+            Assert.That(LeftAt(20), Is.InRange(5.0, 16.0), "leaves with time to walk out");
+            Assert.That(double.IsNaN(LeftAt(1000)), Is.True, "control: a long mission keeps searching");
+        }
+
+        [Test]
+        public void ARobotOutsideGoesBackInByAFrontierClearOfTheFireEvenWhenTheNearestIsNot()
+        {
+            // Codex review of held-out seed 916: re-entry tested only the planner's first frontier, so a robot whose nearest
+            // frontier lay by the fire stayed out although other frontiers were clear. A fire line 1.8 m beyond the nearest
+            // edge of the searched floor; the sides, 6 m away, are clear. Control: with the fire along every edge it stays out.
+            int Reentries(bool fireEverywhere)
+            {
+                var c = Settings(); c.grid_size_m = 16; c.robot_radius_m = .25f;
+                var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -6, 6, -2.5f, 7);
+                var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+                typeof(RobotBrain).GetField("completed", flags).SetValue(b, true);
+                typeof(RobotBrain).GetField("canReenter", flags).SetValue(b, true);
+                int n = 0;
+                for (int i = 0; i < 150; i++)
+                {
+                    double t = i / 15.0; Motion(b, t); b.OnRgbd(Image(t, true)); b.OnAirTemperature(t, 20);
+                    var g = Map(b);
+                    for (float x = -7.5f; x <= 7.5f; x += .1f) g.ObserveHeat(g.Cell(new Vector2(x, -4.3f)), 500, t);
+                    if (fireEverywhere)
+                        for (float y = -7.5f; y <= 7.5f; y += .1f) { g.ObserveHeat(g.Cell(new Vector2(-7.5f, y)), 500, t); g.ObserveHeat(g.Cell(new Vector2(7.5f, y)), 500, t); g.ObserveHeat(g.Cell(new Vector2(y, 7.9f)), 500, t); }   // inside the 16 m grid
+                    b.Step(t, 1f / 15); n += b.DrainEvents().Count(e => e.kind == "reenter");
+                }
+                return n;
+            }
+            Assert.That(Reentries(false), Is.EqualTo(1), "back in by a clear frontier");
+            Assert.That(Reentries(true), Is.Zero, "control: every frontier by the fire");
+        }
+
+        [Test]
         public void ARobotGoesBackInOnlyWhereTheFireIsNotClosingOnTheWayIn()
         {
             // Held-out seed 914 run 4, robot A: it left at 50 s because the fire was closing on its way out and re-entered in

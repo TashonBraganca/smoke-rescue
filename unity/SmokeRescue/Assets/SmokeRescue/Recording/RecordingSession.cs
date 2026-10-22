@@ -176,6 +176,11 @@ namespace SmokeRescue.Recording
                     // No prior knowledge: each brain starts at the origin of its own frame, facing its own +y. Frames are
                     // linked only from matched LiDAR fingerprints (FrameLink); nobody tells a robot where it is.
                     var brainCfg = BrainConfig.Load();
+                    // One deadline for the brain, its agent and the recording: the mission's own length (the operating brief,
+                    // like a crew's air supply; it says nothing about the house). The brain counted to 240 s while recordings
+                    // stop at 200 s, and an agent was told it had 44 s left at 196 s (Codex review, 22 Oct).
+                    float missionS = Mathf.Min(scenario.duration_s, maxSeconds);
+                    if (missionS > 0 && !float.IsInfinity(missionS)) brainCfg.mission_time_limit_s = missionS;
                     rig.brain = brainCfg.frames_shared_at_start
                         ? new RobotBrain(sensorCfg, brainCfg, spec.id, scenario.seed * 1000 + i * 10 + 6, new EntryPose(spec.spawn.at[0], spec.spawn.at[1], spec.spawn.yaw))
                         : new RobotBrain(sensorCfg, brainCfg, spec.id, scenario.seed * 1000 + i * 10 + 6);
