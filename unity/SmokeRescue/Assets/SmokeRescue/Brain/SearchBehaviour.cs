@@ -106,6 +106,36 @@ namespace SmokeRescue.Brain
         Vector2 doorwayProbeForward;
         double doorwayProbeStarted, doorwayProbeHoldUntil = double.NaN;
         readonly List<(Vector2 position, double t)> doorwayProbes = new List<(Vector2, double)>();
+        readonly List<(Vector2 position, Vector2 forward, double t)> localEvidenceLooks = new List<(Vector2, Vector2, double)>();
+
+        bool TryStartLocalEvidenceLook(double t)
+        {
+            if (!c.frontier_local_evidence || !c.search_requires_ceiling || !c.ceiling_sight_lines || nearFire ||
+                AgentMoveRefusal(t) != null || !InSearchArea(motion.Pose.position)) return false;
+            localEvidenceLooks.RemoveAll(p => t - p.t > c.sweep_repeat_s);
+            // Resume the interrupted frontier after one attempt here. Selecting a different point in the same
+            // camera view must not start another look before the robot has walked to a new standpoint.
+            if (localEvidenceLooks.Exists(p => Vector2.Distance(p.position, motion.Pose.position) <= c.visited_radius_m)) return false;
+            var exits = new List<Vector2>(Exits());
+            bool Excluded(Vector2 p) => ClaimBlocks(p, t) || GoalBlacklisted(p, t) || VisitedGoal(p, t) ||
+                exits.Exists(e => Vector2.Distance(e, p) <= c.threshold_exit_clear_m);
+            float halfFov = Mathf.Atan(Mathf.Min(sensors.camera.cx + .5f, sensors.camera.width - .5f - sensors.camera.cx) / sensors.camera.fx) * Mathf.Rad2Deg;
+            bool Tried(Vector2 at, Vector2 toward) => localEvidenceLooks.Exists(q =>
+                Vector2.Distance(q.position, at) <= c.visited_radius_m && Vector2.Distance(q.position, toward) <= c.search_max_range_m &&
+                Vector2.Angle(q.forward, toward - q.position) <= halfFov && grid.EvidenceSightLineClear(q.position, toward));
+            var look = planner.LocalEvidenceLook(motion.Pose.position, InSearchArea, Excluded, Tried);
+            if (look == null || look.path.Count == 0 || !planner.PathSafe(look.path)) return false;
+            var at = look.path[look.path.Count - 1];
+            if (exits.Exists(e => Vector2.Distance(e, at) <= c.threshold_exit_clear_m)) return false;
+            SetPath(look.path); lastPlan = t; doorwayProbeGoal = goal;
+            doorwayProbeForward = (look.toward - at).normalized;
+            doorwayProbeStarted = t; doorwayProbeHoldUntil = double.NaN;
+            localEvidenceLooks.Add((at, doorwayProbeForward, t));
+            Emit(t, "local_evidence_started", "Local mapped floor is still unproven indoors: look from proven floor before leaving this search horizon.",
+                "x_m", at.x, "y_m", at.y, "toward_x_m", look.toward.x, "toward_y_m", look.toward.y,
+                "path_cost", look.cost, "mapped_unsearched_m2", look.mappedCells * grid.CellM * grid.CellM);
+            return true;
+        }
 
         /// <summary>Take one bounded look at a nearby mapped wall opening before walking past it. The camera goes
         /// only to the wall line; the body stays its calibrated camera offset behind it. A doorway is never labelled

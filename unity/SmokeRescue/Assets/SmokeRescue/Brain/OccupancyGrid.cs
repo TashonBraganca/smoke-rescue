@@ -570,11 +570,27 @@ namespace SmokeRescue.Brain
                 if (twice < dx) { error += dx; y += sy; }
             }
         }
+        /// <summary>Discs the planner treats as obstacles: confirmed people, so a robot never walks into a casualty (one-door
+        /// seed 927: robot A, routing past the person it had just confirmed, pressed into her body's collision volume, which
+        /// the depth map had recorded smaller, and stayed pinned for over a minute).</summary>
+        public void SetKeepOut(IReadOnlyList<Vector2> centres, float radius)
+        {
+            keepOut ??= new bool[Count]; System.Array.Clear(keepOut, 0, Count);
+            foreach (var p in centres)
+            {
+                int c0 = Cell(p); if (c0 < 0) continue;
+                int r = Mathf.CeilToInt(radius / CellM), cx = c0 % Size, cy = c0 / Size;
+                for (int dy = -r; dy <= r; dy++) for (int dx = -r; dx <= r; dx++)
+                    if (Inside(cx + dx, cy + dy) && Vector2.Distance(Centre((cy + dy) * Size + cx + dx), p) <= radius) keepOut[(cy + dy) * Size + cx + dx] = true;
+            }
+            dirty = true;
+        }
+        bool[] keepOut;
         internal void PrepareNavigation()
         {
             if (!dirty) return;
             if (obstacleDistance == null) { obstacleDistance = new float[Count]; fireDistance = new float[Count]; }
-            Distances(i => Occupancy(i) == 255, obstacleDistance);
+            Distances(i => Occupancy(i) == 255 || (keepOut != null && keepOut[i]), obstacleDistance);
             Distances(Dangerous, fireDistance); dirty = false;
         }
         /// <summary>Distance planned routes keep from fire: fire_clearance_m, lowered to emergency_fire_clearance_m only for an
@@ -820,6 +836,13 @@ namespace SmokeRescue.Brain
                 if (twice > -dy) { error -= dy; x += sx; }
                 if (twice < dx) { error += dx; y += sy; }
             }
+        }
+        /// <summary>A camera may look across unmapped floor. This checks only for mapped obstructions and supplies
+        /// neither navigation clearance nor indoor evidence.</summary>
+        internal bool EvidenceSightLineClear(Vector2 from, Vector2 to)
+        {
+            int a = Cell(from), b = Cell(to);
+            return a >= 0 && b >= 0 && ClearLine(a, b);
         }
         /// <summary>Whether a camera sector can still search floor. Unknown floor keeps a look eligible; only known
         /// opaque obstacles hide it. A low obstacle with measured top height does not hide the whole view behind it.

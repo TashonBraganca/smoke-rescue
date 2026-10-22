@@ -12,6 +12,172 @@ namespace SmokeRescue.Tests.EditMode
     public sealed partial class BrainTests
     {
         [Test]
+        public void WalkingAnOpenQuarterTurnSpendsLessTimeStationaryAndAWallKeepsThePivot()
+        {
+            (float stationary, float elapsed, float firstSpeed, float firstYaw) Drive(float arcLimit, bool wall)
+            {
+                var c = Settings(); c.grid_size_m = 12; c.arc_max_heading_deg = arcLimit;
+                var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -5, 5, -5, 5);
+                if (wall)
+                    for (int i = 0; i < Map(b).Count; i++)
+                    { var p = Map(b).Centre(i); if (p.y > .5f && p.y < .6f) Map(b).ObserveOccupied(i); }
+                b.AgentGoTo(new Vector2(3, 0), 0, 30, "quarter turn");
+                var command = new BrainCommand(); float stationary = 0, firstSpeed = -1, firstYaw = 0;
+                for (int tick = 0; tick < 400; tick++)
+                {
+                    command = DriveTick(b, tick, command.forwardMps, command.yawRateDeg);
+                    if (tick == 0) { firstSpeed = command.forwardMps; firstYaw = command.yawRateDeg; }
+                    if (wall)
+                    {
+                        var pose = b.Snapshot().pose;
+                        float tip = pose.position.y + Mathf.Abs(pose.Forward.y) * (c.body_half_length_m - c.body_radius_m) + c.body_radius_m;
+                        Assert.That(tip, Is.LessThan(.5f), "the capsule stays below the wall's near face");
+                    }
+                    if (b.DrainEvents().Any(e => e.kind == "agent_goal_reached"))
+                    {
+                        TestContext.WriteLine($"arc_limit={arcLimit}, wall={wall}, stationary={stationary:0.00}s, arrival={tick / 20f:0.00}s");
+                        return (stationary, tick / 20f, firstSpeed, firstYaw);
+                    }
+                    if (Mathf.Abs(command.forwardMps) <= c.survivor_stop_speed_mps) stationary += .05f;
+                }
+                Assert.That(false, Is.True, "the robot must reach the goal");
+                return default;
+            }
+            var prior = Drive(0, false); var arc = Drive(90, false);
+            Assert.That(arc.firstSpeed, Is.GreaterThan(0), "walk while steering toward a goal 90 degrees off heading");
+            Assert.That(prior.stationary - arc.stationary, Is.GreaterThan(.5f), "remove at least half a second of pivoting");
+            var tight = Drive(90, true);
+            var priorTight = Drive(0, true);
+            Assert.That(tight.firstSpeed, Is.Zero, "the forward arc would sweep into the wall");
+            Assert.That(Mathf.Abs(tight.firstYaw), Is.GreaterThan(0), "pivot in place where the body fits");
+            Assert.That(tight.elapsed, Is.LessThanOrEqualTo(priorTight.elapsed), "the wall control must still reach its goal without adding delay");
+        }
+
+        [Test]
+        public void StayInsidePreventsAnArcAcrossUnprovenFloorAndGoalsBehindStillPivot()
+        {
+            BrainCommand First(bool stayInside, Vector2 target)
+            {
+                var c = Settings(); c.grid_size_m = 12; c.search_requires_ceiling = true; c.stay_inside = stayInside; c.arc_max_heading_deg = 90;
+                var b = new RobotBrain(Calibration(), c, "A", 0); var g = Map(b); Room(b, -5, 5, -5, 5);
+                var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+                var indoor = (bool[])typeof(OccupancyGrid).GetField("sightIndoors", flags).GetValue(g);
+                for (int i = 0; i < g.Count; i++) indoor[i] = g.Centre(i).y < .1f;
+                b.AgentGoTo(target, 0, 30, "search standpoint");
+                return DriveTick(b, 0);
+            }
+            Assert.That(First(false, new Vector2(3, 0)).forwardMps, Is.GreaterThan(0), "control: known free arc with no indoor boundary restriction");
+            var inside = First(true, new Vector2(3, 0));
+            Assert.That(inside.forwardMps, Is.Zero, "the arc would cross the indoor evidence boundary");
+            Assert.That(Mathf.Abs(inside.yawRateDeg), Is.GreaterThan(0), "turn in place instead");
+            Assert.That(First(false, new Vector2(0, -3)).forwardMps, Is.Zero, "a goal behind the body still requires a pivot");
+        }
+
+        [Test]
+        public void ArcRequiresKnownFreeTailSpaceAndKeepsTheHeatMargin()
+        {
+            var c = Settings(); c.grid_size_m = 12;
+            var g = OpenGrid(c); var planner = new GridPlanner(g, c); var pose = new BrainPose();
+            Assert.That(planner.ArcSafe(pose, 0, .6f, 60, 90, .05f), Is.True, "open mapped floor admits the accelerating arc");
+            Assert.That(planner.ArcSafe(pose, 0, .6f, 60, 90, .05f, p => p.x > -.1f), Is.False,
+                "an indoor robot's arc and braking route cannot leave proven floor under stay_inside");
+            // A cell under the tail cap is outside the planning circle. A safe centre chord cannot certify it.
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var odds = (float[])typeof(OccupancyGrid).GetField("odds", flags).GetValue(g);
+            int tail = g.Cell(new Vector2(.05f, -.35f)); odds[tail] = 0;
+            Assert.That(planner.SegmentSafe(Vector2.zero, new Vector2(.1f, 0)), Is.True, "control: the centre chord is still safe");
+            Assert.That(planner.ArcSafe(pose, 0, .6f, 60, 90, .05f), Is.False, "unknown floor under the tail forbids the arc");
+            g.ObserveFree(tail);
+            g.ObserveHeat(g.Cell(new Vector2(-1, 0)), 500, 0);
+            Assert.That(planner.ArcSafe(pose, 0, .6f, 60, 90, .05f), Is.False, "known geometric clearance does not waive the fire margin");
+        }
+
+
+        [Test]
+        public void NearbyUnprovenFloorGetsALookBeforeAnAgentFrontierLeavesTheArea()
+        {
+            // Run 926 A, 75 s: 5.35 m2 mapped unsearched in a side room, only 0.30 m2 proven indoors.
+            // No complete pair of door jambs is mapped. Proven corridor targets still exist, so the old
+            // no-frontier-only ThresholdLook never runs. This fixture uses only a partial sensor map.
+            var c = Settings(); c.grid_size_m = 14; c.search_requires_ceiling = true; c.stay_inside = true;
+            var b = new RobotBrain(Calibration(), c, "A", 0); var g = Map(b);
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            ((DeadReckoning)typeof(RobotBrain).GetField("motion", flags).GetValue(b)).ApplyCorrection(new BrainPose { position = new Vector2(0, 3) });
+            var indoor = (bool[])typeof(OccupancyGrid).GetField("sightIndoors", flags).GetValue(g);
+            var lidar = (float[])typeof(OccupancyGrid).GetField("lidarOdds", flags).GetValue(g);
+            for (int i = 0; i < g.Count; i++)
+            {
+                var p = g.Centre(i);
+                if (Mathf.Abs(p.x) < 5 && p.y > 2 && p.y < 4)
+                { g.ObserveFree(i); indoor[i] = true; }
+                if (Mathf.Abs(p.x) < 1 && p.y >= 4 && p.y < 6.7f) lidar[i] = -c.log_odds_cap;
+                if (Mathf.Abs(p.x) < .5f && p.y >= 4 && p.y < 4.3f) indoor[i] = true;
+            }
+            int mapped = 0, proven = 0;
+            for (int i = 0; i < g.Count; i++)
+            {
+                var p = g.Centre(i);
+                if (Mathf.Abs(p.x) >= 1 || p.y < 4 || p.y >= 6.7f) continue;
+                if (g.OwnOccupancy(i) == 1 && g.Unsearched(i)) { mapped++; if (indoor[i]) proven++; }
+            }
+            Assert.That(mapped * c.cell_m * c.cell_m, Is.EqualTo(5.4f).Within(.02f), "partial map approximates the measured 5.35 m2");
+            Assert.That(proven * c.cell_m * c.cell_m, Is.EqualTo(.3f).Within(.02f), "only 0.30 m2 of that floor has indoor evidence");
+            var target = new Vector2(-4, 3);
+            b.AgentExplore(target, 0, 30, "continue searching");
+            Assert.That(b.FrontierOptions(0, 8).Any(f => f.provenIndoors), Is.True, "proven work remains");
+            int before = g.CopyIndoors().Count(v => v != 0);
+            var command = DriveTick(b, 0);
+            var started = b.DrainEvents().FirstOrDefault(e => e.kind == "local_evidence_started");
+            Assert.That(started != null, Is.True, "look locally before following the distant exploration order");
+            Assert.That(g.Indoors(b.Snapshot().goal.Value), Is.True, "the body stops on proven floor");
+            Assert.That(g.CopyIndoors().Count(v => v != 0), Is.EqualTo(before), "a planned look supplies no indoor evidence");
+            Assert.That((Vector2?)typeof(RobotBrain).GetField("agentGoal", flags).GetValue(b), Is.EqualTo((Vector2?)target), "retain the agent's target");
+            // Feedback has no depth returns. The look must face, hold, finish, and resume without inventing a ceiling.
+            bool finished = false, resumed = false;
+            for (int tick = 1; tick < 400; tick++)
+            {
+                command = DriveTick(b, tick, command.forwardMps, command.yawRateDeg);
+                var events = b.DrainEvents();
+                finished |= events.Any(e => e.kind == "doorway_probe_done");
+                resumed |= finished && events.Any(e => e.kind == "goal" && e.reason.StartsWith("Agent order:"));
+                if (resumed) break;
+            }
+            Assert.That(finished, Is.True, "bounded look ends even without ceiling returns");
+            Assert.That(resumed, Is.True, "the retained exploration order resumes");
+            Assert.That(g.Indoors(new Vector2(0, 6)), Is.False, "unseen ceiling stays unproven");
+        }
+
+        [Test]
+        public void LocalEvidenceApproachesStayProvenAndRespectClaimsAndWalls()
+        {
+            var c = Settings(); c.grid_size_m = 12;
+            var g = new OccupancyGrid(c);
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var lidar = (float[])typeof(OccupancyGrid).GetField("lidarOdds", flags).GetValue(g);
+            for (int i = 0; i < g.Count; i++)
+            {
+                var p = g.Centre(i);
+                if (Mathf.Abs(p.x) < 3 && p.y > -1 && p.y < 1) g.ObserveFree(i);
+                if (Mathf.Abs(p.x) < 1 && p.y >= 1 && p.y < 4) lidar[i] = -c.log_odds_cap;
+            }
+            var planner = new GridPlanner(g, c);
+            var look = planner.LocalEvidenceLook(Vector2.zero, p => p.y < 1, null, null);
+            Assert.That(look != null, Is.True, "a sparse free map is enough to plan an evidence look");
+            Assert.That(look.path.All(p => p.y < 1 && g.OwnOccupancy(g.Cell(p)) == 1), Is.True, "every body waypoint stays on proven own floor");
+            Assert.That(look.cost, Is.LessThanOrEqualTo(c.search_max_range_m), "travel stays in the search horizon");
+            Assert.That(planner.LocalEvidenceLook(Vector2.zero, p => p.y < 1, p => p.y >= 1, null) == null, Is.True, "a claim or blacklist on the unproven floor prevents a look toward it");
+            Assert.That(planner.LocalEvidenceLook(Vector2.zero, p => p.y < 1, null, (at, toward) => true) == null, Is.True, "already tried views are left alone");
+            for (int i = 0; i < g.Count; i++)
+            { var p = g.Centre(i); if (p.y >= 1 && p.y < 1.6f) lidar[i] = 0; }
+            var acrossUnknown = planner.LocalEvidenceLook(Vector2.zero, p => p.y < 1, null, null);
+            Assert.That(acrossUnknown != null && acrossUnknown.path.All(p => p.y < 1), Is.True,
+                "the camera may look across unmapped floor while the body stays on proven floor");
+            for (int i = 0; i < g.Count; i++)
+            { var p = g.Centre(i); if (Mathf.Abs(p.y - 1) < .06f) g.ObserveOccupied(i); }
+            Assert.That(planner.LocalEvidenceLook(Vector2.zero, p => p.y < 1, null, null) == null, Is.True, "mapped free floor behind a wall does not justify a look through it");
+        }
+
+        [Test]
         public void TriggerFireConfigurationReachesHeatAndSurvivesARewind()
         {
             var fire = new SmokeRescue.World.Scenario.FireSpread { config_file = "fire_trigger_cold.json", head_start_s = 0 };
@@ -650,6 +816,56 @@ namespace SmokeRescue.Tests.EditMode
             b.AgentAvoidArea(new Vector2(0, 4f), 3f, 0, 30, "ev");
             var shrunk = b.DrainEvents().Single(x => x.kind == "agent_order");
             Assert.That(shrunk.numbers["radius_m"], Is.LessThan(4f - Settings().fire_clearance_m - Settings().robot_radius_m + 1e-3), "shrunk to leave the robot outside");
+        }
+
+        [Test]
+        public void StayingInsideWarmAirWithNothingLeftDoesNotPingPongRetreats()
+        {
+            // Seed 927, robot B: with nothing left to search and the air at 24 to 31 C, the "leave while the way out is open"
+            // rule became a retreat that the cool air ended on the next tick, 44 times in 12 s. Staying inside, that rule does
+            // not run. Control: without stay_inside it fires (and starts a return).
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            int Overrides(bool stay)
+            {
+                var c = Settings(); c.stay_inside = stay; c.mission_time_limit_s = 1000;
+                var b = new RobotBrain(Calibration(), c, "B", 0); Room(b, -3, 3, -3, 3);
+                Motion(b, 0); b.OnRgbd(Image(0, true, 0)); b.OnAirTemperature(0, 31); b.Step(0, .05f);
+                typeof(RobotBrain).GetField("noFrontierAt", flags).SetValue(b, 0.0);
+                typeof(RobotBrain).GetField("scanSince", flags).SetValue(b, 0.0);
+                int n = 0; double last = 0;
+                for (int i = 1; i <= 60; i++)
+                {
+                    double t = i / 30.0; Motion(b, t); b.OnRgbd(Image(t, true, 0)); b.OnAirTemperature(t, 31); b.Step(t, (float)(t - last)); last = t;
+                    n += b.DrainEvents().Count(e => e.kind == "stay_overridden");
+                }
+                return n;
+            }
+            Assert.That(Overrides(true), Is.Zero, "staying inside, no leave-while-open override");
+            Assert.That(Overrides(false), Is.GreaterThan(0), "control: without stay_inside the rule fires");
+        }
+
+        [Test]
+        public void ARouteNeverPassesThroughAConfirmedPerson()
+        {
+            // One-door seed 927: robot A routed past the person it had just confirmed, pressed into her body and was pinned
+            // from 46 s until the fire reached it. Here a confirmed person lies between the robot and its goal in open floor:
+            // every route point keeps the keep-out radius plus the walking clearance. Control: with no keep-out the straight
+            // route passes within a metre of her.
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            float Closest(float keepout)
+            {
+                var c = Settings(); c.survivor_keepout_m = keepout; c.grid_size_m = 12; c.robot_radius_m = .25f;
+                var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -4, 4, -4, 4);
+                var person = new Vector2(0, 2);
+                ((List<Vector2>)typeof(RobotBrain).GetField("survivors", flags).GetValue(b)).Add(person);
+                Motion(b, 0); b.OnRgbd(Image(0, true, 0)); b.OnAirTemperature(0, 20); b.Step(0, .05f);
+                var planner = (GridPlanner)typeof(RobotBrain).GetField("planner", flags).GetValue(b);
+                var route = planner.Plan(Vector2.zero, new Vector2(0, 3.8f));
+                Assert.That(route.Count, Is.GreaterThan(0), "a route around exists");
+                return route.Min(p => Vector2.Distance(p, person));
+            }
+            Assert.That(Closest(1.05f), Is.GreaterThanOrEqualTo(1.05f + .25f - .1f), "the route keeps clear of the person");
+            Assert.That(Closest(0f), Is.LessThan(1f), "control: without a keep-out the route runs past her");
         }
 
         [Test]
