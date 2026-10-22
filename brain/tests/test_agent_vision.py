@@ -154,3 +154,25 @@ def test_a_colour_only_confirmation_carries_the_measured_position(tmp_path, monk
     r = v.inspect_candidate(f, 3.0, 3.0, output_dir=tmp_path)
     assert r["verdict"] == "person"
     assert (r["candidate"]["bearing_deg"], r["candidate"]["range_m"]) == (5.0, 3.4)
+
+
+
+def test_a_colour_person_is_placed_on_the_body_not_the_wall_behind_it():
+    # Held-out seed 919, robot B: a woman crouched 2 m away at the bottom of the image, a wall far behind; the box's
+    # median optical depth said 3 m and her confirmation landed 1.16 m from her. Here: floor whose depth follows the
+    # real camera mount, a body at 2 m in the lower box, a wall at 4.5 m behind it.
+    import json, math
+    mount = json.loads((Path(v.__file__).resolve().parents[3] / "config/sensors.json").read_text())["camera"]["mount"]
+    p = math.radians(mount["pitch_down_deg"]); h = mount["height_m"]
+    f = scene(); K = f.K; depth = np.full(f.depth_m.shape, np.nan, np.float32)
+    for row in range(depth.shape[0]):
+        d = (row - K[1, 2]) / K[1, 1]
+        down = math.sin(p) + d * math.cos(p)            # floor depth along this row: h = z (sin p + y/z cos p)
+        if down > 0: depth[row, :] = h / down
+    depth[30:80, 50:110] = 4.5                          # wall behind
+    depth[80:112, 60:100] = 2.0                         # the body, low in the box
+    f.depth_m = depth
+    person = v._rgb_person(f, (50, 30, 110, 118), .9)
+    assert 1.9 <= person["range_m"] <= 2.6, person          # body at 2 m optical, plus the 0.25 m mount offset
+    z = depth[30 + 22: 118 - 22, 50 + 15: 110 - 15]; z = z[np.isfinite(z)]
+    assert float(np.median(z)) > 3.5, "control: the old middle-half median lands on the wall"
