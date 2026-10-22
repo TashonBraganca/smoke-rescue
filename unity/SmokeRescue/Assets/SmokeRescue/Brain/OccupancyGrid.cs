@@ -573,19 +573,28 @@ namespace SmokeRescue.Brain
         /// <summary>Discs the planner treats as obstacles: confirmed people, so a robot never walks into a casualty (one-door
         /// seed 927: robot A, routing past the person it had just confirmed, pressed into her body's collision volume, which
         /// the depth map had recorded smaller, and stayed pinned for over a minute).</summary>
-        public void SetKeepOut(IReadOnlyList<Vector2> centres, float radius)
+        /// <summary>Around each confirmed person: a hard core (an obstacle) where the body surely is, and a soft ring out to
+        /// radius that costs keepout_cost_weight at the core edge, falling to nothing at the rim. One-door seed 931: a person
+        /// confirmed 2.4 m inside the one door, with the whole 1.05 m disc an obstacle, closed the entrance to both robots.</summary>
+        public void SetKeepOut(IReadOnlyList<Vector2> centres, float coreRadius, float radius)
         {
             keepOut ??= new bool[Count]; System.Array.Clear(keepOut, 0, Count);
+            keepSoft ??= new float[Count]; System.Array.Clear(keepSoft, 0, Count);
             foreach (var p in centres)
             {
                 int c0 = Cell(p); if (c0 < 0) continue;
                 int r = Mathf.CeilToInt(radius / CellM), cx = c0 % Size, cy = c0 / Size;
                 for (int dy = -r; dy <= r; dy++) for (int dx = -r; dx <= r; dx++)
-                    if (Inside(cx + dx, cy + dy) && Vector2.Distance(Centre((cy + dy) * Size + cx + dx), p) <= radius) keepOut[(cy + dy) * Size + cx + dx] = true;
+                {
+                    if (!Inside(cx + dx, cy + dy)) continue;
+                    int i = (cy + dy) * Size + cx + dx; float d = Vector2.Distance(Centre(i), p);
+                    if (d <= coreRadius) keepOut[i] = true;
+                    else if (d <= radius) keepSoft[i] = Mathf.Max(keepSoft[i], 1 - (d - coreRadius) / Mathf.Max(1e-3f, radius - coreRadius));
+                }
             }
             dirty = true;
         }
-        bool[] keepOut;
+        bool[] keepOut; float[] keepSoft;
         internal void PrepareNavigation()
         {
             if (!dirty) return;
@@ -972,7 +981,8 @@ namespace SmokeRescue.Brain
             float warm = Mathf.Clamp01((heat[i] - c.heat_project_min_c) / (c.fire_c - c.heat_project_min_c));
             float clearance = obstacleDistance[i] - c.robot_radius_m - CellM * .707107f;
             float edge = Mathf.Clamp01(1 - clearance / c.obstacle_cost_margin_m);
-            return 1 + c.heat_cost_weight * (strength * strength + warm * warm) + c.obstacle_cost_weight * edge * edge;
+            float soft = keepSoft != null ? keepSoft[i] : 0;
+            return 1 + c.heat_cost_weight * (strength * strength + warm * warm) + c.obstacle_cost_weight * edge * edge + c.keepout_cost_weight * soft * soft;
         }
         internal float FireDistance(int i) => i < 0 ? 0 : fireDistance[i];
         public byte[] CopyOccupancy() { var result = new byte[Count]; for (int i = 0; i < Count; i++) result[i] = Occupancy(i); return result; }
