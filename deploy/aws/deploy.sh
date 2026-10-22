@@ -2,6 +2,8 @@
 # Deploy Smoke Rescue to AWS with one command. Needs credentials in the environment or a profile.
 #
 #   ./deploy/aws/deploy.sh --email you@example.com
+# India recommendation: --region ap-south-1 --model-id in.anthropic.claude-haiku-4-5-20251001-v1:0
+# Virginia remains valid: --region us-east-1 --model-id us.anthropic.claude-haiku-4-5-20251001-v1:0
 #
 # Options (or the matching environment variables):
 #   --email ADDR        budget and alarm email (ALERT_EMAIL), required
@@ -46,7 +48,7 @@ while [ $# -gt 0 ]; do
     --skip-slam) SKIP_SLAM=1; shift ;;
     --skip-pipeline) SKIP_PIPELINE=1; shift ;;
     --results) RESULTS_DIR="${2:?}"; shift 2 ;;
-    -h|--help) sed -n '2,21p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    -h|--help) sed -n '2,23p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) die "unknown option $1" ;;
   esac
 done

@@ -38,7 +38,7 @@ Parameters:
     Description: Existing Secrets Manager ARN with AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY and AZURE_OPENAI_API_VERSION JSON keys. Required for azure.
   AgentModelId:
     Type: String
-    Description: Value of AGENT_MODEL, a Bedrock model/profile ID or Azure deployment name.
+    Description: Value of AGENT_MODEL. For Mumbai use in.anthropic.claude-haiku-4-5-20251001-v1:0; for us-east-1 use us.anthropic.claude-haiku-4-5-20251001-v1:0. Azure uses its deployment name.
   BedrockModelArns:
     Type: CommaDelimitedList
     Description: Exact model and inference profile ARNs the task may invoke. Nothing else is granted.

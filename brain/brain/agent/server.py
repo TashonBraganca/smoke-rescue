@@ -20,18 +20,21 @@ import json
 import os
 import time
 import threading
+import tempfile
 from pathlib import Path
 
 import cv2
 import numpy as np
 from fastapi import FastAPI, HTTPException, Request
 from starlette.concurrency import run_in_threadpool
+from starlette.responses import Response
 
 from brain.agent.commander import Commander, simulated_operator
 from brain.agent.llm import make_backend
 from brain.agent.robot_agent import RobotAgent
 from brain.agent import place
 from brain.agent.map3d import RobotMap3D
+from brain.agent.recording_transport import RecordingStore, MAX_BATCH_BYTES
 
 RUN_DIR = Path(os.environ.get("AGENT_RUN_DIR", "/tmp/smoke-rescue-agent"))
 RUN_DIR.mkdir(parents=True, exist_ok=True)
@@ -74,12 +77,40 @@ def health():
             "opencv": cv2.__version__, "run_dir": str(RUN_DIR), "approval_mode": APPROVAL_MODE}
 
 
+def recording_store():
+    return RecordingStore(RUN_DIR / "recordings")
+
+
+@app.put("/runs/{run_id}/{robot}/files")
+async def upload_recording(run_id: str, robot: str, request: Request):
+    # Stream into a bounded temporary file, rather than retaining the whole ZIP in RAM.
+    with tempfile.TemporaryFile() as stream:
+        size = 0
+        async for chunk in request.stream():
+            size += len(chunk)
+            if size > MAX_BATCH_BYTES:
+                raise HTTPException(413, "ZIP body exceeds 64 MiB")
+            stream.write(chunk)
+        stream.seek(0)
+        try:
+            return await run_in_threadpool(recording_store().upload, run_id, robot, stream,
+                                          request.headers.get("x-recording-source"))
+        except (ValueError, OSError) as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+
+def _robot_step(robot, req):
+    with recording_store().request(req, history=True, robot=robot) as resolved:
+        resolved["robot"] = robot
+        return RobotAgent(backend(), Path(resolved.get("trace_path") or TRACE)).step(resolved)
+
+
 @app.post("/robot/{robot}/step")
 async def robot_step(robot: str, request: Request):
     req = await request.json()
     req["robot"] = robot
     # In a worker thread: the recorder sends both robots' steps at once, and a blocking call here would serialise them.
-    return await run_in_threadpool(RobotAgent(backend(), Path(req.get("trace_path") or TRACE)).step, req)
+    return await run_in_threadpool(_robot_step, robot, req)
 
 
 @app.post("/commander/step")
@@ -165,8 +196,12 @@ async def perceive_people(request: Request):
     from brain.agent import vision
     req = await request.json()
     t0 = time.perf_counter()
-    frame = await run_in_threadpool(vision.load_frame, req["robot_dir"], float(req["t"]))
-    people = await run_in_threadpool(lambda: vision.detect_people_rgb(frame, min_conf=float(req.get("min_conf", 0.25))))
+    def detect():
+        with recording_store().request(req) as resolved:
+            frame = vision.load_frame(resolved["robot_dir"], float(resolved["t"]))
+            people = vision.detect_people_rgb(frame, min_conf=float(resolved.get("min_conf", 0.25)))
+            return frame, people
+    frame, people = await run_in_threadpool(detect)
     return {"t": float((frame.get("stamps") or {}).get("rgb", req["t"])), "people": people, "opencv": cv2.__version__, "ms": round((time.perf_counter() - t0) * 1000, 1)}
 
 
@@ -205,7 +240,11 @@ def _map3d_request(robot, operation, req):
 
 @app.post('/map3d/{robot}/integrate')
 async def map3d_integrate(robot: str, request: Request):
-    return await run_in_threadpool(_map3d_request, robot, 'integrate', await request.json())
+    req = await request.json()
+    def integrate():
+        with recording_store().request(req, sensors=('depth',), robot=robot) as resolved:
+            return _map3d_request(robot, 'integrate', resolved)
+    return await run_in_threadpool(integrate)
 
 
 @app.post('/map3d/{robot}/layers')
@@ -216,10 +255,37 @@ async def map3d_layers(robot: str, request: Request):
 
 @app.post('/map3d/{robot}/export')
 async def map3d_export(robot: str, request: Request):
-    return await run_in_threadpool(_map3d_request, robot, 'export', await request.json())
+    req = await request.json()
+    def export():
+        with recording_store().request(req, sensors=(), robot=robot) as resolved:
+            if str(req.get('robot_dir', '')).startswith('run:'):
+                resolved['path'] = str(Path(resolved['robot_dir']) / 'map3d.ply')
+                result = _map3d_request(robot, 'export', resolved)
+                run = Path(resolved['robot_dir']).parent.name
+                result['download_url'] = f'/runs/{run}/{robot}/map3d.ply'
+                return result
+            return _map3d_request(robot, 'export', resolved)
+    return await run_in_threadpool(export)
+
+
+@app.get('/runs/{run_id}/{robot}/map3d.ply')
+def download_map(run_id: str, robot: str):
+    try:
+        with recording_store().request({'robot_dir': f'run://{run_id}/{robot}', 't': 0}, sensors=()) as req:
+            path = Path(req['robot_dir']) / 'map3d.ply'
+            if not path.is_file() or path.is_symlink():
+                raise HTTPException(404, 'no map export for this robot')
+            return Response(path.read_bytes(), media_type='application/octet-stream')
+    except OSError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 def _place_request(operation, robot, req):
+    with recording_store().request(req, sensors=('rgb', 'depth') if operation == 'keyframe' else (), robot=robot) as resolved:
+        return _resolved_place_request(operation, robot, resolved)
+
+
+def _resolved_place_request(operation, robot, req):
     try:
         if operation == 'keyframe':
             return place.keyframe(robot, req['robot_dir'], float(req['t']))
