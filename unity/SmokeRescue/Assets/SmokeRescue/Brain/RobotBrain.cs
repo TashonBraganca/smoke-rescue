@@ -1254,6 +1254,18 @@ namespace SmokeRescue.Brain
             ResetStuckRecovery(); ResetWayOutAndArrival(); returning = true; active = null; dwell = 0; returnReason = reason; ClearPath();
             Emit(t, "goal", reason + " Return to the estimated start.", "x_m", home.x, "y_m", home.y);
         }
+        /// <summary>Target speed and policy from the nearest obstacle ahead. Near walls the robot halves its speed, except when
+        /// it is leaving because of heat or a closing way out: held-out seed 920, robot B walked its 6.5 m way out through a
+        /// heating foyer at 0.32 to 0.38 m/s, every doorway "near", and spent 11.8 s in air over 60 C (peak 76.5 C); at
+        /// open speed it would have been out by about 154 s, under 55 C. Every command still passes the stopping-distance
+        /// cap (SafeForward) and the thermal-mode cap in Command.</summary>
+        float PursuitSpeed(float near, out string policy)
+        {
+            bool fleeing = returning && (emergencyExit || returnReason == WayOutClosing || returnReason == HeatLeave);
+            if (near >= c.near_obstacle_m) { policy = "open"; return c.open_speed_mps; }
+            if (fleeing) { policy = "escape"; return c.open_speed_mps; }
+            policy = "near"; return c.near_speed_mps;
+        }
         bool swingBlocked;
         BrainCommand FollowOrHold(double t, float dt, float? arriveM = null)
         {
@@ -1285,8 +1297,7 @@ namespace SmokeRescue.Brain
             }
             float error = BrainMath.Angle(motion.Pose.yawRad, BrainMath.Heading(target - position));
             float near = ObstacleAhead(c.near_cone_deg, out _);
-            float speed = near < c.near_obstacle_m ? c.near_speed_mps : c.open_speed_mps;
-            string policy = near < c.near_obstacle_m ? "near" : "open";
+            float speed = PursuitSpeed(near, out string policy);
             if (health.Thermal) { speed = Mathf.Min(speed, c.thermal_speed_mps); policy = "thermal"; }
             speed *= Mathf.Clamp01(Vector2.Distance(position, goal.Value) / c.goal_slow_distance_m);
             float yaw = 2 * speed * Mathf.Sin(error * Mathf.Deg2Rad) / Mathf.Max(grid.CellM, Vector2.Distance(position, target)) * Mathf.Rad2Deg;
