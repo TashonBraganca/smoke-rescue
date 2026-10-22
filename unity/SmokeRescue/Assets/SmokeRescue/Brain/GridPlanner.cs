@@ -235,7 +235,9 @@ namespace SmokeRescue.Brain
             for (int i = 1; i <= steps; i++) if (grid.OwnOccupancy(grid.Cell(from + dir * (length * i / steps))) == 255) return false;
             return true;
         }
-        internal List<Vector2> CoolestPath(Vector2 from)
+        /// <summary>The coolest reachable known cell. allowed, when given, limits the candidates (stay_inside: floor proven
+        /// indoors only), and preferStart false drops the pull toward the start, which is outside the house.</summary>
+        internal List<Vector2> CoolestPath(Vector2 from, Func<Vector2, bool> allowed = null, bool preferStart = true)
         {
             grid.PrepareNavigation();
             if (!Lead(from, out int start, out var lead)) return new List<Vector2>();
@@ -244,11 +246,12 @@ namespace SmokeRescue.Brain
             for (int i = 0; i < grid.Count; i++)
             {
                 if (float.IsPositiveInfinity(distance[i]) || Vector2.Distance(from, grid.Centre(i)) < c.retreat_min_distance_m) continue;
+                if (allowed != null && !allowed(grid.Centre(i))) continue;
                 // Heat dominates, then prefer the start and a short escape. All candidates are known and reachable.
-                float score = grid.Heat(i) + Vector2.Distance(grid.Centre(i), Home) * c.retreat_start_weight + distance[i] * c.retreat_path_weight;
+                float score = grid.Heat(i) + (preferStart ? Vector2.Distance(grid.Centre(i), Home) * c.retreat_start_weight : 0) + distance[i] * c.retreat_path_weight;
                 if (score < bestScore) { bestScore = score; best = i; }
             }
-            return best < 0 ? Plan(from, Home) : Join(lead, Reconstruct(parent, start, best));
+            return best < 0 ? (allowed != null ? new List<Vector2>() : Plan(from, Home)) : Join(lead, Reconstruct(parent, start, best));
         }
         public bool PathSafe(IReadOnlyList<Vector2> path, int from = 0)
         {

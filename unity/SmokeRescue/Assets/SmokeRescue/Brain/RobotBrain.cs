@@ -164,10 +164,10 @@ namespace SmokeRescue.Brain
                 if (NeedPlan(t))
                 {
                     bool blocked = path.Count > 0 && !planner.PathSafe(path, cursor);
-                    var escape = goal.HasValue && !blocked ? planner.Plan(motion.Pose.position, goal.Value) : planner.CoolestPath(motion.Pose.position);
+                    var escape = goal.HasValue && !blocked ? planner.Plan(motion.Pose.position, goal.Value) : RetreatPath();
                     SetPath(escape); lastPlan = t;
                     Emit(t, "replan", escape.Count > 0 ? "Retreat along the coolest reachable known route." : "No safe cool route is known; hold position.", "path_points", path.Count);
-                    if (goal.HasValue) EmitGoal(t, "Coolest reachable known cell, with a preference for the start.");
+                    if (goal.HasValue) EmitGoal(t, c.stay_inside ? "Coolest reachable floor inside the house." : "Coolest reachable known cell, with a preference for the start.");
                 }
                 return FollowOrHold(t, dt);
             }
@@ -252,7 +252,7 @@ namespace SmokeRescue.Brain
                     {
                         // No way out is open at all: standing still in rising heat is the worst choice. Go to the coolest
                         // reachable floor; the next replan tries the way out again.
-                        var cool = planner.CoolestPath(motion.Pose.position);
+                        var cool = RetreatPath();
                         if (cool.Count > 0)
                         {
                             SetPath(cool);
@@ -510,11 +510,16 @@ namespace SmokeRescue.Brain
                         }
                         // Cut off, a return would only find the way out closed: stay, keep checking for a way out, and leave the
                         // agent free to act (held-out seed 914 run 4, robot B).
-                        if (t - scanSince >= c.no_frontier_scan_s && !cutOff) BeginReturn(t, NoFrontierLeft);
+                        if (t - scanSince >= c.no_frontier_scan_s && !cutOff)
+                        {
+                            if (!c.stay_inside) BeginReturn(t, NoFrontierLeft);
+                            else if (!searchedOut) { searchedOut = true; Emit(t, "goal", "Nothing reachable is left to search after a full scan: hold here, inside, until new floor appears or the agent orders a move."); }
+                        }
                     }
                 }
             }
-            if (!goal.HasValue && !returning) return Command(0, scanSign * c.scan_yaw_dps, dt, true);
+            if (!goal.HasValue && !returning) return searchedOut ? Command(0, 0, dt, true) : Command(0, scanSign * c.scan_yaw_dps, dt, true);
+            searchedOut = false;
             return FollowOrHold(t, dt);
         }
 
@@ -905,6 +910,7 @@ namespace SmokeRescue.Brain
         /// </summary>
         void CheckWayOut(double t)
         {
+            if (c.stay_inside) return;   // no way out is used, so none is watched
             if (completed || returning || retreating || t < nextWayOutCheck) return;
             nextWayOutCheck = t + c.escape_check_s;
             var route = PlanOut();
@@ -1280,6 +1286,7 @@ namespace SmokeRescue.Brain
         /// retreat goal with the budget at 0 and a route out open).</summary>
         bool TryEmergencyExit(double t, string why)
         {
+            if (c.stay_inside) return false;
             var exit = PlanOut(); float clearance = c.fire_clearance_m;
             if (exit.Count == 0)
             {
@@ -1420,6 +1427,7 @@ namespace SmokeRescue.Brain
             foreach (var exit in walkedIn) yield return exit;
         }
         readonly List<Vector2> walkedIn = new List<Vector2>();
+        bool searchedOut;   // stay_inside: a full scan found nothing reachable; hold still instead of turning
         /// <summary>A route to the last proven-indoor floor on the way to an unproven frontier, when no proven one is left.
         /// Floor seen through an interior doorway is mapped free but not proven indoors until the camera sees its ceiling,
         /// which it does only about 4.7 m away; from the far side of a room it never does. One-door seed 924: both robots
@@ -1511,8 +1519,27 @@ namespace SmokeRescue.Brain
             nextWayOutCheck = t + c.escape_recheck_s;
             Emit(t, "escape_closing", "The known way out is closed; retreat to the coolest reachable floor and search on while it is cool.", "route_points", 0);
         }
+        /// <summary>Where a retreat goes: the coolest reachable known cell; with stay_inside only floor proven indoors, with no
+        /// pull toward the start (it is outside).</summary>
+        List<Vector2> RetreatPath() => c.stay_inside ? planner.CoolestPath(motion.Pose.position, InSearchArea, false) : planner.CoolestPath(motion.Pose.position);
         void BeginReturn(double t, string reason)
         {
+            // Stay inside (the owner's decision, 22 Oct): a robot that has gone in never leaves by the entrance. At the
+            // deadline it stops where it stands; every other reason to leave (heat, a closing way out, nothing left to search)
+            // becomes a retreat to the coolest floor inside, where it can spray and wait for the air to cool.
+            if (c.stay_inside && reason != CarryingOut)
+            {
+                ResetStuckRecovery(); active = null; dwell = 0; ClearPath();
+                if (reason == MissionTimeUp)
+                {
+                    completed = true;
+                    Emit(t, "mission_complete", "Mission time is up: stop here, inside (stay_inside: robots never leave by the entrance).");
+                    return;
+                }
+                retreating = true; sweeping = false;
+                Emit(t, "retreat", reason + " Staying inside: retreat to the coolest floor inside instead of leaving.", "air_c", airC, "heat_budget", budget);
+                return;
+            }
             ResetStuckRecovery(); ResetWayOutAndArrival(); returning = true; active = null; dwell = 0; returnReason = reason; ClearPath();
             Emit(t, "goal", reason + " Return to the estimated start.", "x_m", home.x, "y_m", home.y);
         }

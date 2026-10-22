@@ -653,6 +653,58 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void StayingInsideARobotStopsAtTheDeadlineAndRetreatsInsteadOfLeaving()
+        {
+            // Owner's decision (22 Oct): robots never leave by the entrance. At the deadline the robot stops where it is;
+            // a heat reason to leave becomes a retreat. Control: without stay_inside the same deadline starts a return.
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            (bool returning, bool completed, bool retreating, List<BrainEvent> events) Run(bool stay, string reason)
+            {
+                var c = Settings(); c.stay_inside = stay; c.mission_time_limit_s = 1000;
+                var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -3, 3, -3, 3);
+                Motion(b, 0); b.OnRgbd(Image(0, true, 0)); b.OnAirTemperature(0, 20); b.Step(0, .05f); b.DrainEvents();
+                typeof(RobotBrain).GetMethod("BeginReturn", flags).Invoke(b, new object[] { 1.0, reason });
+                bool F(string n) => (bool)typeof(RobotBrain).GetField(n, flags).GetValue(b);
+                return (F("returning"), F("completed"), F("retreating"), b.DrainEvents().ToList());
+            }
+            const string timeUp = "Mission time is nearly up: leave now to be out by the deadline.";
+            var deadline = Run(true, timeUp);
+            Assert.That(deadline.completed && !deadline.returning, Is.True, "stops where it is at the deadline");
+            Assert.That(deadline.events.Any(e => e.kind == "goal" && e.reason.Contains("Return to the estimated start")), Is.False);
+            var heat = Run(true, "Heat is building.");
+            Assert.That(heat.retreating && !heat.returning, Is.True, "a heat reason to leave becomes a retreat inside");
+            Assert.That(Run(false, timeUp).returning, Is.True, "control: without stay_inside the deadline starts a return");
+        }
+
+        [Test]
+        public void StayingInsideTheRetreatNeverPicksFloorOutside()
+        {
+            // The retreat used to prefer the start, which for a one-door launch is outside on the pad. Here the yard (y < 0)
+            // is cool and the indoor floor near the robot is hot: with stay_inside the retreat stays on indoor floor; without,
+            // the same map sends it out to the yard (control).
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            Vector2 End(bool stay)
+            {
+                var c = Settings(); c.stay_inside = stay; c.search_requires_ceiling = true; c.grid_size_m = 16; c.robot_radius_m = .25f;
+                var b = new RobotBrain(Calibration(), c, "A", 0, new EntryPose(0, 1, 0)); var g = Map(b); Room(b, -4, 4, -4, 6);
+                var indoors = (bool[])typeof(OccupancyGrid).GetField("sightIndoors", flags).GetValue(g);
+                for (int i = 0; i < g.Count; i++)
+                {
+                    var p = g.Centre(i);
+                    if (p.y > 0) indoors[i] = true;
+                    if (p.y > 0 && p.y < 2.5f && Mathf.Abs(p.x) < 2.5f) g.ObserveHeat(i, 150f, 0);   // hot floor around the robot, inside
+                }
+                typeof(OccupancyGrid).GetField("roofDirty", flags).SetValue(g, true);
+                Motion(b, 0); b.OnRgbd(Image(0, true, 0)); b.OnAirTemperature(0, 20); b.Step(0, .05f);
+                var path = (List<Vector2>)typeof(RobotBrain).GetMethod("RetreatPath", flags).Invoke(b, null);
+                Assert.That(path.Count, Is.GreaterThan(0), "a retreat exists");
+                return path[path.Count - 1];
+            }
+            Assert.That(End(true).y, Is.GreaterThan(0), "stay_inside: the retreat ends on indoor floor");
+            Assert.That(End(false).y, Is.LessThan(0), "control: without stay_inside the cool yard wins");
+        }
+
+        [Test]
         public void ACloserLookAtAnUnstandablePointUsesAStandableViewpointWithAClearView()
         {
             // One-door seed 926, robot B at 80 s: the agent's step-back point, 2.8 m from a person in the study, lay in a
@@ -3029,7 +3081,13 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(blind, Is.InRange(2.0f, 2.3f), "the 1.6 m mast sees the floor from about 2.16 m");
             Assert.That(c.survivor_stop_min_m, Is.GreaterThan(blind), "no viewing stop inside the blind floor");
             Assert.That(c.survivor_standoff_m, Is.GreaterThan(blind));
-            Assert.That(c.survivor_stop_max_m, Is.LessThan(c.search_max_range_m), "the stop stays inside the confirm range");
+            Assert.That(c.survivor_stop_max_m, Is.LessThanOrEqualTo(c.search_max_range_m), "the stop stays inside the search range");
+            // The thermal camera has the narrower vertical view, so its blind floor reaches farther (seed 926: robot B 1.2 m from
+            // a person with no thermal view of her). The viewing window must start past it too.
+            var th = SensorConfig.Load().thermal;
+            float thermalBlind = cam.mount.forward_offset_m + cam.mount.height_m / Mathf.Tan(cam.mount.pitch_down_deg * Mathf.Deg2Rad + th.vertical_fov_deg * .5f * Mathf.Deg2Rad);
+            Assert.That(thermalBlind, Is.InRange(2.8f, 3.1f), "the thermal camera sees the floor from about 2.97 m");
+            Assert.That(c.survivor_stop_min_m, Is.GreaterThanOrEqualTo(thermalBlind), "no viewing stop inside the thermal blind floor");
         }
 
         [Test]

@@ -117,6 +117,7 @@ namespace SmokeRescue.Brain
         public bool thermal_lidar_range_fallback = true;
         public float carried_person_radius_m = 0.85f, search_max_range_m = 4.0f;
         public bool frames_shared_at_start = true;
+        public bool stay_inside = false;
         public float keyframe_spacing_m = 1.0f, keyframe_turn_deg = 45f;
         public int keyframe_beams = 360, keyframe_max = 400, keyframes_per_message = 2;
         public bool visual_place_linking = true;
