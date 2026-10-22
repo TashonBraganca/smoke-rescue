@@ -176,3 +176,36 @@ def test_a_colour_person_is_placed_on_the_body_not_the_wall_behind_it():
     assert 1.9 <= person["range_m"] <= 2.6, person          # body at 2 m optical, plus the 0.25 m mount offset
     z = depth[30 + 22: 118 - 22, 50 + 15: 110 - 15]; z = z[np.isfinite(z)]
     assert float(np.median(z)) > 3.5, "control: the old middle-half median lands on the wall"
+
+
+
+def test_a_person_lying_in_front_of_a_fire_is_not_merged_with_the_warm_floor(tmp_path, monkeypatch):
+    # One-door seeds 922 and 923: people lying in front of a burning sofa were judged not_person, because floor the fire
+    # heated glows in the human band and joined them into one fire-sized warm region. A floor in real mount geometry, a
+    # body 0.25 m thick lying on it, a fire beside it and warm floor between: the inspected region is the body alone.
+    # Control: with every pixel counted as above the floor (the old cut), the region takes in the warm floor.
+    import json, math
+    mount = json.loads((Path(v.__file__).resolve().parents[3] / "config/sensors.json").read_text())["camera"]["mount"]
+    p = math.radians(mount["pitch_down_deg"]); h = mount["height_m"]
+    f = scene(); K = f.K
+    depth = np.full(f.depth_m.shape, np.nan, np.float32)
+    for row in range(depth.shape[0]):
+        down = math.sin(p) + (row - K[1, 2]) / K[1, 1] * math.cos(p)
+        if down > 0: depth[row, :] = h / down
+    thermal = np.full(f.thermal.shape, 2932, np.uint16)
+    yy, xx = np.mgrid[80:96, 30:78]
+    depth[80:96, 30:78] -= (.25 * np.sin((xx - 29) / 49 * np.pi) * np.sin((yy - 79) / 17 * np.pi) + .05).astype(np.float32)
+    thermal[80:96, 30:78] = np.round((305.15 + 4 * (yy - 80) / 16 + 1.5 * np.sin((xx - 30) / 8)) * 10).astype(np.uint16)
+    thermal[70:110, 120:155] = 7000                                          # the fire, far above the human band
+    thermal[96:112, 30:120] = 3082; thermal[80:96, 78:120] = 3082              # warm floor joining body and fire
+    f.depth_m = depth; f.thermal = thermal; f.rgb = np.full(f.rgb.shape, 70, np.uint8)
+    if hasattr(f, "_registered"): del f._registered
+    monkeypatch.setattr(v, "detect_people_rgb", lambda frame, **k: [])
+    body_bearing = math.degrees(math.atan2((54 - K[0, 2]), K[0, 0]))
+    cut = v.inspect_candidate(f, body_bearing, 3.0, output_dir=tmp_path)
+    assert cut["candidate"] is not None and cut["candidate"]["width_m"] < 1.6, cut["candidate"]
+    monkeypatch.setattr(v, "_above_floor", lambda frame, depth, floor_band_m=None: np.ones(depth.shape, bool))
+    merged = v.inspect_candidate(f, body_bearing, 3.0, output_dir=tmp_path)
+    # The old cut joins her to the warm floor: either no warm region sits at her bearing and range any more, or the one
+    # that does is much wider than her.
+    assert merged["candidate"] is None or merged["candidate"]["width_m"] > cut["candidate"]["width_m"] + .8, merged["candidate"]
