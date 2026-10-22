@@ -102,8 +102,23 @@ def load_scenario(meta: dict) -> dict:
 
 
 def start_pose(scenario: dict, robot: str) -> np.ndarray | None:
-    spawn = next((r['spawn'] for r in scenario.get('robots', []) if r['id'] == robot), None)
-    return None if spawn is None else np.array([*spawn['at'], -np.radians(spawn['yaw'])], float)
+    """Where this robot's own frame sits in the house (evaluator side). Robots launched from pads at one gate share the
+    gate frame, placed by the pad the team set at (0, 0, 0), whose robot stands exactly there; each other robot's real
+    placement error then stays its own error. Without pads, a robot's frame starts at its own spawn. One-door seeds 922
+    and 923 were scored with B's own spawn as origin, which shifted every B position by its pad offset (1.2 m) and
+    scored a confirmation 0.13 m from s6 as a false one 1.23 m away."""
+    robots = scenario.get('robots', [])
+    me = next((r for r in robots if r['id'] == robot), None)
+    if me is None:
+        return None
+    if me.get('launch_pad') is not None:
+        gate = next((r for r in robots if r.get('launch_pad') is not None and not any(float(v) for v in r['launch_pad'])), None)
+        if gate is None:
+            raise ValueError("launch pads without a pad at (0, 0, 0): the gate frame is not placed in the house")
+        spawn = gate['spawn']
+    else:
+        spawn = me['spawn']
+    return np.array([*spawn['at'], -np.radians(spawn['yaw'])], float)
 
 
 def rotation(yaw: float) -> np.ndarray:

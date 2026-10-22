@@ -21,7 +21,8 @@ every = int(sys.argv[sys.argv.index('--every') + 1]) if '--every' in sys.argv el
 max_range = float(sys.argv[sys.argv.index('--range') + 1]) if '--range' in sys.argv else 4.0
 meta = json.loads((rec / 'meta.json').read_text())
 scenario = json.loads((Path(__file__).resolve().parents[1] / 'config' / meta['scenario']).read_text())
-spawn = {r['id']: (np.array(r['spawn']['at'], float), -math.radians(r['spawn']['yaw'])) for r in scenario['robots']}
+from brain.nav_io import start_pose    # one gate: robots share the gate frame (nav_io.start_pose)
+spawn = {r['id']: (start_pose(scenario, r['id'])[:2], float(start_pose(scenario, r['id'])[2])) for r in scenario['robots']}
 people = json.loads((rec / 'oracle' / 'survivors.json').read_text())
 HEIGHTS = (.15, .3, .45, .7)
 
