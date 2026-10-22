@@ -116,6 +116,7 @@ namespace SmokeRescue.Brain
             nearFire = fireNow;
 
             if (!completed && !returning && t >= c.mission_time_limit_s) BeginReturn(t, "Exploration time limit reached.");
+            RefreshSensedExits(t);
             CheckWayOut(t);
             CheckEmergencyExit(t);
             CheckHeatBuilding(t);
@@ -1150,6 +1151,22 @@ namespace SmokeRescue.Brain
             yield return home;
             foreach (var partner in peers.Keys)
                 if (PartnerToOwn(partner, Vector2.zero, out var entry)) yield return entry;
+            // And ways out this robot found with its own LiDAR (OccupancyGrid.SensedExits). The planner reaches the nearest
+            // one, as DARPA SubT's GBPlanner2 plans home over every traversed edge rather than one fixed door: a robot
+            // whose entry is cut need not leave if another sensed way out is open (held-out seed 914 run 5: robot A held
+            // at 185 C with the front door 5.5 m away, its LiDAR seeing open ground through it).
+            foreach (var exit in sensedExits) yield return exit;
+        }
+        List<Vector2> sensedExits = new List<Vector2>(); double nextExitScan;
+        void RefreshSensedExits(double t)
+        {
+            if (t < nextExitScan) return;
+            nextExitScan = t + c.escape_check_s;
+            var now = grid.SensedExits();
+            foreach (var exit in now)
+                if (!sensedExits.Exists(e => Vector2.Distance(e, exit) <= c.survivor_merge_m) && Vector2.Distance(exit, home) > c.survivor_merge_m)
+                    Emit(t, "exit_found", "The LiDAR sees open ground past this walkable floor in sweep after sweep: a way out.", "x_m", exit.x, "y_m", exit.y);
+            sensedExits = now;
         }
         /// <summary>The shortest known route to any way out (fewest waypoints), or an empty path.</summary>
         List<Vector2> PlanOut()

@@ -1607,6 +1607,68 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void TheLidarFindsAWayOutThroughAnOpeningInHeavySmoke()
+        {
+            // A robot knew only its own entry as a way out (held-out seed 914 run 5: robot A held at 185 C with the front
+            // door 5.5 m away). Its own LiDAR sees open ground through an exterior opening sweep after sweep, while smoke
+            // drops pulses at random. A 6 x 6 m room with a 1.2 m opening in its south wall, sweeps from moving poses inside,
+            // half of all returning pulses dropped (sensors.json's worst case). The floor just past the opening is a way out;
+            // nothing inside the room is. Control: the same room and smoke with the wall closed has no way out.
+            int openInside = 0;
+            List<Vector2> Exits(bool opening, float share = -1)
+            {
+                var c = Settings(); c.grid_size_m = 20; c.robot_radius_m = .25f; if (share > 0) c.exit_open_share = share;
+                var g = new OccupancyGrid(c); var rng = new System.Random(7);
+                var walls = new List<(Vector2 a, Vector2 b)> { (new Vector2(-3, -3), new Vector2(-3, 3)), (new Vector2(3, -3), new Vector2(3, 3)), (new Vector2(-3, 3), new Vector2(3, 3)) };
+                if (opening) { walls.Add((new Vector2(-3, -3), new Vector2(-.6f, -3))); walls.Add((new Vector2(.6f, -3), new Vector2(3, -3))); }
+                else walls.Add((new Vector2(-3, -3), new Vector2(3, -3)));
+                float Hit(Vector2 o, Vector2 d)
+                {
+                    float best = float.PositiveInfinity;
+                    foreach (var (a, b) in walls)
+                    {
+                        Vector2 e = b - a; float den = d.x * e.y - d.y * e.x; if (Mathf.Abs(den) < 1e-6f) continue;
+                        Vector2 w = a - o; float t = (w.x * e.y - w.y * e.x) / den, u = (w.x * d.y - w.y * d.x) / den;
+                        if (t > 0 && u >= 0 && u <= 1) best = Mathf.Min(best, t);
+                    }
+                    return best;
+                }
+                const int beams = 720; float inc = 2 * Mathf.PI / beams;
+                for (int k = 0; k < 60; k++)
+                {
+                    var pose = new BrainPose { position = new Vector2(1.2f * Mathf.Sin(k * .37f), .9f * Mathf.Cos(k * .23f)), yawRad = k * .11f };
+                    var ranges = new float[beams];
+                    for (int i = 0; i < beams; i++)
+                    {
+                        float ang = pose.yawRad - Mathf.PI + i * inc; float r = Hit(pose.position, new Vector2(-Mathf.Sin(ang), Mathf.Cos(ang)));
+                        ranges[i] = r > 12f || rng.NextDouble() < .5 ? 0f : r;
+                    }
+                    g.IntegrateLidar(new LidarScan(k * .1, -Mathf.PI, inc, .15f, 12f, 0f, .45f, ranges), pose);
+                }
+                // The camera saw the floor inside and, through the opening, just past it.
+                for (int i = 0; i < g.Count; i++)
+                {
+                    var q = g.Centre(i);
+                    if ((Mathf.Abs(q.x) < 2.9f && Mathf.Abs(q.y) < 2.9f) || (opening && Mathf.Abs(q.x) < .5f && q.y < -3.1f && q.y > -4.6f)) g.ObserveFree(i);
+                }
+                var openBeyond = typeof(OccupancyGrid).GetMethod("OpenBeyond", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                openInside = 0;
+                for (int i = 0; i < g.Count; i++) { var q = g.Centre(i); if (Mathf.Abs(q.x) < 2.4f && Mathf.Abs(q.y) < 2.4f && (bool)openBeyond.Invoke(g, new object[] { i })) openInside++; }
+                return g.SensedExits();
+            }
+            var open = Exits(true);
+            Assert.That(open.Any(e => Mathf.Abs(e.x) < 1f && e.y < -3f && e.y > -5f), Is.True, "the floor past the opening is a way out: " + string.Join(";", open));
+            Assert.That(open.All(e => e.y < -2.5f), Is.True, "nothing more than half a metre inside the wall line: " + string.Join(";", open));
+            Assert.That(Exits(false), Is.Empty, "control: a closed room in the same smoke has no way out");
+            Assert.That(openInside, Is.Zero, "the statistic alone, before any indoor test: no cell of the closed room reads open beyond");
+            // A sweep counts a cell open only if every beam crossing it came back empty; a few metres out about four beams
+            // cross each 10 cm cell, so half-pulse smoke empties all of them about 6 % of the time. Below that share the
+            // smoke alone reads open: the threshold, not luck, holds the control.
+            Exits(false, .03f);
+            Assert.That(openInside, Is.GreaterThan(50), "at a 0.03 open share the smoke alone reads open");
+        }
+
+        [Test]
         public void ARobotLeavesInTimeToBeOutByTheMissionDeadline()
         {
             // The brain started back only at mission_time_limit_s itself, so it was still inside when the mission ended
