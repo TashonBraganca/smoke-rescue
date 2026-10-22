@@ -202,6 +202,11 @@ class ToolRegistry:
     # confirmed or rejected, or the approach fails, explore_frontier is refused (hidden-corner run 3: both agents ordered
     # an approach and dropped it on the next area_searched event, and nobody was confirmed).
     _pending: dict = {}
+    # Approaches dropped before the candidate was resolved (heat, no path, timeout): robot -> [{"x", "y", "t", "evidence_id",
+    # "dropped_because"}]. One-door seed 924, robot A at 37.6 s: a "person" verdict from 4.6 m, an approach ordered, then
+    # the reflex backed away from a fire 2 m from her; the next step had no trace of her and she was never found.
+    _unfinished: dict = {}
+    UNFINISHED_KEPT = 4
     # Events that mean the approach failed: the robot could not get there, or must leave for heat.
     APPROACH_FAILED = ("goal_blacklisted", "no_progress", "collision_hold", "stuck", "avoid_fire", "retreat", "escape_closing")
     MAX_LOOKS, LOOK_CELL_M, LOOK_MEMORY_S = 2, 1.5, 90.0
@@ -216,15 +221,31 @@ class ToolRegistry:
         self.finished: str | None = None
         self._cache: dict = {}
 
+    def unfinished(self) -> list[dict]:
+        """Candidates this robot set out to look at closer and never resolved, newest last, with distance and bearing from
+        here; one the team has since confirmed (the brain's survivor list) is left out."""
+        out = []
+        for u in self._unfinished.get(self.ctx.robot, []):
+            if any(math.hypot(u["x"] - s[0], u["y"] - s[1]) <= SURVIVOR_MERGE_M for s in self.ctx.survivors):
+                continue
+            dx, dy = u["x"] - self.ctx.x, u["y"] - self.ctx.y
+            out.append({"x": u["x"], "y": u["y"], "distance_m": round(math.hypot(dx, dy), 2),
+                        "bearing_deg": round((math.degrees(math.atan2(dx, dy)) - self.ctx.heading_deg + 180) % 360 - 180, 1),
+                        "since_s": round(self.ctx.t - u["t"], 1), "dropped_because": u["dropped_because"]})
+        return out
+
     def pending(self) -> dict | None:
         """This robot's unresolved approach, with distance and bearing from where it stands now; None when there is
         none, it has timed out (pending_candidate_s), or this step's event says the approach failed."""
         p = self._pending.get(self.ctx.robot)
         if p is None:
             return None
-        if (self.ctx.event_kind in self.APPROACH_FAILED or self.ctx.t - p["t"] > float(_PERCEPTION["pending_candidate_s"])
-                or self._brain_dropped_order(p["t"])):
+        timed_out = self.ctx.t - p["t"] > float(_PERCEPTION["pending_candidate_s"])
+        if self.ctx.event_kind in self.APPROACH_FAILED or timed_out or self._brain_dropped_order(p["t"]):
             self._pending.pop(self.ctx.robot, None)
+            why = self.ctx.event_kind if self.ctx.event_kind in self.APPROACH_FAILED else "timed out" if timed_out else "no path to it"
+            kept = [u for u in self._unfinished.get(self.ctx.robot, []) if math.hypot(u["x"] - p["x"], u["y"] - p["y"]) > self.LOOK_CELL_M]
+            self._unfinished[self.ctx.robot] = (kept + [{**p, "dropped_because": why}])[-self.UNFINISHED_KEPT:]
             return None
         dx, dy = p["x"] - self.ctx.x, p["y"] - self.ctx.y
         bearing = (math.degrees(math.atan2(dx, dy)) - self.ctx.heading_deg + 180) % 360 - 180
@@ -617,6 +638,8 @@ class ToolRegistry:
             p = self._pending.get(self.ctx.robot)
             if p is not None and math.hypot(p["x"] - float(args["x"]), p["y"] - float(args["y"])) <= self.LOOK_CELL_M:
                 self._pending.pop(self.ctx.robot, None)
+            self._unfinished[self.ctx.robot] = [u for u in self._unfinished.get(self.ctx.robot, [])
+                                                if math.hypot(u["x"] - float(args["x"]), u["y"] - float(args["y"])) > self.LOOK_CELL_M]
         if name == "withdraw_survivor":
             self._confirmed[self.ctx.robot] = [c for c in self._confirmed.get(self.ctx.robot, [])
                                                if math.hypot(c["x"] - float(args["x"]), c["y"] - float(args["y"])) > SURVIVOR_MERGE_M]

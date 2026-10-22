@@ -581,3 +581,52 @@ def test_a_clipped_body_closer_than_the_cameras_floor_view_says_so():
     # The clipped inspections at 1 m gave the agent no reason why they kept failing.
     from brain.agent import vision as v
     assert 2.0 < v._blind_floor_m() < 2.3, "the 1.6 m mast sees the floor from about 2.16 m"
+
+
+def test_the_commander_is_told_what_robots_can_do_for_a_found_person(tmp_path, monkeypatch):
+    # One-door seed 924: with carrying switched off, the commander told robot A to "protect and maintain access to the
+    # confirmed survivor" and A held beside her for about 30 s instead of searching.
+    from brain.agent import commander as C
+
+    class Seen(Scripted):
+        def chat(self, messages, tools):
+            self.system = messages[0]["content"]
+            return super().chat(messages, tools)
+
+    for enabled, said in ((False, "cannot lift, carry, shield or guard anyone"), (True, "carry them out")):
+        monkeypatch.setattr(C, "RESCUE_ENABLED", enabled)
+        model = Seen([])
+        C.Commander(model, tmp_path / "trace.jsonl").step({"t": 48.0, "reports": [], "robots": ["robot_A", "robot_B"]})
+        assert said in model.system
+
+
+def test_an_approach_dropped_for_heat_is_kept_as_a_look_not_finished(tmp_path, monkeypatch):
+    # One-door seed 924, robot A at 37.6 s: a "person" verdict from 4.6 m, an approach ordered, then a heat event backed
+    # the robot away; the next step had no trace of the candidate and she was never found. Control: once rejected, it
+    # is gone; and a candidate the team has confirmed since is not listed.
+    from brain.agent.robot_agent import RobotAgent as Agent
+    fake_vision(monkeypatch, "uncertain")
+
+    class Seen(Scripted):
+        def chat(self, messages, tools):
+            self.context = json.loads(messages[1]["content"].split("Context:\n", 1)[1])
+            return super().chat(messages, tools)
+
+    def step(t, event, turns, survivors=()):
+        model = Seen(turns)
+        req = request(tmp_path) | {"t": t, "event": {"kind": event}, "survivors": [list(s) for s in survivors]}
+        Agent(model, tmp_path / "t.jsonl").step(req)
+        return model.context
+
+    step(10.0, "survivor_candidate", [[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": 4.6})],
+                                      [ToolCall("approach_candidate", {"evidence_id": "ev1"})]])
+    assert "pending_candidate" in step(12.0, "periodic", [])
+    seen = step(14.0, "avoid_fire", [])
+    [look] = seen["looks_not_finished"]
+    assert look["dropped_because"] == "avoid_fire" and abs(look["y"] - 9.6) < .05 and "pending_candidate" not in seen
+    assert step(20.0, "periodic", [], survivors=[(5.0, 9.6)]).get("looks_not_finished") is None, "confirmed by the team since"
+    assert step(22.0, "periodic", [[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": 4.6})]])["looks_not_finished"]
+    fake_vision(monkeypatch, "not_person")
+    step(24.0, "periodic", [[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": 4.6})],
+                            [ToolCall("reject_candidate", {"x": 5.0, "y": 9.6, "evidence_id": "ev1"})]])
+    assert step(26.0, "periodic", []).get("looks_not_finished") is None, "rejected: no longer listed"

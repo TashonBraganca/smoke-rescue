@@ -52,6 +52,8 @@ Facts about your robot and the context:
   right. Your partner's numbers are in its own frame, so its coordinates are not positions in yours. Once partners
   shows maps_linked, your robot matched LiDAR fingerprints with that partner: its position and the area it searched
   are converted into your frame, and your frontier list leaves its searched area out.
+- looks_not_finished: warm candidates you set out to look at closer whose approach was dropped (dropped_because: a
+  heat event, no path to it, or timed out), not yet confirmed or rejected by you or confirmed by the team.
 - frontiers: floor your robot can reach that no camera on the team has searched. Each has id, x, y, path_m (planned
   distance, with heat and wall costs), unsearched_m2 (unsearched floor right beside the frontier), mapped_unsearched_m2
   (indoor floor your own sensors have mapped beyond it, up to the LiDAR's range, that no camera has searched; floor
@@ -96,7 +98,7 @@ Finish every step with one sentence saying what you decided and why."""
 
 
 _RESCUE_TEXT = [
-    ("find every person in the building and get them out alive", "find every person in the building and report where they are"),
+    ("find every person in the building and get them out alive", "find every person in the building and report where they are (a reported person needs no robot beside them: the crews outside have the position)"),
     (""" extract_survivor
   needs the person within the rescue reach and the grip cone (numbers in its description), cited either by the evidence
   that confirmed them (survivors_to_rescue) or by a person verdict taken within that reach. The robot never confirms a
@@ -166,7 +168,7 @@ class RobotAgent:
         if run != cls._run or restarted:
             cls._run = run; cls._last_t = {robot: t}
             cls._recent.clear(); ToolRegistry._looks.clear(); ToolRegistry._lifted.clear(); ToolRegistry._confirmed.clear()
-            ToolRegistry._pending.clear(); TeamState.reset()
+            ToolRegistry._pending.clear(); ToolRegistry._unfinished.clear(); TeamState.reset()
 
     def step(self, req: dict) -> dict:
         start = time.perf_counter()
@@ -202,6 +204,9 @@ class RobotAgent:
         pending = tools.pending()
         if pending is not None:
             context["pending_candidate"] = pending
+        unfinished = tools.unfinished()
+        if unfinished:
+            context["looks_not_finished"] = unfinished
         messages = [{"role": "system", "content": system_prompt()},
                     {"role": "user", "content": "Decision needed. Context:\n" + json.dumps(context, default=str)}]
         step_id = f"{req['robot']}@{float(req['t']):.3f}"

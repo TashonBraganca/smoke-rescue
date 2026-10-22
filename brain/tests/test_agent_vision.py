@@ -209,3 +209,23 @@ def test_a_person_lying_in_front_of_a_fire_is_not_merged_with_the_warm_floor(tmp
     # The old cut joins her to the warm floor: either no warm region sits at her bearing and range any more, or the one
     # that does is much wider than her.
     assert merged["candidate"] is None or merged["candidate"]["width_m"] > cut["candidate"]["width_m"] + .8, merged["candidate"]
+
+
+
+def test_a_body_beyond_a_doorway_is_not_an_opening_but_a_window_still_is(tmp_path):
+    # One-door seed 924: a woman slumped beyond a doorway, framed by a nearer jamb and wall, was judged "an opening" and
+    # rejected. A body region 5 m away framed by a 3 m surround: with floor running to her at about her range below
+    # her, she is grounded and not an opening; framed below by the same nearer wall (a window), it is still an opening.
+    def frame(grounded_floor):
+        f = scene()
+        depth = np.full(f.depth_m.shape, 3.0, np.float32)
+        yy, xx = np.mgrid[30:90, 69:91]
+        depth[30:90, 69:91] = 5.0 - .2 * np.sin((xx - 68) / 24 * np.pi) * np.sin((yy - 29) / 62 * np.pi)
+        if grounded_floor: depth[90:, 55:105] = 4.9
+        f.depth_m = depth
+        if hasattr(f, "_registered"): del f._registered
+        return f
+    body = inspect(frame(True), tmp_path)
+    assert not body["cues"]["window"]["opening"] and body["cues"]["window"]["grounded"]
+    window = inspect(frame(False), tmp_path)
+    assert window["cues"]["window"]["opening"] and window["verdict"] == "not_person", "control: wall beneath, an opening"

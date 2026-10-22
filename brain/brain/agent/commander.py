@@ -12,6 +12,7 @@ import time
 from pathlib import Path
 
 from brain.agent.llm import append_jsonl, request_key
+from brain.agent.tools import RESCUE_ENABLED
 
 SYSTEM = """You are the incident commander for two search robots inside a burning building whose layout nobody knows.
 You stand outside at the command post and hear their radio reports, which may arrive late or not at all. You have
@@ -19,6 +20,23 @@ no map, no floor plan and no building outline: everything you know comes from th
 what one robot learned that changes the other's plan (a survivor found, fire spreading, a route blocked, an area
 already searched), and to set priorities in words. You never assign coordinates or areas; each robot decides where
 to search from its own map. Be brief: broadcast only when it helps, then finish with one sentence."""
+
+# What the robots can do for a person they found, so priorities stay within it. One-door seed 924: with carrying
+# switched off, the commander told robot A at 48 s to "protect and maintain access to the confirmed survivor", and A
+# held beside her for about 30 s instead of searching, an order no robot ability can carry out.
+_ABILITIES = {
+    True: """
+The robots can lift a confirmed person within arm's reach and carry them out; a person still inside needs a robot to
+reach them.""",
+    False: """
+The robots find, confirm and report people; they cannot lift, carry, shield or guard anyone. A confirmed person's
+position is already with the crews outside, so no robot needs to stay with them: every robot's time is best spent on
+floor nobody has searched.""",
+}
+
+
+def system_prompt() -> str:
+    return SYSTEM + _ABILITIES[RESCUE_ENABLED]
 
 TOOLS = [
     {"type": "function", "function": {"name": "broadcast", "description": "Radio a short message to all robots.",
@@ -49,7 +67,7 @@ class Commander:
 
     def step(self, req: dict) -> dict:
         start = time.perf_counter()
-        messages = [{"role": "system", "content": SYSTEM},
+        messages = [{"role": "system", "content": system_prompt()},
                     {"role": "user", "content": "Situation:\n" + json.dumps({"t": req["t"],
                      "reports": req.get("reports", []), "robots": req.get("robots", {})}, default=str)}]
         step_id = f"commander@{float(req['t']):.3f}"
