@@ -275,6 +275,8 @@
   "teammate_predict_max_s_reason": "A partner's body is predicted from its last radioed pose for at most this long (OnTeammate): two 2 s message intervals, so one lost message still leaves it masked. Heard from longer ago it may be anywhere, and its returns are mapped as usual.",
   "teammate_mask_margin_m": 0.15,
   "teammate_mask_margin_m_reason": "Beyond the body's 0.375 m half length, LiDAR and depth returns this close to the partner's predicted stretch are its body: B's placement error at the pad is sigma 5 cm and 2 deg (3 sigma 0.15 m plus 0.1 m of heading at 3 m), and odometry adds a few cm. Masking only skips returns; it erases nothing already mapped.",
+  "wait_behind_partner_s": 30.0,
+  "wait_behind_partner_s_reason": "Longest a robot waits behind a partner standing just ahead on the way in (WaitBehindPartner) before its no-frontier scan may end the search: two agent steps (up to about 13 s each in run 924), so a partner stopped to inspect or confirm someone has moved on. Seed 925: A stood 6 s confirming a person in the doorway and B, with nothing else reachable, ended its mission at 18 s.",
   "threshold_look_options": 8,
   "threshold_look_options_reason": "Unproven frontiers checked per decision for a doorway to look through, best score first. Each tried frontier is remembered, so later decisions reach the rest; eight bounds the planning work of one tick (each is already planned by the frontier search).",
   "follow_partner_standoff_m": 2.0,

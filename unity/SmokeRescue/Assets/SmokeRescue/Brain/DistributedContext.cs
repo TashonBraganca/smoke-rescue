@@ -248,16 +248,25 @@ namespace SmokeRescue.Brain
                 Emit(t, "map_shared", "Local and received explored cells first overlap with " + pair.Key + ".", "sequence", pair.Value.message.Sequence);
             }
         }
-        /// <summary>Is p on a partner's body at time t? From its last radioed pose, moved on at the velocity between its last
-        /// two poses for at most teammate_predict_max_s: within the body's half length plus teammate_mask_margin_m of that
-        /// stretch. A partner not heard from for longer may be anywhere, so nothing is masked for it.</summary>
+        /// <summary>Is p on a partner's body at time t? Within the body's half length plus teammate_mask_margin_m of the stretch
+        /// it can have walked since its last radioed pose, for at most teammate_predict_max_s: toward the goal it radioed, at up
+        /// to open_speed_mps, or at the velocity between its last two poses when it radioed none. On one-door seed 924's real
+        /// LiDAR (A, 8 to 13.5 s, B walking in behind it) the velocity alone left 27 % of the returns on B's body unmasked, all
+        /// in the second after B set off from standing; along its goal 1 % were left, with 0.7 % of other returns skipped.
+        /// A partner not heard from for longer may be anywhere, so nothing is masked for it.</summary>
         bool OnTeammate(Vector2 p, double t)
         {
             foreach (var peer in peers.Values)
             {
                 if (!peer.poseKnown) continue;
                 double age = t - peer.poseT; if (age > c.teammate_predict_max_s) continue;
-                Vector2 a = peer.pose.position, b = a + peer.velocity * (float)Math.Max(0, age), d = b - a;
+                float since = (float)Math.Max(0, age); Vector2 a = peer.pose.position, b = a + peer.velocity * since;
+                if (peer.goal.HasValue)
+                {
+                    Vector2 to = peer.goal.Value - a; float far = to.magnitude;
+                    b = far > 1e-4f ? a + to * (Mathf.Min(c.open_speed_mps * since, far) / far) : a;
+                }
+                Vector2 d = b - a;
                 float u = d.sqrMagnitude < 1e-9f ? 0 : Mathf.Clamp01(Vector2.Dot(p - a, d) / d.sqrMagnitude);
                 if (Vector2.Distance(p, a + d * u) <= c.body_half_length_m + c.teammate_mask_margin_m) return true;
             }

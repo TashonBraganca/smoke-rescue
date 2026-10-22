@@ -484,6 +484,7 @@ namespace SmokeRescue.Brain
                         Emit(t, "goal", "Unsearched floor lies only past floor not yet proven indoors: stand at the edge of proven floor and look in for a ceiling.",
                             "x_m", goal.Value.x, "y_m", goal.Value.y, "beyond_x_m", beyond.x, "beyond_y_m", beyond.y);
                     }
+                    else if (WaitBehindPartner(t)) { ClearPath(); lastPlan = t; scanSince = double.NaN; noFrontierAt = double.NaN; }
                     else
                     {
                         ClearPath(); lastPlan = t; if (double.IsNaN(scanSince))
@@ -756,6 +757,31 @@ namespace SmokeRescue.Brain
             }
             return best;
         }
+        /// <summary>True while a linked partner, heard within teammate_predict_max_s, stands on floor this robot's map shows
+        /// indoors within the follow standoff, with no wall between, and for at most wait_behind_partner_s of it: the partner
+        /// is on the way in, so this robot waits its turn instead of ending the search. One-door seed 925, robot B: in the
+        /// doorway with A 1.85 m ahead (A stood 6 s confirming a person), everything B could reach was A's floor, following
+        /// in needs the partner beyond the 2 m standoff, and B's no-frontier scan ran out: mission complete at 18 s, outside.</summary>
+        bool WaitBehindPartner(double t)
+        {
+            bool ahead = false;
+            foreach (var peer in peers.Values)
+            {
+                if (peer.message == null || !peer.poseKnown || t - peer.poseT > c.teammate_predict_max_s || !TryPartnerLink(peer.message.Sender, out _)) continue;
+                var at = peer.pose.position;
+                if (InSearchArea(at) && Vector2.Distance(at, motion.Pose.position) <= c.follow_partner_standoff_m + c.goal_tolerance_m &&
+                    SameSideOfWalls(motion.Pose.position, at)) ahead = true;
+            }
+            if (!ahead) { waitBehindSince = double.NaN; return false; }
+            if (double.IsNaN(waitBehindSince))
+            {
+                waitBehindSince = t;
+                Emit(t, "goal", "The partner stands just ahead on the only floor that leads on: wait behind it rather than end the search.",
+                    "wait_s", c.wait_behind_partner_s);
+            }
+            return t - waitBehindSince <= c.wait_behind_partner_s;
+        }
+        double waitBehindSince = double.NaN;
         bool SameSideOfWalls(Vector2 a, Vector2 b)
         {
             int steps = Mathf.CeilToInt(Vector2.Distance(a, b) / (grid.CellM * .5f));
@@ -1382,8 +1408,12 @@ namespace SmokeRescue.Brain
             for (int k = 0; k < options.Count && k < c.threshold_look_options; k++)
             {
                 var f = options[k]; lookedAt.Add(f.position);
-                int i = f.path.FindIndex(p => !InSearchArea(p));
-                if (i <= 0) continue;   // standing on unproven floor already: nothing to look in from
+                // The look is from proven floor onto unproven floor: from the first proven point on the route, the last proven
+                // point before the route leaves it. A robot outside (seed 925, robot B walking the building's wall) starts on
+                // unproven ground, so the route enters proven floor at the door first and the look is past it.
+                int j = f.path.FindIndex(p => InSearchArea(p));
+                int i = j < 0 ? -1 : f.path.FindIndex(j, p => !InSearchArea(p));
+                if (i <= 0) continue;   // the route never crosses proven floor onto unproven floor
                 var at = f.path[i - 1]; bool nearExit = false;
                 foreach (var e in Exits()) nearExit |= Vector2.Distance(e, at) <= c.threshold_exit_clear_m;
                 if (nearExit || lookedFrom.Exists(q => Vector2.Distance(q, at) <= c.stuck_repeat_radius_m)) continue;
@@ -1405,12 +1435,37 @@ namespace SmokeRescue.Brain
             sensedExits = now;
         }
         /// <summary>The shortest known route to any way out (fewest waypoints), or an empty path.</summary>
-        List<Vector2> PlanOut()
+        /// <summary>Where a route out of the building ends for one way out: the way out itself when the body fits there,
+        /// else the walkable cell nearest it within return_arrive_m, the distance at which a return already counts as
+        /// arrived. A way out is a place, not one cell: one-door seed 925, robot A at 120 s had a clear front door (walkable
+        /// all the way through) but its start pad stood 0.32 m from a few cells of the partner's body mapped there earlier,
+        /// below the walking clearance; every route out was refused, the brain read "no route out even past the fire", and
+        /// A held inside for 48 s while the door was open, then the fire reached it (185 C). Null when nothing is walkable
+        /// that near.</summary>
+        Vector2? ExitStandpoint(Vector2 exit)
+        {
+            grid.PrepareNavigation();
+            int e = grid.Cell(exit); if (e < 0) return null;
+            if (grid.Walkable(e)) return exit;
+            int reach = Mathf.CeilToInt(c.return_arrive_m / grid.CellM), ex = e % grid.Size, ey = e / grid.Size;
+            Vector2? best = null; float bestD = float.PositiveInfinity;
+            for (int dy = -reach; dy <= reach; dy++) for (int dx = -reach; dx <= reach; dx++)
+            {
+                if (!grid.Inside(ex + dx, ey + dy)) continue;
+                int i = (ey + dy) * grid.Size + ex + dx; float d = Vector2.Distance(grid.Centre(i), exit);
+                if (d <= c.return_arrive_m && d < bestD && grid.Walkable(i)) { bestD = d; best = grid.Centre(i); }
+            }
+            return best;
+        }
+        List<Vector2> PlanOut() => PlanOutFrom(motion.Pose.position);
+        List<Vector2> PlanOutFrom(Vector2 from)
         {
             List<Vector2> best = new List<Vector2>();
             foreach (var exit in Exits())
             {
-                var route = planner.Plan(motion.Pose.position, exit);
+                var standpoint = ExitStandpoint(exit);
+                if (!standpoint.HasValue) continue;
+                var route = planner.Plan(from, standpoint.Value);
                 if (route.Count > 0 && (best.Count == 0 || route.Count < best.Count)) best = route;
             }
             return best;
