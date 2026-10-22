@@ -8,7 +8,7 @@ namespace SmokeRescue.Brain
     /// <summary>Integrates interval-ending sensor velocities and retains capture-time pose history.
     /// Only operator entry and explicit pose corrections set absolute pose. Expect 2% translation scale error plus 10-30% slip overshoot,
     /// and accumulated gyro bias. No simulator pose or odometry yaw is used.</summary>
-    internal sealed class DeadReckoning
+    public sealed class DeadReckoning
     {
         struct Segment { public double start, end; public BrainPose pose; public float right, forward, yaw; public bool valid; }
         readonly List<OdometrySample> odometry = new List<OdometrySample>();

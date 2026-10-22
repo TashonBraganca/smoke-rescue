@@ -131,6 +131,7 @@ namespace SmokeRescue.Brain
                 Emit(t, "goal", "Cool air and a recovered heat budget permit travel again.", "air_c", airC, "heat_budget", budget);
             }
             NoteBodyTrack();
+            if (survivors.Count != keptOut) { keptOut = survivors.Count; grid.SetKeepOut(survivors, c.survivor_keepout_m); }
             CheckReenter(t);
             if (doorwayProbeGoal.HasValue && (returning || retreating || completed || nearFire || active != null ||
                 (AgentGoalActive(t) && !(c.frontier_doorway_looks && agentGoalIsFrontier)) || recoveryPhase != 0 || t - doorwayProbeStarted >= c.sweep_max_s))
@@ -378,6 +379,8 @@ namespace SmokeRescue.Brain
             // side openings. Explicit approaches and holds still win. The retained agentGoal resumes after the look.
             if (!sweeping && (!AgentGoalActive(t) || (c.frontier_doorway_looks && agentGoalIsFrontier)) && !facing.HasValue && t >= agentHoldUntil && NeedPlan(t) && TryStartDoorwayProbe(t))
                 return DoorwayProbeStep(t, dt).Value;
+            if (!sweeping && (!AgentGoalActive(t) || (c.frontier_doorway_looks && agentGoalIsFrontier)) && !facing.HasValue &&
+                t >= agentHoldUntil && NeedPlan(t) && TryStartLocalEvidenceLook(t)) return DoorwayProbeStep(t, dt).Value;
             if (goal.HasValue && Vector2.Distance(goal.Value, motion.Pose.position) <= c.goal_tolerance_m)
             {
                 bool wasFrontier = frontierGoal; var reached = goal.Value;
@@ -1383,6 +1386,10 @@ namespace SmokeRescue.Brain
                 }
                 return;
             }
+            // Staying inside, the rules below (leave while the way out is open) have no purpose: heat inside is handled by the
+            // absolute retreat (heat_retreat_c / heat budget, with its own recovery band). Kept, the no-frontier rule turned
+            // into a retreat that cool air ended on the next tick: robot B logged 44 retreats at 24 C (seed 927, 162 to 174 s).
+            if (c.stay_inside) return;
             if (!returning && !retreating && burned && HeatBuilding(t, out float again))
             {
                 // Back inside after leaving for heat: the building is known to be heating, so leave at the first sign.
@@ -1427,6 +1434,7 @@ namespace SmokeRescue.Brain
             foreach (var exit in walkedIn) yield return exit;
         }
         readonly List<Vector2> walkedIn = new List<Vector2>();
+        int keptOut;   // how many confirmed people the planner's keep-out discs cover
         bool searchedOut;   // stay_inside: a full scan found nothing reachable; hold still instead of turning
         /// <summary>A route to the last proven-indoor floor on the way to an unproven frontier, when no proven one is left.
         /// Floor seen through an interior doorway is mapped free but not proven indoors until the camera sees its ceiling,
@@ -1590,7 +1598,19 @@ namespace SmokeRescue.Brain
             if (health.Thermal) { speed = Mathf.Min(speed, c.thermal_speed_mps); policy = "thermal"; }
             speed *= Mathf.Clamp01(Vector2.Distance(position, goal.Value) / c.goal_slow_distance_m);
             float yaw = 2 * speed * Mathf.Sin(error * Mathf.Deg2Rad) / Mathf.Max(grid.CellM, Vector2.Distance(position, target)) * Mathf.Rad2Deg;
-            if (Mathf.Abs(error) > c.turn_in_place_deg)
+            bool arc = false;
+            if (Mathf.Abs(error) > c.turn_in_place_deg && Mathf.Abs(error) <= c.arc_max_heading_deg)
+            {
+                // Match Command's speed cap without recording a blocked-forward event for an arc we might reject.
+                float room = SweptClearance() - c.collision_margin_m;
+                float arcSpeed = Mathf.Min(speed, room <= 0 ? 0 : Mathf.Sqrt(2 * c.limits.max_accel_mps2 * room));
+                if (carryingSpeed > 0) arcSpeed = Mathf.Min(arcSpeed, carryingSpeed);
+                float arcYaw = Mathf.Clamp(yaw, -c.limits.max_yaw_rate_dps, c.limits.max_yaw_rate_dps);
+                arc = planner.ArcSafe(motion.Pose, commandedSpeed, arcSpeed, arcYaw, error, dt,
+                    c.stay_inside && InSearchArea(position) ? InSearchArea : (System.Func<Vector2, bool>)null);
+                if (arc) { speed = arcSpeed; policy = "arc"; swingBlocked = false; }
+            }
+            if (Mathf.Abs(error) > c.turn_in_place_deg && !arc)
             {
                 speed = 0; policy = "turn";
                 // Brake before rotating, so the acceleration ramp cannot make a turn drift into a wall.
@@ -1613,7 +1633,7 @@ namespace SmokeRescue.Brain
             if (nextSpeed > 0 && !planner.SegmentSafe(position, position + midPose.Forward * nextSpeed * dt))
             {
                 Emit(t, "collision_risk", "The next commanded translation leaves known safe free space.");
-                return Command(0, yaw, dt, true);
+                return Command(0, arc ? 0 : yaw, dt, true);
             }
             if (policy != motionPolicy)
             {

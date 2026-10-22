@@ -80,6 +80,59 @@ namespace SmokeRescue.Brain
         {
             var all = Frontiers(from, excluded, partnerSearchedToo); return all.Count > 0 ? all[0] : null;
         }
+        public sealed class EvidenceLook
+        { public Vector2 toward; public List<Vector2> path; public float cost; public int mappedCells; }
+
+        /// <summary>Finish collecting local indoor evidence before leaving the camera's search horizon. The target is
+        /// mapped unsearched floor, not an assumed room. The body follows proven own floor and stops on its side of
+        /// the evidence boundary. No walkable cell beyond that boundary or complete door jambs are required.</summary>
+        public EvidenceLook LocalEvidenceLook(Vector2 from, Func<Vector2, bool> proven, Func<Vector2, bool> excluded,
+            Func<Vector2, Vector2, bool> tried)
+        {
+            grid.PrepareNavigation();
+            if (!Lead(from, out int start, out var lead)) return null;
+            var indoor = new Dictionary<int, bool>();
+            bool Inside(int i)
+            {
+                if (!indoor.TryGetValue(i, out bool value)) indoor[i] = value = proven(grid.Centre(i));
+                return value;
+            }
+            bool Allowed(int i) => grid.OwnOccupancy(i) == 1 && Inside(i);
+            if (!Allowed(start) || lead.Exists(i => !Allowed(i))) return null;
+            Search(start, -1, out var distance, out var parent, Allowed, c.search_max_range_m);
+            var stands = new List<int>();
+            for (int i = 0; i < grid.Count; i++)
+                if (!float.IsPositiveInfinity(distance[i]) && (excluded == null || !excluded(grid.Centre(i)))) stands.Add(i);
+            if (stands.Count == 0) return null;
+            var labels = grid.UnsearchedRegions(); var counts = new Dictionary<int, int>();
+            foreach (int label in labels) if (label >= 0) counts[label] = counts.TryGetValue(label, out int n) ? n + 1 : 1;
+            EvidenceLook best = null; float bestGap = float.PositiveInfinity;
+            int reach = Mathf.CeilToInt(2 * c.search_max_range_m / grid.CellM);
+            int sx = start % grid.Size, sy = start / grid.Size;
+            for (int y = Math.Max(0, sy - reach); y <= Math.Min(grid.Size - 1, sy + reach); y++)
+                for (int x = Math.Max(0, sx - reach); x <= Math.Min(grid.Size - 1, sx + reach); x++)
+                {
+                    int cell = y * grid.Size + x, label = labels[cell]; var toward = grid.Centre(cell);
+                    if (label < 0 || counts[label] * grid.CellM * grid.CellM < c.frontier_wide_min_m2 || grid.OpenGroundAt(toward) || Inside(cell) ||
+                        (excluded != null && excluded(toward))) continue;
+                    // Use the closest proven standpoint to this evidence boundary. A nearer-to-robot point can still
+                    // be too far back to see a ceiling through the opening.
+                    int stand = -1; float gap = float.PositiveInfinity;
+                    foreach (int i in stands)
+                    {
+                        float d = Vector2.Distance(grid.Centre(i), toward);
+                        if (d > c.search_max_range_m || d >= gap || (tried != null && tried(grid.Centre(i), toward)) ||
+                            !grid.EvidenceSightLineClear(grid.Centre(i), toward)) continue;
+                        gap = d; stand = i;
+                    }
+                    if (stand < 0 || (best != null && (distance[stand] > best.cost ||
+                        (distance[stand] == best.cost && gap >= bestGap)))) continue;
+                    bestGap = gap;
+                    best = new EvidenceLook { toward = toward, path = Join(lead, Reconstruct(parent, start, stand)),
+                        cost = distance[stand], mappedCells = counts[label] };
+                }
+            return best;
+        }
         /// <summary>Every worthwhile reachable frontier cluster, best score first. partnerSearchedToo keeps frontier cells a
         /// partner's camera has searched (normally dropped), for following a partner through the one way on.</summary>
         internal List<FrontierChoice> Frontiers(Vector2 from, Func<Vector2, bool> excluded = null, bool partnerSearchedToo = false)
@@ -272,7 +325,7 @@ namespace SmokeRescue.Brain
             return true;
         }
         // Check a pursuit chord too, since its lookahead can otherwise cut inside an inflated corner.
-        internal bool SegmentSafe(Vector2 a, Vector2 b)
+        public bool SegmentSafe(Vector2 a, Vector2 b)
         {
             grid.PrepareNavigation(); int steps = Math.Max(1, Mathf.CeilToInt(Vector2.Distance(a, b) / (grid.CellM * .25f)));
             bool leading = true; int previous = grid.Cell(a);
@@ -283,6 +336,69 @@ namespace SmokeRescue.Brain
                 if (grid.Walkable(cell)) leading = false;
                 else if (!leading || !LeadStep(cell, previous)) return false;
                 previous = cell;
+            }
+            return true;
+        }
+
+        /// <summary>Check the accelerating capsule through this heading change. Each pose also needs a straight
+        /// braking corridor, so the next control tick can abandon the arc safely. Unknown cells block the body,
+        /// including its nose and tail. Quarter-cell sampling plus a half-sample pad covers motion between samples.</summary>
+        public bool ArcSafe(BrainPose pose, float currentSpeed, float targetSpeed, float yawRateDeg, float turnDeg, float dt,
+            Func<Vector2, bool> allowed = null)
+        {
+            if (currentSpeed < 0 || targetSpeed <= 0 || Mathf.Abs(yawRateDeg) <= 0 || dt <= 0) return false;
+            grid.PrepareNavigation();
+            if (!grid.Walkable(grid.Cell(pose.position))) return false;
+            float omega = yawRateDeg * Mathf.Deg2Rad;
+            float remaining = Mathf.Abs(turnDeg / yawRateDeg), speed = currentSpeed;
+            float sampleM = grid.CellM * .25f, pad = sampleM * .5f;
+            bool StopFits(BrainPose at, float v)
+            {
+                float stopping = v * v / (2 * c.limits.max_accel_mps2) + v * dt;
+                var end = at.position + at.Forward * stopping;
+                if (allowed != null)
+                {
+                    int n = Mathf.Max(1, Mathf.CeilToInt(stopping / sampleM));
+                    for (int i = 0; i <= n; i++) if (!allowed(Vector2.Lerp(at.position, end, i / (float)n))) return false;
+                }
+                return SegmentSafe(at.position, end) && CapsuleKnownFree(at, stopping, pad);
+            }
+            if (!StopFits(pose, speed)) return false;
+            while (remaining > 0)
+            {
+                float tick = Mathf.Min(dt, remaining);
+                speed = Mathf.MoveTowards(speed, targetSpeed, c.limits.max_accel_mps2 * dt);
+                if (!StopFits(pose, speed)) return false;
+                int samples = Mathf.Max(1, Mathf.CeilToInt((speed + Mathf.Abs(omega) * c.body_half_length_m) * tick / sampleM));
+                float h = tick / samples;
+                for (int i = 0; i < samples; i++)
+                {
+                    var previous = pose.position; float yaw = pose.yawRad + omega * h;
+                    pose.position += new Vector2(Mathf.Cos(yaw) - Mathf.Cos(pose.yawRad),
+                        Mathf.Sin(yaw) - Mathf.Sin(pose.yawRad)) * (speed / omega);
+                    pose.yawRad = yaw;
+                    if (!SegmentSafe(previous, pose.position) || !StopFits(pose, speed)) return false;
+                }
+                remaining -= tick;
+            }
+            return true;
+        }
+
+        bool CapsuleKnownFree(BrainPose pose, float stopping, float pad)
+        {
+            float nose = Mathf.Max(0, c.body_half_length_m - c.body_radius_m);
+            Vector2 a = pose.position - pose.Forward * nose, b = pose.position + pose.Forward * (nose + stopping), d = b - a;
+            // A cell is a square. Its half diagonal bounds its distance from its centre in every orientation.
+            float radius = c.body_radius_m + grid.CellM * Mathf.Sqrt(2) / 2 + pad;
+            Vector2 lo = Vector2.Min(a, b) - Vector2.one * radius, hi = Vector2.Max(a, b) + Vector2.one * radius;
+            int x0 = Mathf.FloorToInt((lo.x - grid.Origin.x) / grid.CellM), x1 = Mathf.FloorToInt((hi.x - grid.Origin.x) / grid.CellM);
+            int y0 = Mathf.FloorToInt((lo.y - grid.Origin.y) / grid.CellM), y1 = Mathf.FloorToInt((hi.y - grid.Origin.y) / grid.CellM);
+            for (int y = y0; y <= y1; y++) for (int x = x0; x <= x1; x++)
+            {
+                var p = grid.Origin + new Vector2(x + .5f, y + .5f) * grid.CellM;
+                float u = d.sqrMagnitude > 0 ? Mathf.Clamp01(Vector2.Dot(p - a, d) / d.sqrMagnitude) : 0;
+                if ((p - a - d * u).sqrMagnitude > radius * radius) continue;
+                if (!grid.Inside(x, y) || grid.Occupancy(y * grid.Size + x) != 1) return false;
             }
             return true;
         }
@@ -305,7 +421,8 @@ namespace SmokeRescue.Brain
             }
             return true;
         }
-        void Search(int start, int goal, out float[] distance, out int[] parent)
+        void Search(int start, int goal, out float[] distance, out int[] parent, Func<int, bool> allowed = null,
+            float maxCost = float.PositiveInfinity)
         {
             distance = new float[grid.Count]; parent = new int[grid.Count];
             for (int i = 0; i < distance.Length; i++) { distance[i] = float.PositiveInfinity; parent[i] = -1; }
@@ -320,11 +437,12 @@ namespace SmokeRescue.Brain
                 {
                     if ((dx == 0 && dy == 0) || !grid.Inside(x + dx, y + dy)) continue;
                     int n = (y + dy) * grid.Size + x + dx;
-                    if (!grid.Walkable(n)) continue;
+                    if (!grid.Walkable(n) || (allowed != null && !allowed(n))) continue;
                     if (dx != 0 && dy != 0 && (!grid.Walkable(cell + dx) || !grid.Walkable(cell + dy * grid.Size))) continue;
+                    if (allowed != null && dx != 0 && dy != 0 && (!allowed(cell + dx) || !allowed(cell + dy * grid.Size))) continue;
                     float step = grid.CellM * (dx != 0 && dy != 0 ? 1.41421356f : 1);
                     float cost = distance[cell] + step * (grid.Cost(cell) + grid.Cost(n)) / 2;
-                    if (cost >= distance[n]) continue;
+                    if (cost >= distance[n] || cost > maxCost) continue;
                     distance[n] = cost; parent[n] = cell; heap.Push(n, cost + Heuristic(n, goal), cost);
                 }
             }
