@@ -87,8 +87,18 @@ namespace SmokeRescue.Brain
                 return false;
             }
             var proven = planner.Frontiers(motion.Pose.position, Excluded);
+            // The same fallback as the brain's own choice: when only a partner's claim or searched floor hides the indoor
+            // frontiers, offer them, so the agent is not left with yard options alone (one-door seed 922, robot B).
+            if (proven.Count == 0 && peers.Count > 0)
+                proven = planner.Frontiers(motion.Pose.position, p => GoalBlacklisted(p, t) || VisitedGoal(p, t) || !InSearchArea(p), true);
             var unproven = planner.Frontiers(motion.Pose.position,
                 p => ClaimBlocks(p, t) || GoalBlacklisted(p, t) || VisitedGoal(p, t) || InSearchArea(p));
+            // With proven indoor floor to search, an unproven frontier on ground this robot's own LiDAR saw as open, with no
+            // mapped floor beyond it, is yard, not a way in: it is not offered (one-door seed 922, robot B: 6 of its 8
+            // options were such yard frontiers, larger on paper than the 2 proven ones; its agent turned to check them for
+            // 14 s). Without a proven option they stay, so a robot outside can still find its way in.
+            if (proven.Count > 0)
+                unproven.RemoveAll(f => grid.OpenGroundAt(f.position) && grid.UnsearchedFloorBeyond(f.position, c.frontier_beyond_m) < c.frontier_wide_min_m2);
             // Merge the already sorted sets. Equal scores prefer proven evidence, as does the local-slot fill below.
             var all = new List<GridPlanner.FrontierChoice>(); int pi = 0, ui = 0;
             while (pi < proven.Count || ui < unproven.Count)
@@ -173,7 +183,7 @@ namespace SmokeRescue.Brain
                 if (grid.FireDistance(grid.Cell(p)) > margin) continue;
                 Vector2 d = p - motion.Pose.position;
                 return new BrainFireBlock { blockAt = p, frontier = route[route.Count - 1], bearingDegRight = -BrainMath.Angle(motion.Pose.yawRad, Mathf.Atan2(-d.x, d.y)),
-                    distanceM = d.magnitude, frontierPathM = routeM, unsearchedM2 = 0 };
+                    distanceM = d.magnitude, frontierPathM = routeM, unsearchedM2 = 0, burningM2 = grid.BurningAreaNear(p, c.burning_radius_m) };
             }
             return null;
         }
@@ -194,7 +204,8 @@ namespace SmokeRescue.Brain
                     if (grid.FireDistance(grid.Cell(p)) > margin) continue;
                     Vector2 d = p - motion.Pose.position;
                     return new BrainFireBlock { blockAt = p, frontier = f.position, bearingDegRight = -BrainMath.Angle(motion.Pose.yawRad, Mathf.Atan2(-d.x, d.y)),
-                        distanceM = d.magnitude, frontierPathM = f.cost, unsearchedM2 = f.information * grid.CellM * grid.CellM };
+                        distanceM = d.magnitude, frontierPathM = f.cost, unsearchedM2 = f.information * grid.CellM * grid.CellM,
+                        burningM2 = grid.BurningAreaNear(p, c.burning_radius_m) };
                 }
             return null;
         }

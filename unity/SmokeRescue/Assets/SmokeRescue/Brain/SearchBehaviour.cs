@@ -33,7 +33,7 @@ namespace SmokeRescue.Brain
         bool VisitedGoal(Vector2 p, double t)
         {
             visited.RemoveAll(v => t >= v.until);
-            return visited.Exists(v => Vector2.Distance(p, v.position) <= v.radius);
+            return visited.Exists(v => Vector2.Distance(p, v.position) <= v.radius && SameSideOfWalls(p, v.position));
         }
 
         void OnFrontierReached(Vector2 at, double t)

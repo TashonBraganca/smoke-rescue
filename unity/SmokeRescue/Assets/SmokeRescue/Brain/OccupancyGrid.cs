@@ -141,14 +141,18 @@ namespace SmokeRescue.Brain
             dirty = roofDirty = true; return marked;
         }
         /// <summary>toOwn maps the sender's frame into this one (FrameLink); each own cell looks up the sender cell under it.</summary>
-        internal void ReplacePeerLayer(string sender, BrainMessage m, byte[] explored, BrainPose toOwn)
+        /// <param name="ownBody">True where this robot's own body has stood. A partner's LiDAR sees this robot as an
+        /// obstacle, so its map reports walls wherever this robot walked in its view; floor this robot's body covered is
+        /// not a wall (one-door seed 922: B saw A walk through the one door and reported the doorway as wall; at 4 s both
+        /// robots lost every route and frontier).</param>
+        internal void ReplacePeerLayer(string sender, BrainMessage m, byte[] explored, BrainPose toOwn, Func<Vector2, bool> ownBody = null)
         {
             var layer = new byte[Count]; float cos = Mathf.Cos(-toOwn.yawRad), sin = Mathf.Sin(-toOwn.yawRad);
             for (int i = 0; i < Count; i++)
             {
                 Vector2 d = Centre(i) - toOwn.position;
                 int cell = m.Cell(new Vector2(cos * d.x - sin * d.y, sin * d.x + cos * d.y)); if (cell < 0) continue;
-                if (BrainMessage.Bit(m.Occupied, cell)) layer[i] = 255;
+                if (BrainMessage.Bit(m.Occupied, cell) && (ownBody == null || !ownBody(Centre(i)))) layer[i] = 255;
                 else if (BrainMessage.Bit(explored, cell)) layer[i] = 1;
             }
             peerLayers[sender] = layer;
@@ -226,6 +230,21 @@ namespace SmokeRescue.Brain
             }
             time = t; localObservationTime = t; dirty |= changed; roofDirty |= changed;
         }
+        /// <summary>Cells measured at or above fire_c (not forecast) within radius of p, as floor area in square metres.</summary>
+        public float BurningAreaNear(Vector2 p, float radius)
+        {
+            int n = 0, r = Mathf.CeilToInt(radius / CellM), centre = Cell(p); if (centre < 0) return 0;
+            int cx = centre % Size, cy = centre / Size;
+            for (int dy = -r; dy <= r; dy++) for (int dx = -r; dx <= r; dx++)
+            {
+                if (!Inside(cx + dx, cy + dy)) continue;
+                int i = (cy + dy) * Size + cx + dx;
+                if (heat[i] >= c.fire_c && Vector2.Distance(Centre(i), p) <= radius) n++;
+            }
+            return n * CellM * CellM;
+        }
+        /// <summary>This robot's own LiDAR saw open ground here (wide no-return spans, MarkOpenGround).</summary>
+        public bool OpenGroundAt(Vector2 p) { int i = Cell(p); return i >= 0 && openGround[i]; }
         public bool Dangerous(int i) => heat[i] >= c.fire_c ||
             (firePrediction && time - heatTime[i] <= c.heat_rise_memory_s && heat[i] + rise[i] * c.heat_prediction_s >= c.fire_c);
         /// <summary>Whether a cell forecast to reach fire_c within heat_prediction_s counts as fire. True while searching; false

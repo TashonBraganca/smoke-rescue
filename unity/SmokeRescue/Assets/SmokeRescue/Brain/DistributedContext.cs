@@ -173,7 +173,7 @@ namespace SmokeRescue.Brain
         {
             var m = peer.message;
             if (!TryPartnerLink(sender, out var link)) { peer.claim = null; peer.goal = null; return; }
-            grid.ReplacePeerLayer(sender, m, peer.explored, link);
+            grid.ReplacePeerLayer(sender, m, peer.explored, link, OwnBodyWasAt);
             peer.pose = new BrainPose { position = link.Transform(m.Pose.position.x, m.Pose.position.y), yawRad = m.Pose.yawRad + link.yawRad };
             peer.goal = m.Goal.HasValue ? link.Transform(m.Goal.Value.x, m.Goal.Value.y) : (Vector2?)null;
             peer.claim = m.Claim == null ? null : new BrainClaim { centre = link.Transform(m.Claim.centre.x, m.Claim.centre.y), radiusM = m.Claim.radiusM, expiresAt = m.Claim.expiresAt };

@@ -2273,6 +2273,123 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void TheBurningAreaCountsMeasuredFireNearTheBlockNotForecastOrFarFire()
+        {
+            // The agent judges water against the fire that blocks its way. 1 m2 measured burning at the block counts; a
+            // forecast (rising but below fire_c) and fire 5 m away do not (controls).
+            var c = Settings(); c.grid_size_m = 12; var b = new RobotBrain(Calibration(), c, "A", 0); var g = Map(b);
+            for (float x = -.45f; x < .5f; x += .1f) for (float y = 1.55f; y < 2.5f; y += .1f) g.ObserveHeat(g.Cell(new Vector2(x, y)), 600, 1);
+            for (float x = -.45f; x < .5f; x += .1f) g.ObserveHeat(g.Cell(new Vector2(x, 2.75f)), c.fire_c - 20, 1);
+            for (float x = -.45f; x < .5f; x += .1f) g.ObserveHeat(g.Cell(new Vector2(x, 7f)), 600, 1);
+            Assert.That(g.BurningAreaNear(new Vector2(0, 2f), 2f), Is.EqualTo(1f).Within(.05f));
+        }
+
+        [Test]
+        public void AnExclusionCircleDoesNotReachThroughAWall()
+        {
+            // Codex review #27: a blacklisted goal (up to 2.5 m) or a visited spot hid frontiers in the next room. A 2.5 m
+            // circle at the origin, a mapped wall at x = 1: the point beyond it (1.5, 0) is not excluded; the point on the
+            // same side (-1.5, 0) still is (control).
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var c = Settings(); c.grid_size_m = 12; var b = new RobotBrain(Calibration(), c, "A", 0); var g = Map(b);
+            for (float y = -2f; y <= 2f; y += .05f) g.ObserveOccupied(g.Cell(new Vector2(1.02f, y)));
+            typeof(RobotBrain).GetMethod("BlacklistGoal", flags).Invoke(b, new object[] { Vector2.zero, 0.0, 0, 100.0, "test", 2.5f });
+            bool Black(float x) => (bool)typeof(RobotBrain).GetMethod("GoalBlacklisted", flags).Invoke(b, new object[] { new Vector2(x, 0), 1.0 });
+            Assert.That(Black(1.5f), Is.False, "beyond the wall: not hidden");
+            Assert.That(Black(-1.5f), Is.True, "control: same side, hidden");
+        }
+
+        [Test]
+        public void YardFrontiersOnOpenGroundGiveWayToProvenIndoorOptions()
+        {
+            // One-door seed 922, robot B in the yard: 6 of 8 options were yard frontiers (no indoor floor beyond), larger on
+            // paper than the 2 proven ones. Here a robot at a doorway has a searched-indoors room behind it and yard its LiDAR
+            // saw as open ground in front: yard options are dropped. Control: with no proven indoor option, they stay.
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            (int yard, int total) Options(bool roomIndoors)
+            {
+                var c = Settings(); c.grid_size_m = 30; c.robot_radius_m = .25f; c.search_requires_ceiling = true; c.frontier_wide_options = 0;
+                var b = new RobotBrain(Calibration(), c, "A", 0); var g = Map(b);
+                var indoors = (bool[])typeof(OccupancyGrid).GetField("sightIndoors", flags).GetValue(g);
+                var open = (bool[])typeof(OccupancyGrid).GetField("openGround", flags).GetValue(g);
+                for (int i = 0; i < g.Count; i++)
+                {
+                    var p = g.Centre(i);
+                    bool facade = Mathf.Abs(p.y - 2.05f) < .1f && p.x > -4 && p.x < 12 && !(Mathf.Abs(p.x) < .5f);
+                    if (facade) g.ObserveOccupied(i);
+                    else if (Mathf.Abs(p.y - 2.05f) < .1f && Mathf.Abs(p.x) < .5f) { g.ObserveFree(i); if (roomIndoors) indoors[i] = true; }   // the doorway
+                    else if (p.y > 2.15f && p.y < 5f && p.x > -3.9f && p.x < 3.9f) { g.ObserveFree(i); if (roomIndoors) indoors[i] = true; }
+                    else if (p.y > -4f && p.y < 1.95f && p.x > -4f && p.x < 4f) { g.ObserveFree(i); open[i] = true; }
+                }
+                typeof(OccupancyGrid).GetField("dirty", flags).SetValue(g, true);
+                typeof(OccupancyGrid).GetField("roofDirty", flags).SetValue(g, true);   // the indoor layer is derived from sightIndoors
+                Motion(b, 0); b.OnAirTemperature(0, 20); b.Step(0, .05f);
+                var list = b.FrontierOptions(0, 8);
+                return (list.Count(f => f.position.y < 1.95f), list.Count);
+            }
+            var withRoom = Options(true);
+            Assert.That(withRoom.total - withRoom.yard, Is.GreaterThan(0), "proven indoor options exist");
+            Assert.That(withRoom.yard, Is.Zero, "no yard frontiers beside proven indoor ones");
+            var noRoom = Options(false);
+            Assert.That(noRoom.yard, Is.GreaterThan(0), "control: with nothing proven, the yard options stay");
+        }
+
+        [Test]
+        public void APartnersWallWhereThisRobotWalkedIsItsOwnBody()
+        {
+            // One-door seed 922: B's LiDAR saw A walk through the one door and B's map reported walls there; at 4 s, the first
+            // exchange after that, both robots lost every route and frontier. A walked from its pad 2 m ahead; the partner
+            // reports walls on that path (0, 1), 0.6 m beside it, and 1 m past where it stopped. The one on its path is its
+            // own body and is dropped; the others stay (controls).
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var c = Settings(); c.grid_size_m = 12; c.frames_shared_at_start = true;
+            var b = new RobotBrain(Calibration(), c, "B", 0); var a = new RobotBrain(Calibration(), c, "A", 0);
+            Motion(a, 0); a.OnAirTemperature(0, 20); a.Step(0, .05f); Motion(b, 0); b.OnAirTemperature(0, 20); b.Step(0, .05f);
+            var track = (List<BrainPose>)typeof(RobotBrain).GetField("bodyTrack", flags).GetValue(b);
+            for (float y = 0; y <= 2f; y += .1f) track.Add(new BrainPose { position = new Vector2(0, y), yawRad = 0 });
+            var gb = Map(b);
+            Assert.That(gb.OwnOccupancy(gb.Cell(new Vector2(0, 1f))), Is.Zero, "precondition: B's own map knows nothing at (0, 1)");
+            var ga = Map(a);
+            foreach (var w in new[] { new Vector2(0, 1f), new Vector2(.6f, 1f), new Vector2(0, 3f) }) ga.ObserveOccupied(ga.Cell(w));
+            Motion(a, .1); a.OnAirTemperature(.1, 20); a.Step(.1, .1f);
+            b.OnPeerMessage(Wire(a.BuildMessage(.1)), .1);
+            Assert.That(gb.Occupancy(gb.Cell(new Vector2(0, 1f))), Is.Not.EqualTo(255), "where B's body stood is no wall");
+            Assert.That(gb.Occupancy(gb.Cell(new Vector2(.6f, 1f))), Is.EqualTo(255), "control: beside its path stays");
+            Assert.That(gb.Occupancy(gb.Cell(new Vector2(0, 3f))), Is.EqualTo(255), "control: past where it went stays");
+        }
+
+        [Test]
+        public void BehindItsPartnerAtOneDoorARobotFollowsThroughInsteadOfStopping()
+        {
+            // One-door seed 922, robot B: at the one door behind A, every frontier it saw lay in A's claim or A's searched
+            // floor, so it yielded 120 times, scanned and ended its mission at 16.6 s. Here both robots stand at the same pad
+            // seeing the same corridor; A searches it and claims the way on. B follows through rather than reporting no
+            // frontier. Control: alone (no partner), the same view gives B its own frontier anyway.
+            (int follows, int noFrontier, int ownGoals) Run(bool partner)
+            {
+                var c = Settings(); c.grid_size_m = 16; c.robot_radius_m = .25f; c.frames_shared_at_start = true; c.mission_time_limit_s = 1000;
+                var b = new RobotBrain(Calibration(), c, "B", 0);
+                var a = new RobotBrain(Calibration(), c, "A", 0);
+                var events = new List<BrainEvent>();
+                for (int i = 0; i < 15 * 6; i++)
+                {
+                    double t = i / 15.0;
+                    Motion(a, t); a.OnRgbd(Image(t, true)); a.OnAirTemperature(t, 20); a.Step(t, 1f / 15);
+                    if (partner && i % 15 == 0) { var m = a.BuildMessage(t); if (m != null) b.OnPeerMessage(Wire(m), t); }
+                    Motion(b, t); b.OnRgbd(Image(t, true)); b.OnAirTemperature(t, 20); b.Step(t, 1f / 15); events.AddRange(b.DrainEvents());
+                }
+                return (events.Count(e => e.kind == "goal" && e.reason.StartsWith("Only the partner's")), events.Count(e => e.kind == "no_frontier"),
+                        events.Count(e => e.kind == "goal" && e.reason.StartsWith("Reachable frontier")));
+            }
+            var behind = Run(true);
+            Assert.That(behind.noFrontier, Is.Zero, "no 'nothing left' behind a partner at one door");
+            Assert.That(behind.follows + behind.ownGoals, Is.GreaterThan(0), "it heads on through");
+            var alone = Run(false);
+            Assert.That(alone.ownGoals, Is.GreaterThan(0), "control: the view itself has a way on");
+            Assert.That(alone.follows, Is.Zero, "control: alone there is no partner to follow");
+        }
+
+        [Test]
         public void OutOfContactTooLongTheRobotWalksBackToWhereItLastHeardItsPartner()
         {
             // Held-out seeds 919 and 920: out of radio contact 168 to 184 s of 200. Robot B hears A at the start, walks 4 m on

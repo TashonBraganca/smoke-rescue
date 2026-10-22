@@ -139,6 +139,7 @@ namespace SmokeRescue.Brain
         public int progress_min_cells = 40;
         public float progress_window_s = 15f, progress_skip_radius_m = 2.5f;
         public float progress_min_travel_m = 1f;
+        public float burning_radius_m = 2f; public int body_track_poses = 600;
         public float rendezvous_after_s = 45f, rendezvous_hold_s = 10f; public int rendezvous_min_unshared_cells = 1500;
         public float exterior_dwell_s = 15f, facade_band_m = 2f; public float exit_open_share = 0.9f; public int exit_min_scans = 30, exit_max_count = 4;
         public int frontier_information_radius_cells = 3;
