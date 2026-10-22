@@ -2413,6 +2413,109 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void AFarFireBesideANearJambIsNotPutOnTheJamb()
+        {
+            // One-door seed 924, robot B at 51 s: three fire cells appeared on its way out, 2.2 m away, while the fire was
+            // 11 m away past a door jamb. The thermal camera sits to the colour camera's right, and a match by intrinsics
+            // alone gave the fire's pixels beside the jamb the jamb's range. Here the jamb (2 m) fills colour columns 0 to
+            // 39 and has no depth return beyond; the thermal camera, 0.1 m to the right, sees the far fire from column 38.
+            // Control: when the jamb itself burns, its heat is still mapped.
+            int Burning(bool jambBurns)
+            {
+                var s = Calibration(); s.thermal.mount_right_offset_m = .1f; var c = Settings(); var g = new OccupancyGrid(c);
+                var rgb = Image(0, true, 0); for (int v = 0; v < 60; v++) for (int u = 0; u < 40; u++) rgb.Depth[v * 80 + u] = 2000;
+                var pixels = Enumerable.Repeat((ushort)2932, 80 * 60).ToArray();
+                for (int y = 0; y < 60; y++) for (int x = 0; x < 80; x++) if (x >= 38 || jambBurns) pixels[y * 80 + x] = 9000;
+                var project = typeof(ThermalPerception).GetMethod("ProjectHeat", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+                for (int k = 0; k < 2; k++)
+                    project.Invoke(null, new object[] { new ThermalFrame(k * .1, 80, 60, pixels), rgb, s, c, new BrainPose { position = Vector2.zero }, g });
+                int burning = 0; for (int i = 0; i < g.Count; i++) if (g.Dangerous(i)) burning++;
+                return burning;
+            }
+            Assert.That(Burning(false), Is.Zero, "no fire on the jamb from the fire beyond it");
+            Assert.That(Burning(true), Is.GreaterThan(0), "control: a burning jamb is mapped as fire");
+        }
+
+        [Test]
+        public void APartnerWalkingInIsNotMappedAsWallButAWallBesideItIs()
+        {
+            // One-door seed 924: robot A's LiDAR drew robot B, walking in behind it, as a line of wall through the front
+            // door, and A lost its way out at 12 s. B radios its pose at 1 s and 2 s walking at 0.5 m/s; at 3 s A's LiDAR
+            // sees B's body 1 s further on and a wall 1.2 m to its side. Control: with B never heard, its body is mapped.
+            (byte body, byte wall) Mapped(bool heard)
+            {
+                var c = Settings(); c.grid_size_m = 16; c.frames_shared_at_start = true;
+                var a = new RobotBrain(Calibration(), c, "A", 0, new EntryPose(0, -3, 0));
+                var b = new RobotBrain(Calibration(), c, "B", 0);
+                Vector2 p1 = default, p2 = default;
+                for (int i = 0; i <= 30; i++)
+                {
+                    double t = i / 15.0; Motion(b, t, .5f); b.OnAirTemperature(t, 20); b.Step(t, i == 0 ? .05f : 1f / 15);
+                    Motion(a, t); a.OnAirTemperature(t, 20); a.Step(t, i == 0 ? .05f : 1f / 15);
+                    if (i == 15 || i == 30)
+                    {
+                        if (i == 15) p1 = b.Snapshot().pose.position; else p2 = b.Snapshot().pose.position;
+                        if (heard) a.OnPeerMessage(Wire(b.BuildMessage(t)), t + .05);
+                    }
+                }
+                Vector2 p3 = p2 + (p2 - p1);   // where B's body is at 3 s
+                var walls = Box(p3.x - .18f, p3.y - .375f, p3.x + .18f, p3.y + .375f).Concat(new[] { (new Vector2(1.2f, 0), new Vector2(1.2f, 3)) }).ToArray();
+                for (int k = 0; k < 3; k++)
+                {
+                    double t = 3 + k * .1; Motion(a, t); a.OnAirTemperature(t, 20); a.OnLidar(SegmentScan(t, new Vector2(0, -3), 0, walls)); a.Step(t, k == 0 ? 1f : .1f);
+                }
+                var g = Map(a); int body = 0, wall = 0;
+                for (int i = 0; i < g.Count; i++)
+                {
+                    if (g.Occupancy(i) != 255) continue; var q = g.Centre(i);
+                    if (Vector2.Distance(q, p3) <= .6f) body++;
+                    if (Mathf.Abs(q.x - 1.2f) <= .15f && q.y > .5f && q.y < 2.5f) wall++;
+                }
+                return ((byte)Mathf.Min(body, 255), (byte)Mathf.Min(wall, 255));
+            }
+            var withPartner = Mapped(true);
+            Assert.That(withPartner.wall, Is.GreaterThan(5), "the wall beside the partner is mapped");
+            Assert.That(withPartner.body, Is.Zero, "no wall cell within 0.6 m of the partner");
+            Assert.That(Mapped(false).body, Is.GreaterThan(0), "control: a partner never heard from is mapped like anything else");
+        }
+
+        [Test]
+        public void WithOnlyUnprovenFloorPastADoorwayTheRobotGoesToLookThroughIt()
+        {
+            // One-door seed 924: the hallway and bedrooms behind the north wall were mapped through its doorways, never
+            // proven indoors (no ceiling seen from across the room), and robot A began its return at 90 s with two of five
+            // people there. A walled room proven indoors, a 1 m doorway in its north wall, and a second room beyond it mapped
+            // free but unproven (its walls not yet seen): the robot walks to the proven side of the doorway. Control: with the second room proven
+            // too, it explores the second room's frontier as usual.
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            (string reason, Vector2? goal) Choice(bool secondRoomProven)
+            {
+                var c = Settings(); c.grid_size_m = 16; c.robot_radius_m = .25f; c.search_requires_ceiling = true;
+                var b = new RobotBrain(Calibration(), c, "A", 0); var g = Map(b); Room(b, -2, 2, -1, 6);
+                for (int i = 0; i < g.Count; i++)
+                {
+                    var p = g.Centre(i);
+                    bool side = Mathf.Abs(p.x) > 2 && Mathf.Abs(p.x) < 2.3f && p.y > -1.3f && p.y < 3.2f;   // the room beyond: walls unseen
+                    bool south = p.y < -1 && p.y > -1.3f && Mathf.Abs(p.x) < 2.3f;
+                    bool north = p.y > 3 && p.y < 3.2f && Mathf.Abs(p.x) > .5f && Mathf.Abs(p.x) < 2.3f;
+                    if (side || south || north) g.ObserveOccupied(i);
+                }
+                var indoors = (bool[])typeof(OccupancyGrid).GetField("sightIndoors", flags).GetValue(g);
+                for (int i = 0; i < g.Count; i++) { var p = g.Centre(i); if (Mathf.Abs(p.x) < 2 && p.y > -1 && p.y < (secondRoomProven ? 6 : 3)) indoors[i] = true; }
+                typeof(OccupancyGrid).GetField("roofDirty", flags).SetValue(g, true);
+                Motion(b, 0); b.OnRgbd(Image(0, true, 0)); b.OnAirTemperature(0, 20); b.Step(0, .05f);
+                var goal = b.DrainEvents().LastOrDefault(e => e.kind == "goal");
+                return (goal?.reason, b.Snapshot().goal);
+            }
+            var look = Choice(false);
+            Assert.That(look.reason, Does.StartWith("Unsearched floor lies only past floor not yet proven indoors"));
+            Assert.That(look.goal.HasValue && look.goal.Value.y > 2 && look.goal.Value.y < 3.2f && Mathf.Abs(look.goal.Value.x) < 1, Is.True,
+                $"the goal is the proven side of the doorway, got {look.goal}");
+            var usual = Choice(true);
+            Assert.That(usual.reason, Does.StartWith("Reachable frontier"), "control: proven floor beyond, the usual frontier");
+        }
+
+        [Test]
         public void WithNothingLeftAtTheDoorARobotWalksInAfterItsPartner()
         {
             // One-door seed 923, robot B: A went in and B, at the pad, had no frontier at all, so it scanned and held at the
@@ -3450,6 +3553,32 @@ namespace SmokeRescue.Tests.EditMode
             // to stand indoors (in the yard, looking through a door) marks nothing.
             Assert.That(Run(false, true), Is.EqualTo("True False False False"));
             Assert.That(Run(true, false), Is.EqualTo("False False False False"));
+        }
+
+        [Test]
+        public void AnAgentFrontierInsideThePartnersClaimIsYieldedOnceAndDropped()
+        {
+            // One-door seed 924, robot B at 52 s: the agent ordered a frontier robot A had claimed. Each tick the order set
+            // it as the goal and the ID tie-break yielded it, 118 times in 2 s while B stood still.
+            var b = new RobotBrain(Calibration(), Settings(), "B", 0, new EntryPose(-3, 0, 90));
+            void Sense(double t) { Motion(b, t); b.OnAirTemperature(t, 20); b.OnRgbd(Image(t, true, 0)); b.OnLidar(RoomScan(t, new Vector2(-3, 0), 0, 4f, 720)); }
+            Sense(0); b.Step(0, 1f / 60);
+            Room(b, -4, 0, -4, 4);
+            var target = b.FrontierOptions(0, 10)[0].position;
+            b.AgentExplore(target, 0, 30, "largest unsearched area");
+            Sense(.05); b.Step(.05, .05f);
+            var driven = b.DrainEvents();
+            Assert.That(driven.Any(e => e.kind == "goal" && e.reason.StartsWith("Agent order")), Is.True,
+                "control: the order is driven; events: " + string.Join(" | ", driven.Select(e => e.kind + ": " + e.reason)));
+            var a = new RobotBrain(Calibration(), Settings(), "A", 0); Room(a, -4, 0, -4, 4);
+            var m = a.BuildMessage(0); m.Claim = new BrainClaim { centre = target, radiusM = 2.5f, expiresAt = 15 };
+            b.OnPeerMessage(Wire(m), .1);
+            double last = .05;
+            for (int i = 1; i <= 30; i++) { double t = .1 + i / 60.0; Sense(t); b.Step(t, (float)(t - last)); last = t; }
+            var events = b.DrainEvents();
+            Assert.That(events.Count(e => e.kind == "goal_yielded"), Is.EqualTo(1), "yielded once, not every tick");
+            Assert.That(events.Count(e => e.kind == "goal" && e.reason.StartsWith("Agent order")), Is.Zero, "the yielded order is not set again");
+            Assert.That(events.Any(e => e.kind == "replan" && e.reason.StartsWith("Agent goal is the partner's claimed frontier")), Is.True);
         }
 
         [Test]

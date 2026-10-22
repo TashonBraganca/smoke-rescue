@@ -39,6 +39,8 @@ namespace SmokeRescue.Brain
         public byte[] occupancy, peerExplored;
         // 1 where this robot's own camera, or a linked partner's, has searched the floor; row-major like occupancy.
         public byte[] searched;
+        /// <summary>Floor this robot's own cameras searched (searched also holds floor received from partners).</summary>
+        public byte[] ownSearched;
         public PeerSnapshot[] peers;
         public SurvivorSnapshot[] survivors;
         public float[] heat;

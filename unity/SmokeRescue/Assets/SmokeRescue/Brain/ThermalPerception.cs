@@ -12,8 +12,27 @@ namespace SmokeRescue.Brain
         internal static bool Match(int x, int y, RgbdFrame rgb, SensorConfig s, out int u, out int v, out float z)
         {
             var a = s.thermal; var b = s.camera;
-            u = Mathf.RoundToInt((x - a.cx) / a.fx * b.fx + b.cx);
-            v = Mathf.RoundToInt((y - a.cy) / a.fy * b.fy + b.cy); z = 0;
+            float nx = (x - a.cx) / a.fx, shift = a.mount_right_offset_m;
+            u = Mathf.RoundToInt(nx * b.fx + b.cx);
+            v = Mathf.RoundToInt((y - a.cy) / a.fy * b.fy + b.cy);
+            if (!DepthAt(rgb, s, u, v, out z)) return false;
+            if (shift == 0) return true;
+            // The thermal camera sits mount_right_offset_m to the colour camera's right, so what a thermal pixel sees at
+            // range z lies shift / z further right in the colour image than the intrinsics alone say. Move there and read
+            // the range again until the pixel stays put; one that never settles straddles a depth edge. Without this, a far
+            // fire's pixels beside a near door jamb took the jamb's range: one-door seed 924, three fire cells appeared on
+            // robot B's way out at 51 s (the fire was 11 m away) and B lost its way out at 52 s.
+            for (int k = 0; k < 3; k++)
+            {
+                int next = Mathf.RoundToInt((nx + shift / z) * b.fx + b.cx);
+                if (next == u) return true;
+                u = next; if (!DepthAt(rgb, s, u, v, out z)) return false;
+            }
+            return false;
+        }
+        static bool DepthAt(RgbdFrame rgb, SensorConfig s, int u, int v, out float z)
+        {
+            z = 0;
             if (u < 0 || v < 0 || u >= rgb.Width || v >= rgb.Height) return false;
             z = rgb.Depth[v * rgb.Width + u] * .001f;
             return z >= s.depth.min_m && z <= s.depth.max_m;
