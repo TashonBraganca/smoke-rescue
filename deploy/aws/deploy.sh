@@ -2,10 +2,14 @@
 # Deploy Smoke Rescue to AWS with one command. Needs credentials in the environment or a profile.
 #
 #   ./deploy/aws/deploy.sh --email you@example.com
+# India recommendation: --region ap-south-1 --model-id in.anthropic.claude-haiku-4-5-20251001-v1:0
+# Virginia remains valid: --region us-east-1 --model-id us.anthropic.claude-haiku-4-5-20251001-v1:0
 #
 # Options (or the matching environment variables):
 #   --email ADDR        budget and alarm email (ALERT_EMAIL), required
 #   --region REGION     AWS region (AWS_REGION), default us-east-1
+#   --backend NAME      bedrock (default) or azure (AGENT_BACKEND)
+#   --azure-secret-arn ARN  existing Azure JSON secret (AZURE_SECRET_ARN), required for azure
 #   --model-id ID       Bedrock model or inference profile id (BEDROCK_MODEL_ID)
 #   --budget USD        monthly budget limit (MONTHLY_BUDGET_USD), default 50
 #   --skip-slam         do not build/push the ORB-SLAM3 OpenCV 5 image (slow, about 30 to 60 minutes)
@@ -23,6 +27,8 @@ PROJECT="${PROJECT_NAME:-smoke-rescue}"
 REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-us-east-1}}"
 EMAIL="${ALERT_EMAIL:-}"
 MODEL_ID="${BEDROCK_MODEL_ID:-us.anthropic.claude-haiku-4-5-20251001-v1:0}"
+BACKEND="${AGENT_BACKEND:-bedrock}"
+AZURE_SECRET="${AZURE_SECRET_ARN:-}"
 BUDGET="${MONTHLY_BUDGET_USD:-50}"
 SKIP_SLAM=0
 SKIP_PIPELINE=0
@@ -35,19 +41,29 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --email) EMAIL="${2:?}"; shift 2 ;;
     --region) REGION="${2:?}"; shift 2 ;;
+    --backend) BACKEND="${2:?}"; shift 2 ;;
+    --azure-secret-arn) AZURE_SECRET="${2:?}"; shift 2 ;;
     --model-id) MODEL_ID="${2:?}"; shift 2 ;;
     --budget) BUDGET="${2:?}"; shift 2 ;;
     --skip-slam) SKIP_SLAM=1; shift ;;
     --skip-pipeline) SKIP_PIPELINE=1; shift ;;
     --results) RESULTS_DIR="${2:?}"; shift 2 ;;
-    -h|--help) sed -n '2,19p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    -h|--help) sed -n '2,23p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) die "unknown option $1" ;;
   esac
 done
 [ -n "$EMAIL" ] || die "--email is required"
+case "$BACKEND" in
+  bedrock) ;;
+  azure)
+    [ -n "$AZURE_SECRET" ] || die "azure requires --azure-secret-arn"
+    case "$MODEL_ID" in *anthropic*) die "azure requires --model-id with the Azure deployment name" ;; esac ;;
+  *) die "--backend must be bedrock or azure" ;;
+esac
 export AWS_REGION="$REGION" AWS_DEFAULT_REGION="$REGION"
 
 # ---- preflight
+command -v python3 >/dev/null || die "python3 not found"
 command -v aws >/dev/null || die "aws CLI not found (install AWS CLI v2)"
 command -v docker >/dev/null || die "docker not found"
 docker buildx version >/dev/null 2>&1 || die "docker buildx not available"
@@ -59,7 +75,7 @@ if [ "$SKIP_SLAM" = 0 ] || [ "$SKIP_PIPELINE" = 0 ]; then
   [ "$driver" = "docker" ] || die "active buildx driver is '$driver'; batch images build from a local base image and need the 'docker' driver (run: docker buildx use default)"
 fi
 case "$MODEL_ID" in
-  us.*|eu.*|apac.*|au.*|jp.*|global.*) ;;
+  us.*|eu.*|apac.*|au.*|jp.*|in.*|global.*) ;;
   *) log "model id has no geo prefix; treating it as an in-region foundation model" ;;
 esac
 log "account $ACCOUNT, region $REGION, project $PROJECT"
@@ -71,13 +87,18 @@ ORIGIN_SECRET="$PROJECT/origin-verify"
 AGENT_STACK="$PROJECT-agent"; BATCH_STACK="$PROJECT-batch"
 STORAGE_STACK="$PROJECT-storage"; BUDGET_STACK="$PROJECT-budget"
 
-# Bedrock ARNs the task role may invoke. Foundation model ARN uses a wildcard region because
-# cross-region inference profiles route to other regions.
-case "$MODEL_ID" in
-  us.*|eu.*|apac.*|au.*|jp.*|global.*)
-    MODEL_ARNS="arn:aws:bedrock:$REGION:$ACCOUNT:inference-profile/$MODEL_ID,arn:aws:bedrock:*::foundation-model/${MODEL_ID#*.}" ;;
-  *) MODEL_ARNS="arn:aws:bedrock:$REGION::foundation-model/$MODEL_ID" ;;
-esac
+# Bedrock ARNs the task role may invoke, including the resolved destinations for cross-region inference.
+MODEL_ARNS="arn:aws:bedrock:$REGION::foundation-model/unused"
+if [ "$BACKEND" = bedrock ]; then
+  case "$MODEL_ID" in
+    arn:*:bedrock:*:*:inference-profile/*|arn:*:bedrock:*:*:application-inference-profile/*|us.*|eu.*|apac.*|au.*|jp.*|in.*|global.*)
+      # Resolve actual profile destinations rather than guessing the model ARN from its prefix.
+      PROFILE_JSON="$(aws bedrock get-inference-profile --inference-profile-identifier "$MODEL_ID" --output json)"
+      MODEL_ARNS="$(printf '%s' "$PROFILE_JSON" | python3 -c 'import json,sys; p=json.load(sys.stdin); print(",".join([p["inferenceProfileArn"]]+[m["modelArn"] for m in p["models"]]))')" ;;
+    arn:*:bedrock:*::foundation-model/*) MODEL_ARNS="$MODEL_ID" ;;
+    *) MODEL_ARNS="arn:aws:bedrock:$REGION::foundation-model/$MODEL_ID" ;;
+  esac
+fi
 
 # CloudFront origin-facing prefix list; skip it if it would not fit the default 60-rule security group quota.
 PREFIX_LIST="$(aws ec2 describe-managed-prefix-lists \
@@ -108,13 +129,13 @@ deploy_stack() { # deploy_stack name template [Key=Value ...]
 image_exists() { aws ecr describe-images --repository-name "$1" --image-ids imageTag="$2" >/dev/null 2>&1; }
 ecr_login() { aws ecr get-login-password | docker login --username AWS --password-stdin "$REGISTRY" >/dev/null; }
 
-AGENT_TAG="agent-$(hash_of "$ROOT/brain/brain" "$ROOT/brain/uv.lock" "$ROOT/brain/pyproject.toml" "$HERE/Dockerfile.agent")"
+AGENT_TAG="agent-$(hash_of "$ROOT/brain/brain" "$ROOT/brain/uv.lock" "$ROOT/brain/pyproject.toml" "$ROOT/config" "$HERE/Dockerfile.agent" "$HERE/Dockerfile.agent.dockerignore" "$HERE/export_yolo.py" "$HERE/check_agent_image.py")"
 SLAM_TAG="slam-$(hash_of "$ROOT/slam" "$HERE/batch/Dockerfile.slam" "$HERE/batch/slam_entrypoint.sh")"
 PIPE_TAG="pipe-$(hash_of "$ROOT/brain/brain" "$ROOT/brain/uv.lock" "$HERE/Dockerfile.pipeline" "$HERE/batch/pipeline_entrypoint.sh")"
 
 agent_params() { # agent_params desired tag
   echo "RunsBucketName=$RUNS_BUCKET" "DesiredCount=$1" "ImageTag=$2" "AgentModelId=$MODEL_ID" \
-    "BedrockModelArns=$MODEL_ARNS" "CloudFrontPrefixListId=$PREFIX_ID" "OriginSecretName=$ORIGIN_SECRET"
+    "AgentBackend=$BACKEND" "AzureSecretArn=$AZURE_SECRET" "BedrockModelArns=$MODEL_ARNS" "CloudFrontPrefixListId=$PREFIX_ID" "OriginSecretName=$ORIGIN_SECRET"
 }
 
 # ---- 1. agent stack and image
