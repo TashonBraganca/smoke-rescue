@@ -481,6 +481,7 @@ def test_an_event_at_a_new_place_is_not_dropped_as_a_repeat(tmp_path):
     # Held-out seed 914 runs 1 to 3: arriving at a second place within 12 s was dropped as a repeat of the first arrival,
     # so the reflex picked the next frontier alone. Positional events repeat only at the same spot; others by time.
     agent = RobotAgent(Scripted([]), tmp_path / "t.jsonl")
+    RobotAgent._recent.clear(); RobotAgent._ordered.clear()   # class-level memory: earlier tests' steps must not leak in
     def ev(t, kind, x=None):
         n = {} if x is None else {"x_m": x, "y_m": 0.0}
         return {"robot": "robot_A", "t": t, "event": {"kind": kind, "numbers": n}}
@@ -489,6 +490,23 @@ def test_an_event_at_a_new_place_is_not_dropped_as_a_repeat(tmp_path):
     assert agent._repeat(ev(10, "agent_goal_reached", 4.5)), "the same place within the window repeats"
     assert not agent._repeat(ev(0, "sensor_switch"))
     assert agent._repeat(ev(5, "sensor_switch")), "events without a position repeat by time"
+
+
+def test_an_arrival_after_a_new_order_is_not_a_repeat(tmp_path):
+    # Seed 929, robot A: ordered at 44.0 s to face s4 again, it arrived at 46.8 s; the arrival faced the same point as the
+    # one at 38.2 s and was dropped as a repeat, so the agent never inspected her again. Control: with no order in between
+    # the same arrival still repeats.
+    def agent_with(order_at):
+        agent = RobotAgent(Scripted([]), tmp_path / "t.jsonl")
+        RobotAgent._recent.clear(); RobotAgent._ordered.clear()
+        ev = lambda t: {"robot": "robot_A", "t": t, "event": {"kind": "agent_goal_reached", "numbers": {"x_m": -4.1, "y_m": 3.9}}}
+        assert not agent._repeat(ev(38.2))
+        if order_at is not None:
+            RobotAgent._ordered["robot_A"] = order_at
+        return agent._repeat(ev(46.8))
+    assert not agent_with(44.0), "a new order since the last arrival makes this arrival a new decision"
+    assert agent_with(None), "control: the same arrival with no order in between repeats"
+    assert agent_with(30.0), "control: an order before the last arrival does not count"
 
 
 def test_where_fire_blocks_the_way_out_reaches_the_model(tmp_path):
@@ -640,3 +658,15 @@ def test_the_agent_is_told_the_robot_stays_inside_when_configured(monkeypatch):
     assert "never leaves the building" in text and "It leaves the building when" not in text
     monkeypatch.setitem(T._CONFIG, "stay_inside", False)
     assert "It leaves the building when its own heat rules say so" in RA.system_prompt(), "control"
+
+
+def test_a_fire_heating_the_robot_is_a_spray_option(tmp_path):
+    # Seed 929, robot B: air 30 to 211 C beside a fire in its own room; the spray option existed only for a fire blocking
+    # a way out or a frontier, so its agent was never offered its water. Control: with no fire near, no option.
+    from brain.agent.tools import spray_option
+    near = {"bearing_deg": 12.0, "distance_m": 3.1, "burning_m2": 1.5}
+    opt = spray_option({"fire_near_robot": near, "water_l": 12.0})
+    assert opt is not None and opt["blocks"] == "near" and opt["within_nozzle_reach"] and opt["in_camera_view"]
+    assert spray_option({"water_l": 12.0}) is None, "control: no fire near the robot, no option"
+    blocked = {"bearing_deg": 0.0, "distance_m": 2.0, "burning_m2": 1.0}
+    assert spray_option({"fire_blocks_exit": blocked, "fire_near_robot": near, "water_l": 12.0})["blocks"] == "exit", "a blocked route still comes first"

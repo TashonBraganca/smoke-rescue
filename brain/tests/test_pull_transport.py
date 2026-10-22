@@ -164,7 +164,11 @@ def test_two_robots_pull_their_own_files_concurrently(local,monkeypatch):
         assert response.status_code==202,response.text
         jobs.append((folder,response.json()['poll_url']))
     results={}
-    for _ in range(200):
+    from brain.agent.recording_transport import PULL_LIMITS
+    # Two real OpenCV inferences share a lock. Poll for the transport's bounded
+    # job lifetime instead of treating two seconds of CPU contention as failure.
+    deadline=time.monotonic()+PULL_LIMITS['wait_s']
+    while time.monotonic()<deadline:
         for folder,url in jobs:
             state=call('GET',url).json()
             if state['status']=='needs_files':

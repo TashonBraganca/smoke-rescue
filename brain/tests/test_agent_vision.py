@@ -229,3 +229,22 @@ def test_a_body_beyond_a_doorway_is_not_an_opening_but_a_window_still_is(tmp_pat
     assert not body["cues"]["window"]["opening"] and body["cues"]["window"]["grounded"]
     window = inspect(frame(False), tmp_path)
     assert window["cues"]["window"]["opening"] and window["verdict"] == "not_person", "control: wall beneath, an opening"
+
+
+def test_negative_warm_object_cannot_reject_a_separate_colour_person(tmp_path, monkeypatch):
+    # A warm wall high in the thermal view and a person lower in the RGB view
+    # share a bearing. Rejecting that wall says nothing about the separate body.
+    f = scene('wall')
+    hit = {'confidence':.9,'bbox_rgb':[70,95,22,20],'bearing_deg':0.,'range_m':3.}
+    monkeypatch.setattr(v,'detect_people_rgb',lambda frame:[hit])
+    result = v.inspect_candidate(f,0.,3.,output_dir=tmp_path)
+    assert result['verdict']=='person'
+    assert result['candidate']['source']=='rgb_dnn'
+    assert result['cues']['rejected_thermal_object']['verdict']=='not_person'
+
+
+def test_negative_shape_still_wins_when_colour_box_overlaps_it(tmp_path, monkeypatch):
+    f = scene('wall')
+    hit = {'confidence':.9,'bbox_rgb':[65,25,30,70],'bearing_deg':0.,'range_m':3.}
+    monkeypatch.setattr(v,'detect_people_rgb',lambda frame:[hit])
+    assert v.inspect_candidate(f,0.,3.,output_dir=tmp_path)['verdict']=='not_person'

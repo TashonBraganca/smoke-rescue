@@ -122,5 +122,9 @@
   "fusion_min_views": 2,
   "fusion_min_views_reason": "Require two translated observations, each independently passing thermal structure and measured depth-shape checks. Neither needs an unclipped silhouette.",
   "fusion_max_observations": 128,
-  "fusion_max_observations_reason": "Bound per-robot storage to 128 small evidence records. This covers sixty seconds at two separated observations per second with eight records spare."
+  "fusion_max_observations_reason": "Bound per-robot storage to 128 small evidence records. This covers sixty seconds at two separated observations per second with eight records spare.",
+  "rgb_lidar_min_beams": 3,
+  "rgb_lidar_min_beams_reason": "Require three consecutive half-degree scanner rays inside the colour box. At 12 m their one-degree total span covers about 0.21 m, smaller than an adult torso; an isolated range cannot place the visual person.",
+  "rgb_lidar_span_m": 0.3,
+  "rgb_lidar_span_m_reason": "The rays supporting one colour detection must agree within 0.3 m, approximately torso thickness. This rejects mixtures of furniture and a wall behind the box. LiDAR supplies range only; colour confidence and confirmation range checks still apply."
 }

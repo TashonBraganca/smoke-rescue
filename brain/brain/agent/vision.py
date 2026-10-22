@@ -564,7 +564,8 @@ def inspect_candidate(frame: Frame, bearing_deg: float, range_m: float, *, outpu
             "plane":plane,"window":{"opening":window,"grounded":grounded,"surrounding_z_m":_number(surround) if surround is not None else None,
                 "recess_m":_number(recess) if recess is not None else None},"rgb":rgb,
             "depth":{"valid_fraction":region["depth_fraction"],"registered_fraction":registered_fraction,"nonplanar":nonplanar,
-                "span_m":_number(depth_span) if depth_span is not None else None,"single_surface":single_surface}}
+                "span_m":_number(depth_span) if depth_span is not None else None,"single_surface":single_surface,
+                "body_shape_supported":registered_fraction>=min_depth_fraction}}
         reasons = []
         if lidar_cue is not None:
             result["cues"]["lidar"] = lidar_cue
@@ -585,14 +586,17 @@ def inspect_candidate(frame: Frame, bearing_deg: float, range_m: float, *, outpu
                                "view it from further back (approach_candidate citing this inspection steps back to the viewing distance).")
         elif ramp: reasons.append("Warm component is a slope between hotter and cooler surfaces, not a distinct body.")
         elif not single_surface: reasons.append("Warm component spans more than 1.5 m of depth, so it covers several surfaces rather than one body.")
-        elif temp_ok and nonplanar:
+        elif temp_ok and nonplanar and registered_fraction>=min_depth_fraction:
             result["verdict"] = "person"
             reasons.append("Body-sized warm component has temperature structure and nonplanar depth without a background recess.")
+        elif temp_ok and nonplanar and lidar_cue is not None:
+            reasons.append("LiDAR-filled depth supplies range, not independent vertical body shape; too little registered camera depth supports a person verdict.")
         else: reasons.append("Temperature structure or nonplanar body shape is insufficient for confirmation.")
         result["reasons"] = reasons
-    if result["verdict"] == "uncertain":
+    thermal_negative = result["verdict"] == "not_person"
+    if result["verdict"] == "uncertain" or (thermal_negative and aligned.any()):
         # Second sensor: a confident RGB person detection at the same bearing and range. It never overrides a
-        # not_person verdict from planarity, a window recess or impossible size.
+        # negative cue on the same object from planarity, a window recess or impossible size.
         # Matched against where the selected warm body was measured as well as where the agent asked: held-out seed 915,
         # robot A, the agent asked at 0 deg, the warm component lay at -6.9 deg and the colour detector saw a person at
         # -8.9 deg with confidence 0.83, just outside 8 deg of the request, so the verdict stayed uncertain (Codex replay).
@@ -601,7 +605,8 @@ def inspect_candidate(frame: Frame, bearing_deg: float, range_m: float, *, outpu
         if cand.get("bearing_deg") is not None:
             refs.append((cand["bearing_deg"], cand["range_m"] if cand.get("range_m") is not None else range_m))
         hits = [p for p in detect_people_rgb(frame)
-                if any(abs(p["bearing_deg"] - b) <= bearing_tolerance_deg and (p["range_m"] is None or abs(p["range_m"] - r) <= range_tolerance_m)
+                if any(abs(p["bearing_deg"] - b) <= bearing_tolerance_deg and (p["range_m"] is None or abs(p["range_m"] - r) <= range_tolerance_m or
+                        (not cand and p.get("range_source") == "lidar"))
                        for b, r in refs)]
         # A box cut by the left or right side of the image shows only part of whatever it is, as the thermal mask rule
         # above says for warm components: it cannot confirm a body (held-out seed 914 run 3: a 22 px sliver at the left
@@ -611,15 +616,30 @@ def inspect_candidate(frame: Frame, bearing_deg: float, range_m: float, *, outpu
         margin = config["rgb_side_margin_px"]
         whole = [h for h in hits if h["bbox_rgb"][0] > margin and h["bbox_rgb"][0] + h["bbox_rgb"][2] < width - margin]
         result["cues"]["rgb_dnn"] = {"model": PERSON_ONNX.name, "hits": hits, "clipped_by_side": len(hits) - len(whole)}
+        if thermal_negative:
+            # A negative shape cue applies to the selected warm object. It cannot
+            # reject a separate body elsewhere in the calibrated colour image.
+            # Any overlap preserves the negative, including partial silhouettes.
+            def separate(hit):
+                x,y,w,h = hit["bbox_rgb"]
+                return hit.get("range_m") is not None and not aligned[y:y+h,x:x+w].any()
+            whole = [h for h in whole if separate(h)]
         if whole and max(h["confidence"] for h in whole) >= 0.5:
             best = max(whole, key=lambda h: h["confidence"])
+            if thermal_negative:
+                result["cues"]["rejected_thermal_object"] = {
+                    "verdict":"not_person", "candidate":result["candidate"], "reasons":result["reasons"]}
+                result["candidate"] = None
+                result["reasons"] = ["The rejected warm object projects outside the colour person's box; its negative shape cues do not describe that person."]
             result["verdict"] = "person"
             # With no warm body matched, the person is where the colour detector measured them, not where the agent asked.
             if result.get("candidate") is None and best.get("range_m") is not None:
-                result["candidate"] = {"bearing_deg": best["bearing_deg"], "range_m": best["range_m"], "source": "rgb_dnn"}
+                result["candidate"] = {"bearing_deg": best["bearing_deg"], "range_m": best["range_m"], "source": "rgb_dnn",
+                                       "range_source": best.get("range_source", "depth"), "range_evidence": best.get("range_evidence"),
+                                       "bbox_rgb": best["bbox_rgb"]}
             result["reasons"] = result["reasons"] + [f"OpenCV dnn person detector (YOLO11m) confidence {best['confidence']:.2f} "
                                                      f"at bearing {best['bearing_deg']:.1f} deg, range {best['range_m']} m."]
-        elif any(h["confidence"] >= 0.5 for h in hits):
+        elif not thermal_negative and any(h["confidence"] >= 0.5 for h in hits):
             result["reasons"] = result["reasons"] + ["A colour person detection touches the side of the image, so it shows "
                                                      "only part of the object and cannot confirm a body; face it to look again."]
     path = Path(output_dir)/f"{result['id']}.png"
@@ -733,18 +753,63 @@ def detect_people_rgb(frame: Frame, *, min_conf: float = 0.35, model: Path | Non
 
 def _rgb_person(frame: Frame, box, confidence: float) -> dict:
     """One colour person detection: bearing and horizontal range from the robot centre to the body inside the box
-    (_body_point), falling back to the box centre column and the median depth of its middle half."""
+    (_body_point), or consistent LiDAR points projected inside the box. Floor-only depth leaves range unknown."""
     x0, y0, x1, y1 = box
     body = _body_point(frame, box)
     if body is not None:
         bearing, rng = body
     else:
-        z = frame.depth_m[y0 + (y1 - y0) // 4: y1 - (y1 - y0) // 4, x0 + (x1 - x0) // 4: x1 - (x1 - x0) // 4]
-        z = z[np.isfinite(z) & (z > 0)]
         bearing = math.degrees(math.atan2((x0 + x1) / 2 - frame.K[0, 2], frame.K[0, 0]))
-        rng = float(np.median(z)) if z.size >= 10 else None
+        supported = _rgb_lidar_point(frame, box)
+        if supported is None:
+            rng, source, evidence = None, "unmeasured", None
+        else:
+            bearing, rng, evidence = supported
+            source = "lidar"
+    if body is not None:
+        source, evidence = "depth", None
     return {"confidence": _number(confidence), "bbox_rgb": [x0, y0, x1 - x0, y1 - y0],
-            "bearing_deg": _number(bearing), "range_m": _number(rng) if rng is not None else None}
+            "bearing_deg": _number(bearing), "range_m": _number(rng) if rng is not None else None,
+            "range_source": source, "range_evidence": evidence}
+
+
+def _rgb_lidar_point(frame: Frame, box):
+    """Range support from scan points that project inside a colour person's box.
+
+    A planar scanner supplies position only. The colour detector supplies the
+    person evidence. Floor-only depth never becomes a range to a person.
+    """
+    scan, cfg = frame.lidar, _perception()
+    if scan is None or abs(scan.t-frame["stamps"]["rgb"]) > cfg["frame_tolerance_s"]:
+        return None
+    sensors = json.loads((Path(__file__).resolve().parents[3]/"config/sensors.json").read_text())
+    mount = sensors["camera"]["mount"]
+    pitch = math.radians(mount["pitch_down_deg"])
+    angles = scan.angle_min_rad + np.arange(len(scan.ranges_m))*scan.increment_rad
+    ranges = scan.ranges_m
+    right = -ranges*np.sin(angles)
+    forward = scan.mount_forward_m + ranges*np.cos(angles)
+    camera_forward = forward-mount["forward_offset_m"]
+    drop = mount["height_m"]-sensors["lidar"]["mount"]["height_m"]
+    z = math.cos(pitch)*camera_forward + math.sin(pitch)*drop
+    y = -math.sin(pitch)*camera_forward + math.cos(pitch)*drop
+    safe_z = np.where(z>0,z,1.)
+    u = frame.K[0,0]*right/safe_z+frame.K[0,2]
+    v = frame.K[1,1]*y/safe_z+frame.K[1,2]
+    x0,y0,x1,y1 = box
+    valid = (np.isfinite(ranges)&(ranges>=scan.min_m)&(ranges<=scan.max_m)&(z>0)&
+             (u>x0)&(u<x1)&(v>y0)&(v<y1))
+    beams = np.flatnonzero(valid)
+    if len(beams)<cfg["rgb_lidar_min_beams"]:
+        return None
+    # Require neighbouring rays through the same object, rather than isolated returns
+    # or a mix of foreground furniture and the wall behind the colour box.
+    if np.any(np.diff(beams)!=1) or float(np.ptp(ranges[beams]))>cfg["rgb_lidar_span_m"]:
+        return None
+    x, f = float(np.median(right[beams])), float(np.median(forward[beams]))
+    return math.degrees(math.atan2(x,f)), math.hypot(x,f), {
+        "t":scan.t,"beams":beams.tolist(),"beam_ranges_m":ranges[beams].tolist(),
+        "source":"scan points projected into the RGB box at scanner height; range support only"}
 
 
 def _body_point(frame: Frame, box, *, floor_band_m: float = .08, cluster_m: float = .8):

@@ -126,7 +126,10 @@ namespace SmokeRescue.Brain
             // air_rise_c_per_min) starts the retreat to cooler floor and holds it while the rise lasts; the 70 C trigger alone
             // came after the 60 C limit (seed 927, robot B: air 28 C at 168 s, 59 C at 172 s, retreat at 174 s, peak 169 C).
             // Warm but steady air does not, or a robot in a warm house would never search.
-            bool heatInside = c.stay_inside && HeatRising(t);
+            // Once seen, a rise counts for one more air_rise_window_s: at the +air_rise_min_delta_c edge, sensor noise of a few
+            // tenths of a degree flipped the test each sample (seed 929, robot B at 42.5 to 44 s: 4 retreats in 1.5 s at 24 C).
+            if (c.stay_inside && HeatRising(t)) heatRisingUntil = t + c.air_rise_window_s;
+            bool heatInside = c.stay_inside && t < heatRisingUntil;
             if (!retreating && !emergencyExit && (airC > c.heat_retreat_c || budget < c.heat_retreat_fraction || heatInside))
             {
                 ResetStuckRecovery(); retreating = true; sweeping = false; active = null; dwell = 0; ClearPath();
@@ -658,9 +661,17 @@ namespace SmokeRescue.Brain
         /// <summary>Colour sightings arrive once per scan period, thermal blobs every frame, so freshness depends on the source.</summary>
         double FreshS(Track track) => track.rgb ? c.person_rgb_fresh_s : c.survivor_fresh_s;
 
+        public static Vector2 PersonSightingPosition(BrainPose pose, float bearingDegRight, float rangeM)
+        {
+            // Python has already removed mast pitch and included the camera offset.
+            // Adding the camera mount here would translate every track a second time.
+            float bearing = bearingDegRight * Mathf.Deg2Rad;
+            return pose.Transform(Mathf.Sin(bearing) * rangeM, Mathf.Cos(bearing) * rangeM);
+        }
+
         /// <summary>A person seen by the colour camera's OpenCV 5 dnn detector (YOLO11m, run by the recorder's vision
-        /// service on this robot's own frame at t): bearing in degrees, positive to the right; range is the median depth
-        /// of the box. Thermal saturates inside a fire room's hot gas layer and found no person in 161 visible views
+        /// service on this robot's own frame at t): bearing in degrees, positive to the right; horizontal range and bearing
+        /// are measured from the robot body centre by the vision service. Thermal saturates inside a fire room's hot gas layer and found no person in 161 visible views
         /// (warm_eval); the colour camera still sees them. Repeated sightings make a candidate like thermal blobs do.</summary>
         public void OnPersonSighting(double t, float bearingDegRight, float rangeM, float confidence)
         {
@@ -668,9 +679,7 @@ namespace SmokeRescue.Brain
             if (!BrainMath.Finite(bearingDegRight) || !BrainMath.Finite(rangeM) || !BrainMath.Finite(confidence)) throw new ArgumentException("Nonfinite person sighting.");
             if (confidence < c.person_rgb_min_confidence || !(rangeM > 0) || rangeM > c.person_rgb_max_range_m) return;
             var pose = motion.Covers(t) ? motion.At(t) : motion.Pose;
-            Vector2 camera = pose.Transform(0, sensors.camera.mount.forward_offset_m);
-            float heading = pose.yawRad - bearingDegRight * Mathf.Deg2Rad;
-            var position = camera + new Vector2(-Mathf.Sin(heading), Mathf.Cos(heading)) * rangeM;
+            var position = PersonSightingPosition(pose, bearingDegRight, rangeM);
             foreach (var person in survivors) if (Vector2.Distance(person, position) <= c.survivor_merge_m) return;
             if (AtOwnSetDown(position)) return;
             Track nearest = null; float best = c.survivor_merge_m;
@@ -700,7 +709,7 @@ namespace SmokeRescue.Brain
                 airHistory.Add(sample);
                 if (sample.t < from) { if (sample.t > lastAir) { airC = sample.c; lastAir = sample.t; } continue; }
                 IntegrateBudget((float)(sample.t - from), from); from = sample.t;
-                airC = sample.c; lastAir = sample.t;
+                airC = sample.c; lastAir = sample.t; NoteAirSample(sample.c, sample.t);
             }
             IntegrateBudget((float)(t - from), from);
             double keep = t - Math.Max(c.air_rise_window_s, c.air_rise_baseline_s) - 1;
@@ -1344,6 +1353,7 @@ namespace SmokeRescue.Brain
         /// </summary>
         /// <summary>The rate-of-rise half of HeatBuilding: air rising at air_rise_c_per_min or faster, by at least
         /// air_rise_min_delta_c over its recent low.</summary>
+        double heatRisingUntil = double.NegativeInfinity;
         bool HeatRising(double t)
         {
             if (t - lastAir > c.frame_max_age_s || AirSlopePerMin(t) < c.air_rise_c_per_min) return false;
@@ -1553,7 +1563,38 @@ namespace SmokeRescue.Brain
         }
         /// <summary>Where a retreat goes: the coolest reachable known cell; with stay_inside only floor proven indoors, with no
         /// pull toward the start (it is outside).</summary>
-        List<Vector2> RetreatPath() => c.stay_inside ? planner.CoolestPath(motion.Pose.position, InSearchArea, false) : planner.CoolestPath(motion.Pose.position);
+        List<Vector2> RetreatPath() => c.stay_inside ? planner.CoolestPath(motion.Pose.position, InSearchArea, false, AirCost()) : planner.CoolestPath(motion.Pose.position);
+        /// <summary>The air the robot itself measured near each cell, from its own track: a hot gas layer heats the air long
+        /// before the floor shows on the thermal map. Floor it has no sample near counts as hot as the air where it stands.
+        /// Seed 929, robot B at 60 to 90 s: retreating to the "coolest floor" by surface heat alone, it stood still in the
+        /// living room while its air rose to 47 C; it had measured 20 C in the foyer 40 s earlier.</summary>
+        Func<int, float> AirCost()
+        {
+            if (c.retreat_air_weight <= 0 || airTrack.Count == 0) return null;
+            var measured = new Dictionary<int, float>();
+            int reach = Mathf.CeilToInt(c.air_sample_radius_m / grid.CellM);
+            foreach (var s in airTrack)   // oldest first, so a later sample overwrites an earlier one
+            {
+                int centre = grid.Cell(s.position); if (centre < 0) continue;
+                int cx = centre % grid.Size, cy = centre / grid.Size;
+                for (int dy = -reach; dy <= reach; dy++) for (int dx = -reach; dx <= reach; dx++)
+                    if (grid.Inside(cx + dx, cy + dy) && (dx * dx + dy * dy) * grid.CellM * grid.CellM <= c.air_sample_radius_m * c.air_sample_radius_m)
+                        measured[(cy + dy) * grid.Size + cx + dx] = s.c;
+            }
+            float here = airC;
+            return i => c.retreat_air_weight * Mathf.Max(0, (measured.TryGetValue(i, out var a) ? a : here) - c.ambient_c);
+        }
+        readonly List<(Vector2 position, float c, double t)> airTrack = new List<(Vector2, float, double)>();
+        void NoteAirSample(float airValue, double t)
+        {
+            var p = motion.Pose.position;
+            // Within the spacing the newest reading replaces the last one at that sample's place; the place does not slide
+            // along with the robot, or one sample would end up holding the whole track.
+            if (airTrack.Count > 0 && Vector2.Distance(airTrack[airTrack.Count - 1].position, p) < c.air_sample_spacing_m)
+                airTrack[airTrack.Count - 1] = (airTrack[airTrack.Count - 1].position, airValue, t);
+            else airTrack.Add((p, airValue, t));
+            if (airTrack.Count > 2000) airTrack.RemoveAt(0);
+        }
         void BeginReturn(double t, string reason)
         {
             // Stay inside (the owner's decision, 22 Oct): a robot that has gone in never leaves by the entrance. At the
