@@ -1,0 +1,79 @@
+{
+  "inherits": "scenario_house_onedoor_seed925.json",
+  "survivors": [],
+  "survivor_placement": "fixed",
+  "warm_objects": [],
+  "dark_rooms": [],
+  "obstacles": [
+    {
+      "room": "foyer",
+      "kind": "obstacle_wood_pile",
+      "at": [
+        9.2,
+        2.6
+      ],
+      "yaw": 0
+    },
+    {
+      "room": "foyer",
+      "kind": "obstacle_wood_pile",
+      "at": [
+        9.2,
+        3.4
+      ],
+      "yaw": 0
+    },
+    {
+      "room": "foyer",
+      "kind": "obstacle_wood_pile",
+      "at": [
+        10,
+        2.6
+      ],
+      "yaw": 0
+    },
+    {
+      "room": "foyer",
+      "kind": "obstacle_wood_pile",
+      "at": [
+        10,
+        3.4
+      ],
+      "yaw": 0
+    },
+    {
+      "room": "foyer",
+      "kind": "obstacle_wood_pile",
+      "at": [
+        10.8,
+        2.6
+      ],
+      "yaw": 0
+    },
+    {
+      "room": "foyer",
+      "kind": "obstacle_wood_pile",
+      "at": [
+        10.8,
+        3.4
+      ],
+      "yaw": 0
+    }
+  ],
+  "duration_s": 40,
+  "door_states": {},
+  "id": "trigger_two_streams",
+  "seed": 1411,
+  "description": "Exercise #59 cooperating against a fire too large for one stream. Initially involved area pi*1.35^2 is about 5.73 m2 before fuel clipping; each stream removes 1295 kW and the measured area decides the actual assessment. Evidence is both robots assessing the same gate-frame fire patch as needing two streams, aiming their spray orders at it, and overlapping positive flows in water.jsonl. Cooperation remains the agents choice.",
+  "target_fixes": [
+    "59"
+  ],
+  "duration_s_reason": "Test observation window; also the existing recorder operating deadline. Meeting and heat re-entry require their full physical waiting periods.",
+  "fire": {
+    "spread": true,
+    "head_start_s": 6,
+    "head_start_s_reason": "Fire age when robots reach the launch pads. Zero for delayed ignition, 6 s to develop a local flame, 60 s for a heated compartment.",
+    "config_file": "fire_trigger_two_streams.json",
+    "config_file_reason": "World-only fuel ignition experiment. Heat and smoke load the same file."
+  }
+}

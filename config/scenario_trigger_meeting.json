@@ -1,0 +1,31 @@
+{
+  "inherits": "scenario_house_onedoor_seed925.json",
+  "survivors": [],
+  "survivor_placement": "fixed",
+  "warm_objects": [],
+  "dark_rooms": [],
+  "obstacles": [],
+  "duration_s": 90,
+  "door_states": {},
+  "id": "trigger_meeting",
+  "seed": 1407,
+  "description": "Exercise #57 meeting after 45 s without radio. No fire or people distract the search. A damaged radio has a 3 m physical range, allowing initial contact at the gate then losing it as robots separate. Evidence is rendezvous with out_of_contact_s at least 45 and unshared_cells at least 1500. A 40 s recording cannot exercise this unchanged rule; 90 s leaves time to return and exchange maps.",
+  "target_fixes": [
+    "57"
+  ],
+  "duration_s_reason": "Test observation window; also the existing recorder operating deadline. Meeting and heat re-entry require their full physical waiting periods.",
+  "fire": {
+    "spread": true,
+    "head_start_s": 0,
+    "head_start_s_reason": "Fire age when robots reach the launch pads. Zero for delayed ignition, 6 s to develop a local flame, 60 s for a heated compartment.",
+    "config_file": "fire_trigger_cold.json",
+    "config_file_reason": "World-only fuel ignition experiment. Heat and smoke load the same file."
+  },
+  "radio": {
+    "range_m": 3,
+    "max_walls": 1,
+    "broadcast_period_s": 2,
+    "budget_bytes_per_s": 2048,
+    "range_m_reason": "World radio damage experiment: reduced transmitter range. No contact timestamps or robot meeting thresholds change."
+  }
+}

@@ -34,7 +34,41 @@ from brain.agent.llm import make_backend
 from brain.agent.robot_agent import RobotAgent
 from brain.agent import place
 from brain.agent.map3d import RobotMap3D
-from brain.agent.recording_transport import RecordingStore, MAX_BATCH_BYTES
+from brain.agent.recording_transport import (RecordingStore, MAX_BATCH_BYTES, PullJobs, ACTIVE_PULL,
+                                           thermal_depth_frame, rgb_depth_frame, tool_frame_times)
+
+# The existing agent imports its registry as a module-level class. Install one compatible subclass once, with a
+# request-local ContextVar. Local requests use the original methods; concurrent robots never replace global loaders.
+from brain.agent import robot_agent as _agent_module
+from brain.agent.tools import ToolRegistry as _ToolRegistry
+
+
+class _PullToolRegistry(_ToolRegistry):
+    def __init__(self, robot_dir, ctx, debug_dir=None):
+        job = ACTIVE_PULL.get()
+        super().__init__(job.folder if job else robot_dir, ctx, debug_dir)
+
+    def _frame(self):
+        job = ACTIVE_PULL.get()
+        if job:
+            job.require('latest', self.ctx.t)
+        return super()._frame()
+
+    def _p_track_fire_spread(self, seconds=3.0):
+        job = ACTIVE_PULL.get()
+        if not job:
+            return super()._p_track_fire_spread(seconds)
+        from brain.agent import vision
+        times = tool_frame_times(self.ctx.t, self.ctx.frame_times, seconds)
+        if len(times) < 2:
+            return {'error': 'need at least two thermal frames'}
+        job.require('track_fire_spread', self.ctx.t, self.ctx.frame_times, seconds)
+        return vision.track_fire_spread([thermal_depth_frame(job.folder, t) for t in times])
+
+
+_agent_module.ToolRegistry = _PullToolRegistry
+_pull_jobs = PullJobs()
+
 
 RUN_DIR = Path(os.environ.get("AGENT_RUN_DIR", "/tmp/smoke-rescue-agent"))
 RUN_DIR.mkdir(parents=True, exist_ok=True)
@@ -93,8 +127,11 @@ async def upload_recording(run_id: str, robot: str, request: Request):
             stream.write(chunk)
         stream.seek(0)
         try:
-            return await run_in_threadpool(recording_store().upload, run_id, robot, stream,
-                                          request.headers.get("x-recording-source"))
+            store = recording_store()
+            result = await run_in_threadpool(store.upload, run_id, robot, stream,
+                                            request.headers.get("x-recording-source"))
+            _pull_jobs.notify(store.folder(run_id, robot))
+            return result
         except (ValueError, OSError) as exc:
             raise HTTPException(400, str(exc)) from exc
 
@@ -109,8 +146,30 @@ def _robot_step(robot, req):
 async def robot_step(robot: str, request: Request):
     req = await request.json()
     req["robot"] = robot
+    if req.get('transport') == 'pull-v1':
+        return _submit_pull(robot, req, lambda job: RobotAgent(backend(), Path(job.resolved['trace_path'])).step(job.resolved))
     # In a worker thread: the recorder sends both robots' steps at once, and a blocking call here would serialise them.
     return await run_in_threadpool(_robot_step, robot, req)
+
+
+def _submit_pull(robot, req, execute):
+    try:
+        result = _pull_jobs.submit(recording_store(), robot, req, execute)
+        return Response(json.dumps(result), status_code=202, media_type='application/json')
+    except (ValueError, KeyError, TypeError, OSError) as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.get('/pull/{job_id}')
+def poll_pull(job_id: str):
+    return _pull_jobs.get(job_id).state()
+
+
+@app.delete('/pull/{job_id}')
+def cancel_pull(job_id: str):
+    job = _pull_jobs.get(job_id)
+    job.cancel()
+    return job.state()
 
 
 @app.post("/commander/step")
@@ -196,6 +255,14 @@ async def perceive_people(request: Request):
     from brain.agent import vision
     req = await request.json()
     t0 = time.perf_counter()
+    if req.get('transport') == 'pull-v1':
+        def pull_detect(job):
+            job.require('rgb_depth', float(req['t']))
+            frame = rgb_depth_frame(job.folder, float(req['t']))
+            people = vision.detect_people_rgb(frame, min_conf=float(req.get('min_conf', .25)))
+            return {'t': frame['stamps']['rgb'], 'people': people, 'opencv': cv2.__version__,
+                    'ms': round((time.perf_counter()-t0)*1000, 1)}
+        return _submit_pull(Path(req.get('robot_dir', '')).name, dict(req, operation='people'), pull_detect)
     def detect():
         with recording_store().request(req) as resolved:
             frame = vision.load_frame(resolved["robot_dir"], float(resolved["t"]))
@@ -241,6 +308,11 @@ def _map3d_request(robot, operation, req):
 @app.post('/map3d/{robot}/integrate')
 async def map3d_integrate(robot: str, request: Request):
     req = await request.json()
+    if req.get('transport') == 'pull-v1':
+        def pull_integrate(job):
+            job.require('depth', float(req['t']))
+            return _map3d_request(robot, 'integrate', dict(job.resolved, robot_dir=str(job.folder)))
+        return _submit_pull(robot, dict(req, operation='map3d'), pull_integrate)
     def integrate():
         with recording_store().request(req, sensors=('depth',), robot=robot) as resolved:
             return _map3d_request(robot, 'integrate', resolved)
@@ -300,7 +372,15 @@ def _resolved_place_request(operation, robot, req):
 async def place_keyframe(robot: str, request: Request):
     """Store an own view. Success returns {ok, id, database_id, t, features, payload_b64}; t is the actual RGB stamp.
     A restarted database changes database_id before reusing service ids."""
-    return await run_in_threadpool(_place_request, 'keyframe', robot, await request.json())
+    req = await request.json()
+    if req.get('transport') == 'pull-v1':
+        def pull_keyframe(job):
+            # The place worker's existing full-frame loader reads all three latest sensors. Its persistent database
+            # stays keyed to the stable run folder, not to the temporary decision snapshot.
+            job.require('latest', float(req['t']))
+            return _resolved_place_request('keyframe', robot, job.resolved)
+        return _submit_pull(robot, dict(req, operation='place'), pull_keyframe)
+    return await run_in_threadpool(_place_request, 'keyframe', robot, req)
 
 
 @app.post('/place/{robot}/match')

@@ -133,7 +133,7 @@ namespace SmokeRescue.Brain
             NoteBodyTrack();
             CheckReenter(t);
             if (doorwayProbeGoal.HasValue && (returning || retreating || completed || nearFire || active != null ||
-                AgentGoalActive(t) || recoveryPhase != 0 || t - doorwayProbeStarted >= c.sweep_max_s))
+                (AgentGoalActive(t) && !(c.frontier_doorway_looks && agentGoalIsFrontier)) || recoveryPhase != 0 || t - doorwayProbeStarted >= c.sweep_max_s))
                 EndDoorwayProbe(t, "Evidence look cancelled by safety, a survivor, an agent order, or its time limit.");
             if (routeLook.HasValue && (retreating || returning || completed || nearFire))
                 EndRouteLook(t, "Cancelled: a heat reflex or a return to the way out takes precedence over the route look.", true);
@@ -211,6 +211,7 @@ namespace SmokeRescue.Brain
                 }
                 if (arrived)
                 {
+                    RememberMissionInterior();
                     completed = true; completedAt = t; relocateGoal = null; relocateFrom = null; ClearPath(); carryClearFrom = stepAwayFrom = new Vector2(float.NaN, float.NaN);
                     // Left early to stay safe, or carried someone out: it may go back in once that is safe (CheckReenter).
                     // NoFrontierLeft too: the exclusions that emptied the list (fire-cut blacklist, visited circles, a
@@ -373,7 +374,9 @@ namespace SmokeRescue.Brain
             }
             var doorwayLook = DoorwayProbeStep(t, dt);
             if (doorwayLook.HasValue) return doorwayLook.Value;
-            if (!sweeping && !AgentGoalActive(t) && !facing.HasValue && t >= agentHoldUntil && NeedPlan(t) && TryStartDoorwayProbe(t))
+            // An exploration order selects search floor; it must not suppress the local sensor look needed to admit
+            // side openings. Explicit approaches and holds still win. The retained agentGoal resumes after the look.
+            if (!sweeping && (!AgentGoalActive(t) || (c.frontier_doorway_looks && agentGoalIsFrontier)) && !facing.HasValue && t >= agentHoldUntil && NeedPlan(t) && TryStartDoorwayProbe(t))
                 return DoorwayProbeStep(t, dt).Value;
             if (goal.HasValue && Vector2.Distance(goal.Value, motion.Pose.position) <= c.goal_tolerance_m)
             {
@@ -442,6 +445,17 @@ namespace SmokeRescue.Brain
                         SetPath(agentPath, agentGoalIsFrontier); scanSince = double.NaN;
                         if (agentGoalIsFrontier) { frontierCentre = agentGoal.Value; frontierRadius = c.peer_claim_radius_m; }
                         Emit(t, "goal", "Agent order: " + agentGoalReason, "x_m", agentGoal.Value.x, "y_m", agentGoal.Value.y, "path_points", path.Count);
+                    }
+                    else if (agentFace.HasValue && !agentGoalIsFrontier && (agentPath = planner.ApproachPath(motion.Pose.position, agentFace.Value)).Count > 0)
+                    {
+                        // A closer look whose point is not standable (a wall or furniture there): view the same point from the
+                        // nearest standable spot at the viewing distance with a clear line to it. One-door seed 926, robot B
+                        // at 80 s: the step-back point 2.8 m from the person in the study lay in a wall, the order died with
+                        // "no known free path", B looked again from 1.3 to 1.5 m, below the thermal camera's view, and left
+                        // without confirming her.
+                        agentGoal = agentPath[agentPath.Count - 1]; SetPath(agentPath, false); scanSince = double.NaN;
+                        Emit(t, "goal", "Agent order: the asked viewpoint is not standable; view the same point from the nearest standable spot at the viewing distance.",
+                            "x_m", agentGoal.Value.x, "y_m", agentGoal.Value.y, "face_x_m", agentFace.Value.x, "face_y_m", agentFace.Value.y);
                     }
                     else { Emit(t, "replan", "Agent goal has no known free path; back to exploring.", "x_m", agentGoal.Value.x, "y_m", agentGoal.Value.y); agentGoal = null; }
                 }
@@ -1071,7 +1085,11 @@ namespace SmokeRescue.Brain
             // just left with its air at 34 C and rising). Wait reenter_after_heat_s in cool, steady air first.
             if (burned && (t - heatExitAt < c.reenter_after_heat_s || HeatBuilding(t, out _))) return;
             grid.FireClearance = c.fire_clearance_m; grid.FirePrediction = true;
-            System.Func<Vector2, bool> excluded = p => ClaimBlocks(p, t) || GoalBlacklisted(p, t) || VisitedGoal(p, t) || !InSearchArea(p);
+            RememberMissionInterior();
+            bool[] connected = c.reentry_requires_interior_link && c.search_requires_ceiling
+                ? grid.InteriorConnectedTo(missionInterior) : null;
+            bool Linked(Vector2 p) => connected == null || (grid.Cell(p) >= 0 && connected[grid.Cell(p)]);
+            System.Func<Vector2, bool> excluded = p => ClaimBlocks(p, t) || GoalBlacklisted(p, t) || VisitedGoal(p, t) || !InSearchArea(p) || !Linked(p);
             // Every frontier, in the planner's own order, not only the first: the nearest can lie by the fire while a farther
             // one is clear (Codex review, 22 Oct: robot B stood at its door for 119 s of held-out seed 916 while the only
             // frontier checked was the one beside the burning foyer).
@@ -1080,7 +1098,7 @@ namespace SmokeRescue.Brain
             // (one-door seed 922, robot B walked the outside wall at 31 s while A searched inside).
             var candidates = planner.Frontiers(motion.Pose.position, excluded);
             if (candidates.Count == 0 && peers.Count > 0)
-                candidates = planner.Frontiers(motion.Pose.position, p => GoalBlacklisted(p, t) || VisitedGoal(p, t) || !InSearchArea(p), true);
+                candidates = planner.Frontiers(motion.Pose.position, p => GoalBlacklisted(p, t) || VisitedGoal(p, t) || !InSearchArea(p) || !Linked(p), true);
             foreach (var candidate in candidates)
             {
                 float near = ReentryFireDistance(candidate.path);
@@ -1102,6 +1120,16 @@ namespace SmokeRescue.Brain
                 walkedIn.Add(motion.Pose.position);
             Emit(t, "reenter", "Heat budget recovered and a frontier is reachable with the fire clear of the way: go back in.",
                 "fire_distance_m", closest, "information_cells", frontier.information, "heat_budget", budget);
+        }
+        bool[] missionInterior;
+        /// <summary>Freeze the searched, ceiling-backed interior before walking the exterior. Newly seen ceilings in a
+        /// neighbouring building are not mission anchors. This records observations, never a building outline or identity.</summary>
+        void RememberMissionInterior()
+        {
+            if (missionInterior != null) return;
+            missionInterior = new bool[grid.Count];
+            for (int i = 0; i < grid.Count; i++)
+                missionInterior[i] = grid.OwnObserved(i) && grid.UnderCeiling(grid.Centre(i));
         }
         readonly List<int> reenterCells = new List<int>(); readonly List<float> reenterRates = new List<float>();
         float reenterThen = float.PositiveInfinity; double reenterThenT = double.NaN;
@@ -1230,7 +1258,7 @@ namespace SmokeRescue.Brain
             if (options.Count == 0) { completedAt = t; return null; }
             var f = options[0];
             SetPath(f.path); relocateGoal = f.position; relocateFrom = from; lastPlan = t;
-            Emit(t, "relocate", "Every way in is still blocked after waiting outside: follow the building's wall to look for another way in.",
+            Emit(t, "relocate", "No linked safe way in after waiting outside: follow sensed walls; re-entry still needs indoor connectivity to the searched interior.",
                 "x_m", f.position.x, "y_m", f.position.y, "waited_s", t - completedAt);
             return FollowOrHold(t, dt);
         }

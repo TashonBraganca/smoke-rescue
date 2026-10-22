@@ -99,6 +99,8 @@ namespace SmokeRescue.Brain
         public float agent_avoid_min_radius_m = 0.3f, agent_avoid_max_radius_m = 4f;
         public float frontier_cluster_max_m = 2.5f;
         public bool search_requires_ceiling = false, ceiling_sight_lines = true;
+        public bool reentry_requires_interior_link = true;
+        public bool frontier_doorway_looks = true;
         public float ceiling_min_height_m = 2.5f, ceiling_radius_m = 0.6f, ceiling_wall_margin_m = 0.4f;
         public int ceiling_min_hits = 2;
         public int enclosure_rays = 36;
@@ -139,7 +141,7 @@ namespace SmokeRescue.Brain
         public int progress_min_cells = 40;
         public float progress_window_s = 15f, progress_skip_radius_m = 2.5f;
         public float progress_min_travel_m = 1f;
-        public float burning_radius_m = 2f; public int body_track_poses = 600; public float follow_partner_standoff_m = 2f, teammate_track_max_m = 2.5f, threshold_exit_clear_m = 1.5f, teammate_predict_max_s = 4f, teammate_mask_margin_m = .15f, wait_behind_partner_s = 30f; public int threshold_look_options = 8;
+        public float burning_radius_m = 2f; public int body_track_poses = 600; public float follow_partner_standoff_m = 2f, teammate_track_max_m = 2.5f, threshold_exit_clear_m = 1.5f, teammate_predict_max_s = 4f, teammate_mask_margin_m = .15f, wait_behind_partner_s = 30f, survivor_view_clear_m = .5f; public int threshold_look_options = 8;
         public float rendezvous_after_s = 45f, rendezvous_hold_s = 10f; public int rendezvous_min_unshared_cells = 1500;
         public float exterior_dwell_s = 15f, facade_band_m = 2f; public float exit_open_share = 0.9f; public int exit_min_scans = 30, exit_max_count = 4;
         public int frontier_information_radius_cells = 3;

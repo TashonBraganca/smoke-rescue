@@ -175,13 +175,13 @@ namespace SmokeRescue.World
                 // The fire sees this run's obstacles as fuel too (burning wood piles in the hallway).
                 var firePlan = FloorPlan.Load();     // a fresh copy, so the shared plan keeps only the house
                 if (scenario.obstacles != null) firePlan.landmarks.AddRange(scenario.obstacles);
-                var spread = new FireSimHeat(firePlan, scenario.seed, scenario.fire.head_start_s);
+                var spread = new FireSimHeat(firePlan, scenario.seed, scenario.fire.head_start_s, scenario.fire.ConfigPath);
                 a.fireSim = spread;
                 a.thermal = new ThermalField(plan, spread);
                 if (scenario.smoke.model == "fluid")
                 {
                     a.smokeSolver = SmokeSolver.Load(firePlan,
-                        System.IO.Path.Combine(FloorPlan.ConfigDir, "fire.json"),
+                        scenario.fire.ConfigPath,
                         System.IO.Path.Combine(FloorPlan.ConfigDir, "smoke.json"), scenario.seed, spread.HeadStart);
                     spread.FluidSmoke = a.smokeSolver;
                     a.field.Override = a.smokeSolver.Density;

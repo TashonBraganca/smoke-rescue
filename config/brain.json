@@ -275,6 +275,8 @@
   "teammate_predict_max_s_reason": "A partner's body is predicted from its last radioed pose for at most this long (OnTeammate): two 2 s message intervals, so one lost message still leaves it masked. Heard from longer ago it may be anywhere, and its returns are mapped as usual.",
   "teammate_mask_margin_m": 0.15,
   "teammate_mask_margin_m_reason": "Beyond the body's 0.375 m half length, LiDAR and depth returns this close to the partner's predicted stretch are its body: B's placement error at the pad is sigma 5 cm and 2 deg (3 sigma 0.15 m plus 0.1 m of heading at 3 m), and odometry adds a few cm. Masking only skips returns; it erases nothing already mapped.",
+  "survivor_view_clear_m": 0.5,
+  "survivor_view_clear_m_reason": "A viewing standpoint needs no mapped wall on its line to the person, except within this distance of the person: a body slumped against a wall or lying by furniture is itself in the map, or touches wall cells, there. Half a metre is a seated person's depth from the wall to the front of the knees.",
   "wait_behind_partner_s": 30.0,
   "wait_behind_partner_s_reason": "Longest a robot waits behind a partner standing just ahead on the way in (WaitBehindPartner) before its no-frontier scan may end the search: two agent steps (up to about 13 s each in run 924), so a partner stopped to inspect or confirm someone has moved on. Seed 925: A stood 6 s confirming a person in the doorway and B, with nothing else reachable, ended its mission at 18 s.",
   "threshold_look_options": 8,
@@ -482,5 +484,9 @@
   "visual_lidar_keyframes_per_message": 1,
   "visual_lidar_keyframes_per_message_reason": "MessageByteLimitsUseActualBinaryRoundTripsAtHouseScale measured an 8165-byte delta with two 360-beam LiDAR sweeps and one 96-feature visual payload, above 8000 bytes. One sweep near the visual capture pose supports map verification even after a delayed service reply. The test measured 7407-byte deltas and 7975-byte full snapshots; LiDAR-only messages still carry two.",
   "visual_keyframe_max_payload_bytes": 3653,
-  "visual_keyframe_max_payload_bytes_reason": "The measured service uses 96 ORB features at 38 bytes each plus a 5-byte header, exactly 3653 bytes. Reject larger service payloads until the radio budget is measured again; the one-sweep house delta measured 7407 bytes."
+  "visual_keyframe_max_payload_bytes_reason": "The measured service uses 96 ORB features at 38 bytes each plus a 5-byte header, exactly 3653 bytes. Reject larger service payloads until the radio budget is measured again; the one-sweep house delta measured 7407 bytes.",
+  "reentry_requires_interior_link": true,
+  "reentry_requires_interior_link_reason": "After walking outside, re-enter only ceiling-backed free floor connected indoors to floor this robot searched before leaving. A free yard path and a neighbouring ceiling do not establish the same structure. Uses body clearance and four-neighbour map connectivity, without a gate-distance cutoff, outline or house identity. Missing roof coverage can conservatively leave a real alternative entrance unverified.",
+  "frontier_doorway_looks": true,
+  "frontier_doorway_looks_reason": "An explore_frontier order chooses search floor, so the same bounded doorway camera look available during reflex exploration remains available en route. Explicit go_to/person approaches and holds still take precedence. Uses the existing body/camera geometry, frontier_peek_m, sweep_hold_s and sweep_max_s; no house-specific timing or direction is added."
 }

@@ -53,14 +53,16 @@ namespace SmokeRescue.World
         }
 
         readonly int seed;
+        readonly string firePath;
         double lastFireTime = -1;
 
-        public FireSimHeat(FloorPlan plan, int seed, float headStart)
+        public FireSimHeat(FloorPlan plan, int seed, float headStart, string firePath = null)
         {
             this.plan = plan;
             this.seed = seed;
             HeadStart = headStart;
-            Sim = FireSim.Load(plan, Path.Combine(FloorPlan.ConfigDir, "fire.json"), seed);
+            this.firePath = firePath ?? Path.Combine(FloorPlan.ConfigDir, "fire.json");
+            Sim = FireSim.Load(plan, this.firePath, seed);
         }
 
         public double FireTime(float t) => Mathf.Max(0f, t + HeadStart);
@@ -83,7 +85,7 @@ namespace SmokeRescue.World
                 if (ft < lastFireTime)    // FireSim rejects any request earlier than the previous one
                 {
                     Rewinds++;
-                    Sim = FireSim.Load(plan, Path.Combine(FloorPlan.ConfigDir, "fire.json"), seed);
+                    Sim = FireSim.Load(plan, this.firePath, seed);
                     foreach (var spray in sprays) spray.Schedule(Sim);
                     flamesT = float.NaN;
                 }

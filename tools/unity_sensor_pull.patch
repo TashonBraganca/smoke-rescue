@@ -1,0 +1,244 @@
+diff --git a/unity/SmokeRescue/Assets/SmokeRescue/Recording/SensorPullClient.cs b/unity/SmokeRescue/Assets/SmokeRescue/Recording/SensorPullClient.cs
+new file mode 100644
+--- /dev/null
++++ b/unity/SmokeRescue/Assets/SmokeRescue/Recording/SensorPullClient.cs
+@@ -0,0 +1,163 @@
++using System;
++using System.Collections.Generic;
++using System.Globalization;
++using System.IO;
++using System.IO.Compression;
++using System.Linq;
++using System.Net.Http;
++using System.Text;
++using System.Text.RegularExpressions;
++using System.Threading;
++using System.Threading.Tasks;
++using Newtonsoft.Json;
++using Newtonsoft.Json.Linq;
++
++namespace SmokeRescue.Recording
++{
++    /// <summary>Sensor files stay on Unity until a remote tool asks for them. All transfers keep the original PNG bytes.</summary>
++    public static class SensorPullClient
++    {
++        static readonly string[] Small = { "camera.yaml", "thermal.yaml", "rgb.txt", "depth.txt", "thermal.txt", "lidar.txt", "decisions.jsonl" };
++        static readonly Regex Id = new Regex(@"^[A-Za-z0-9][A-Za-z0-9_-]{0,95}$");
++        static readonly Regex Image = new Regex(@"^(rgb|depth|thermal)/[0-9]+(?:\.[0-9]+)?\.png$");
++        static readonly Regex Poll = new Regex(@"^/pull/[A-Za-z0-9_-]+$");
++        // Same expanded/wire bound as RecordingStore. A demand is rejected rather than resized or re-encoded.
++        const long MaxBytes = 64L * 1024 * 1024;
++
++        public static bool Applies(Uri endpoint, string path, JObject request) => !endpoint.IsLoopback &&
++            (request["robot_dir"] != null || (path.EndsWith("/export") && request["path"] != null));
++
++        public static Dictionary<string, byte[]> RequestedFiles(string folder, IEnumerable<string> names)
++        {
++            var result = new Dictionary<string, byte[]>();
++            folder = Path.GetFullPath(folder).TrimEnd(Path.DirectorySeparatorChar);
++            foreach (string name in names)
++            {
++                if (!Image.IsMatch(name)) throw new InvalidDataException("Server requested a non-sensor file.");
++                string path = Path.GetFullPath(Path.Combine(folder, name.Replace('/', Path.DirectorySeparatorChar)));
++                if (!path.StartsWith(folder + Path.DirectorySeparatorChar, StringComparison.Ordinal)) throw new InvalidDataException("Sensor path left the robot folder.");
++                for (var part = new FileInfo(path) as FileSystemInfo; part != null; )
++                {
++                    if ((part.Attributes & FileAttributes.ReparsePoint) != 0) throw new InvalidDataException("Sensor symlinks are refused.");
++                    if (part.FullName == folder) break;
++                    part = part is FileInfo file ? file.Directory : ((DirectoryInfo)part).Parent;
++                }
++                result.Add(name, File.ReadAllBytes(path));
++            }
++            return result;
++        }
++
++        static Dictionary<string, byte[]> Metadata(string folder, double t)
++        {
++            var result = new Dictionary<string, byte[]>();
++            foreach (string name in Small)
++            {
++                string path = Path.Combine(folder, name);
++                if (!File.Exists(path)) continue;
++                if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) throw new InvalidDataException("Metadata symlinks are refused.");
++                if (name.EndsWith(".yaml")) { result[name] = File.ReadAllBytes(path); continue; }
++                var kept = new List<string>();
++                foreach (string line in File.ReadAllLines(path))
++                {
++                    if (string.IsNullOrWhiteSpace(line) || line.TrimStart().StartsWith("#")) { kept.Add(line); continue; }
++                    double stamp = name.EndsWith(".jsonl") ? JObject.Parse(line).Value<double>("t") :
++                        double.Parse(line.Split((char[])null, StringSplitOptions.RemoveEmptyEntries)[0], CultureInfo.InvariantCulture);
++                    if (stamp <= t) kept.Add(line);
++                }
++                result[name] = Encoding.UTF8.GetBytes(string.Join("\n", kept) + "\n");
++            }
++            return result;
++        }
++
++        static async Task Upload(HttpClient http, Uri endpoint, string run, string robot, Dictionary<string, byte[]> files, string source, CancellationToken token)
++        {
++            if (files.Count == 0) return;
++            if (files.Values.Sum(bytes => (long)bytes.Length) > MaxBytes) throw new InvalidDataException("Sensor batch exceeds 64 MiB; no fidelity reduction is allowed.");
++            using (var zip = new MemoryStream())
++            {
++                using (var batch = new ZipArchive(zip, ZipArchiveMode.Create, true))
++                    foreach (var file in files)
++                        using (var entry = batch.CreateEntry(file.Key, CompressionLevel.NoCompression).Open()) entry.Write(file.Value, 0, file.Value.Length);
++                if (zip.Length > MaxBytes) throw new InvalidDataException("Sensor ZIP exceeds 64 MiB.");
++                using (var message = new HttpRequestMessage(HttpMethod.Put, new Uri(endpoint, $"runs/{run}/{robot}/files")))
++                {
++                    message.Headers.Add("X-Recording-Source", source);
++                    message.Content = new ByteArrayContent(zip.ToArray());
++                    message.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/zip");
++                    using (var response = await http.SendAsync(message, token).ConfigureAwait(false)) response.EnsureSuccessStatusCode();
++                }
++            }
++        }
++
++        static async Task<JObject> Json(HttpClient http, HttpMethod method, Uri url, JObject body, CancellationToken token)
++        {
++            using (var request = new HttpRequestMessage(method, url))
++            {
++                if (body != null) request.Content = new StringContent(body.ToString(Formatting.None), Encoding.UTF8, "application/json");
++                using (var response = await http.SendAsync(request, token).ConfigureAwait(false))
++                {
++                    response.EnsureSuccessStatusCode();
++                    return JObject.Parse(await response.Content.ReadAsStringAsync().ConfigureAwait(false));
++                }
++            }
++        }
++
++        public static async Task<JObject> Run(HttpClient http, Uri endpoint, string path, JObject request, CancellationToken token)
++        {
++            endpoint = new Uri(endpoint.ToString().TrimEnd('/') + "/");
++            string exportPath = request.Value<string>("path");
++            string folder = Path.GetFullPath(request.Value<string>("robot_dir") ?? Path.GetDirectoryName(exportPath));
++            string robot = new DirectoryInfo(folder).Name, run = new DirectoryInfo(folder).Parent.Name;
++            if (!Id.IsMatch(robot) || !Id.IsMatch(run)) throw new InvalidDataException("Invalid run or robot id.");
++            var remote = (JObject)request.DeepClone();
++            remote["robot_dir"] = $"run://{run}/{robot}";
++            double t = remote.Value<double?>("t") ?? 0;
++            remote["t"] = t;
++            await Upload(http, endpoint, run, robot, Metadata(folder, t), folder, token).ConfigureAwait(false);
++            bool pull = path.EndsWith("/step") || path == "/perceive/people" || path.EndsWith("/integrate") || path.EndsWith("/keyframe");
++            if (pull) remote["transport"] = "pull-v1";
++            JObject state = await Json(http, HttpMethod.Post, new Uri(endpoint, path.TrimStart('/')), remote, token).ConfigureAwait(false);
++            if (!pull)
++            {
++                if (exportPath != null && state.Value<string>("download_url") is string download)
++                {
++                    if (download != $"/runs/{run}/{robot}/map3d.ply") throw new InvalidDataException("Invalid map download path.");
++                    using (var response = await http.GetAsync(new Uri(endpoint, download.TrimStart('/')), token).ConfigureAwait(false))
++                    {
++                        response.EnsureSuccessStatusCode();
++                        File.WriteAllBytes(exportPath, await response.Content.ReadAsByteArrayAsync().ConfigureAwait(false));
++                    }
++                }
++                return state;
++            }
++            string poll = state.Value<string>("poll_url");
++            if (poll == null || !Poll.IsMatch(poll)) throw new InvalidDataException("Invalid pull status path.");
++            var pollUrl = new Uri(endpoint, poll.TrimStart('/'));
++            int waitMs = state.Value<int>("poll_wait_ms"); // server transport setting, independent of simulation time
++            if (waitMs <= 0) throw new InvalidDataException("Missing polling interval.");
++            try
++            {
++                while (true)
++                {
++                    state = await Json(http, HttpMethod.Get, pollUrl, null, token).ConfigureAwait(false);
++                    switch (state.Value<string>("status"))
++                    {
++                        case "complete": return (JObject)state["result"];
++                        case "failed": throw new IOException("Remote sensor decision failed: " + state.Value<string>("error"));
++                        case "needs_files":
++                            var names = ((JArray)state["files"]).Values<string>();
++                            await Upload(http, endpoint, run, robot, RequestedFiles(folder, names), folder, token).ConfigureAwait(false);
++                            break;
++                        default: await Task.Delay(waitMs, token).ConfigureAwait(false); break;
++                    }
++                }
++            }
++            catch (OperationCanceledException)
++            {
++                // Best effort cleanup is independent of the token that just expired. The server also bounds its wait.
++                try { using (var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(1))) await Json(http, HttpMethod.Delete, pollUrl, null, cleanup.Token).ConfigureAwait(false); } catch (Exception) { }
++                throw;
++            }
++        }
++    }
++}
+diff --git a/unity/SmokeRescue/Assets/SmokeRescue/Recording/RecordingSession.Agents.cs b/unity/SmokeRescue/Assets/SmokeRescue/Recording/RecordingSession.Agents.cs
+--- a/unity/SmokeRescue/Assets/SmokeRescue/Recording/RecordingSession.Agents.cs
++++ b/unity/SmokeRescue/Assets/SmokeRescue/Recording/RecordingSession.Agents.cs
+@@ -478,7 +478,7 @@
+             if (t - rig.lastMap3dExport >= Map3dExportPeriodS - 1e-9)
+             {
+                 rig.lastMap3dExport = t;
+-                Post($"/map3d/{id}/export", new JObject { ["path"] = Path.GetFullPath(Path.Combine(rig.dir, "map3d.ply")) }, PeopleUrl);
++                Post($"/map3d/{id}/export", new JObject { ["path"] = Path.GetFullPath(Path.Combine(rig.dir, "map3d.ply")), ["robot_dir"] = Path.GetFullPath(rig.dir), ["t"] = t }, PeopleUrl);
+             }
+         }
+ 
+@@ -493,6 +493,10 @@
+         {
+             try
+             {
++                var endpoint = new System.Uri((baseUrl ?? AgentUrl).TrimEnd('/') + "/");
++                if (SensorPullClient.Applies(endpoint, path, body))
++                    using (var timeout = new System.Threading.CancellationTokenSource(System.TimeSpan.FromSeconds(120)))
++                        return SensorPullClient.Run(Http, endpoint, path, body, timeout.Token).GetAwaiter().GetResult();
+                 var content = new StringContent(body.ToString(Formatting.None), Encoding.UTF8, "application/json");
+                 var resp = Http.PostAsync((baseUrl ?? AgentUrl).TrimEnd('/') + path, content).Result;
+                 string text = resp.Content.ReadAsStringAsync().Result;
+diff --git a/unity/SmokeRescue/Assets/SmokeRescue/Recording/VisualPlaceClient.cs b/unity/SmokeRescue/Assets/SmokeRescue/Recording/VisualPlaceClient.cs
+--- a/unity/SmokeRescue/Assets/SmokeRescue/Recording/VisualPlaceClient.cs
++++ b/unity/SmokeRescue/Assets/SmokeRescue/Recording/VisualPlaceClient.cs
+@@ -29,6 +29,9 @@
+         {
+             try
+             {
++                if (SensorPullClient.Applies(baseUri, path, body))
++                    using (var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutS)))
++                        return new Response { body = await SensorPullClient.Run(http, baseUri, path, body, deadline.Token).ConfigureAwait(false) };
+                 using (var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutS)))
+                 using (var content = new StringContent(body.ToString(Formatting.None), Encoding.UTF8, "application/json"))
+                 using (var response = await http.PostAsync(new Uri(baseUri, path.TrimStart('/')), content, timeout.Token).ConfigureAwait(false))
+@@ -38,7 +41,7 @@
+                     return new Response { body = JObject.Parse(text) };
+                 }
+             }
+-            catch (Exception e) when (e is HttpRequestException || e is OperationCanceledException || e is JsonException || e is ObjectDisposedException)
++            catch (Exception e) when (e is System.IO.IOException || e is ArgumentException || e is FormatException || e is HttpRequestException || e is OperationCanceledException || e is JsonException || e is ObjectDisposedException)
+             { return new Response { error = e.GetBaseException().Message }; }
+         }
+         public void Dispose() => http.Dispose();
+diff --git a/unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/BrainTests.cs b/unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/BrainTests.cs
+--- a/unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/BrainTests.cs
++++ b/unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/BrainTests.cs
+@@ -128,6 +128,27 @@
+             Assert.That(exploration.retained, Is.True, "the original frontier resumes after the bounded look");
+             Assert.That(Run(false, false).started, Is.False, "control: the previous guard suppresses it");
+             Assert.That(Run(true, true).started, Is.False, "an explicit approach remains uninterrupted");
++        }
++
++        [Test]
++        public void PullTransportSendsOnlyRequestedOriginalSensorBytes()
++        {
++            string folder = Path.Combine(Path.GetTempPath(), "smoke-pull-test-" + Guid.NewGuid());
++            Directory.CreateDirectory(Path.Combine(folder, "rgb"));
++            Directory.CreateDirectory(Path.Combine(folder, "depth"));
++            try
++            {
++                byte[] original = { 137, 80, 78, 71, 0, 255, 17, 42 };
++                File.WriteAllBytes(Path.Combine(folder, "depth", "1.000000.png"), original);
++                File.WriteAllBytes(Path.Combine(folder, "rgb", "1.000000.png"), new byte[] { 99 });
++                var files = SmokeRescue.Recording.SensorPullClient.RequestedFiles(folder, new[] { "depth/1.000000.png" });
++                Assert.That(files.Count, Is.EqualTo(1), "the server asked for depth only");
++                CollectionAssert.AreEqual(original, files["depth/1.000000.png"], "no image decoding, scaling or re-encoding");
++                Assert.Throws<InvalidDataException>(() => SmokeRescue.Recording.SensorPullClient.RequestedFiles(folder, new[] { "../robot_B/depth/1.png" }));
++                Assert.Throws<InvalidDataException>(() => SmokeRescue.Recording.SensorPullClient.RequestedFiles(folder, new[] { "oracle/survivors.json" }));
++                Assert.Throws<InvalidDataException>(() => SmokeRescue.Recording.SensorPullClient.RequestedFiles(folder, new[] { "depth/../../scene.json" }));
++            }
++            finally { Directory.Delete(folder, true); }
+         }
+ 
+         static BrainConfig Settings() => new BrainConfig

@@ -1,0 +1,36 @@
+{
+  "inherits": "scenario_house_onedoor_seed925.json",
+  "survivors": [],
+  "survivor_placement": "fixed",
+  "warm_objects": [],
+  "dark_rooms": [],
+  "obstacles": [
+    {
+      "room": "foyer",
+      "kind": "obstacle_wood_pile",
+      "at": [
+        10,
+        3
+      ],
+      "yaw": 0
+    }
+  ],
+  "duration_s": 40,
+  "door_states": {},
+  "id": "trigger_spray",
+  "seed": 1405,
+  "description": "Exercise #19/#23/#79 water use. A small fuel pile burns within 5 m of the front gate and obstructs forward exploration. Evidence is agent_order with successful spray_water and a matching positive flow in water.jsonl. Tools still need measured thermal evidence; no spray order is injected.",
+  "target_fixes": [
+    "19",
+    "23",
+    "79"
+  ],
+  "duration_s_reason": "Test observation window; also the existing recorder operating deadline. Meeting and heat re-entry require their full physical waiting periods.",
+  "fire": {
+    "spread": true,
+    "head_start_s": 6,
+    "head_start_s_reason": "Fire age when robots reach the launch pads. Zero for delayed ignition, 6 s to develop a local flame, 60 s for a heated compartment.",
+    "config_file": "fire_trigger_spray.json",
+    "config_file_reason": "World-only fuel ignition experiment. Heat and smoke load the same file."
+  }
+}

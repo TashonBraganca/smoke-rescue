@@ -472,6 +472,7 @@ namespace SmokeRescue.Recording
                     oracle.FireEvents(new
                     {
                         head_start_s = atmosphere.FireSpread.HeadStart,
+                        config_file = scenario.fire.config_file,
                         note = "times are on the robots' clock (fire time minus head start)",
                         collapses = sim.Collapses.Select(c => new { t = c.Time - atmosphere.FireSpread.HeadStart, c.Room,
                             rect = new[] { c.CellRect.xMin, c.CellRect.yMin, c.CellRect.xMax, c.CellRect.yMax } }).ToArray(),
@@ -499,7 +500,7 @@ namespace SmokeRescue.Recording
                     ["thermal"] = sensorCfg.thermal != null ? "thermal/<t>.png 16-bit kelvin x 10, 320x256, 15 Hz, see thermal.yaml" : null,
                     ["air_temperature"] = sensorCfg.air_temperature != null ? "air_temp.txt, 10 Hz, C" : null,
                     ["lidar"] = sensorCfg.lidar != null ? $"lidar.txt, planar 360 degree, {sensorCfg.lidar.beams} beams, {sensorCfg.lidar.rate_hz} Hz, {sensorCfg.lidar.mount.height_m} m up" : null,
-                    ["fire"] = atmosphere.FireSpread != null ? $"spreading fire (config/fire.json), head start {atmosphere.FireSpread.HeadStart} s" : "static fires",
+                    ["fire"] = atmosphere.FireSpread != null ? $"spreading fire (config/{scenario.fire.config_file}), head start {atmosphere.FireSpread.HeadStart} s" : "static fires",
                     ["camera_mount"] = sensorCfg.camera.mount,
                     ["exposure"] = $"per-sensor deterministic auto exposure, target grey {RgbdCamera.TargetGrey * 255:0}, EV100 {RgbdCamera.ExposureMinEv} to {RgbdCamera.ExposureMaxEv}",
                 };

@@ -99,7 +99,7 @@ PERCEPTION = [
         "depth)."),
     _fn("track_fire_spread", "Measure fire growth and the hot front's speed and direction over the last seconds of "
         "thermal video.", {"seconds": NUM}),
-    _fn("measure_opening", "Measure the clear width of the opening at a bearing from depth, and whether the robot fits.",
+    _fn("measure_opening", "Measure a depth opening and whether the robot fits; also returns door candidates from RGB panel and depth-plane evidence, without claiming they can be opened.",
         {"bearing_deg": NUM}, ["bearing_deg"]),
 ]
 
@@ -132,7 +132,7 @@ ACTIONS = [
         "Needs an assess_visibility result.", {"mode": {"type": "string", "enum": ["wide", "narrow", "low", "off"]},
         "pitch_deg": NUM, "yaw_deg": NUM, "evidence_id": EVIDENCE}, ["mode", "evidence_id"]),
     _fn("open_door", "Use the arm to open the closed door directly ahead. Needs a measure_opening result showing the "
-        "way is not passable.", {"evidence_id": EVIDENCE}, ["evidence_id"]),
+        "way is not passable and a closed-door candidate directly ahead. Candidate status does not establish the swing direction or safe opening.", {"evidence_id": EVIDENCE}, ["evidence_id"]),
     _fn("clear_debris", "Use the arm to push light debris ahead out of the way. Needs a measure_opening result showing "
         "the way is not passable.", {"evidence_id": EVIDENCE}, ["evidence_id"]),
     # Held-out seed 914 run 5: this description named only a fresh person verdict taken within the reach; a lying person
@@ -507,7 +507,12 @@ class ToolRegistry:
                 args = {**args, "seconds": round(min(max(0.0, float(args.get("seconds", 0))), float(_NOZZLE["max_spray_s"])), 2)}
         elif name == "set_torch":
             refusal = self._need(args, ("assess_visibility",))
-        elif name in ("open_door", "clear_debris"):
+        elif name == "open_door":
+            refusal = self._need(args, ("measure_opening",), lambda ev: ev.get("passable") is False and
+                                 (ev.get("door") or {}).get("verdict") == "closed_door_candidate" and
+                                 abs(float((ev.get("door") or {}).get("bearing_deg", 1e9))) <= float(_PERCEPTION["bearing_tolerance_deg"]),
+                                 "need a measured closed-door candidate directly ahead; a blocked or missing-depth view alone is not a door")
+        elif name == "clear_debris":
             refusal = self._need(args, ("measure_opening",), lambda ev: ev.get("passable") is False,
                                  "the cited measurement says the way is passable; just drive")
         elif name == "explore_frontier":

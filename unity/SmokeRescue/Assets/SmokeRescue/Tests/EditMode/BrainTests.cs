@@ -11,6 +11,125 @@ namespace SmokeRescue.Tests.EditMode
 {
     public sealed partial class BrainTests
     {
+        [Test]
+        public void TriggerFireConfigurationReachesHeatAndSurvivesARewind()
+        {
+            var fire = new SmokeRescue.World.Scenario.FireSpread { config_file = "fire_trigger_cold.json", head_start_s = 0 };
+            var heat = new SmokeRescue.World.FireSimHeat(SmokeRescue.World.FloorPlan.Load(), 1407, 0, fire.ConfigPath);
+            Assert.That(heat.Flames(30).Count, Is.Zero, "cold experiment must not load fire.json ignitions");
+            Assert.That(heat.Flames(1).Count, Is.Zero, "rewind must keep the selected configuration");
+            Assert.That(new SmokeRescue.World.Scenario.FireSpread().ConfigPath, Does.EndWith("fire.json"));
+            Assert.Throws<InvalidDataException>(() => { var ignored = new SmokeRescue.World.Scenario.FireSpread { config_file = "../fire.json" }.ConfigPath; });
+        }
+
+        [Test]
+        public void ReentryNeedsAnIndoorConnectionNotAFreePathAcrossTheYard()
+        {
+            var c = Settings(); c.grid_size_m = 16; c.cell_m = .1f; c.robot_radius_m = .25f;
+            var g = new OccupancyGrid(c);
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var roof = (bool[])typeof(OccupancyGrid).GetField("sightIndoors", flags).GetValue(g);
+            var anchors = new bool[g.Count];
+            for (int i = 0; i < g.Count; i++)
+            {
+                var p = g.Centre(i);
+                if (p.x > -6 && p.x < 6 && p.y > -3 && p.y < 4) g.ObserveFree(i);
+                roof[i] = p.y > 0 && p.y < 4 && (p.x < -1 || p.x > 1);
+                anchors[i] = roof[i] && p.x < -1;
+            }
+            int same = g.Cell(new Vector2(-3, 2)), neighbour = g.Cell(new Vector2(3, 2));
+            var linked = g.InteriorConnectedTo(anchors);
+            Assert.That(linked[same], Is.True, "another doorway into the original interior is eligible");
+            Assert.That(linked[neighbour], Is.False, "known free yard and a neighbouring roof are not an indoor connection");
+            // A sensor-observed covered passage joins the interiors, without a house-specific distance threshold.
+            for (int i = 0; i < g.Count; i++)
+            { var p = g.Centre(i); if (p.y > 1 && p.y < 3 && Mathf.Abs(p.x) <= 1) roof[i] = true; }
+            Assert.That(g.InteriorConnectedTo(anchors)[neighbour], Is.True, "control: a covered connection establishes continuity");
+            for (int i = 0; i < g.Count; i++) if (Mathf.Abs(g.Centre(i).x) < .1f) g.ObserveOccupied(i);
+            Assert.That(g.InteriorConnectedTo(anchors)[neighbour], Is.False, "a wall blocks connectivity even under a continuous roof");
+        }
+
+        [Test]
+        public void NewExteriorViewsCannotBecomeReentryAnchors()
+        {
+            var c = Settings(); c.grid_size_m = 16; c.robot_radius_m = .25f; c.search_requires_ceiling = true;
+            var b = new RobotBrain(Calibration(), c, "A", 0); var g = Map(b);
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var roof = (bool[])typeof(OccupancyGrid).GetField("sightIndoors", flags).GetValue(g);
+            var seen = (bool[])typeof(OccupancyGrid).GetField("observed", flags).GetValue(g);
+            int original = g.Cell(new Vector2(0, 3)), nextDoor = g.Cell(new Vector2(6, 3));
+            roof[original] = seen[original] = true;
+            var remember = typeof(RobotBrain).GetMethod("RememberMissionInterior", flags);
+            remember.Invoke(b, null);
+            roof[nextDoor] = seen[nextDoor] = true;
+            remember.Invoke(b, null);
+            var anchors = (bool[])typeof(RobotBrain).GetField("missionInterior", flags).GetValue(b);
+            Assert.That(anchors[original], Is.True);
+            Assert.That(anchors[nextDoor], Is.False, "seeing another ceiling while outside cannot certify the mission building");
+        }
+
+        [Test]
+        public void ReentryDoesNotChooseANeighboursFrontierEvenWhenItsYardRouteIsSafe()
+        {
+            int Reentries(bool requireLink)
+            {
+                var c = Settings(); c.grid_size_m = 20; c.robot_radius_m = .25f; c.search_requires_ceiling = true;
+                c.reentry_requires_interior_link = requireLink;
+                var b = new RobotBrain(Calibration(), c, "A", 0); var g = Map(b);
+                var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+                var roof = (bool[])typeof(OccupancyGrid).GetField("sightIndoors", flags).GetValue(g);
+                var seen = (bool[])typeof(OccupancyGrid).GetField("observed", flags).GetValue(g);
+                var lidar = (float[])typeof(OccupancyGrid).GetField("lidarOdds", flags).GetValue(g);
+                for (int i = 0; i < g.Count; i++)
+                {
+                    var p = g.Centre(i);
+                    // LiDAR maps the yard and both approaches without marking the neighbour camera-searched.
+                    if (p.x > -8 && p.x < 8 && p.y > -2 && p.y < 6) lidar[i] = -c.log_odds_cap;
+                    if (p.x > -7 && p.x < -3 && p.y > 1 && p.y < 5) roof[i] = seen[i] = true;
+                }
+                typeof(OccupancyGrid).GetField("dirty", flags).SetValue(g, true);
+                typeof(RobotBrain).GetMethod("RememberMissionInterior", flags).Invoke(b, null);
+                for (int i = 0; i < g.Count; i++)
+                { var p = g.Centre(i); if (p.x > 3 && p.x < 7 && p.y > 1 && p.y < 5) roof[i] = true; }
+                // The original interior was searched and its residual edges are excluded. Only the new indoor frontier remains.
+                typeof(RobotBrain).GetMethod("BlacklistGoal", flags).Invoke(b, new object[] { new Vector2(-5, 3), 0.0, 0, 30.0, "searched test interior", 4f });
+                typeof(RobotBrain).GetField("completed", flags).SetValue(b, true);
+                typeof(RobotBrain).GetField("canReenter", flags).SetValue(b, true);
+                var check = typeof(RobotBrain).GetMethod("CheckReenter", flags);
+                for (int t = 0; t <= 8; t += 2) check.Invoke(b, new object[] { (double)t });
+                return b.DrainEvents().Count(e => e.kind == "reenter");
+            }
+            Assert.That(Reentries(false), Is.EqualTo(1), "control: the earlier rule accepts the neighbouring ceiling");
+            Assert.That(Reentries(true), Is.Zero, "the re-entry selector must enforce the indoor link");
+        }
+
+        [Test]
+        public void AgentFrontierSearchStillTakesTheDoorwayLookAndKeepsItsTarget()
+        {
+            (bool started, bool cancelled, bool retained) Run(bool permit, bool explicitGoTo)
+            {
+                var b = DoorwayBrain(-1.1f); var g = Map(b);
+                var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+                var c = (BrainConfig)typeof(RobotBrain).GetField("c", flags).GetValue(b); c.frontier_doorway_looks = permit;
+                var target = new Vector2(-2, -1.1f);
+                ((bool[])typeof(OccupancyGrid).GetField("sightIndoors", flags).GetValue(g))[g.Cell(target)] = true;
+                if (explicitGoTo) b.AgentGoTo(target, 0, 30, "explicit approach");
+                else b.AgentExplore(target, 0, 30, "search this floor");
+                Motion(b, 0); b.OnAirTemperature(0, 20); b.OnRgbd(Image(0, true, 0)); b.Step(0, 1f / 15);
+                bool started = b.DrainEvents().Any(e => e.kind == "doorway_probe_started");
+                Motion(b, 1.0 / 15); b.OnAirTemperature(1.0 / 15, 20); b.OnRgbd(Image(1.0 / 15, true, 0)); b.Step(1.0 / 15, 1f / 15);
+                bool cancelled = b.DrainEvents().Any(e => e.kind == "doorway_probe_done");
+                var retained = (Vector2?)typeof(RobotBrain).GetField("agentGoal", flags).GetValue(b);
+                return (started, cancelled, retained.HasValue && retained.Value == target);
+            }
+            var exploration = Run(true, false);
+            Assert.That(exploration.started, Is.True, "an agent frontier must allow the same sensor probe as reflex search");
+            Assert.That(exploration.cancelled, Is.False, "the next tick must not cancel that look merely because the frontier order remains active");
+            Assert.That(exploration.retained, Is.True, "the original frontier resumes after the bounded look");
+            Assert.That(Run(false, false).started, Is.False, "control: the previous guard suppresses it");
+            Assert.That(Run(true, true).started, Is.False, "an explicit approach remains uninterrupted");
+        }
+
         static BrainConfig Settings() => new BrainConfig
         {
             limits = new BrainConfig.MotionLimits
@@ -531,6 +650,39 @@ namespace SmokeRescue.Tests.EditMode
             b.AgentAvoidArea(new Vector2(0, 4f), 3f, 0, 30, "ev");
             var shrunk = b.DrainEvents().Single(x => x.kind == "agent_order");
             Assert.That(shrunk.numbers["radius_m"], Is.LessThan(4f - Settings().fire_clearance_m - Settings().robot_radius_m + 1e-3), "shrunk to leave the robot outside");
+        }
+
+        [Test]
+        public void ACloserLookAtAnUnstandablePointUsesAStandableViewpointWithAClearView()
+        {
+            // One-door seed 926, robot B at 80 s: the agent's step-back point, 2.8 m from a person in the study, lay in a
+            // wall; the order died with "no known free path", B looked again from 1.3 m and left without confirming her. Here
+            // the asked point is inside furniture; the robot views the same person from a standable spot 2.4 to 3.5 m away
+            // with no wall between. Control: walled off from every viewing distance, the order still fails honestly.
+            (string reason, Vector2? goal) Look(bool walledOff)
+            {
+                var c = Settings(); c.grid_size_m = 12; c.robot_radius_m = .25f;
+                var b = new RobotBrain(Calibration(), c, "B", 0); Room(b, -4, 4, -4, 4); var g = Map(b);
+                var person = new Vector2(0, 2.5f);
+                for (int i = 0; i < g.Count; i++)
+                {
+                    var p = g.Centre(i);
+                    bool furniture = Vector2.Distance(p, new Vector2(0, -1.5f)) < .5f;   // clear of the robot at the origin
+                    bool box = walledOff && Mathf.Abs(Vector2.Distance(p, person) - 1.2f) < .1f;   // a ring wall 1.2 m round the person
+                    if (furniture || box) { g.ObserveOccupied(i); g.ObserveOccupied(i); }
+                }
+                Motion(b, 0); b.OnRgbd(Image(0, true, 0)); b.OnAirTemperature(0, 20); b.Step(0, .05f); b.DrainEvents();
+                b.AgentGoTo(new Vector2(0, -1.5f), 0, 15, "closer look", person);
+                Motion(b, .05); b.OnRgbd(Image(.05, true, 0)); b.OnAirTemperature(.05, 20); b.Step(.05, .05f);
+                var events = b.DrainEvents();
+                var e = events.FirstOrDefault(x => x.kind == "goal" && x.reason.StartsWith("Agent order")) ?? events.FirstOrDefault(x => x.kind == "replan" && x.reason.StartsWith("Agent goal has no"));
+                return (e?.reason, b.Snapshot().goal);
+            }
+            var look = Look(false);
+            Assert.That(look.reason, Does.StartWith("Agent order: the asked viewpoint is not standable"));
+            float range = Vector2.Distance(look.goal.Value, new Vector2(0, 2.5f));
+            Assert.That(range, Is.InRange(Settings().survivor_stop_min_m, Settings().survivor_stop_max_m), $"viewing distance, got {range}");
+            Assert.That(Look(true).reason, Does.StartWith("Agent goal has no known free path"), "control: no clear view from any viewing distance");
         }
 
         [Test]

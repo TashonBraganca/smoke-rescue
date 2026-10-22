@@ -877,6 +877,31 @@ namespace SmokeRescue.Brain
                 if (dx * dx + dy * dy <= reach * reach && Inside(sx + dx, sy + dy)) { int n = (sy + dy) * Size + sx + dx; if (label[n] >= 0 && ClearLine(start, n)) found.Add(label[n]); }
             return found;
         }
+        /// <summary>Geometry-only indoor connectivity to an earlier sensor map. A yard route cannot join two buildings.
+        /// Fire is deliberately ignored here: it can block travel without changing which interior was explored.
+        /// Four neighbours prevent a diagonal contact through wall corners from claiming a connection.</summary>
+        public bool[] InteriorConnectedTo(bool[] anchors)
+        {
+            if (anchors == null || anchors.Length != Count) throw new ArgumentException("anchor mask must match the grid");
+            PrepareNavigation();
+            var connected = new bool[Count]; var queue = new Queue<int>();
+            bool IndoorFloor(int i) => Occupancy(i) == 1 && UnderCeiling(Centre(i)) &&
+                obstacleDistance[i] > c.robot_radius_m + CellM * .707107f;
+            for (int i = 0; i < Count; i++)
+                if (anchors[i] && IndoorFloor(i)) { connected[i] = true; queue.Enqueue(i); }
+            while (queue.Count > 0)
+            {
+                int i = queue.Dequeue(), x = i % Size, y = i / Size;
+                for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++)
+                {
+                    if (Math.Abs(dx) + Math.Abs(dy) != 1 || !Inside(x + dx, y + dy)) continue;
+                    int n = (y + dy) * Size + x + dx;
+                    if (!connected[n] && IndoorFloor(n)) { connected[n] = true; queue.Enqueue(n); }
+                }
+            }
+            return connected;
+        }
+
         public bool UnderCeiling(Vector2 p)
         {
             int i = Cell(p); if (i < 0) return false;
