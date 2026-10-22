@@ -22,7 +22,8 @@ class Scripted:
 
 def fake_vision(monkeypatch, verdict="person"):
     monkeypatch.setattr(T.vision, "load_frame", lambda d, t: object())
-    monkeypatch.setattr(T.vision, "inspect_candidate", lambda f, b, r, output_dir: {"id": "ev1", "tool": "inspect_candidate", "verdict": verdict})
+    monkeypatch.setattr(T.vision, "inspect_candidate", lambda f, b, r, output_dir: {"id": "ev1", "tool": "inspect_candidate", "verdict": verdict,
+                                                                                  "candidate": {"bearing_deg": b, "range_m": r}})
     monkeypatch.setattr(T.vision, "track_fire_spread", lambda frames: {"id": "fire1", "tool": "track_fire_spread"})
     monkeypatch.setattr(T.vision, "assess_visibility", lambda f: {"id": "vis1", "tool": "assess_visibility", "usable_rgb": False})
 
@@ -202,6 +203,21 @@ def test_a_survivor_is_confirmed_only_from_a_close_inspection(tmp_path, monkeypa
     near, _ = run(tmp_path, [[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": 3})],
                              [ToolCall("confirm_survivor", {"x": 5, "y": 8, "evidence_id": "ev3"})]])
     assert [o["type"] for o in near["orders"]] == ["confirm_survivor"], "control: 3 m"
+
+
+def test_a_person_with_no_measured_range_is_not_confirmed_at_a_guessed_spot(tmp_path, monkeypatch):
+    # Held-out seed 920, robot B: a person far through two doorways, no depth on the body, inspected at a range the model
+    # guessed (1.3 m), and confirmed there, 5.6 m from anyone. Control: the same calls with a measured range confirm.
+    fake_vision(monkeypatch, "person")
+    monkeypatch.setattr(T.vision, "inspect_candidate", lambda f, b, r, output_dir: {
+        "id": "ev1", "tool": "inspect_candidate", "verdict": "person", "candidate": {"bearing_deg": b, "range_m": None}})
+    out, _ = run(tmp_path, [[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": 1.3})],
+                            [ToolCall("confirm_survivor", {"x": 5, "y": 6.3, "evidence_id": "ev1"})]])
+    assert out["orders"] == [] and "measured no range" in out["refusals"][0]["reason"]
+    fake_vision(monkeypatch, "person")
+    out, _ = run(tmp_path, [[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": 1.3})],
+                            [ToolCall("confirm_survivor", {"x": 5, "y": 6.3, "evidence_id": "ev1"})]])
+    assert [o["type"] for o in out["orders"]] == ["confirm_survivor"], "control: measured range"
 
 
 def test_blocked_unsearched_floor_reaches_the_model(tmp_path, monkeypatch):

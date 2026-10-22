@@ -345,6 +345,13 @@ class ToolRegistry:
         if name == "confirm_survivor":
             refusal = self._need(args, ("inspect_candidate",), lambda ev: ev.get("verdict") == "person" and self._near(ev, args),
                                  "the cited inspection is not a person verdict at that position")
+            if refusal is None and (self.evidence[str(args["evidence_id"])].get("candidate") or {}).get("range_m") is None:
+                # Held-out seed 920, robot B at 0 s: a person 11.6 m away through two doorways, no depth that far, and the
+                # model asked to inspect at 1.3 m; with nothing measured the spot was its guess, and the confirmation
+                # landed 5.6 m from anyone. A position needs a measured range to the body.
+                refusal = {"refused": True, "reason": "the inspection measured no range to the person (no depth or LiDAR "
+                           "return on the body), so the position is only the requested guess: approach_candidate citing it "
+                           "to get closer along that bearing, then inspect again"}
             if refusal is None:
                 looked = self._inspection_range(self.evidence[str(args["evidence_id"])])
                 if looked is not None and looked > CONFIRM_MAX_RANGE_M:
