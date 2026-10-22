@@ -14,6 +14,20 @@ namespace SmokeRescue.Tests.EditMode
         const float Dt = 1f / 60f;
 
         [Test]
+        public void AnArrivalTheAgentAskedForIsDecidedAtOnceOtherEventsWaitTheGap()
+        {
+            // Held-out seeds 915 to 917: robots stood 28 to 58 s per run after agent turns, waiting out the 4 s gap between
+            // agent calls and then a 5 s hold. An arrival (or the candidate view the agent set up) is decided at once;
+            // controls: other events still wait the gap, nothing is asked without an event before the period.
+            Assert.That(SmokeRescue.Recording.RecordingSession.AgentDue("agent_goal_reached", 1.0), Is.True);
+            Assert.That(SmokeRescue.Recording.RecordingSession.AgentDue("survivor_view_ready", .5), Is.True);
+            Assert.That(SmokeRescue.Recording.RecordingSession.AgentDue("survivor_candidate", 1.0), Is.False, "control: other events wait the gap");
+            Assert.That(SmokeRescue.Recording.RecordingSession.AgentDue("survivor_candidate", 4.5), Is.True);
+            Assert.That(SmokeRescue.Recording.RecordingSession.AgentDue(null, 10), Is.False, "control: no event, no call before the period");
+            Assert.That(SmokeRescue.Recording.RecordingSession.AgentDue(null, 20), Is.True);
+        }
+
+        [Test]
         public void RandomPeopleArePlacedOncePerScenarioSoTheTruthFileMatchesTheScene()
         {
             // Held-out seed 914 runs 3 and 4: the scenario was loaded to build the scene and again inside the recorder; the

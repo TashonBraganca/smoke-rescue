@@ -115,7 +115,7 @@ namespace SmokeRescue.Brain
                     "fire_distance_m", grid.FireDistance(cell), "clearance_m", c.fire_clearance_m);
             nearFire = fireNow;
 
-            if (!completed && !returning && t >= c.mission_time_limit_s) BeginReturn(t, "Exploration time limit reached.");
+            if (!completed && !returning && t >= c.mission_time_limit_s) BeginReturn(t, MissionTimeUp);
             RefreshSensedExits(t);
             CheckWayOut(t);
             CheckEmergencyExit(t);
@@ -136,7 +136,7 @@ namespace SmokeRescue.Brain
                 EndDoorwayProbe(t, "Evidence look cancelled by safety, a survivor, an agent order, or its time limit.");
             if (routeLook.HasValue && (retreating || returning || completed || nearFire))
                 EndRouteLook(t, "Cancelled: a heat reflex or a return to the way out takes precedence over the route look.", true);
-            if (completed && !retreating) return Command(0, 0, dt, true);
+            if (completed && !retreating) return RelocateStep(t, dt) ?? Command(0, 0, dt, true);
             bool sensorsHealthy = t - lastRgb <= c.frame_max_age_s && motion.Healthy(t) &&
                 t - lastAir <= c.frame_max_age_s && (!health.Thermal || t - lastThermal <= c.frame_max_age_s);
             if (!sensorsHealthy)
@@ -210,7 +210,7 @@ namespace SmokeRescue.Brain
                 }
                 if (arrived)
                 {
-                    completed = true; ClearPath(); carryClearFrom = stepAwayFrom = new Vector2(float.NaN, float.NaN);
+                    completed = true; completedAt = t; relocateGoal = null; ClearPath(); carryClearFrom = stepAwayFrom = new Vector2(float.NaN, float.NaN);
                     // Left early to stay safe, or carried someone out: it may go back in once that is safe (CheckReenter).
                     // NoFrontierLeft too: the exclusions that emptied the list (fire-cut blacklist, visited circles, a
                     // partner's claim) expire, and CheckReenter still needs a reachable frontier with the fire clear of the way
@@ -267,10 +267,12 @@ namespace SmokeRescue.Brain
                             "clearance_m", c.emergency_fire_clearance_m, "route_points", path.Count, "air_c", airC);
                     }
                     if (path.Count == 0 && returnReason != EmergencyExit && returnReason != CarryingOut && returnReason != WayOutClosing &&
-                        returnReason != HeatLeave && HeatBuilding(t, out _) &&
+                        returnReason != HeatLeave && returnReason != MissionTimeUp && HeatBuilding(t, out _) &&
                         TryEmergencyExit(t, "The way out is blocked and the air is heating: leave by the nearest way out"))
                         return Command(0, 0, dt, true);
-                    if (path.Count == 0 && (returnReason == WayOutClosing || returnReason == HeatLeave))
+                    // A deadline return cut on the way is the same: retreat and search on, never hold (held-out seed 919,
+                    // robot B held 20 s in cool air when fire cut its route home after a deadline return began).
+                    if (path.Count == 0 && (returnReason == WayOutClosing || returnReason == HeatLeave || returnReason == MissionTimeUp))
                     {
                         // Fire cut the way home while the robot was on it (agent run 12: robot A held still for the rest
                         // of the run). Same as finding it cut: retreat to the coolest floor and search on while it is cool.
@@ -982,7 +984,7 @@ namespace SmokeRescue.Brain
             if (!ReentryFrontSteady(t, frontier.path, closest)) return;
             reenterCells.Clear(); reenterRates.Clear(); reenterThenT = double.NaN;
             completed = false; canReenter = false; emergencyExit = false; returning = false; hadWayOut = false; ClearPath();
-            noFrontierAt = double.NaN; cutOff = false;
+            noFrontierAt = double.NaN; cutOff = false; relocateGoal = null;
             Emit(t, "reenter", "Heat budget recovered and a frontier is reachable with the fire clear of the way: go back in.",
                 "fire_distance_m", closest, "information_cells", frontier.information, "heat_budget", budget);
         }
@@ -1011,6 +1013,40 @@ namespace SmokeRescue.Brain
             if (rate <= 0) return true;
             float routeM = 0; for (int i = 1; i < route.Count; i++) routeM += Vector2.Distance(route[i - 1], route[i]);
             return Mathf.Max(0, closest - c.fire_clearance_m) / rate >= routeM / c.open_speed_mps * c.escape_time_factor;
+        }
+        double completedAt; Vector2? relocateGoal;
+        /// <summary>
+        /// Outside after leaving for safety, allowed back in, and every way in still blocked after exterior_dwell_s: drive to
+        /// unexplored floor along the building's wall (outside the search area, within facade_band_m of a mapped wall) to
+        /// look for another way in, then wait again while the re-entry check runs. DARPA SubT: CERBERUS backtracks after a
+        /// set time without motion, and GBPlanner2 keeps exploring when home is unreachable. Held-out seeds 916/917:
+        /// robots stood at their own blocked door for 106 to 124 s. Never open yard: the wall keeps the robot's LiDAR
+        /// localisation anchored (held-out run 2: robot B lost its position searching an open yard).
+        /// </summary>
+        BrainCommand? RelocateStep(double t, float dt)
+        {
+            if (!canReenter || c.exterior_dwell_s <= 0 || t >= c.mission_time_limit_s) return null;
+            if (relocateGoal.HasValue)
+            {
+                if (Vector2.Distance(motion.Pose.position, relocateGoal.Value) <= c.goal_tolerance_m || path.Count == 0 || !planner.PathSafe(path, cursor))
+                {
+                    visited.Add(new Visited { position = relocateGoal.Value, radius = c.visited_radius_m, until = t + c.visited_hold_s });
+                    Emit(t, "relocate_done", "At the wall: wait for the re-entry check before moving on.", "x_m", motion.Pose.position.x, "y_m", motion.Pose.position.y);
+                    relocateGoal = null; ClearPath(); completedAt = t;
+                    return null;
+                }
+                return FollowOrHold(t, dt);
+            }
+            if (t - completedAt < c.exterior_dwell_s) return null;
+            grid.FireClearance = c.fire_clearance_m; grid.FirePrediction = true;
+            var options = planner.Frontiers(motion.Pose.position, p => InSearchArea(p) || VisitedGoal(p, t) || GoalBlacklisted(p, t) ||
+                grid.ObstacleDistance(grid.Cell(p)) > c.facade_band_m);
+            if (options.Count == 0) { completedAt = t; return null; }
+            var f = options[0];
+            SetPath(f.path); relocateGoal = f.position; lastPlan = t;
+            Emit(t, "relocate", "Every way in is still blocked after waiting outside: follow the building's wall to look for another way in.",
+                "x_m", f.position.x, "y_m", f.position.y, "waited_s", t - completedAt);
+            return FollowOrHold(t, dt);
         }
         bool emergencyExit; double nextEmergencyCheck;
         /// <summary>

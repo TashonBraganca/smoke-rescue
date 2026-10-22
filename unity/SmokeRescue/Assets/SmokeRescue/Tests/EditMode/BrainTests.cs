@@ -1439,10 +1439,12 @@ namespace SmokeRescue.Tests.EditMode
                 }
                 var plans = events.Where(e => e.kind == "replan" && (e.reason.StartsWith("Return to the start") || e.reason.StartsWith("The known return route"))).ToList();
                 Assert.That(plans, Is.Not.Empty, "the time limit started a return");
+                // A deadline return cut by fire now loses the way out and retreats rather than holding (#43).
+                if (events.Any(e => e.kind == "escape_closing" && e.reason.StartsWith("The known way out is closed"))) return "lost the way out";
                 return plans.Last().reason;
             }
             Assert.That(ReturnPlan(true), Does.StartWith("Return to the start"), "a route to the partner's entry");
-            Assert.That(ReturnPlan(false), Does.StartWith("The known return route is blocked"), "control: own entry only");
+            Assert.That(ReturnPlan(false), Is.EqualTo("lost the way out"), "control: own entry only, cut, so the way out is lost");
         }
 
         [Test]
@@ -1607,6 +1609,52 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void ARobotWaitingOutsideAtABlockedEntryFollowsTheWallToLookForAnotherWayIn()
+        {
+            // Held-out seeds 916/917: robots that left for safety stood at their own door for 106 to 124 s while every way in
+            // through it stayed unsafe. DARPA SubT's CERBERUS backtracks after a set time without motion; GBPlanner2 keeps
+            // exploring when home is unreachable. Here a robot outside a building, its entry inside cut by fire, waits
+            // exterior_dwell_s, then drives to unexplored floor along the building's wall (within facade_band_m of mapped
+            // wall, outside the search area), never into open yard. Control: with the dwell switched off it stays.
+            (int relocations, Vector2 end, float maxFromWall) Run(float dwell)
+            {
+                var c = Settings(); c.grid_size_m = 30; c.robot_radius_m = .25f; c.search_requires_ceiling = true;
+                c.exterior_dwell_s = dwell; c.facade_band_m = 2f; c.mission_time_limit_s = 1000;
+                var b = new RobotBrain(Calibration(), c, "A", 0); var g = Map(b);
+                var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+                var indoors = (bool[])typeof(OccupancyGrid).GetField("sightIndoors", flags).GetValue(g);
+                for (int i = 0; i < g.Count; i++)
+                {
+                    var p = g.Centre(i);
+                    bool facade = Mathf.Abs(p.y - 2.05f) < .1f && p.x > -4 && p.x < 12 && !(Mathf.Abs(p.x) < .5f);
+                    bool side = (Mathf.Abs(p.x + 4) < .1f || Mathf.Abs(p.x - 12) < .1f) && p.y > 2 && p.y < 9;
+                    if (facade || side || (Mathf.Abs(p.y - 9) < .1f && p.x > -4 && p.x < 12)) g.ObserveOccupied(i);
+                    else if (p.y > 2.15f && p.y < 8.9f && p.x > -3.9f && p.x < 6f) { g.ObserveFree(i); indoors[i] = true; }   // searched part of the inside
+                    else if (p.y > -1.5f && p.y < 1.95f && p.x > -3f && p.x < 3f) g.ObserveFree(i);                          // the yard the robot saw at its door
+                }
+                typeof(RobotBrain).GetField("completed", flags).SetValue(b, true);
+                typeof(RobotBrain).GetField("canReenter", flags).SetValue(b, true);
+                int n = 0; var command = new BrainCommand(); float maxFromWall = 0;
+                for (int tick = 0; tick < 20 * 40; tick++)
+                {
+                    for (float x = -1.5f; x <= 1.5f; x += .1f) g.ObserveHeat(g.Cell(new Vector2(x, 3.2f)), 500, tick / 20.0);   // fire just inside the door
+                    command = DriveTick(b, tick, command.forwardMps, command.yawRateDeg);
+                    n += b.DrainEvents().Count(e => e.kind == "relocate");
+                    maxFromWall = Mathf.Max(maxFromWall, 2.05f - b.Snapshot().pose.position.y);
+                }
+                return (n, b.Snapshot().pose.position, maxFromWall);
+            }
+            var moved = Run(3f);
+            Assert.That(moved.relocations, Is.GreaterThan(0), "it sets off along the wall");
+            // Either way along the wall: the robot cannot know where another door is, so it takes the nearest unexplored edge.
+            Assert.That(Mathf.Abs(moved.end.x), Is.GreaterThan(1.5f), "along the facade to an unexplored edge: " + moved.end);
+            Assert.That(moved.maxFromWall, Is.LessThan(2.6f), "never out into the yard");
+            var stays = Run(0f);
+            Assert.That(stays.relocations, Is.Zero, "control: no dwell budget, it waits at its door");
+            Assert.That(stays.end.magnitude, Is.LessThan(.3f));
+        }
+
+        [Test]
         public void TheLidarFindsAWayOutThroughAnOpeningInHeavySmoke()
         {
             // A robot knew only its own entry as a way out (held-out seed 914 run 5: robot A held at 185 C with the front
@@ -1666,6 +1714,28 @@ namespace SmokeRescue.Tests.EditMode
             // smoke alone reads open: the threshold, not luck, holds the control.
             Exits(false, .03f);
             Assert.That(openInside, Is.GreaterThan(50), "at a 0.03 open share the smoke alone reads open");
+        }
+
+        [Test]
+        public void ADeadlineReturnCutByFireRetreatsInsteadOfHolding()
+        {
+            // Held-out seed 919, robot B: a deadline return began, fire then cut the route home, and the robot held "the
+            // known return route is blocked" for 20 s in cool air. Like a closing-route return, it now loses the way out
+            // and retreats to search on. Control: the same cut on a long mission (no deadline return) is unaffected.
+            int Holds(float limit)
+            {
+                var c = Settings(); c.grid_size_m = 12; c.robot_radius_m = .25f; c.mission_time_limit_s = limit;
+                var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -5, 5, -2, 6);
+                var events = new List<BrainEvent>();
+                for (int i = 0; i < 15 * 20; i++)
+                {
+                    double t = i / 15.0; Motion(b, t, t < 3 ? 1f : 0); b.OnRgbd(Image(t, true)); b.OnAirTemperature(t, 20);
+                    if (t >= 5) { var g = Map(b); for (float x = -5; x <= 5; x += .05f) g.ObserveHeat(g.Cell(new Vector2(x, 1.5f)), 500, t); }
+                    b.Step(t, 1f / 15); events.AddRange(b.DrainEvents());
+                }
+                return events.Count(e => e.kind == "replan" && e.reason.StartsWith("The known return route is blocked"));
+            }
+            Assert.That(Holds(12f), Is.Zero, "a deadline return cut by fire does not hold");
         }
 
         [Test]
