@@ -16,7 +16,7 @@ namespace SmokeRescue.Brain
             public bool overlapLogged;
             // In this robot's frame; null or unset until the frames are linked.
             public BrainClaim claim;
-            public BrainPose pose;
+            public BrainPose pose; public bool poseKnown;
             public Vector2? goal;
         }
         readonly SortedDictionary<string, PeerState> peers = new SortedDictionary<string, PeerState>(StringComparer.Ordinal);
@@ -174,7 +174,14 @@ namespace SmokeRescue.Brain
             var m = peer.message;
             if (!TryPartnerLink(sender, out var link)) { peer.claim = null; peer.goal = null; return; }
             grid.ReplacePeerLayer(sender, m, peer.explored, link, OwnBodyWasAt);
+            var before = peer.poseKnown ? peer.pose.position : (Vector2?)null;
             peer.pose = new BrainPose { position = link.Transform(m.Pose.position.x, m.Pose.position.y), yawRad = m.Pose.yawRad + link.yawRad };
+            peer.poseKnown = true;
+            // Where the partner stands, and the straight line it reported moving along since its last pose, is floor.
+            float ends = Mathf.Max(0, c.body_half_length_m - c.body_radius_m); var f = peer.pose.Forward;
+            grid.MarkTeammateFree(peer.pose.position - f * ends, peer.pose.position + f * ends, c.body_radius_m);
+            if (before.HasValue && Vector2.Distance(before.Value, peer.pose.position) <= c.teammate_track_max_m)
+                grid.MarkTeammateFree(before.Value, peer.pose.position, c.body_radius_m);
             peer.goal = m.Goal.HasValue ? link.Transform(m.Goal.Value.x, m.Goal.Value.y) : (Vector2?)null;
             peer.claim = m.Claim == null ? null : new BrainClaim { centre = link.Transform(m.Claim.centre.x, m.Claim.centre.y), radiusM = m.Claim.radiusM, expiresAt = m.Claim.expiresAt };
             foreach (var hot in m.Hotspots)

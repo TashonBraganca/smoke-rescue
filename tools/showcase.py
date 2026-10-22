@@ -38,6 +38,7 @@ GOOD, WARN, CV = (74, 222, 128), (239, 68, 68), (110, 231, 183)
 WATER = (96, 140, 255)
 NOZZLE = json.loads((Path(__file__).resolve().parents[1] / "config" / "actuators.json").read_text())["nozzle"]
 SF = "/System/Library/Fonts/SFNS.ttf"
+FRAME_NOTE = "robots link frames from LiDAR fingerprints"
 
 
 def font(size: int, weight: str = "Regular") -> ImageFont.FreeTypeFont:
@@ -113,6 +114,10 @@ class LiveMaps:
         # positive toward east), drawn as the nozzle's cone while the water flows.
         self.water = jsonl(rec / "water.jsonl")
         scenario = load_scenario(meta)
+        # How the robots' frames relate, for the caption: one gate (launch pads) or linked by LiDAR fingerprints.
+        global FRAME_NOTE
+        if any(r.get('launch_pad') is not None for r in scenario.get('robots', [])):
+            FRAME_NOTE = "robots share one frame from their launch pads at the door"
         self.frames = {r: recording_frame(states[r], scenario, r) for r in robots}
         x0, y0, x1, y1 = scenario['search_area']
         starts = [transform_poses([[states[r][0]['x'], states[r][0]['y'], states[r][0]['yaw_rad']]], self.frames[r][0])[0, :2]
@@ -496,7 +501,7 @@ def main() -> None:
             d.text((mbox[0] + 16, mbox[1] + 60), "SLAM pipeline not run for this recording", font=F["body"], fill=FAINT)
         if live_maps is not None:
             d.text((mbox[0] + 16, mbox[3] - 34), "placed on the plan with the known start pose for display;", font=F['tiny'], fill=DIM)
-            d.text((mbox[0] + 16, mbox[3] - 18), "robots link frames from LiDAR fingerprints", font=F['tiny'], fill=DIM)
+            d.text((mbox[0] + 16, mbox[3] - 18), FRAME_NOTE, font=F['tiny'], fill=DIM)
         cbox = (672, 568, 672 + 640, H - 16)
         evaluator_plan_panel(d, cbox, 'Shared context')
         c = context.render(t)[56:56 + context.mh + 4, 6:6 + context.mw + 8, ::-1]
@@ -512,7 +517,7 @@ def main() -> None:
         total = confirmation_label(confirmation_report, None, t)
         d.text((cbox[0] + 16, yl + 40), f'Team: {total}', font=F['small'], fill=TEXT)
         d.text((cbox[0] + 16, cbox[3] - 34), "placed on the plan with the known start pose for display;", font=F['tiny'], fill=DIM)
-        d.text((cbox[0] + 16, cbox[3] - 18), "robots link frames from LiDAR fingerprints", font=F['tiny'], fill=DIM)
+        d.text((cbox[0] + 16, cbox[3] - 18), FRAME_NOTE, font=F['tiny'], fill=DIM)
         radio.draw(d, (1328, 72, W - 16, H - 16), t)
         ff.stdin.write(np.asarray(im).tobytes())
     ff.stdin.close()

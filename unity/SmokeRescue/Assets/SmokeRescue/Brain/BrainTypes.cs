@@ -72,6 +72,8 @@ namespace SmokeRescue.Brain
         /// <summary>False when the robot has no evidence of its own that this floor is indoors (no ceiling seen, walls
         /// not mapped around it). The agent may still choose it, citing an OpenCV check of its own camera frame.</summary>
         public bool provenIndoors;
+        /// <summary>Not a frontier: the way in behind the partner (RobotBrain.FollowPartnerGoal), offered when nothing proven is left.</summary>
+        public bool towardPartner;
         /// <summary>Indoor floor this robot mapped beyond the frontier that no camera has searched
         /// (OccupancyGrid.UnsearchedFloorBeyond).</summary>
         public float mappedUnsearchedM2;

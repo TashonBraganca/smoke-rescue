@@ -75,7 +75,7 @@ namespace SmokeRescue.Brain
             var result = Frontier(from, excluded); return result?.position;
         }
         internal sealed class FrontierChoice
-        { public Vector2 position, claimCentre; public List<Vector2> path; public float cost, score, claimRadius; public int information; }
+        { public Vector2 position, claimCentre; public List<Vector2> path; public float cost, score, claimRadius; public int information; public bool towardPartner; }
         internal FrontierChoice Frontier(Vector2 from, Func<Vector2, bool> excluded = null, bool partnerSearchedToo = false)
         {
             var all = Frontiers(from, excluded, partnerSearchedToo); return all.Count > 0 ? all[0] : null;
