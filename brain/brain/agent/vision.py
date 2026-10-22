@@ -572,13 +572,52 @@ def detect_people_rgb(frame: Frame, *, min_conf: float = 0.35, model: Path | Non
     for i in np.array(idx).reshape(-1):
         x, y, bw, bh = boxes[i]
         x0, y0, x1, y1 = max(0, int(x)), max(0, int(y)), min(w, int(x + bw)), min(h, int(y + bh))
+        people.append(_rgb_person(frame, (x0, y0, x1, y1), float(conf[i])))
+    return people
+
+
+def _rgb_person(frame: Frame, box, confidence: float) -> dict:
+    """One colour person detection: bearing and horizontal range from the robot centre to the body inside the box
+    (_body_point), falling back to the box centre column and the median depth of its middle half."""
+    x0, y0, x1, y1 = box
+    body = _body_point(frame, box)
+    if body is not None:
+        bearing, rng = body
+    else:
         z = frame.depth_m[y0 + (y1 - y0) // 4: y1 - (y1 - y0) // 4, x0 + (x1 - x0) // 4: x1 - (x1 - x0) // 4]
         z = z[np.isfinite(z) & (z > 0)]
-        u = (x0 + x1) / 2
-        people.append({"confidence": _number(float(conf[i])), "bbox_rgb": [x0, y0, x1 - x0, y1 - y0],
-                       "bearing_deg": _number(math.degrees(math.atan2(u - frame.K[0, 2], frame.K[0, 0]))),
-                       "range_m": _number(float(np.median(z))) if z.size >= 10 else None})
-    return people
+        bearing = math.degrees(math.atan2((x0 + x1) / 2 - frame.K[0, 2], frame.K[0, 0]))
+        rng = float(np.median(z)) if z.size >= 10 else None
+    return {"confidence": _number(confidence), "bbox_rgb": [x0, y0, x1 - x0, y1 - y0],
+            "bearing_deg": _number(bearing), "range_m": _number(rng) if rng is not None else None}
+
+
+def _body_point(frame: Frame, box, *, floor_band_m: float = .08, cluster_m: float = .8):
+    """Where the body in a colour box is, from the robot centre: bearing (deg, right positive) and horizontal range (m).
+
+    Every pixel with depth is back-projected with the camera's real mount (sensors.json: 1.6 m mast, pitched down,
+    0.25 m forward of the body centre). Floor pixels (within floor_band_m of the floor plane) are dropped, and the body
+    is the nearest compact cluster: points within cluster_m of the 20th-percentile range, about half an adult's length,
+    so a wall or room behind a person does not pull the range out. The old range, the median optical depth of the box's
+    middle half, put a woman crouched 2 m away at 3 m and her confirmation 1.16 m from her (held-out seed 919, robot B).
+    Returns None with fewer than 10 body pixels.
+    """
+    mount = json.loads((Path(__file__).resolve().parents[3] / "config/sensors.json").read_text())["camera"]["mount"]
+    pitch = math.radians(float(mount["pitch_down_deg"])); sp, cp = math.sin(pitch), math.cos(pitch)
+    x0, y0, x1, y1 = (int(v) for v in box)
+    z = frame.depth_m[y0:y1, x0:x1].astype(float)
+    vs, us = np.mgrid[y0:y1, x0:x1]
+    K = frame.K
+    X = (us - K[0, 2]) * z / K[0, 0]; Y = (vs - K[1, 2]) * z / K[1, 1]
+    height = float(mount["height_m"]) - sp * z - cp * Y
+    forward = cp * z - sp * Y + float(mount["forward_offset_m"])
+    body = np.isfinite(z) & (z > 0) & (height > floor_band_m)
+    if body.sum() < 10:
+        return None
+    r = np.hypot(forward[body], X[body])
+    near = r <= np.percentile(r, 20) + cluster_m
+    f, x = float(np.median(forward[body][near])), float(np.median(X[body][near]))
+    return math.degrees(math.atan2(x, f)), math.hypot(f, x)
 
 
 def check_indoors(frame: Frame, bearing_deg: float, *, output_dir: str | Path,
