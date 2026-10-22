@@ -28,6 +28,9 @@ _ACTUATORS = json.loads((_Path(__file__).resolve().parents[3] / "config" / "actu
 _NOZZLE, _RESCUE = _ACTUATORS["nozzle"], _ACTUATORS["rescue"]
 # A walk to a person (seen or confirmed) ends inside the arm's measured reach (actuators.json rescue.approach_m).
 RESCUE_APPROACH_M = float(_RESCUE["approach_m"])
+# Carrying people out can be switched off (actuators.json rescue.enabled): the lift tool, the rescue list and the prompt's
+# rescue text then never reach the model, and a walk to a person stops at the camera's viewing distance instead.
+RESCUE_ENABLED = bool(_RESCUE.get("enabled", True))
 _PERCEPTION = json.loads((_Path(__file__).resolve().parents[3] / "config" / "perception.json").read_text())
 _CAMERA = json.loads((_Path(__file__).resolve().parents[3] / "config" / "sensors.json").read_text())["camera"]
 # Half the colour camera's horizontal view (atan of half the width over fx: 37.6 deg). A person further off the heading
@@ -117,6 +120,11 @@ ACTIONS = [
 ]
 
 ALL_TOOLS = PERCEPTION + ACTIONS
+
+
+def tool_specs() -> list:
+    """The tools offered to the model this step: all of them, less the lift when rescue is switched off."""
+    return [t for t in ALL_TOOLS if RESCUE_ENABLED or t["function"]["name"] != "extract_survivor"]
 ACTION_NAMES = {t["function"]["name"] for t in ACTIONS}
 
 
@@ -357,6 +365,8 @@ class ToolRegistry:
             refusal = self._need(args, ("scan_thermal", "track_fire_spread"),
                                  lambda ev: ev.get("tool") == "track_fire_spread" or bool(ev.get("hotspots")),
                                  "the cited scan found no hotspot")
+        elif name == "extract_survivor" and not RESCUE_ENABLED:
+            refusal = {"refused": True, "reason": "carrying people out is switched off for this mission; report the person instead"}
         elif name == "extract_survivor":
             reach = float(_RESCUE["reach_m"])
             known = next((c for c in self._confirmed.get(self.ctx.robot, []) if c["id"] == str(args.get("evidence_id"))), None)
@@ -446,7 +456,7 @@ class ToolRegistry:
                 ev = self.evidence[args["evidence_id"]]
                 dx, dy = ev["x"] - self.ctx.x, ev["y"] - self.ctx.y
                 dist = max(1e-6, (dx * dx + dy * dy) ** 0.5)
-                k = max(0.0, dist - RESCUE_APPROACH_M) / dist
+                k = max(0.0, dist - (RESCUE_APPROACH_M if RESCUE_ENABLED else APPROACH_STANDOFF_M)) / dist
                 args = {**args, "x": round(self.ctx.x + dx * k, 2), "y": round(self.ctx.y + dy * k, 2),
                         "face_x": ev["x"], "face_y": ev["y"],
                         "reason": f"reach the person seen at ({ev['x']}, {ev['y']}) to lift them"}
@@ -506,6 +516,8 @@ class ToolRegistry:
             # Run 15: robot A confirmed a person from 2.7 m and searched on; the next step to get them out was only in the
             # prompt. The result says it, from the same inspection.
             looked, reach = self._inspection_range(self.evidence[str(args["evidence_id"])]), float(_RESCUE["reach_m"])
+            if not RESCUE_ENABLED:
+                return {"ok": True, "queued": name}
             if self.ctx.carrying_person:
                 hint = "you are already towing a person; report this one to your partner and the commander"
             elif looked is not None and looked <= reach:
