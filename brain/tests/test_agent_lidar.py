@@ -11,7 +11,7 @@ from brain.agent import vision as v
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def recording(folder, *, scan_m=2., real_depth=False, curved=True, stamp=0., bearing=0.):
+def recording(folder, *, scan_m=2., real_depth=False, curved=True, stamp=0., bearing=0., hot=False):
     folder.mkdir(parents=True)
     calibration = ('%YAML:1.0\n---\nCamera1.fx: 120.0\nCamera1.fy: 120.0\n'
                    'Camera1.cx: 79.5\nCamera1.cy: 59.5\nCamera.width: 160\n'
@@ -24,6 +24,8 @@ def recording(folder, *, scan_m=2., real_depth=False, curved=True, stamp=0., bea
     mask = (yy >= 30) & (yy < 90) & (xx >= centre - 11) & (xx < centre + 11)
     thermal = np.full(mask.shape, 2932, np.uint16)
     thermal[mask] = np.round((303.15 + 5 * (yy[mask] - 30) / 60) * 10).astype(np.uint16)
+    if hot:
+        thermal[mask] = 9000                                   # about 627 C
     # A rounded body's shoulders return farther than its centre at 2 m.
     angles = -math.pi + np.arange(720) * (2 * math.pi / 720)
     distance_from_centre = angles + math.radians(bearing)
@@ -183,7 +185,23 @@ def test_recorded_visible_survivor_with_sparse_registered_depth(tmp_path):
     assert result['cues']['range_source'] == 'lidar'
     assert result['cues']['lidar']['filled_pixels'] == 477
     assert result['cues']['lidar']['t'] == pytest.approx(59.001667)
-    # A real person behind the desk remains rejected by the existing recess check.
+    # s3 is a real person. The recess check used to reject her as an opening; with no sill beneath her she is no longer
+    # one, and with LiDAR-only range the verdict stays uncertain, so the agent must approach before confirming.
     # This recording predates severe frame-wide smoke dropout; it tests real sparse registration.
-    assert result['verdict'] == 'not_person'
-    assert result['cues']['window']['opening']
+    assert result['verdict'] == 'uncertain'
+    assert not result['cues']['window']['opening'] and result['cues']['window']['grounded']
+
+
+def test_a_fire_with_no_depth_is_bounded_by_the_floor_under_it(tmp_path):
+    # One-door seed 924, robot B: a 618 C fire 2.7 m ahead had depth on none of its pixels, so it had no range and every
+    # spray_water was refused; the LiDAR crossed it to a wall at 11.3 m. The floor under the fire's lowest row bounds its
+    # range: row 89 is 29.5 px below the centre at fy 120, with the camera 1.6 m up and pitched 10 deg down.
+    import json
+    mount = json.loads((ROOT / 'config/sensors.json').read_text())['camera']['mount']
+    p = math.radians(mount['pitch_down_deg'])
+    expected = mount['height_m'] / (math.sin(p) + 29.5 / 120 * math.cos(p))
+    [hot] = v.scan_thermal(recording(tmp_path / 'flames', scan_m=11.3, curved=False, hot=True))['hotspots']
+    assert hot['range_source'] == 'floor_upper_bound' and hot['range_m'] == pytest.approx(expected, abs=.05)
+    # Control: a fire with depth on it keeps the measured range.
+    [hot] = v.scan_thermal(recording(tmp_path / 'solid', real_depth=True, hot=True))['hotspots']
+    assert hot['range_source'] == 'depth' and hot['range_m'] == pytest.approx(2., abs=.3)

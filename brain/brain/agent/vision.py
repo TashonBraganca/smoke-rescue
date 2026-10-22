@@ -270,6 +270,21 @@ def _above_floor(frame, depth, floor_band_m=None):
     return ~known | (height > band)
 
 
+def _floor_range_bound(frame, mask):
+    """Optical range at which the lowest pixel of each mask column meets the floor, median over columns: an upper bound
+    on the range of what those pixels show. None when the region's bottom is not below the horizon."""
+    mount = json.loads((Path(__file__).resolve().parents[3] / "config/sensors.json").read_text())["camera"]["mount"]
+    pitch = math.radians(mount["pitch_down_deg"])
+    cols = np.flatnonzero(mask.any(axis=0))
+    if not len(cols):
+        return None
+    rows = mask.shape[0] - 1 - np.argmax(mask[::-1, cols], axis=0)
+    down = (rows - frame.thermal_K[1, 2]) / frame.thermal_K[1, 1]
+    drop = math.sin(pitch) + down * math.cos(pitch)
+    z = mount["height_m"] / drop[drop > 1e-3]
+    return float(np.median(z)) if len(z) else None
+
+
 def _lidar_component_depth(frame, mask, depth, tolerance):
     """Fill only missing warm pixels, using the pitched ray's horizontal bearing."""
     scan = frame.lidar
@@ -340,7 +355,19 @@ def scan_thermal(frame: Frame, *, human_band_c=(28.,40.), hot_min_c=200., min_pi
     for p in people:
         p["score"] = _number(min(1.,p["pixels"]/100)*p["depth_fraction"])
         p["size_plausible"] = _size_plausible(p["width_m"],p["height_m"])
-    hot = [_region(frame,m,s,depth) for m,s in _components(valid & (c>=hot_min_c),min_pixels)]
+    hot = []
+    for m,s in _components(valid & (c>=hot_min_c),min_pixels):
+        region = _region(frame,m,s,depth) | {"range_source": "depth"}
+        # Flames return no depth, so a fire had no range: one-door seed 924, robot B faced a 618 C fire 2.7 m ahead on its
+        # way out with depth on 0 % of its pixels, and spray_water (which needs the fire within the nozzle's reach) was
+        # refused three times. The LiDAR is no help: its beam crossed that floor fire and returned off a wall at 11.3 m.
+        # What holds by geometry: anything seen along a downward ray is nearer than where the ray meets the floor, so the
+        # floor point under the fire's lowest pixels bounds how far away it is.
+        if region["range_m"] is None:
+            bound = _floor_range_bound(frame, m)
+            if bound is not None:
+                region |= {"range_m": _number(bound), "range_source": "floor_upper_bound"}
+        hot.append(region)
     return _base("scan_thermal",frame,{"human_band_c":[lo,hi],"hot_min_c":hot_min_c,"min_pixels":min_pixels},
         hotspots=hot,people=people,rgb_people=detect_people_rgb(frame),
         evidence=[f"{len(hot)} hot and {len(people)} warm connected components; warm candidates are not person confirmations.",
@@ -419,6 +446,33 @@ def _debug(f,mask,aligned,path):
         raise OSError("cannot write debug crop")
 
 
+SILL_STEP_M = .5   # floor seen from a 1.6 m mast changes by about r^2/(h f) per row: 0.05 m at 5.7 m for f = 400 px
+
+
+def _sill_beneath(depth, bbox, range_m, nearer_m=.8):
+    """True when most columns under a region meet a nearer surface by a step (a sill), False when by smooth floor, None
+    when too few columns have depth beneath the region to tell. Columns where nothing nearer appears below count as floor."""
+    if range_m is None:
+        return None
+    x, y, w, h = bbox
+    strip = depth[y + h:, x:x + w]
+    sills = floors = 0
+    for col in strip.T:
+        z = col[np.isfinite(col) & (col > 0)]
+        if len(z) < 3:
+            continue
+        near = np.flatnonzero(z < range_m - nearer_m)
+        if len(near) == 0:
+            floors += 1
+        elif near[0] == 0 or z[near[0] - 1] - z[near[0]] > SILL_STEP_M:
+            sills += 1
+        else:
+            floors += 1
+    if sills + floors < max(3, w // 2):
+        return None
+    return sills > floors
+
+
 def inspect_candidate(frame: Frame, bearing_deg: float, range_m: float, *, output_dir: str | Path,
                       human_band_c=(28.,40.), bearing_tolerance_deg=8., range_tolerance_m=1.5,
                       depth_noise_mm_per_m2=1.5) -> dict:
@@ -491,7 +545,14 @@ def inspect_candidate(frame: Frame, bearing_deg: float, range_m: float, *, outpu
         ring_z = depth[ring & np.isfinite(depth)]
         surround = float(np.median(ring_z)) if len(ring_z)>=20 else None
         recess = region["range_m"]-surround if region["range_m"] is not None and surround is not None else None
-        window = bool(recess is not None and recess>=.8)
+        # A window has a sill beneath it: going down the image from the warm region, depth steps abruptly onto the nearer
+        # wall. A body beyond a doorway sits or stands on floor, and floor comes toward the camera smoothly. So a recess
+        # counts as an opening only when, in most columns under the region, the first surface nearer than the recess
+        # threshold is reached by a step (one-door seed 924, robot B at 0 s: a woman slumped beyond a doorway, framed by
+        # the nearer jamb and wall, was judged an opening and rejected; robot A confirmed her 0.36 m away 4 s later).
+        sill = _sill_beneath(depth, region["bbox"], region["range_m"])
+        grounded = bool(sill is not None and not sill)
+        window = bool(recess is not None and recess>=.8 and not grounded)
         rgb,aligned = _rgb_cue(frame,mask,depth)
         nonplanar = bool(plane["residual_m"] is not None and plane["residual_m"]>=max(.012,1.5*sigma))
         result["cues"] = {"range_source": "lidar" if lidar_cue is not None else "depth",
@@ -499,7 +560,7 @@ def inspect_candidate(frame: Frame, bearing_deg: float, range_m: float, *, outpu
             "rotated_size_px":[_number(x) for x in rect[1]],"truncated_by_image_edge":truncated},
             "temperature":{"structured":temp_ok,"mean_c":region["mean_c"],"std_c":region["std_c"],"p90_p10_c":_number(spread),
                 "rim_hot_fraction":_number(rim_hot),"rim_cold_fraction":_number(rim_cold),"band_crossing_ramp":ramp},
-            "plane":plane,"window":{"opening":window,"surrounding_z_m":_number(surround) if surround is not None else None,
+            "plane":plane,"window":{"opening":window,"grounded":grounded,"surrounding_z_m":_number(surround) if surround is not None else None,
                 "recess_m":_number(recess) if recess is not None else None},"rgb":rgb,
             "depth":{"valid_fraction":region["depth_fraction"],"registered_fraction":registered_fraction,"nonplanar":nonplanar,
                 "span_m":_number(depth_span) if depth_span is not None else None,"single_surface":single_surface}}
