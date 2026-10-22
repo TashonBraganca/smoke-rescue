@@ -9,6 +9,7 @@ replacing files. No tool infers world coordinates or reads scene metadata.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from copy import deepcopy
 from functools import lru_cache
 import hashlib
 import json
@@ -607,7 +608,8 @@ def inspect_candidate(frame: Frame, bearing_deg: float, range_m: float, *, outpu
         # border beside a burning sofa, confidence 0.58, confirmed a person 2.6 m from anyone). A box cut at the bottom
         # stays usable: that is a person lying close, below the lower edge of the view.
         width = frame.rgb.shape[1]
-        whole = [h for h in hits if h["bbox_rgb"][0] > 0 and h["bbox_rgb"][0] + h["bbox_rgb"][2] < width]
+        margin = config["rgb_side_margin_px"]
+        whole = [h for h in hits if h["bbox_rgb"][0] > margin and h["bbox_rgb"][0] + h["bbox_rgb"][2] < width - margin]
         result["cues"]["rgb_dnn"] = {"model": PERSON_ONNX.name, "hits": hits, "clipped_by_side": len(hits) - len(whole)}
         if whole and max(h["confidence"] for h in whole) >= 0.5:
             best = max(whole, key=lambda h: h["confidence"])
@@ -625,6 +627,68 @@ def inspect_candidate(frame: Frame, bearing_deg: float, range_m: float, *, outpu
     result["debug_crop"] = str(path)
     result["evidence"] = result["reasons"]+[f"Thermal crop left, projected RGB crop right: {path}"]
     return result
+
+
+class InspectionHistory:
+    """Fuse this robot's measured observations in its map frame, without voting on correlated frames.
+
+    A planar scan supplies range support, never independent vertical body shape.
+    Each qualifying view must already contain thermal structure and measured depth shape.
+    Translation, time separation and stable map position permit partial views to corroborate.
+    This is a conservative rule, not a calibrated probability of a person.
+    """
+
+    def __init__(self):
+        self.observations = []
+        self.last_t = -math.inf
+
+    def observe(self, result, *, position, observer):
+        out = deepcopy(result)
+        cfg = _perception()
+        t = float(out.get("t", self.last_t))
+        if not np.isfinite([t, *position, *observer]).all():
+            raise ValueError("fusion needs finite sensor time and map positions")
+        if t < self.last_t:
+            self.observations.clear()
+        self.last_t = t
+        self.observations = [o for o in self.observations if t - o["t"] <= cfg["fusion_memory_s"]]
+        radius = cfg["fusion_association_m"]
+        near = lambda o: math.dist(position, o["position"]) <= radius
+        cues = out.setdefault("cues", {})
+        candidate = out.get("candidate") or {}
+        size, depth, thermal = (cues.get(k, {}) for k in ("size", "depth", "temperature"))
+        if out.get("verdict") == "not_person":
+            self.observations = [o for o in self.observations if not near(o)]
+        qualified = bool(candidate.get("range_m") is not None and
+            out.get("verdict") != "not_person" and cues.get("range_source") == "depth" and
+            size.get("plausible") and depth.get("registered_fraction", 0) >= cfg["inspection_min_depth_fraction"] and
+            depth.get("nonplanar") and depth.get("single_surface") and thermal.get("structured") and
+            not thermal.get("band_crossing_ramp") and not cues.get("plane", {}).get("large_plane") and
+            not cues.get("window", {}).get("opening"))
+        associated = [o for o in self.observations if near(o)]
+        if qualified and not any(o["t"] == t for o in associated):
+            observation = {"id": out["id"], "t": t, "position": list(position), "observer": list(observer),
+                           "mean_c": thermal["mean_c"], "rgb_hits": len(cues.get("rgb_dnn", {}).get("hits", []))}
+            self.observations.append(observation)
+            associated.append(observation)
+        independent = []
+        for o in associated:
+            if all(abs(o["t"] - p["t"]) >= cfg["fusion_min_interval_s"] and
+                   math.dist(o["observer"], p["observer"]) >= cfg["fusion_view_baseline_m"] and
+                   abs(o["mean_c"] - p["mean_c"]) <= cfg["fusion_temperature_change_c"]
+                   for p in independent):
+                independent.append(o)
+        cues["temporal"] = {"qualified_current_view": qualified, "views": len(independent),
+            "evidence_ids": [o["id"] for o in independent], "sensor_times": [o["t"] for o in independent],
+            "positions": [o["position"] for o in independent], "observers": [o["observer"] for o in independent],
+            "lidar_is_body_shape": False}
+        if qualified and out.get("verdict") == "uncertain" and len(independent) >= cfg["fusion_min_views"]:
+            out["verdict"] = "person"
+            reason = "Translated views agree on a body-sized structured thermal region with measured nonplanar depth at the same map position."
+            out["reasons"] = [*out.get("reasons", []), reason]
+            out["evidence"] = [*out.get("evidence", []), reason]
+        self.observations = self.observations[-int(cfg["fusion_max_observations"]):]
+        return out
 
 
 PERSON_ONNX = Path(__file__).resolve().parents[3] / "data" / "models" / "onnx" / "yolo11m.onnx"

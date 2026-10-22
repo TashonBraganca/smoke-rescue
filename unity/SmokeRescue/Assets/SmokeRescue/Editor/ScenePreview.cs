@@ -115,6 +115,23 @@ namespace SmokeRescue.Editor
         /// burning sofa behind her as its range (4.45 m), and the robot walked inside its camera's blind floor before
         /// looking again. Each such material is replaced on this instance (the imported asset is untouched) by an opaque
         /// copy with alpha clipping, so hair cards stay cut. Returns how many materials changed.</summary>
+        /// <summary>An opaque HDRP/Lit copy of a glTF metallic-roughness material: base colour (texture and factor, alpha
+        /// forced to 1), normal map, metallic and smoothness, double-sided as the source; alpha clipping at 0.5 keeps hair and
+        /// lash cut-outs.</summary>
+        static Material OpaqueLit(Material m)
+        {
+            var lit = new Material(Shader.Find("HDRP/Lit")) { name = m.name + " (solid lit)" };
+            Texture T(string n) => m.HasProperty(n) ? m.GetTexture(n) : null;
+            var col = m.HasProperty("baseColorFactor") ? m.GetColor("baseColorFactor") : Color.white; col.a = 1;
+            lit.SetColor("_BaseColor", col);
+            if (T("baseColorTexture") != null) lit.SetTexture("_BaseColorMap", T("baseColorTexture"));
+            if (T("normalTexture") != null) lit.SetTexture("_NormalMap", T("normalTexture"));
+            lit.SetFloat("_Metallic", m.HasProperty("metallicFactor") ? m.GetFloat("metallicFactor") : 0f);
+            lit.SetFloat("_Smoothness", 1f - (m.HasProperty("roughnessFactor") ? m.GetFloat("roughnessFactor") : .7f));
+            lit.SetFloat("_AlphaCutoff", .5f);
+            lit.SetFloat("_DoubleSidedEnable", 1f);
+            return lit;
+        }
         public static int SolidBodies(GameObject go)
         {
             int changed = 0;
@@ -125,7 +142,12 @@ namespace SmokeRescue.Editor
                 {
                     var m = mats[i];
                     if (m == null || !m.HasProperty("_SurfaceType") || m.GetFloat("_SurfaceType") == 0) continue;
-                    var solid = new Material(m) { name = m.name + " (solid)" };
+                    // A transparent glTF shader-graph material ignores a per-material opaque override: its own graph keeps
+                    // drawing the transparent pass, so a body was solid to the depth camera (depth write on) and a near-
+                    // invisible ghost to the colour camera and the colour person detector (seed 926: the "Debra" model, s2 and
+                    // s6, all nine materials alphaMode BLEND; the evidence render showed nothing where she lay). Draw such
+                    // bodies with HDRP/Lit, opaque, from the same textures; alpha-clip only where the texture has cut-outs.
+                    var solid = m.shader.name.StartsWith("Shader Graphs/glTF") ? OpaqueLit(m) : new Material(m) { name = m.name + " (solid)" };
                     solid.SetFloat("_SurfaceType", 0);
                     if (solid.HasProperty("_AlphaCutoffEnable")) solid.SetFloat("_AlphaCutoffEnable", 1);
                     if (solid.HasProperty("_ZWrite")) solid.SetFloat("_ZWrite", 1);

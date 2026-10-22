@@ -19,6 +19,8 @@ namespace SmokeRescue.World
         public Dictionary<string, string> door_states = new Dictionary<string, string>();
         public int seed;
         public float duration_s;
+        // false: no mission deadline for the robots; the recording still ends at duration_s (owner toggle, 22 Oct).
+        public bool time_limit = true;
         public float sim_rate_hz = 15f;
         public float[] search_area;
         public List<string> dark_rooms = new List<string>();   // rooms whose emergency and room lights are out   // operator knowledge: building outline x_min, z_min, x_max, z_max, seen from outside

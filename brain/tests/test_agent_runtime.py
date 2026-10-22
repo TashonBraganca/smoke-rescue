@@ -630,3 +630,13 @@ def test_an_approach_dropped_for_heat_is_kept_as_a_look_not_finished(tmp_path, m
     step(24.0, "periodic", [[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": 4.6})],
                             [ToolCall("reject_candidate", {"x": 5.0, "y": 9.6, "evidence_id": "ev1"})]])
     assert step(26.0, "periodic", []).get("looks_not_finished") is None, "rejected: no longer listed"
+
+
+def test_the_agent_is_told_the_robot_stays_inside_when_configured(monkeypatch):
+    # Owner's decision (22 Oct): robots never leave by the entrance; the prompt must not say they leave on heat.
+    from brain.agent import robot_agent as RA
+    monkeypatch.setitem(T._CONFIG, "stay_inside", True)
+    text = RA.system_prompt()
+    assert "never leaves the building" in text and "It leaves the building when" not in text
+    monkeypatch.setitem(T._CONFIG, "stay_inside", False)
+    assert "It leaves the building when its own heat rules say so" in RA.system_prompt(), "control"

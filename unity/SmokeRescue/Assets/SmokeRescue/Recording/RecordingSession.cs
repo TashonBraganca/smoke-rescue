@@ -195,6 +195,8 @@ namespace SmokeRescue.Recording
                     // stop at 200 s, and an agent was told it had 44 s left at 196 s (Codex review, 22 Oct).
                     float missionS = Mathf.Min(scenario.duration_s, maxSeconds);
                     if (missionS > 0 && !float.IsInfinity(missionS)) brainCfg.mission_time_limit_s = missionS;
+                    // The owner's toggle: no deadline for the robots; they search until done (a day, so JSON stays finite).
+                    if (!scenario.time_limit) brainCfg.mission_time_limit_s = 86400f;
                     // One launch gate: every robot's brain starts at its pad in the shared gate frame. Never the spawn's house
                     // coordinates, which would hand the brains the building's own frame.
                     brainCfg.frames_shared_at_start = GateLaunch(scenario.robots);

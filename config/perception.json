@@ -106,5 +106,21 @@
   "door_handle_max_height_m": 0.18,
   "door_handle_max_height_m_reason": "Allow a knob and backplate, reject broad foreground objects.",
   "door_handle_edge_fraction": 0.35,
-  "door_handle_edge_fraction_reason": "A handle is normally near a free vertical panel edge. Keep only the outer thirty-five percent on either side; hinge and swing direction remain unknown."
+  "door_handle_edge_fraction_reason": "A handle is normally near a free vertical panel edge. Keep only the outer thirty-five percent on either side; hinge and swing direction remain unknown.",
+  "rgb_side_margin_px": 1,
+  "rgb_side_margin_px_reason": "Integer conversion of decoded box edges loses up to one pixel. A box ending in the last pixel cannot establish an unclipped side contour.",
+  "fusion_memory_s": 60.0,
+  "fusion_memory_s_reason": "Bound stationary-body association to one minute so accumulated localisation drift and changed fire conditions do not persist for the mission.",
+  "fusion_association_m": 0.6,
+  "fusion_association_m_reason": "A partial view can measure another part of a torso up to about 0.3 m away; allow that extent in both observations. This is not a house coordinate or truth-match radius.",
+  "fusion_view_baseline_m": 0.25,
+  "fusion_view_baseline_m_reason": "A quarter-metre translation is one robot body radius and changes the depth rays used for corroboration. Rotation alone is the same viewpoint.",
+  "fusion_min_interval_s": 0.5,
+  "fusion_min_interval_s_reason": "Require at least half a second between supporting views, rather than counting adjacent frames of one sensor exposure.",
+  "fusion_temperature_change_c": 3.0,
+  "fusion_temperature_change_c_reason": "Permit a few degrees of apparent-temperature change from clothing, view angle and smoke. Greater change does not corroborate a stable thermal body.",
+  "fusion_min_views": 2,
+  "fusion_min_views_reason": "Require two translated observations, each independently passing thermal structure and measured depth-shape checks. Neither needs an unclipped silhouette.",
+  "fusion_max_observations": 128,
+  "fusion_max_observations_reason": "Bound per-robot storage to 128 small evidence records. This covers sixty seconds at two separated observations per second with eight records spare."
 }

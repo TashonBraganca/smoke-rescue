@@ -1,0 +1,7 @@
+{
+  "inherits": "scenario_house_onedoor_seed927.json",
+  "id": "house_onedoor_seed927_nolimit",
+  "time_limit": false,
+  "duration_s": 480,
+  "description": "Seed 927 with no mission deadline for the robots (owner's toggle, 22 Oct): they search until done; the recording stops at 480 s."
+}

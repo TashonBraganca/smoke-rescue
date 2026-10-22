@@ -190,6 +190,7 @@ class AgentContext:
 
 
 class ToolRegistry:
+    _inspection_histories: dict = {}
     # Close looks per spot, kept across steps (the server builds a new registry per step): (robot, cell) -> times.
     _looks: dict = {}
     # Where each robot has lifted someone, from its own extract orders, so a lifted person is not offered again.
@@ -322,6 +323,11 @@ class ToolRegistry:
             else (float(bearing_deg), float(range_m))
         r["x"], r["y"] = (round(v, 2) for v in self.world(float(at[0]), float(at[1])))
         r["requested"] = {"bearing_deg": float(bearing_deg), "range_m": float(range_m)}
+        # Per recording and per robot. Sensor time, not request time, rejects replayed frames.
+        if r.get("t") is not None:
+            key = (str(self.robot_dir.resolve()), self.ctx.robot)
+            history = self._inspection_histories.setdefault(key, vision.InspectionHistory())
+            r = history.observe(r, position=(r["x"], r["y"]), observer=(self.ctx.x, self.ctx.y))
         return r
 
     def _p_check_indoors(self, bearing_deg: float):

@@ -110,12 +110,18 @@ _RESCUE_TEXT = [
 ]
 
 
+_LEAVES = "It leaves the building when its own heat rules say so, whatever you ordered."
+_STAYS = ("It never leaves the building once inside: when heat builds it retreats to the coolest floor inside, whatever "
+          "you ordered, and waits for the air to cool; spraying its water on the fire is your decision.")
+
+
 def system_prompt() -> str:
     """The system prompt for this step: with carrying people out switched off (actuators.json rescue.enabled), the goal,
-    limits and facts say nothing about lifting, so the model is never told of a tool it does not have."""
+    limits and facts say nothing about lifting, so the model is never told of a tool it does not have. With stay_inside
+    (brain.json, the owner's decision of 22 Oct) the robot never leaves, and the model is told so."""
+    text = SYSTEM.replace(_LEAVES, _STAYS) if _tools._CONFIG.get("stay_inside") else SYSTEM
     if _tools.RESCUE_ENABLED:
-        return SYSTEM
-    text = SYSTEM
+        return text
     for old, new in _RESCUE_TEXT:
         if text.count(old) != 1:
             raise RuntimeError(f"system prompt changed; rescue text not found once: {old[:60]!r}")
@@ -169,6 +175,7 @@ class RobotAgent:
             cls._run = run; cls._last_t = {robot: t}
             cls._recent.clear(); ToolRegistry._looks.clear(); ToolRegistry._lifted.clear(); ToolRegistry._confirmed.clear()
             ToolRegistry._pending.clear(); ToolRegistry._unfinished.clear(); TeamState.reset()
+            ToolRegistry._inspection_histories.clear()
 
     def step(self, req: dict) -> dict:
         start = time.perf_counter()
@@ -237,6 +244,8 @@ class RobotAgent:
                 result = tools.call(call.name, call.arguments)
                 self._trace({"kind": "tool", "step": step_id, "round": rounds, "name": call.name, "arguments": call.arguments,
                              "result_id": result.get("id"), "verdict": result.get("verdict"),
+                             **({"reasons": result.get("reasons"), "cues": result.get("cues"),
+                                 "candidate": result.get("candidate")} if call.name == "inspect_candidate" else {}),
                              "refused": result.get("refused", False), "reason": result.get("reason"), "error": result.get("error")})
                 messages.append({"role": "tool", "name": call.name, "content": json.dumps(_compact(result), default=str)})
         team.note_intent(ctx.t, tools.finished, tools.orders)
