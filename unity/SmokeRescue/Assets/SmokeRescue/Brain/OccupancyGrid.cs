@@ -197,6 +197,11 @@ namespace SmokeRescue.Brain
             var copy = new byte[Count]; for (int i = 0; i < Count; i++) if (observed[i] || peer[i] != 0) copy[i] = 1;
             return copy;
         }
+        public byte[] CopyOwnSearched()
+        {
+            var copy = new byte[Count]; for (int i = 0; i < Count; i++) if (observed[i]) copy[i] = 1;
+            return copy;
+        }
         public byte[] CopyPeerExplored()
         {
             var copy = new byte[Count]; for (int i = 0; i < Count; i++) if (peer[i] != 0) copy[i] = 1;
@@ -336,6 +341,7 @@ namespace SmokeRescue.Brain
                 if (p.z > c.obstacle_max_height_m) continue;
                 Vector2 end = pose.Transform(p.x, p.y);
                 bool obstacle = p.z >= c.obstacle_min_height_m;
+                if (obstacle && TeammateAt != null && TeammateAt(end, frame.Timestamp)) continue;
                 Ray(start, end, obstacle);
                 // Searched floor is where the ray runs within search_low_m of it: a person lying there would have blocked
                 // it. Higher up, a ray over a table to the wall behind says nothing about the floor below (held-out seed
@@ -360,6 +366,12 @@ namespace SmokeRescue.Brain
         /// <summary>One LiDAR sweep at its capture pose: free along each beam, occupied at its end. A single beam with no
         /// return carries no evidence, because smoke can swallow a pulse in front of a wall; a wide span of them is open
         /// ground (MarkOpenGround).</summary>
+        /// <summary>Where a partner robot's body is predicted at a time (RobotBrain.OnTeammate): returns hitting it are not
+        /// walls and are left out of the map, beam and all, so nothing in the map changes for them. One-door seed 924:
+        /// robot A's LiDAR drew robot B, walking in behind it, as a line of wall through the 0.9 m front door, and A lost
+        /// its way out at 12 s; clearing B's radioed track afterwards (MarkTeammateFree) missed its flank, because the pose
+        /// is up to 2 s old and carries B's placement error.</summary>
+        public Func<Vector2, double, bool> TeammateAt;
         public void IntegrateLidar(LidarScan scan, BrainPose pose)
         {
             Array.Clear(hits, 0, Count); Array.Clear(frees, 0, Count);
@@ -370,7 +382,9 @@ namespace SmokeRescue.Brain
                 float r = scan.RangesM[i];
                 if (!(r >= scan.MinM) || r > scan.MaxM) continue;
                 float a = pose.yawRad + scan.Angle(i);
-                Ray(start, origin + new Vector2(-Mathf.Sin(a), Mathf.Cos(a)) * r, true);
+                Vector2 end = origin + new Vector2(-Mathf.Sin(a), Mathf.Cos(a)) * r;
+                if (TeammateAt != null && TeammateAt(end, scan.Timestamp)) continue;
+                Ray(start, end, true);
             }
             // As for depth, a grazing beam through a wall cell cannot erase a hit from the same sweep.
             for (int i = 0; i < Count; i++)

@@ -552,6 +552,12 @@ namespace SmokeRescue.Recording
                 UnityEngine.Experimental.Rendering.GraphicsFormat.R8_UNorm, (uint)size, (uint)size))));
             pending.Enqueue(Task.Run(() => File.WriteAllBytes(searchedPath, ImageConversion.EncodeArrayToPNG(searched,
                 UnityEngine.Experimental.Rendering.GraphicsFormat.R8_UNorm, (uint)size, (uint)size))));
+            // This robot's own searched floor alone, so an evaluator can tell each robot's share once maps are shared.
+            var ownSearched = new byte[s.ownSearched.Length];
+            for (int i = 0; i < ownSearched.Length; i++) ownSearched[i] = s.ownSearched[i] != 0 ? (byte)255 : (byte)0;
+            string ownPath = Path.Combine(rig.dir, $"brain_map/{Fmt(t)}.own_searched.png");
+            pending.Enqueue(Task.Run(() => File.WriteAllBytes(ownPath, ImageConversion.EncodeArrayToPNG(ownSearched,
+                UnityEngine.Experimental.Rendering.GraphicsFormat.R8_UNorm, (uint)size, (uint)size))));
             rig.mapTxt.Append(Fmt(t)).Append(' ').Append(F(s.pose.position.x)).Append(' ').Append(F(s.pose.position.y)).Append(' ')
                 .Append(F(s.pose.yawRad)).Append(' ').Append(rel).Append('\n');
             // Also flush the brain logs, so a run without agents can be watched live and a crash keeps them.

@@ -17,6 +17,7 @@ namespace SmokeRescue.Brain
             // In this robot's frame; null or unset until the frames are linked.
             public BrainClaim claim;
             public BrainPose pose; public bool poseKnown;
+            public double poseT; public Vector2 velocity;   // when the pose was sent, and the motion between the last two
             public Vector2? goal;
         }
         readonly SortedDictionary<string, PeerState> peers = new SortedDictionary<string, PeerState>(StringComparer.Ordinal);
@@ -174,9 +175,12 @@ namespace SmokeRescue.Brain
             var m = peer.message;
             if (!TryPartnerLink(sender, out var link)) { peer.claim = null; peer.goal = null; return; }
             grid.ReplacePeerLayer(sender, m, peer.explored, link, OwnBodyWasAt);
-            var before = peer.poseKnown ? peer.pose.position : (Vector2?)null;
+            var before = peer.poseKnown ? peer.pose.position : (Vector2?)null; double beforeT = peer.poseT;
             peer.pose = new BrainPose { position = link.Transform(m.Pose.position.x, m.Pose.position.y), yawRad = m.Pose.yawRad + link.yawRad };
-            peer.poseKnown = true;
+            peer.poseKnown = true; peer.poseT = m.SentAt;
+            double dtPose = m.SentAt - beforeT;
+            peer.velocity = before.HasValue && dtPose > 0 && dtPose <= c.teammate_predict_max_s && Vector2.Distance(before.Value, peer.pose.position) <= c.teammate_track_max_m
+                ? (peer.pose.position - before.Value) / (float)dtPose : Vector2.zero;
             // Where the partner stands, and the straight line it reported moving along since its last pose, is floor.
             float ends = Mathf.Max(0, c.body_half_length_m - c.body_radius_m); var f = peer.pose.Forward;
             grid.MarkTeammateFree(peer.pose.position - f * ends, peer.pose.position + f * ends, c.body_radius_m);
@@ -244,6 +248,21 @@ namespace SmokeRescue.Brain
                 Emit(t, "map_shared", "Local and received explored cells first overlap with " + pair.Key + ".", "sequence", pair.Value.message.Sequence);
             }
         }
+        /// <summary>Is p on a partner's body at time t? From its last radioed pose, moved on at the velocity between its last
+        /// two poses for at most teammate_predict_max_s: within the body's half length plus teammate_mask_margin_m of that
+        /// stretch. A partner not heard from for longer may be anywhere, so nothing is masked for it.</summary>
+        bool OnTeammate(Vector2 p, double t)
+        {
+            foreach (var peer in peers.Values)
+            {
+                if (!peer.poseKnown) continue;
+                double age = t - peer.poseT; if (age > c.teammate_predict_max_s) continue;
+                Vector2 a = peer.pose.position, b = a + peer.velocity * (float)Math.Max(0, age), d = b - a;
+                float u = d.sqrMagnitude < 1e-9f ? 0 : Mathf.Clamp01(Vector2.Dot(p - a, d) / d.sqrMagnitude);
+                if (Vector2.Distance(p, a + d * u) <= c.body_half_length_m + c.teammate_mask_margin_m) return true;
+            }
+            return false;
+        }
         bool ClaimBlocks(Vector2 p, double t)
         {
             foreach (var pair in peers)
@@ -269,6 +288,13 @@ namespace SmokeRescue.Brain
                 if (claim == null || claim.expiresAt <= t || Vector2.Distance(frontierCentre, claim.centre) > claim.radiusM + frontierRadius) continue;
                 if (CompareIds(id, pair.Key) < 0) { keepsContested = true; continue; }
                 Emit(t, "goal_yielded", "The lower robot ID " + pair.Key + " keeps the contested frontier.", "x_m", goal.Value.x, "y_m", goal.Value.y);
+                // An agent's frontier order inside the partner's claim yields too, and is dropped: kept, it was set again
+                // the next tick and yielded again, 118 times in 2 s while robot B stood still (one-door seed 924, 52 s).
+                if (AgentGoalActive(t) && agentGoalIsFrontier)
+                {
+                    Emit(t, "replan", "Agent goal is the partner's claimed frontier; back to exploring.", "x_m", agentGoal.Value.x, "y_m", agentGoal.Value.y);
+                    agentGoal = null;
+                }
                 ClearPath(); return;
             }
             // Existing simultaneous claims use the ID tie-break even when both mapped the approach cell.

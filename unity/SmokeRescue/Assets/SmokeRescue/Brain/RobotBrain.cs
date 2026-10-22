@@ -54,7 +54,7 @@ namespace SmokeRescue.Brain
             id = robotId; scanSign = (seed & 1) == 0 ? 1 : -1; LinkDiagnostics = c.link_diagnostics;
             var entry = entryPose.HasValue ? entryPose.Value.pose : new BrainPose();
             home = entry.position;
-            airC = c.ambient_c; motion = new DeadReckoning(c.motion_stale_s, c.frame_max_age_s + c.frame_pair_tolerance_s, entry); grid = new OccupancyGrid(c) { SeeOverMaxM = cfg.camera.mount.height_m - c.see_over_clearance_m };
+            airC = c.ambient_c; motion = new DeadReckoning(c.motion_stale_s, c.frame_max_age_s + c.frame_pair_tolerance_s, entry); grid = new OccupancyGrid(c) { SeeOverMaxM = cfg.camera.mount.height_m - c.see_over_clearance_m }; grid.TeammateAt = OnTeammate;
             if (grid.Cell(home) < 0) throw new ArgumentException("Entry door is outside the configured building grid.");
             planner = new GridPlanner(grid, c) { Home = home }; health = new CameraHealth(c); matcher = new ScanMatcher(grid, c);
             grid.MarkFootprint(home);
@@ -477,6 +477,12 @@ namespace SmokeRescue.Brain
                         Emit(t, "goal", "Reachable frontier minimizes travel and heat cost minus nearby unknown-cell gain.",
                             "x_m", frontier.position.x, "y_m", frontier.position.y, "path_cost", frontier.cost, "information_cells", frontier.information, "score", frontier.score);
                         Emit(t, "replan", "Build a path to the selected frontier.", "path_points", path.Count);
+                    }
+                    else if (ThresholdLook(t, out var lookRoute, out var beyond))
+                    {
+                        SetPath(lookRoute, false); scanSince = double.NaN; noFrontierAt = double.NaN;
+                        Emit(t, "goal", "Unsearched floor lies only past floor not yet proven indoors: stand at the edge of proven floor and look in for a ceiling.",
+                            "x_m", goal.Value.x, "y_m", goal.Value.y, "beyond_x_m", beyond.x, "beyond_y_m", beyond.y);
                     }
                     else
                     {
@@ -1360,6 +1366,33 @@ namespace SmokeRescue.Brain
             foreach (var exit in walkedIn) yield return exit;
         }
         readonly List<Vector2> walkedIn = new List<Vector2>();
+        /// <summary>A route to the last proven-indoor floor on the way to an unproven frontier, when no proven one is left.
+        /// Floor seen through an interior doorway is mapped free but not proven indoors until the camera sees its ceiling,
+        /// which it does only about 4.7 m away; from the far side of a room it never does. One-door seed 924: both robots
+        /// mapped the hallway and the bedrooms behind the north wall through its doorways, never stood in one, and robot A
+        /// began its return at 90 s with two of five people in those rooms unsearched. Standing at the threshold facing in
+        /// (the route ends heading through it) lets the camera prove or disprove the room. Never from near a known way out,
+        /// where the floor beyond is the yard; each frontier and each standpoint is tried once.</summary>
+        bool ThresholdLook(double t, out List<Vector2> route, out Vector2 beyond)
+        {
+            route = null; beyond = default;
+            if (!c.search_requires_ceiling) return false;
+            var options = planner.Frontiers(motion.Pose.position, p => InSearchArea(p) || GoalBlacklisted(p, t) || VisitedGoal(p, t) ||
+                lookedAt.Exists(q => Vector2.Distance(q, p) <= c.stuck_repeat_radius_m));
+            for (int k = 0; k < options.Count && k < c.threshold_look_options; k++)
+            {
+                var f = options[k]; lookedAt.Add(f.position);
+                int i = f.path.FindIndex(p => !InSearchArea(p));
+                if (i <= 0) continue;   // standing on unproven floor already: nothing to look in from
+                var at = f.path[i - 1]; bool nearExit = false;
+                foreach (var e in Exits()) nearExit |= Vector2.Distance(e, at) <= c.threshold_exit_clear_m;
+                if (nearExit || lookedFrom.Exists(q => Vector2.Distance(q, at) <= c.stuck_repeat_radius_m)) continue;
+                lookedFrom.Add(at); route = f.path.GetRange(0, i); beyond = f.path[i];
+                return true;
+            }
+            return false;
+        }
+        readonly List<Vector2> lookedAt = new List<Vector2>(), lookedFrom = new List<Vector2>();
         List<Vector2> sensedExits = new List<Vector2>(); double nextExitScan;
         void RefreshSensedExits(double t)
         {
@@ -1623,7 +1656,7 @@ namespace SmokeRescue.Brain
             occupancy = grid.CopyOccupancy(), heat = grid.CopyHeat(), path = path.ToArray(), goal = goal,
             mode = health.Thermal ? "thermal" : "rgb", state = State, heatBudget = budget,
             confirmedSurvivors = survivors.ToArray(), fireHotspots = grid.FireHotspots(),
-            peerExplored = grid.CopyPeerExplored(), searched = grid.CopySearched(), peers = CopyPeers(), survivors = CopySurvivors()
+            peerExplored = grid.CopyPeerExplored(), searched = grid.CopySearched(), ownSearched = grid.CopyOwnSearched(), peers = CopyPeers(), survivors = CopySurvivors()
         };
         static void ValidateCalibration(SensorConfig s)
         {
