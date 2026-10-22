@@ -32,7 +32,7 @@ def main(recording):
     origin = np.array([x0, y0])
     occupied = truth_occupancy(load_house_points(rec), shape, origin, cell)
     yy, xx = np.indices(shape); xy = origin + (np.stack([xx, yy], -1) + .5) * cell
-    team = np.zeros(shape, bool); per = {}
+    team = np.zeros(shape, bool); per = {}; mixed = []
     for robot in meta['robots']:
         snap = latest_map(rec / robot)
         if snap is None:
@@ -45,7 +45,15 @@ def main(recording):
         src_origin, src_cell = map_geometry(grid.shape, frame)
         own = (xy - transform[:2]) @ rotation(transform[2])
         mask = sample_grid(searched, own, src_origin, src_cell, fill=0) == 255
-        per[robot] = mask; team |= mask
+        team |= mask
+        # Per robot: its own cameras' floor. The searched layer also holds floor a linked partner sent, so without the
+        # own-only layer (recordings before 22 Oct 14:40) the robot's column includes its partner's floor.
+        own_layer = searched_for(rec / robot, t, 'own_searched')
+        if own_layer is not None:
+            mask = sample_grid(own_layer, own, src_origin, src_cell, fill=0) == 255
+        elif any(r.get('launch_pad') is not None for r in scenario.get('robots', [])):
+            mixed.append(robot)
+        per[robot] = mask
     rows = []
     for r in rooms:
         a, b, c, d = r['rect']
@@ -58,6 +66,9 @@ def main(recording):
     for name, m2, share, by in rows:
         print(f'{name:<12} {m2:8.1f} {share:6.0%}  ' + '  '.join(f'{by[k]:8.0%}' for k in per))
     print(f'{"all":<12} {total:8.1f} {sum(m2 * s for _, m2, s, _ in rows) / max(total, 1e-9):6.0%}')
+    if mixed:
+        print(f'note: {", ".join(mixed)} columns include floor received from the partner (no own-only layer in this '
+              'recording); only the team column measures coverage')
 
 
 if __name__ == '__main__':
