@@ -501,3 +501,26 @@ def test_with_rescue_switched_off_nothing_about_lifting_reaches_the_model(tmp_pa
     assert "survivors_to_rescue" not in start.get("context", {})
     monkeypatch.setattr(T, "RESCUE_ENABLED", True)
     assert "extract_survivor" in [t["function"]["name"] for t in T.tool_specs()] and "extract_survivor" in R.system_prompt()
+
+
+
+def test_every_radio_message_carries_the_state_the_tools_accepted(tmp_path, monkeypatch):
+    # Held-out seed 917, robot B: confirm_survivor was refused (inspection from beyond the confirm range) and the next
+    # call radioed "Confirmed survivor". The text now carries the robot's own state, written by code. Control: after an
+    # accepted confirmation the state lists that person.
+    T.ToolRegistry._confirmed.clear(); RobotAgent._recent.clear()
+    fake_vision(monkeypatch, "uncertain")
+    out, _ = run(tmp_path, [[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": 3})],
+                            [ToolCall("confirm_survivor", {"x": 5, "y": 8, "evidence_id": "ev1"})],
+                            [ToolCall("send_team_message", {"text": "Confirmed survivor at (5, 8)."})]])
+    (msg,) = [o for o in out["orders"] if o["type"] == "send_team_message"]
+    assert "this robot has confirmed nobody" in msg["text"] and "confirmation was refused this step" in msg["text"]
+    T.ToolRegistry._confirmed.clear(); RobotAgent._recent.clear()
+    fake_vision(monkeypatch, "person")
+    req = request(tmp_path) | {"t": 40.0}
+    out = RobotAgent(Scripted([[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": 3})],
+                               [ToolCall("confirm_survivor", {"x": 5, "y": 8, "evidence_id": "ev1"})],
+                               [ToolCall("send_team_message", {"text": "Found one."})]]), tmp_path / "t2.jsonl").step(req)
+    (msg,) = [o for o in out["orders"] if o["type"] == "send_team_message"]
+    assert "(5.0, 8.0)" in msg["text"] and "refused" not in msg["text"]
+    T.ToolRegistry._confirmed.clear()
