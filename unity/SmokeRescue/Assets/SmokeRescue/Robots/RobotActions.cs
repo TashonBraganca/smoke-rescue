@@ -97,14 +97,22 @@ namespace SmokeRescue.Robots
             var position = robot.transform.position; float yaw = robot.Driver.YawDeg * Mathf.Deg2Rad;
             var forward = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw));
             Transform best = null; float bestDistance = float.PositiveInfinity; Vector3 bestPoint = default;
+            // Which check turned away the person nearest the robot, with its numbers, so a refusal says what to change
+            // (held-out seed 916: robot B stood 1.03 m from the person's centre and the one message could not say whether
+            // the heading, the reach or the named spot was the cause).
+            string nearestWhy = null; float nearestRange = float.PositiveInfinity;
+            void Note(Vector3 flatToBody, string why) { if (flatToBody.magnitude < nearestRange) { nearestRange = flatToBody.magnitude; nearestWhy = why; } }
             foreach (Transform person in root.transform)
             {
                 var col = person.GetComponent<Collider>(); if (col == null || !col.enabled) continue;
                 var near = col.ClosestPoint(position + Vector3.up * .3f);
                 var flat = new Vector3(near.x - position.x, 0f, near.z - position.z);
-                if (flat.magnitude > .05f && Vector3.Angle(forward, flat) > 60f) continue;
+                if (flat.magnitude > .05f && Vector3.Angle(forward, flat) > 60f)
+                { Note(flat, $"nearest person {Vector3.Angle(forward, flat):0} deg off the heading, beyond the 60 deg grip cone"); continue; }
                 // Whether the strap can go on, from the arm's own link lengths: the nearest part of the body to the arm.
-                if (!robot.Arm.CanReach(col.ClosestPoint(robot.Arm.Root.position))) continue;
+                var grip = col.ClosestPoint(robot.Arm.Root.position);
+                if (!robot.Arm.CanReach(grip))
+                { Note(flat, $"nearest person's body {new Vector2(grip.x - position.x, grip.z - position.z).magnitude:0.00} m from the robot centre, beyond the arm"); continue; }
                 // Only the person the agent named (review: the arm used to lift whoever was nearest): the body closest to
                 // the named spot, within target_tolerance_m of it.
                 float score = flat.magnitude;
@@ -112,15 +120,15 @@ namespace SmokeRescue.Robots
                 {
                     var onBody = col.ClosestPoint(target.Value);
                     score = new Vector2(onBody.x - target.Value.x, onBody.z - target.Value.z).magnitude;
-                    if (score > rescue.target_tolerance_m) continue;
+                    if (score > rescue.target_tolerance_m) { Note(flat, $"nearest reachable person {score:0.00} m from the named spot, beyond {rescue.target_tolerance_m:0.00} m"); continue; }
                 }
                 // The strap goes on the nearest part of the body (a shoulder or limb), the point closest to the arm. The
                 // centre of a lying person's bounds is a metre past their near edge, beyond the arm (run 26: robot A's lift
                 // of s1 failed with "contact point is out of the arm's reach" while their near edge was within reach_m).
                 if (score < bestDistance) { bestDistance = score; best = person; bestPoint = col.ClosestPoint(robot.Arm.Root.position); }
             }
-            if (best == null) return Refuse(target.HasValue ? "nobody at the named spot within the arm's reach ahead; move closer, facing them"
-                                                          : "nobody within the arm's reach ahead; move closer, facing them");
+            if (best == null) return Refuse((target.HasValue ? "nobody at the named spot within the arm's reach ahead; move closer, facing them"
+                                                           : "nobody within the arm's reach ahead; move closer, facing them") + (nearestWhy != null ? $" ({nearestWhy})" : ""));
             contact = bestPoint; TargetId = best.name; pushed = best;
             Action = "extract_survivor"; Status = "running"; FailureReason = null;
             Enter(Phase.Reach);
