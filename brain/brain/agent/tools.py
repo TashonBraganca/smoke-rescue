@@ -489,6 +489,17 @@ class ToolRegistry:
                 args = {"x": round(self.ctx.x, 2), "y": round(self.ctx.y, 2), "face_x": float(args["x"]), "face_y": float(args["y"]),
                         "reason": str(args.get("reason") or "turn to face")}
                 name = "go_to"
+        elif name == "send_team_message":
+            # The radio carries the robot's own state next to the model's words, written by code from what the tools
+            # accepted, so a listener can tell a claim from a fact (held-out seed 917, robot B: confirm_survivor was
+            # refused and the next call radioed "Confirmed survivor"). Filtering words cannot catch a paraphrase.
+            mine = self._confirmed.get(self.ctx.robot, [])
+            state = ("confirmed by this robot so far, own map: " + ", ".join(f"({c['x']:.1f}, {c['y']:.1f})" for c in mine)
+                     if mine else "this robot has confirmed nobody")
+            refused = [r for r in self.refusals if r.get("tool") == "confirm_survivor"]
+            if refused:
+                state += "; a confirmation was refused this step: " + str(refused[-1].get("reason", ""))[:90]
+            args = {**args, "text": f"{str(args.get('text', '')).strip()} [robot state: {state}]"}
         elif name == "request_human_approval":
             refusal = self._need(args, tuple(f["function"]["name"] for f in PERCEPTION))
         elif name == "finish":
