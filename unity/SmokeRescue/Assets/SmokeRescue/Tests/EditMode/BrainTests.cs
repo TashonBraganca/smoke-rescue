@@ -2072,6 +2072,22 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void TheShippedViewingWindowLiesWhereTheCameraCanSeeALyingPerson()
+        {
+            // Since 20 Oct the camera sits on a 1.6 m mast (it was 0.5 m). The 1.0 to 1.5 m viewing window set for the old mount
+            // put a lying person below the bottom of the image, so every reflex stop and every closer look was blind (held-out
+            // seed 915: the person in the study was seen at 4.7 m, too far to confirm, then from 1.6 m, below the view). The
+            // shipped window must start past the floor the camera cannot see and end inside the confirm range.
+            var c = BrainConfig.Load(); var cam = SensorConfig.Load().camera;
+            float bottom = cam.mount.pitch_down_deg * Mathf.Deg2Rad + Mathf.Atan((cam.height - cam.cy) / cam.fy);
+            float blind = cam.mount.forward_offset_m + cam.mount.height_m / Mathf.Tan(bottom);
+            Assert.That(blind, Is.InRange(2.0f, 2.3f), "the 1.6 m mast sees the floor from about 2.16 m");
+            Assert.That(c.survivor_stop_min_m, Is.GreaterThan(blind), "no viewing stop inside the blind floor");
+            Assert.That(c.survivor_standoff_m, Is.GreaterThan(blind));
+            Assert.That(c.survivor_stop_max_m, Is.LessThan(c.search_max_range_m), "the stop stays inside the confirm range");
+        }
+
+        [Test]
         public void ConfigurationLoadsThresholdsAndSensorMotionLimits()
         {
             var c = BrainConfig.Load(); var sensorPath = Path.Combine(SensorConfig.ConfigDir, "sensors.json");
