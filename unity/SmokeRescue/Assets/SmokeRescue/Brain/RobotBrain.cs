@@ -141,7 +141,7 @@ namespace SmokeRescue.Brain
                 Emit(t, "goal", "Cool air and a recovered heat budget permit travel again.", "air_c", airC, "heat_budget", budget);
             }
             NoteBodyTrack();
-            if (survivors.Count != keptOut) { keptOut = survivors.Count; grid.SetKeepOut(survivors, c.survivor_keepout_m); }
+            if (survivors.Count != keptOut) { keptOut = survivors.Count; grid.SetKeepOut(survivors, c.survivor_keepout_core_m, c.survivor_keepout_m + c.robot_radius_m); }   // the ring is for the robot's centre
             CheckReenter(t);
             if (doorwayProbeGoal.HasValue && (returning || retreating || completed || nearFire || active != null ||
                 (AgentGoalActive(t) && !(c.frontier_doorway_looks && agentGoalIsFrontier)) || recoveryPhase != 0 || t - doorwayProbeStarted >= c.sweep_max_s))

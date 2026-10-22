@@ -988,7 +988,7 @@ namespace SmokeRescue.Tests.EditMode
             var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
             float Closest(float keepout)
             {
-                var c = Settings(); c.survivor_keepout_m = keepout; c.grid_size_m = 12; c.robot_radius_m = .25f;
+                var c = Settings(); c.survivor_keepout_m = keepout; c.survivor_keepout_core_m = Mathf.Min(.45f, keepout); c.grid_size_m = 12; c.robot_radius_m = .25f;
                 var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -4, 4, -4, 4);
                 var person = new Vector2(0, 2);
                 ((List<Vector2>)typeof(RobotBrain).GetField("survivors", flags).GetValue(b)).Add(person);
@@ -1000,6 +1000,35 @@ namespace SmokeRescue.Tests.EditMode
             }
             Assert.That(Closest(1.05f), Is.GreaterThanOrEqualTo(1.05f + .25f - .1f), "the route keeps clear of the person");
             Assert.That(Closest(0f), Is.LessThan(1f), "control: without a keep-out the route runs past her");
+        }
+
+        [Test]
+        public void APersonConfirmedJustInsideTheOnlyDoorDoesNotCloseIt()
+        {
+            // One-door seed 931: a person confirmed 2.4 m inside the one door; the whole 1.05 m keep-out disc was an obstacle,
+            // so neither robot could enter. Now only a 0.45 m core is forbidden and the rest of the disc costs extra: a person
+            // 1.1 m inside a 1.2 m door leaves the way in open, and the route still keeps the core plus walking clearance.
+            // Control: the whole disc hard (core = full radius) closes the door, as in 931.
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            List<Vector2> Route(float core)
+            {
+                var c = Settings(); c.grid_size_m = 12; c.robot_radius_m = .25f; c.survivor_keepout_m = 1.05f; c.survivor_keepout_core_m = core;
+                var b = new RobotBrain(Calibration(), c, "A", 0); var g = Map(b);   // robot at the origin, wall at y = 2
+                for (int i = 0; i < g.Count; i++)
+                {
+                    var p = g.Centre(i);
+                    if (Mathf.Abs(p.x) > 4 || p.y < -2 || p.y > 5.9f) continue;
+                    if (Mathf.Abs(p.y - 2) < .06f && Mathf.Abs(p.x) > .6f) g.ObserveOccupied(i); else g.ObserveFree(i);
+                }
+                ((List<Vector2>)typeof(RobotBrain).GetField("survivors", flags).GetValue(b)).Add(new Vector2(0, 3.1f));
+                Motion(b, 0); b.OnRgbd(Image(0, true, 0)); b.OnAirTemperature(0, 20); b.Step(0, .05f);
+                var planner = (GridPlanner)typeof(RobotBrain).GetField("planner", flags).GetValue(b);
+                return planner.Plan(Vector2.zero, new Vector2(0, 5.5f));
+            }
+            var route = Route(.45f);
+            Assert.That(route, Is.Not.Empty, "the way in stays open");
+            Assert.That(route.Min(p => Vector2.Distance(p, new Vector2(0, 3.1f))), Is.GreaterThanOrEqualTo(.45f + .25f - .1f), "clear of the core");
+            Assert.That(Route(1.05f), Is.Empty, "control: the whole disc as an obstacle closes the door");
         }
 
         [Test]
