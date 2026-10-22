@@ -127,6 +127,18 @@ namespace SmokeRescue.Recording
 
         static double LastT;
 
+        /// <summary>Whether a robot's agent is asked now. Events wait AgentMinGapS after the last call, to bound model calls;
+        /// an arrival the agent asked for, or the candidate view it set up, is decided at once, because the robot is
+        /// standing still for exactly that decision and the simulation pauses while the agent answers. Measured on held-out
+        /// seeds 915 to 917: 28 to 58 s per run of standing after agent turns, most of it waiting out this gap and the hold.</summary>
+        public static bool AgentDue(string triggerKind, double sinceLastS)
+        {
+            if (sinceLastS >= AgentPeriodS) return true;
+            if (triggerKind == null) return false;
+            if (triggerKind == "agent_goal_reached" || triggerKind == "survivor_view_ready") return true;
+            return sinceLastS >= AgentMinGapS;
+        }
+
         static void NoteAgentTrigger(RobotRig rig, Brain.BrainEvent e)
         {
             if (!AgentTriggers.Contains(e.kind)) return;
@@ -143,7 +155,7 @@ namespace SmokeRescue.Recording
             foreach (var rig in rigs)
             {
                 if (rig.brain == null || rig.missionDone || (rig.actions != null && rig.actions.IsRunning)) continue;
-                bool due = (rig.trigger != null && t - rig.lastAgent >= AgentMinGapS) || t - rig.lastAgent >= AgentPeriodS;
+                bool due = AgentDue(rig.trigger?.Value<string>("kind"), t - rig.lastAgent);
                 if (!due || rig.thermalTimes.Count == 0) continue;
                 var ev = rig.trigger ?? JObject.FromObject(new { kind = "periodic", reason = "Regular check-in.", numbers = new { } });
                 rig.trigger = null; rig.lastAgent = t;
