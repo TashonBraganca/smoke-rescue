@@ -1,10 +1,19 @@
-*
+**
+!brain/
 !brain/pyproject.toml
 !brain/uv.lock
 !brain/README.md
 !brain/brain/
+!brain/brain/**
 # Ground truth readers and viewer code never ship in the cloud agent.
-brain/brain/oracle
+brain/brain/oracle/**
 brain/brain/evaluator.py
 brain/brain/viewer.py
+!config/
+!config/*.json
+!deploy/
+!deploy/aws/
+!deploy/aws/export_yolo.py
+!deploy/aws/check_agent_image.py
 **/__pycache__
+**/*.pyc

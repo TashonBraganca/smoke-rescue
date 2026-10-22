@@ -87,10 +87,18 @@ class BedrockBackend:
 
     def __init__(self, model: str, region: str | None = None, max_tokens: int = 1024):
         import boto3
+        from botocore.config import Config
 
         self.model = model
         self.max_tokens = max_tokens
-        self.client = boto3.client("bedrock-runtime", region_name=region or os.environ.get("AWS_REGION", "us-east-1"))
+        # ECS supplies task-role credentials. Force SigV4 rather than a Bedrock bearer token.
+        # Bound retries; four model rounds share the proxy's 120 second read allowance.
+        self.client = boto3.client(
+            "bedrock-runtime",
+            region_name=region or os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION", "us-east-1"),
+            config=Config(signature_version="v4", connect_timeout=3, read_timeout=20,
+                          retries={"mode": "standard", "total_max_attempts": 1}),
+        )
 
     def chat(self, messages: list[dict], tools: list[dict]) -> Reply:
         system = [{"text": m["content"]} for m in messages if m["role"] == "system"]
@@ -98,8 +106,9 @@ class BedrockBackend:
         tool_config = {"tools": [{"toolSpec": {"name": t["function"]["name"], "description": t["function"]["description"],
                                                "inputSchema": {"json": t["function"]["parameters"]}}} for t in tools]}
         start = time.perf_counter()
-        out = self.client.converse(modelId=self.model, system=system, messages=convo, toolConfig=tool_config,
-                                   inferenceConfig={"maxTokens": self.max_tokens, "temperature": 0})
+        kwargs = {"toolConfig": tool_config} if tools else {}
+        out = self.client.converse(modelId=self.model, system=system, messages=convo,
+                                   inferenceConfig={"maxTokens": self.max_tokens, "temperature": 0}, **kwargs)
         content = out["output"]["message"]["content"]
         text = "".join(c.get("text", "") for c in content)
         calls = [ToolCall(c["toolUse"]["name"], c["toolUse"].get("input") or {}) for c in content if "toolUse" in c]
@@ -122,25 +131,30 @@ class AzureOpenAIBackend:
 
     def __init__(self, deployment: str | None = None, reasoning_effort: str | None = None, timeout: float = 45.0):
         # 45 s per call: the recorder pauses the simulation while it waits, and a stuck call froze run v8 for minutes.
-        env = {**_load_env_file(Path.home() / ".config" / "smoke-rescue" / "azure.env"), **os.environ}
+        env = dict(os.environ)
+        if not all(env.get(k) for k in ("AZURE_OPENAI_ENDPOINT", "AZURE_OPENAI_API_KEY")):
+            env = {**_load_env_file(Path.home() / ".config" / "smoke-rescue" / "azure.env"), **env}
         self.endpoint = env["AZURE_OPENAI_ENDPOINT"].rstrip("/")
         self.key = env["AZURE_OPENAI_API_KEY"]
         self.version = env.get("AZURE_OPENAI_API_VERSION", "2025-01-01-preview")
         self.model = deployment or env.get("AZURE_OPENAI_DEPLOYMENT", "gpt-5.6-terra")
         self.effort = reasoning_effort or env.get("AZURE_REASONING_EFFORT", "high")
-        self.client = httpx.Client(timeout=timeout)
+        self.client = httpx.Client(timeout=float(env.get("AZURE_OPENAI_TIMEOUT_S", timeout)))
+        self.max_attempts = int(env.get("AZURE_OPENAI_MAX_ATTEMPTS", "4"))
+        if not 1 <= self.max_attempts <= 4:
+            raise ValueError("AZURE_OPENAI_MAX_ATTEMPTS must be between 1 and 4")
 
     def chat(self, messages: list[dict], tools: list[dict]) -> Reply:
         body = {"messages": _openai_messages(messages), "tools": tools, "tool_choice": "auto",
                 "max_completion_tokens": 2000, "reasoning_effort": self.effort}
         url = f"{self.endpoint}/openai/deployments/{self.model}/chat/completions?api-version={self.version}"
         start = time.perf_counter()
-        for attempt in range(4):
+        for attempt in range(self.max_attempts):
             r = self.client.post(url, headers={"api-key": self.key}, json=body)
             if r.status_code == 400 and "reasoning_effort" in r.text and "reasoning_effort" in body:
                 body.pop("reasoning_effort")            # deployment does not take the parameter
                 continue
-            if r.status_code in (429, 500, 502, 503) and attempt < 3:
+            if r.status_code in (429, 500, 502, 503) and attempt < self.max_attempts - 1:
                 time.sleep(min(10.0, float(r.headers.get("retry-after", 2 ** attempt))))
                 continue
             break
@@ -196,7 +210,7 @@ def make_backend(kind: str | None = None, model: str | None = None, trace: str |
     if kind == "ollama":
         return OllamaBackend(model or os.environ.get("AGENT_MODEL", "qwen3-vl:8b"))
     if kind == "azure":
-        return AzureOpenAIBackend(model)
+        return AzureOpenAIBackend(model or os.environ.get("AGENT_MODEL"))
     if kind == "bedrock":
         return BedrockBackend(model or os.environ["AGENT_MODEL"])
     if kind == "replay":

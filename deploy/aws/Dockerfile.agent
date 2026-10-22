@@ -5,8 +5,7 @@
 # Dependencies come from brain/uv.lock, frozen. `uv sync` cannot drop the transitive
 # dependencies of torch/ultralytics/open3d/mlx-vlm without a pyproject change, so the
 # builder runs `uv export --frozen --no-dev --prune ...` and installs the exact locked,
-# hash-checked set. See the final report for the optional pyproject extras that would
-# let a plain `uv sync --frozen --no-dev` do the same.
+# hash-checked runtime set. ONNX export dependencies stay in a disposable stage.
 
 ARG PYTHON_IMAGE=python:3.11-slim-bookworm@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89
 ARG UV_IMAGE=ghcr.io/astral-sh/uv:0.11.2@sha256:c4f5de312ee66d46810635ffc5df34a1973ba753e7241ce3a08ef979ddd7bea5
@@ -21,10 +20,23 @@ COPY brain/pyproject.toml brain/uv.lock brain/README.md ./
 # Packages the agent does not import (vision.py needs cv2, numpy, yaml; evaluation and replay live elsewhere).
 RUN uv export --frozen --no-dev --no-emit-project \
         --prune torch --prune torchvision --prune ultralytics --prune open3d --prune mlx-vlm \
-        --prune evo --prune rerun-sdk --prune pyzmq \
-        -o /tmp/requirements.txt \
+        --prune evo --prune rerun-sdk --prune pyzmq --prune pytest --prune scipy --prune pillow --prune tqdm \
+        -o /tmp/requirements.txt >/dev/null \
     && uv venv /opt/venv \
     && uv pip install --python /opt/venv/bin/python --require-hashes --no-deps -r /tmp/requirements.txt
+
+# Export weights in a disposable stage. Torch and Ultralytics never enter runtime.
+FROM build AS model
+RUN apt-get update && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+RUN uv export --frozen --no-dev --no-emit-project \
+        --prune open3d --prune mlx-vlm --prune evo --prune rerun-sdk --prune pyzmq \
+        -o /tmp/export-requirements.txt >/dev/null \
+    && uv pip install --python /opt/venv/bin/python --require-hashes --no-deps -r /tmp/export-requirements.txt \
+    && uv pip install --python /opt/venv/bin/python --no-deps onnx==1.17.0 protobuf==5.29.3
+ENV YOLO_AUTOINSTALL=false YOLO_CONFIG_DIR=/tmp/yolo OMP_NUM_THREADS=1
+COPY deploy/aws/export_yolo.py /tmp/export_yolo.py
+RUN /opt/venv/bin/python /tmp/export_yolo.py
 
 FROM --platform=linux/arm64 ${PYTHON_IMAGE} AS runtime
 # opencv-python (non-headless wheel in the lock) links libGL and glib.
@@ -33,12 +45,17 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin app
 COPY --from=build /opt/venv /opt/venv
-COPY brain/brain /app/brain
-ENV PATH=/opt/venv/bin:$PATH PYTHONPATH=/app PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 \
+# Keep the repository layout: agent modules resolve parents[3] to /app.
+COPY brain/brain /app/brain/brain
+COPY config/ /app/config/
+COPY --from=model /model/yolo11m.onnx /app/data/models/onnx/yolo11m.onnx
+COPY deploy/aws/check_agent_image.py /tmp/check_agent_image.py
+ENV PATH=/opt/venv/bin:$PATH PYTHONPATH=/app/brain PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 \
     HOME=/tmp AGENT_BACKEND=bedrock PORT=8080
 WORKDIR /app
 # Build gate: fails the build if the lean dependency set cannot import the server.
-RUN python -c "import brain.agent.server"
+RUN AGENT_RUN_DIR=/tmp/image-check python /tmp/check_agent_image.py \
+    && rm /tmp/check_agent_image.py && rmdir /tmp/image-check
 USER 10001:10001
 EXPOSE 8080
 HEALTHCHECK --interval=15s --timeout=3s --start-period=20s --retries=3 \
