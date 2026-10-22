@@ -534,6 +534,50 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void AWayOutIsAPlaceNotOneCell()
+        {
+            // One-door seed 925, robot A at 120 s: the front door was walkable all the way through, but the start pad stood
+            // 0.32 m from a few cells of the partner's body mapped there earlier, under the walking clearance, so every route
+            // out was refused and A read itself cut off. Here one obstacle cell 0.2 m from the start: the route out ends at
+            // walkable floor within the arrival distance. Control: with obstacles all round the start, there is no way out.
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            List<Vector2> Out(bool ringed)
+            {
+                var c = Settings(); c.grid_size_m = 12; c.robot_radius_m = .25f;
+                var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -3, 3, -3, 3); var g = Map(b);
+                for (int i = 0; i < g.Count; i++)
+                {
+                    float d = Vector2.Distance(g.Centre(i), Vector2.zero), a = Vector2.Distance(g.Centre(i), new Vector2(.25f, .05f));
+                    if (ringed ? d > .6f && d < .9f : a < .06f) { g.ObserveOccupied(i); g.ObserveOccupied(i); }
+                }
+                Motion(b, 0); b.OnAirTemperature(0, 20); b.Step(0, .05f);
+                // From 2 m in front of the start, as the robot that read itself cut off stood inside the door.
+                return (List<Vector2>)typeof(RobotBrain).GetMethod("PlanOutFrom", flags).Invoke(b, new object[] { new Vector2(0, 2f) });
+            }
+            var route = Out(false);
+            Assert.That(route.Count, Is.GreaterThan(0), "a route out past one obstacle cell beside the start");
+            Assert.That(Vector2.Distance(route[route.Count - 1], Vector2.zero), Is.LessThanOrEqualTo(Settings().return_arrive_m + 1e-3f), "it ends within the arrival distance");
+            Assert.That(Out(true).Count, Is.Zero, "control: walled in all round, no way out");
+        }
+
+        [Test]
+        public void ACutOffRobotsAgentCannotDrawKeepOutAreas()
+        {
+            // One-door seed 925, robot A: cut off at 122 s, its agent drew 2.0 m of keep-out "fire" beside the front door at
+            // 134 s; with no route out, the route check passed it. Control: the same order on a robot with a way out is kept.
+            bool Accepted(bool cutOff)
+            {
+                var b = new RobotBrain(Calibration(), Settings(), "A", 0); Room(b, -6, 6, -6, 6);
+                Motion(b, 0); b.OnAirTemperature(0, 20); b.Step(0, .05f); b.DrainEvents();
+                typeof(RobotBrain).GetField("cutOff", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).SetValue(b, cutOff);
+                b.AgentAvoidArea(new Vector2(4f, 4f), 1f, 0, 30, "ev");
+                return !b.DrainEvents().Single(x => x.kind == "agent_order").reason.Contains("refused");
+            }
+            Assert.That(Accepted(true), Is.False, "cut off: refused");
+            Assert.That(Accepted(false), Is.True, "control: a robot with a way out keeps the area");
+        }
+
+        [Test]
         public void ColourPersonSightingsBecomeACandidateWhereThePersonIs()
         {
             // Thermal saturates in fire rooms (warm_eval: 0 of 161 visible survivors); the colour dnn detector still sees
@@ -2413,6 +2457,44 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void APartnerSettingOffFromStandingIsNotMappedAsWall()
+        {
+            // One-door seed 924's real LiDAR: B stood at its pad, radioed at 10.07 s, then walked in at 0.6 m/s; a prediction
+            // from its last two poses said "standing" and left 27 % of the returns on its body unmasked. Here B radios twice
+            // standing, with a goal 6 m ahead, then walks 1.8 s toward it before A's LiDAR sees it. Control: never heard.
+            int BodyCells(bool heard)
+            {
+                var c = Settings(); c.grid_size_m = 16; c.frames_shared_at_start = true;
+                var a = new RobotBrain(Calibration(), c, "A", 0, new EntryPose(0, -3, 0));
+                var b = new RobotBrain(Calibration(), c, "B", 0); Room(b, -2, 2, -1, 8);
+                var none = new (Vector2, Vector2)[0];
+                for (int i = 0; i <= 57; i++)
+                {
+                    double t = i / 15.0; float dt = i == 0 ? .05f : 1f / 15;
+                    Motion(b, t, i > 30 ? .6f : 0); b.OnAirTemperature(t, 20); b.OnRgbd(Image(t, true, 0)); b.OnLidar(SegmentScan(t, b.Snapshot().pose.position, 0, none));
+                    if (i == 27) b.AgentGoTo(new Vector2(0, 6), t, 30, "ahead");   // just before its last message while standing
+                    b.Step(t, dt);
+                    Motion(a, t); a.OnAirTemperature(t, 20); a.Step(t, dt);
+                    if (i == 15 || i == 30)
+                    {
+                        var m = b.BuildMessage(t);
+                        if (i == 30) Assert.That(m != null && m.Goal.HasValue, Is.True, "B's last message while standing carries its goal");
+                        if (heard && m != null) a.OnPeerMessage(Wire(m), t + .05);
+                    }
+                }
+                var p = b.Snapshot().pose.position;
+                Assert.That(p.y, Is.GreaterThan(.9f), "B walked about 1 m since its last message, as in seed 924 at 10 to 12 s");
+                var walls = Box(p.x - .18f, p.y - .375f, p.x + .18f, p.y + .375f);
+                for (int k = 0; k < 3; k++) { double t = 3.85 + k * .05; Motion(a, t); a.OnAirTemperature(t, 20); a.OnLidar(SegmentScan(t, new Vector2(0, -3), 0, walls)); a.Step(t, .05f); }
+                var g = Map(a); int body = 0;
+                for (int i = 0; i < g.Count; i++) if (g.Occupancy(i) == 255 && Vector2.Distance(g.Centre(i), p) <= .6f) body++;
+                return body;
+            }
+            Assert.That(BodyCells(true), Is.Zero, "a partner walking toward its radioed goal is not a wall");
+            Assert.That(BodyCells(false), Is.GreaterThan(0), "control: never heard, its body is mapped");
+        }
+
+        [Test]
         public void AFarFireBesideANearJambIsNotPutOnTheJamb()
         {
             // One-door seed 924, robot B at 51 s: three fire cells appeared on its way out, 2.2 m away, while the fire was
@@ -2485,18 +2567,20 @@ namespace SmokeRescue.Tests.EditMode
             // One-door seed 924: the hallway and bedrooms behind the north wall were mapped through its doorways, never
             // proven indoors (no ceiling seen from across the room), and robot A began its return at 90 s with two of five
             // people there. A walled room proven indoors, a 1 m doorway in its north wall, and a second room beyond it mapped
-            // free but unproven (its walls not yet seen): the robot walks to the proven side of the doorway. Control: with the second room proven
-            // too, it explores the second room's frontier as usual.
+            // free but unproven (its walls not yet seen): the robot walks to the proven side of the doorway. The same from
+            // outside the house (seed 925, robot B walking the building's wall): it walks in through the south door to that
+            // doorway. Control: with the second room proven too, it explores the second room's frontier as usual.
             var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
-            (string reason, Vector2? goal) Choice(bool secondRoomProven)
+            (string reason, Vector2? goal) Choice(bool secondRoomProven, bool outside = false)
             {
                 var c = Settings(); c.grid_size_m = 16; c.robot_radius_m = .25f; c.search_requires_ceiling = true;
-                var b = new RobotBrain(Calibration(), c, "A", 0); var g = Map(b); Room(b, -2, 2, -1, 6);
+                var b = outside ? new RobotBrain(Calibration(), c, "A", 0, new EntryPose(0, -2.5f, 0)) : new RobotBrain(Calibration(), c, "A", 0);
+                var g = Map(b); Room(b, -2, 2, outside ? -3.5f : -1, 6);
                 for (int i = 0; i < g.Count; i++)
                 {
                     var p = g.Centre(i);
                     bool side = Mathf.Abs(p.x) > 2 && Mathf.Abs(p.x) < 2.3f && p.y > -1.3f && p.y < 3.2f;   // the room beyond: walls unseen
-                    bool south = p.y < -1 && p.y > -1.3f && Mathf.Abs(p.x) < 2.3f;
+                    bool south = p.y < -1 && p.y > -1.3f && Mathf.Abs(p.x) < 2.3f && !(outside && Mathf.Abs(p.x) < .5f);   // a door when outside
                     bool north = p.y > 3 && p.y < 3.2f && Mathf.Abs(p.x) > .5f && Mathf.Abs(p.x) < 2.3f;
                     if (side || south || north) g.ObserveOccupied(i);
                 }
@@ -2511,6 +2595,10 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(look.reason, Does.StartWith("Unsearched floor lies only past floor not yet proven indoors"));
             Assert.That(look.goal.HasValue && look.goal.Value.y > 2 && look.goal.Value.y < 3.2f && Mathf.Abs(look.goal.Value.x) < 1, Is.True,
                 $"the goal is the proven side of the doorway, got {look.goal}");
+            var fromOutside = Choice(false, true);
+            Assert.That(fromOutside.reason, Does.StartWith("Unsearched floor lies only past floor not yet proven indoors"), "from outside too");
+            Assert.That(fromOutside.goal.HasValue && fromOutside.goal.Value.y > 2 && fromOutside.goal.Value.y < 3.2f && Mathf.Abs(fromOutside.goal.Value.x) < 1, Is.True,
+                $"from outside, the goal is the proven side of the north doorway, got {fromOutside.goal}");
             var usual = Choice(true);
             Assert.That(usual.reason, Does.StartWith("Reachable frontier"), "control: proven floor beyond, the usual frontier");
         }
@@ -2544,6 +2632,42 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(follow.Value.y, Is.InRange(2.3f, 3.9f), "about 2 m short of A (A drove 5 m): " + follow);
             Assert.That(Goal(new Vector2(0, 5), false).HasValue, Is.False, "control: the partner is not on floor proven indoors");
             Assert.That(Goal(null, true).HasValue, Is.False, "control: no partner");
+        }
+
+        [Test]
+        public void BehindAPartnerJustAheadOnTheWayInARobotWaitsItsTurnForALimitedTime()
+        {
+            // One-door seed 925, robot B: in the doorway with A 1.85 m ahead, standing to confirm a person, B had nothing it
+            // could reach, could not follow (A was inside the 2 m standoff) and ended its mission at 18 s, outside. Here A
+            // stops 1.5 m in on floor B's map shows indoors: B waits, and still waits 20 s on; 31 s on it no longer does.
+            // Controls: A 5 m in (following applies instead), A not on indoor floor, and no partner.
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var wait = typeof(RobotBrain).GetMethod("WaitBehindPartner", flags);
+            (bool now, bool later, bool past) Waits(float? walkM, bool indoorFloor)
+            {
+                var c = Settings(); c.grid_size_m = 16; c.robot_radius_m = .25f; c.frames_shared_at_start = true; c.search_requires_ceiling = true;
+                var b = new RobotBrain(Calibration(), c, "B", 0, new EntryPose(0, -.5f, 0)); var g = Map(b); Room(b, -2, 2, -1, 7);
+                var indoors = (bool[])typeof(OccupancyGrid).GetField("sightIndoors", flags).GetValue(g);
+                if (indoorFloor) for (int i = 0; i < g.Count; i++) { var p = g.Centre(i); if (Mathf.Abs(p.x) < 2 && p.y > .5f && p.y < 7) indoors[i] = true; }
+                typeof(OccupancyGrid).GetField("roofDirty", flags).SetValue(g, true);
+                Motion(b, 0); b.OnAirTemperature(0, 20); b.Step(0, .05f);
+                if (!walkM.HasValue) return ((bool)wait.Invoke(b, new object[] { 10.1 }), false, false);
+                var a = new RobotBrain(Calibration(), c, "A", 0);
+                int moving = Mathf.RoundToInt(walkM.Value / .5f * 15);
+                for (int i = 0; i <= 615; i++)
+                {
+                    double t = i / 15.0; Motion(a, t, i < moving ? .5f : 0); a.OnAirTemperature(t, 20); a.Step(t, i == 0 ? .05f : 1f / 15);
+                    if (i == 150 || i == 450 || i == 615) { var m = a.BuildMessage(t); if (m != null) b.OnPeerMessage(Wire(m), t + .05); }
+                    if (i == 150) { var r = (bool)wait.Invoke(b, new object[] { t + .1 }); if (!r) return (false, false, false); }
+                }
+                return (true, (bool)wait.Invoke(b, new object[] { 30.1 }), (bool)wait.Invoke(b, new object[] { 41.1 }));
+            }
+            var near = Waits(1.5f, true);
+            Assert.That(near.now && near.later, Is.True, "waits behind a partner 1.5 m in, and 20 s later: " + near);
+            Assert.That(near.past, Is.False, "not past wait_behind_partner_s");
+            Assert.That(Waits(5f, true).now, Is.False, "control: a partner 5 m in is followed, not waited for");
+            Assert.That(Waits(1.5f, false).now, Is.False, "control: the partner is not on floor proven indoors");
+            Assert.That(Waits(null, true).now, Is.False, "control: no partner");
         }
 
         [Test]

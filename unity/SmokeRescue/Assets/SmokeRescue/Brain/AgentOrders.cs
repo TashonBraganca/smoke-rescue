@@ -304,6 +304,15 @@ namespace SmokeRescue.Brain
                     "x_m", centre.x, "y_m", centre.y, "radius_m", radiusM);
                 return;
             }
+            // A cut-off robot has no route out to keep clear, so the check below passed every circle: one-door seed 925, robot A,
+            // cut off at 122 s, had its agent draw 2.0 m of "fire" beside the front door at 134 s while it looked for a way
+            // out. The reflex keeps clear of measured heat by itself; a drawn circle can only hide the way out.
+            if (cutOff)
+            {
+                Emit(t, "agent_order", "avoid_area refused: the robot is cut off from its way out, and a keep-out area could only hide a way out; the reflex keeps clear of real heat by itself.",
+                    "x_m", centre.x, "y_m", centre.y, "radius_m", radiusM);
+                return;
+            }
             // Nor may it cut the robot's own way out (2x2 building run: robot A's agent drew 2.5 m around its own frontier
             // target, the route home was gone, and the robot held still from 88 s). Stay clear of the planned route out.
             float routeRoom = float.PositiveInfinity;
