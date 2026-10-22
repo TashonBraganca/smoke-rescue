@@ -91,6 +91,12 @@ namespace SmokeRescue.Brain
             // frontiers, offer them, so the agent is not left with yard options alone (one-door seed 922, robot B).
             if (proven.Count == 0 && peers.Count > 0)
                 proven = planner.Frontiers(motion.Pose.position, p => GoalBlacklisted(p, t) || VisitedGoal(p, t) || !InSearchArea(p), true);
+            // Still nothing proven: the way in is behind the partner (one-door seed 923, robot B): offer walking in after it.
+            if (proven.Count == 0 && peers.Count > 0 && FollowPartnerGoal(out var followRoute) is Vector2 follow)
+            {
+                float cost = 0; for (int i = 1; i < followRoute.Count; i++) cost += Vector2.Distance(followRoute[i - 1], followRoute[i]);
+                proven.Add(new GridPlanner.FrontierChoice { position = follow, claimCentre = follow, path = followRoute, cost = cost, score = cost, information = 0, towardPartner = true });
+            }
             var unproven = planner.Frontiers(motion.Pose.position,
                 p => ClaimBlocks(p, t) || GoalBlacklisted(p, t) || VisitedGoal(p, t) || InSearchArea(p));
             // With proven indoor floor to search, an unproven frontier on ground this robot's own LiDAR saw as open, with no
@@ -133,7 +139,7 @@ namespace SmokeRescue.Brain
             foreach (int index in picked)
             {
                 var f = all[index];
-                list.Add(new BrainFrontier { id = list.Count, position = f.position, pathM = f.cost,
+                list.Add(new BrainFrontier { id = list.Count, position = f.position, pathM = f.cost, towardPartner = f.towardPartner,
                     unsearchedM2 = f.information * grid.CellM * grid.CellM, provenIndoors = InSearchArea(f.position),
                     mappedUnsearchedM2 = grid.UnsearchedFloorBeyond(f.position, c.frontier_beyond_m) });
             }

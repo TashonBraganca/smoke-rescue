@@ -1,0 +1,223 @@
+{
+  "id": "house_onedoor_seed924",
+  "description": "One-entrance held-out run (22 Oct 2026) after run 923's fixes: people visible to depth, warm regions cut above the floor, walk in after the partner, a teammate is never a wall, cut off in heating air retreats, step back to the viewing distance; people placed with seed 924, never run. Nothing was tuned on it.",
+  "seed": 924,
+  "duration_s": 200,
+  "search_area": [
+    0,
+    0,
+    20,
+    14
+  ],
+  "dark_rooms": [
+    "bathroom",
+    "bedroom_1"
+  ],
+  "sim_rate_hz": 15,
+  "yaw_convention": "degrees about Unity +y. 0 faces +z (north), 90 faces +x (east).",
+  "smoke": {
+    "model": "fluid",
+    "global_haze": 0.15,
+    "rooms": {
+      "kitchen": 0.35,
+      "living": 0.25,
+      "bedroom_2": 0.3,
+      "default": 0.15
+    },
+    "ramp_per_minute": 0.0
+  },
+  "robots": [
+    {
+      "id": "robot_A",
+      "color": "#F2A900",
+      "spawn": {
+        "at": [
+          10.0,
+          -1.2
+        ],
+        "yaw": 0
+      },
+      "control": "autonomous",
+      "cruise_speed": 0.5,
+      "doorway_speed": 0.3,
+      "route": [],
+      "look_around_at": [],
+      "torch": "off",
+      "launch_pad": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "id": "robot_B",
+      "color": "#2FA3E6",
+      "spawn": {
+        "at": [
+          9.958,
+          -2.418
+        ],
+        "yaw": 1.85
+      },
+      "control": "autonomous",
+      "cruise_speed": 0.5,
+      "doorway_speed": 0.3,
+      "route": [],
+      "look_around_at": [],
+      "torch": "wide",
+      "launch_pad": [
+        0.0,
+        -1.2,
+        0.0
+      ]
+    }
+  ],
+  "look_around": {
+    "sweep_deg": 60,
+    "speed_dps": 25
+  },
+  "survivors": [
+    {
+      "id": "s1",
+      "room": "living",
+      "at": [
+        5.6,
+        2.0
+      ],
+      "yaw": 30,
+      "pose": "lying_on_side"
+    },
+    {
+      "id": "s2",
+      "room": "bathroom",
+      "at": [
+        5.6,
+        9.0
+      ],
+      "yaw": 90,
+      "pose": "slumped_against_wall"
+    },
+    {
+      "id": "s3",
+      "room": "study",
+      "at": [
+        11.0,
+        12.2
+      ],
+      "yaw": 90,
+      "pose": "collapsed_at_desk"
+    },
+    {
+      "id": "s4",
+      "room": "bedroom_2",
+      "at": [
+        13.2,
+        12.4
+      ],
+      "yaw": 0,
+      "pose": "curled_on_bed"
+    },
+    {
+      "id": "s6",
+      "room": "kitchen",
+      "at": [
+        19.55,
+        0.45
+      ],
+      "yaw": 315,
+      "pose": "slumped_against_wall"
+    }
+  ],
+  "survivor_placement": "random",
+  "radio": {
+    "range_m": 12.0,
+    "max_walls": 1,
+    "broadcast_period_s": 2.0,
+    "budget_bytes_per_s": 2048
+  },
+  "fire": {
+    "spread": true,
+    "head_start_s": 0.0,
+    "note": "Whole-house fire from config/fire.json, ignited when the robots enter (head start 0 s)."
+  },
+  "obstacles": [
+    {
+      "room": "hallway",
+      "kind": "obstacle_wood_pile",
+      "at": [
+        6.3,
+        7.4
+      ],
+      "yaw": 15
+    },
+    {
+      "room": "hallway",
+      "kind": "obstacle_rubble",
+      "at": [
+        12.6,
+        7.45
+      ],
+      "yaw": 0
+    },
+    {
+      "room": "foyer",
+      "kind": "obstacle_burnt_crate",
+      "at": [
+        10.9,
+        4.4
+      ],
+      "yaw": 30
+    },
+    {
+      "room": "living",
+      "kind": "obstacle_waste_pile",
+      "at": [
+        5.3,
+        4.7
+      ],
+      "yaw": 60
+    },
+    {
+      "room": "kitchen",
+      "kind": "wooden_desk_with_lamp",
+      "at": [
+        18.9,
+        1.0
+      ],
+      "yaw": 315
+    }
+  ],
+  "warm_objects": [
+    {
+      "room": "kitchen",
+      "kind": "tall_steel_fridge",
+      "temperature_c": 38.0,
+      "temperature_c_reason": "A running fridge's condenser coils and compressor housing sit around 35 to 45 C, overlapping skin and clothed-body temperatures (about 30 to 35 C); the hardest distractor for a temperature-band test."
+    },
+    {
+      "room": "kitchen",
+      "kind": "stove_and_hood",
+      "temperature_c": 120.0,
+      "temperature_c_reason": "A hob left on: cooktop surfaces run from about 100 C to several hundred; 120 C is a low-setting, partly cooled surface, far above body temperature but below flame."
+    },
+    {
+      "room": "laundry",
+      "kind": "washer_and_dryer",
+      "temperature_c": 42.0,
+      "temperature_c_reason": "A tumble dryer's drum and front panel reach about 40 to 50 C while running; near body temperature and person-sized."
+    },
+    {
+      "room": "laundry",
+      "kind": "water_heater_and_pipes",
+      "temperature_c": 48.0,
+      "temperature_c_reason": "An electric water heater set to 50 to 60 C shows a jacket and pipe surface of about 40 to 55 C."
+    }
+  ],
+  "launch": {
+    "door": "front, foyer side",
+    "pad_spacing_m": 1.2,
+    "placement_sigma_m": 0.05,
+    "placement_sigma_deg": 2.0,
+    "reason": "One entrance (owner's decision, 22 Oct 2026): both robots launch from pads at the front door, B 1.2 m behind A, as DARPA SubT teams launched from one surveyed gate. Brains get their pad in the gate frame; B's real placement carries seeded error (sigma 5 cm, 2 deg) that its own LiDAR must absorb. The brains never get house coordinates."
+  }
+}

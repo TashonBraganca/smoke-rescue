@@ -109,6 +109,31 @@ namespace SmokeRescue.Brain
             odds[i] = Mathf.Max(-c.log_odds_cap, odds[i] + c.free_log_odds);
             observed[i] = true; localTime[i] = localObservationTime; dirty = roofDirty = true;
         }
+        /// <summary>A teammate's body is not a wall. This robot's own sensors map a partner standing in view as an
+        /// obstacle, and floor out of view keeps that wall (one-door seed 923: robot A's LiDAR saw B standing on A's pad in
+        /// the one doorway; A walked on into the living room, its only way out stayed walled for the rest of the run, it
+        /// counted itself cut off, and its heat response stayed off while the air rose to 70 C). Own wall cells within
+        /// radius of the straight line the partner reported moving along (from one radio pose to the next) are set free;
+        /// real walls beside its path stay. Returns how many cells changed.</summary>
+        public int MarkTeammateFree(Vector2 from, Vector2 to, float radius)
+        {
+            float r = radius + CellM * .5f; int changed = 0;
+            Vector2 lo = Vector2.Min(from, to) - Vector2.one * r, hi = Vector2.Max(from, to) + Vector2.one * r;
+            int a = Cell(lo), b = Cell(hi); if (a < 0 || b < 0) return 0;
+            for (int y = a / Size; y <= b / Size; y++) for (int x = a % Size; x <= b % Size; x++)
+            {
+                int i = y * Size + x; Vector2 p = Centre(i), d = to - from;
+                float u = d.sqrMagnitude < 1e-9f ? 0 : Mathf.Clamp01(Vector2.Dot(p - from, d) / d.sqrMagnitude);
+                if (Vector2.Distance(p, from + d * u) > r) continue;
+                if (odds[i] >= c.occupied_threshold || lidarOdds[i] >= c.occupied_threshold)
+                {
+                    odds[i] = Mathf.Min(odds[i], c.free_threshold - .1f); lidarOdds[i] = Mathf.Min(lidarOdds[i], c.free_threshold - .1f);
+                    changed++;
+                }
+            }
+            if (changed > 0) dirty = roofDirty = true;
+            return changed;
+        }
         /// <summary>Free floor mapped by the depth camera but too far away to count as searched.</summary>
         void MapFree(int i)
         {

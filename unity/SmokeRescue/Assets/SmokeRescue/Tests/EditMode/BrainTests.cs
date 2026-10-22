@@ -2359,6 +2359,91 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void ATeammateSeenStandingInTheDoorwayIsNotLeftAsAWall()
+        {
+            // One-door seed 923: A's own LiDAR saw B standing on A's pad in the doorway; out of view afterwards, that wall
+            // stayed, A's only way out stayed shut and A counted itself cut off for the rest of the run. B's radio pose there
+            // frees it; a real wall 0.6 m beside B stays (control).
+            var c = Settings(); c.grid_size_m = 12; c.frames_shared_at_start = true;
+            var a = new RobotBrain(Calibration(), c, "A", 0); var b = new RobotBrain(Calibration(), c, "B", 0);
+            Motion(a, 0); a.OnAirTemperature(0, 20); a.Step(0, .05f);
+            for (int i = 0; i <= 30; i++) { double t = i / 15.0; Motion(b, t, i < 30 ? .5f : 0); b.OnAirTemperature(t, 20); b.Step(t, i == 0 ? .05f : 1f / 15); }
+            Vector2 bAt = b.Snapshot().pose.position;
+            var g = Map(a);
+            for (int k = 0; k < 4; k++) { g.ObserveOccupied(g.Cell(bAt)); g.ObserveOccupied(g.Cell(bAt + new Vector2(.6f, 0))); }
+            Assert.That(g.OwnOccupancy(g.Cell(bAt)), Is.EqualTo(255), "precondition: A mapped B's body as a wall");
+            a.OnPeerMessage(Wire(b.BuildMessage(2)), 2);
+            Assert.That(g.OwnOccupancy(g.Cell(bAt)), Is.Not.EqualTo(255), "where B stands is floor");
+            Assert.That(g.OwnOccupancy(g.Cell(bAt + new Vector2(.6f, 0))), Is.EqualTo(255), "control: a wall 0.6 m beside B stays");
+        }
+
+        [Test]
+        public void CutOffInHeatingAirTheRobotRetreatsInsteadOfObeyingAnOrderToStay()
+        {
+            // One-door seed 923: A, counted cut off, turned on the spot for 30 s on its agent's orders while its air rose from 30
+            // to 70 C. Cut off, heating, no route out even past the fire: the order is overridden and it retreats. Control: the
+            // same in cool air keeps the order.
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            RobotBrain lastBrain = null;
+            (bool retreating, int overridden) Run(float air)
+            {
+                var c = Settings(); c.grid_size_m = 12; var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -4, 4, -2, 6);
+                // A genuine cut-off: the way out is walled in (as B's body walled A's in 923), so no route exists even past fire.
+                typeof(RobotBrain).GetField("home", flags).SetValue(b, new Vector2(3f, 4.5f));
+                var g = Map(b);
+                var events = new List<BrainEvent>();
+                for (int i = 0; i < 15 * 12; i++)
+                {
+                    double t = i / 15.0; Motion(b, t); b.OnRgbd(Image(t, true));
+                    if (i == 15)   // the route it had closes, as B's body closed A's doorway in 923
+                        for (float ang = 0; ang < 360; ang += 3)
+                            for (int k = 0; k < 4; k++) g.ObserveOccupied(g.Cell(new Vector2(3f, 4.5f) + 0.6f * new Vector2(Mathf.Cos(ang * Mathf.Deg2Rad), Mathf.Sin(ang * Mathf.Deg2Rad))));
+                    b.OnAirTemperature(t, t < 2 ? 20 : 20 + (air - 20) * (float)Math.Min(1, (t - 2) / 6));
+                    if (i == 30) b.AgentGoTo(new Vector2(0, 1), t, 60, "look again", new Vector2(0, 3));
+                    b.Step(t, 1f / 15); events.AddRange(b.DrainEvents());
+                }
+                lastBrain = b;
+                return ((bool)typeof(RobotBrain).GetField("retreating", flags).GetValue(b), events.Count(e => e.kind == "stay_overridden"));
+            }
+            var hot = Run(60);
+            Assert.That((bool)typeof(RobotBrain).GetField("cutOff", flags).GetValue(lastBrain), Is.True, "precondition: the brain found itself cut off");
+            Assert.That(hot.overridden, Is.GreaterThan(0), "the order to stay is overridden");
+            Assert.That(hot.retreating, Is.True);
+            Assert.That(Run(22).overridden, Is.Zero, "control: in cool air the order stands");
+        }
+
+        [Test]
+        public void WithNothingLeftAtTheDoorARobotWalksInAfterItsPartner()
+        {
+            // One-door seed 923, robot B: A went in and B, at the pad, had no frontier at all, so it scanned and held at the
+            // gate. Here B's map shows indoor floor up to 6 m ahead and A is reported 5 m in: B's goal lies on the way to A,
+            // 2 m short. Controls: a partner standing outside the indoor floor, and no partner, give no goal.
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            Vector2? Goal(Vector2? partnerAt, bool indoorFloor)
+            {
+                var c = Settings(); c.grid_size_m = 16; c.robot_radius_m = .25f; c.frames_shared_at_start = true; c.search_requires_ceiling = true;
+                var b = new RobotBrain(Calibration(), c, "B", 0); var g = Map(b); Room(b, -2, 2, -1, 7);
+                var indoors = (bool[])typeof(OccupancyGrid).GetField("sightIndoors", flags).GetValue(g);
+                if (indoorFloor) for (int i = 0; i < g.Count; i++) { var p = g.Centre(i); if (Mathf.Abs(p.x) < 2 && p.y > 1 && p.y < 7) indoors[i] = true; }
+                typeof(OccupancyGrid).GetField("roofDirty", flags).SetValue(g, true);
+                Motion(b, 0); b.OnAirTemperature(0, 20); b.Step(0, .05f);
+                if (partnerAt.HasValue)
+                {
+                    var a = new RobotBrain(Calibration(), c, "A", 0);
+                    for (int i = 0; i <= 150; i++) { double t = i / 15.0; Motion(a, t, i < 150 ? .5f : 0); a.OnAirTemperature(t, 20); a.Step(t, i == 0 ? .05f : 1f / 15); }
+                    b.OnPeerMessage(Wire(a.BuildMessage(10)), 10);
+                }
+                var args = new object[] { null };
+                return (Vector2?)typeof(RobotBrain).GetMethod("FollowPartnerGoal", flags).Invoke(b, args);
+            }
+            var follow = Goal(new Vector2(0, 5), true);
+            Assert.That(follow.HasValue, Is.True, "a way in behind the partner");
+            Assert.That(follow.Value.y, Is.InRange(2.3f, 3.9f), "about 2 m short of A (A drove 5 m): " + follow);
+            Assert.That(Goal(new Vector2(0, 5), false).HasValue, Is.False, "control: the partner is not on floor proven indoors");
+            Assert.That(Goal(null, true).HasValue, Is.False, "control: no partner");
+        }
+
+        [Test]
         public void BehindItsPartnerAtOneDoorARobotFollowsThroughInsteadOfStopping()
         {
             // One-door seed 922, robot B: at the one door behind A, every frontier it saw lay in A's claim or A's searched
@@ -3576,7 +3661,9 @@ namespace SmokeRescue.Tests.EditMode
             }
             var full = Wire(a.BuildMessage(0));
             Assert.That(full.GridSize, Is.EqualTo(220)); Assert.That(full.Origin, Is.EqualTo(new Vector2(-2, -2)));
-            var receiver = new RobotBrain(Calibration(), HouseSettings(), "robot_B", 0);
+            // The receiver stands on open floor: a partner's reported pose clears this robot's walls under its body
+            // (MarkTeammateFree), and the default (0, 0) lies inside the wall strip at x 0 to 0.2, where no robot can stand.
+            var receiver = new RobotBrain(Calibration(), HouseSettings(), "robot_B", 0, new EntryPose(20, 14, 0));
             receiver.OnPeerMessage(full, 0);
             a.OnPeerMessage(Wire(receiver.BuildMessage(0)), .1);
             var delta = Wire(a.BuildMessage(2));

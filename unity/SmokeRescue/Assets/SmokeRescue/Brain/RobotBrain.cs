@@ -456,7 +456,15 @@ namespace SmokeRescue.Brain
                     // declared its mission complete at 16.6 s. Beyond the partner's floor its own frontiers take over.
                     var through = frontier == null && peers.Count > 0
                         ? planner.Frontier(motion.Pose.position, p => GoalBlacklisted(p, t) || VisitedGoal(p, t) || !InSearchArea(p), true) : null;
-                    if (through != null)
+                    List<Vector2> followRoute = null;
+                    var follow = frontier == null && through == null && peers.Count > 0 ? FollowPartnerGoal(out followRoute) : null;
+                    if (follow.HasValue)
+                    {
+                        SetPath(followRoute, false); scanSince = double.NaN; noFrontierAt = double.NaN;
+                        Emit(t, "goal", "Nothing left to search here and the partner went in: follow it in, so this robot's own sensors map onward.",
+                            "x_m", follow.Value.x, "y_m", follow.Value.y);
+                    }
+                    else if (through != null)
                     {
                         SetPath(through.path, false); scanSince = double.NaN; noFrontierAt = double.NaN;
                         Emit(t, "goal", "Only the partner's claimed or searched floor leads on: follow through it to unsearched floor beyond.",
@@ -719,6 +727,28 @@ namespace SmokeRescue.Brain
                 if (beyond * beyond + lateral * lateral <= r * r) return true;
             }
             return false;
+        }
+        /// <summary>Where to walk to follow a partner in: on the planned route to the partner's last known position, stopping
+        /// follow_partner_standoff_m short of it, when the partner stands on floor this robot's map shows indoors and the
+        /// route exists; else null. One-door seed 923, robot B: A went in through the one door and B, at the pad, had no
+        /// frontier at all (its map held only its own view through the door and A's searched floor), so it scanned and
+        /// held at the gate. Walking in after A gives its own sensors the floor beyond.</summary>
+        internal Vector2? FollowPartnerGoal(out List<Vector2> route)
+        {
+            route = null; Vector2? best = null; float bestD = float.PositiveInfinity;
+            foreach (var peer in peers.Values)
+            {
+                if (peer.message == null || !TryPartnerLink(peer.message.Sender, out _)) continue;
+                var at = peer.pose.position;
+                if (!InSearchArea(at) || Vector2.Distance(at, motion.Pose.position) <= c.follow_partner_standoff_m + c.goal_tolerance_m) continue;
+                var path = planner.Plan(motion.Pose.position, at);
+                if (path.Count == 0) continue;
+                float walked = 0; int cut = path.Count - 1;
+                for (int i = path.Count - 1; i > 0; i--) { walked += Vector2.Distance(path[i - 1], path[i]); if (walked >= c.follow_partner_standoff_m) { cut = i - 1; break; } }
+                var goalAt = path[cut]; float d = Vector2.Distance(goalAt, motion.Pose.position);
+                if (d < bestD) { bestD = d; best = goalAt; route = path.GetRange(0, cut + 1); }
+            }
+            return best;
         }
         bool SameSideOfWalls(Vector2 a, Vector2 b)
         {
@@ -1272,7 +1302,18 @@ namespace SmokeRescue.Brain
             {
                 if (t < nextCutOffCheck) return;
                 nextCutOffCheck = t + c.escape_check_s;
-                if (HeatBuilding(t, out _)) TryEmergencyExit(t, "Cut off from the way out and the air is heating: leave now by the nearest way out");
+                if (HeatBuilding(t, out float cutRise) && !TryEmergencyExit(t, "Cut off from the way out and the air is heating: leave now by the nearest way out")
+                    && !retreating && airC >= c.heat_recover_below_c)
+                {
+                    // No route out even past the fire and the air is heating: never stand in it on an agent's order (one-door
+                    // seed 923, robot A turned on the spot for 30 s on its agent's orders while its air rose from 30 to 70 C).
+                    bool agentOrdered = AgentGoalActive(t) || t < agentHoldUntil || facing.HasValue;
+                    agentGoal = null; agentGoalIsFrontier = false; agentHoldUntil = double.NegativeInfinity; facing = null; agentFace = null;
+                    ResetStuckRecovery(); retreating = true; sweeping = false; active = null; dwell = 0; ClearPath();
+                    Emit(t, "stay_overridden", (agentOrdered ? "The agent's order is overridden: " : "") +
+                        "cut off with the air heating and no route out even past the fire; retreat to the coolest reachable floor.",
+                        "air_c", airC, "rise_c_per_min", cutRise);
+                }
                 return;
             }
             if (!returning && !retreating && burned && HeatBuilding(t, out float again))
