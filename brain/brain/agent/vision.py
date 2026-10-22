@@ -501,8 +501,16 @@ def inspect_candidate(frame: Frame, bearing_deg: float, range_m: float, *, outpu
     if result["verdict"] == "uncertain":
         # Second sensor: a confident RGB person detection at the same bearing and range. It never overrides a
         # not_person verdict from planarity, a window recess or impossible size.
-        hits = [p for p in detect_people_rgb(frame) if abs(p["bearing_deg"] - bearing_deg) <= bearing_tolerance_deg
-                and (p["range_m"] is None or abs(p["range_m"] - range_m) <= range_tolerance_m)]
+        # Matched against where the selected warm body was measured as well as where the agent asked: held-out seed 915,
+        # robot A, the agent asked at 0 deg, the warm component lay at -6.9 deg and the colour detector saw a person at
+        # -8.9 deg with confidence 0.83, just outside 8 deg of the request, so the verdict stayed uncertain (Codex replay).
+        cand = result.get("candidate") or {}
+        refs = [(bearing_deg, range_m)]
+        if cand.get("bearing_deg") is not None:
+            refs.append((cand["bearing_deg"], cand["range_m"] if cand.get("range_m") is not None else range_m))
+        hits = [p for p in detect_people_rgb(frame)
+                if any(abs(p["bearing_deg"] - b) <= bearing_tolerance_deg and (p["range_m"] is None or abs(p["range_m"] - r) <= range_tolerance_m)
+                       for b, r in refs)]
         # A box cut by the left or right side of the image shows only part of whatever it is, as the thermal mask rule
         # above says for warm components: it cannot confirm a body (held-out seed 914 run 3: a 22 px sliver at the left
         # border beside a burning sofa, confidence 0.58, confirmed a person 2.6 m from anyone). A box cut at the bottom
@@ -513,6 +521,9 @@ def inspect_candidate(frame: Frame, bearing_deg: float, range_m: float, *, outpu
         if whole and max(h["confidence"] for h in whole) >= 0.5:
             best = max(whole, key=lambda h: h["confidence"])
             result["verdict"] = "person"
+            # With no warm body matched, the person is where the colour detector measured them, not where the agent asked.
+            if result.get("candidate") is None and best.get("range_m") is not None:
+                result["candidate"] = {"bearing_deg": best["bearing_deg"], "range_m": best["range_m"], "source": "rgb_dnn"}
             result["reasons"] = result["reasons"] + [f"OpenCV dnn person detector (YOLO11m) confidence {best['confidence']:.2f} "
                                                      f"at bearing {best['bearing_deg']:.1f} deg, range {best['range_m']} m."]
         elif any(h["confidence"] >= 0.5 for h in hits):
