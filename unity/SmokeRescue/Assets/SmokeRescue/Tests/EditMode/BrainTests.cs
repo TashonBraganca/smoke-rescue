@@ -2273,6 +2273,29 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void LeavingBecauseOfHeatDoesNotCrawlPastWalls()
+        {
+            // Held-out seed 920, robot B: leaving a heating house, it walked at the 0.3 m/s near-wall speed through every
+            // doorway and spent 11.8 s in air over 60 C. Leaving because of heat, a wall 0.8 m ahead keeps open speed (the
+            // stopping-distance cap still applies in Command); control: searching, the same wall halves it.
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            float Speed(bool leaving)
+            {
+                var c = Settings(); var b = new RobotBrain(Calibration(), c, "A", 0);
+                if (leaving)
+                {
+                    typeof(RobotBrain).GetField("returning", flags).SetValue(b, true);
+                    typeof(RobotBrain).GetField("returnReason", flags).SetValue(b, "No reachable frontier was left and the air was heating.");
+                }
+                var args = new object[] { .8f, null };
+                return (float)typeof(RobotBrain).GetMethod("PursuitSpeed", flags).Invoke(b, args);
+            }
+            var cfg = Settings();
+            Assert.That(Speed(true), Is.EqualTo(cfg.open_speed_mps), "leaving because of heat");
+            Assert.That(Speed(false), Is.EqualTo(cfg.near_speed_mps), "control: searching near a wall");
+        }
+
+        [Test]
         public void TheBodyIsTheCapsuleUnityCollidesNotARoundRobot()
         {
             // Held-out seed 920, robot B: five stalls turning at the foyer-kitchen opening with its face 0.2 to 0.4 m from the
