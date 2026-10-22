@@ -660,7 +660,9 @@ namespace SmokeRescue.Brain
             while (queue.Count > 0)
             {
                 int cell = queue.Dequeue();
-                if (!indoorsOnly || !c.search_requires_ceiling || Indoors(Centre(cell))) count++;
+                // Ranking unproven floor (indoorsOnly false), floor this robot's LiDAR saw as open ground is the yard, not a
+                // room behind a door (held-out seed 917, robot B: all three wide slots went to the yard by its front door).
+                if (indoorsOnly ? !c.search_requires_ceiling || Indoors(Centre(cell)) : !openGround[cell]) count++;
                 int x = cell % Size, y = cell / Size;
                 for (int k = 0; k < 4; k++)
                 {
