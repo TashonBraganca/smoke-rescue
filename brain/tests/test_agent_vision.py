@@ -131,3 +131,26 @@ def test_colour_detection_cut_by_the_image_side_cannot_confirm(bbox, verdict, tm
     r = v.inspect_candidate(f, 0.0, 3.0, output_dir=tmp_path)
     assert r["verdict"] == verdict
     assert r["cues"]["rgb_dnn"]["clipped_by_side"] == (1 if verdict == "uncertain" else 0)
+
+
+
+def test_a_colour_person_beside_the_selected_warm_body_confirms_it(tmp_path, monkeypatch):
+    # Held-out seed 915, robot A (Codex replay): asked at 0 deg, the warm component lay at -6.9 deg and the colour
+    # detector saw a person at -8.9 deg, just outside 8 deg of the request, so the verdict stayed uncertain. Here the
+    # warm body (uniform temperature, so thermal alone is uncertain) sits near 0 deg, the request is at +6 deg and the
+    # colour person at -7 deg: 13 deg from the request, 7 deg from the body. Control: no warm body to associate with.
+    f = scene("uniform")
+    monkeypatch.setattr(v, "detect_people_rgb", lambda frame, **k: [{"confidence": 0.83, "bbox_rgb": [60, 30, 30, 70], "bearing_deg": -7.0, "range_m": 3.0}])
+    assert v.inspect_candidate(f, 6.0, 3.0, output_dir=tmp_path)["verdict"] == "person"
+    g = scene("uniform"); g.thermal[:] = 2932
+    assert v.inspect_candidate(g, 6.0, 3.0, output_dir=tmp_path)["verdict"] == "uncertain", "control: nothing at -7 deg to tie it to"
+
+
+def test_a_colour_only_confirmation_carries_the_measured_position(tmp_path, monkeypatch):
+    # Codex review: with no warm body matched, a colour-only person verdict left candidate empty, so the tool layer used
+    # the requested bearing and range as the person's position. It now carries the detector's measured geometry.
+    f = scene(); f.thermal[:] = 2932
+    monkeypatch.setattr(v, "detect_people_rgb", lambda frame, **k: [{"confidence": 0.9, "bbox_rgb": [60, 30, 30, 70], "bearing_deg": 5.0, "range_m": 3.4}])
+    r = v.inspect_candidate(f, 3.0, 3.0, output_dir=tmp_path)
+    assert r["verdict"] == "person"
+    assert (r["candidate"]["bearing_deg"], r["candidate"]["range_m"]) == (5.0, 3.4)
