@@ -1630,12 +1630,15 @@ namespace SmokeRescue.Tests.EditMode
                     bool side = (Mathf.Abs(p.x + 4) < .1f || Mathf.Abs(p.x - 12) < .1f) && p.y > 2 && p.y < 9;
                     if (facade || side || (Mathf.Abs(p.y - 9) < .1f && p.x > -4 && p.x < 12)) g.ObserveOccupied(i);
                     else if (p.y > 2.15f && p.y < 8.9f && p.x > -3.9f && p.x < 6f) { g.ObserveFree(i); indoors[i] = true; }   // searched part of the inside
-                    else if (p.y > -1.5f && p.y < 1.95f && p.x > -3f && p.x < 3f) g.ObserveFree(i);                          // the yard the robot saw at its door
+                    // The yard the robot saw along the wall, with small unseen pockets against the wall every 1.5 m: each is
+                    // an unexplored edge, as on held-out seed 920 where the first one was 0.6 m from robot A.
+                    else if (p.y > -1.5f && p.y < 1.95f && p.x > -3f && p.x < 11f &&
+                             !(p.y > 1.75f && Mathf.Abs(Mathf.Repeat(p.x + .75f, 1.5f) - .75f) < .15f && Mathf.Abs(p.x) > 1f)) g.ObserveFree(i);
                 }
                 typeof(RobotBrain).GetField("completed", flags).SetValue(b, true);
                 typeof(RobotBrain).GetField("canReenter", flags).SetValue(b, true);
                 int n = 0; var command = new BrainCommand(); float maxFromWall = 0;
-                for (int tick = 0; tick < 20 * 40; tick++)
+                for (int tick = 0; tick < 20 * 60; tick++)
                 {
                     for (float x = -1.5f; x <= 1.5f; x += .1f) g.ObserveHeat(g.Cell(new Vector2(x, 3.2f)), 500, tick / 20.0);   // fire just inside the door
                     command = DriveTick(b, tick, command.forwardMps, command.yawRateDeg);
@@ -1644,10 +1647,12 @@ namespace SmokeRescue.Tests.EditMode
                 }
                 return (n, b.Snapshot().pose.position, maxFromWall);
             }
-            var moved = Run(3f);
+            var moved = Run(15f);
             Assert.That(moved.relocations, Is.GreaterThan(0), "it sets off along the wall");
-            // Either way along the wall: the robot cannot know where another door is, so it takes the nearest unexplored edge.
-            Assert.That(Mathf.Abs(moved.end.x), Is.GreaterThan(1.5f), "along the facade to an unexplored edge: " + moved.end);
+            // Either way along the wall: the robot cannot know where another door is. Held-out seed 920: the first step was
+            // 0.6 m and each next one waited a full dwell; in the 45 s after a 15 s dwell it now walks on past 7 m; hopping with a full dwell each time
+            // reaches about 4.5 m (three hops).
+            Assert.That(Mathf.Abs(moved.end.x), Is.GreaterThan(7f), "on along the facade: " + moved.end);
             Assert.That(moved.maxFromWall, Is.LessThan(2.6f), "never out into the yard");
             var stays = Run(0f);
             Assert.That(stays.relocations, Is.Zero, "control: no dwell budget, it waits at its door");
@@ -1787,6 +1792,67 @@ namespace SmokeRescue.Tests.EditMode
             }
             Assert.That(Reentries(false), Is.EqualTo(1), "back in by a clear frontier");
             Assert.That(Reentries(true), Is.Zero, "control: every frontier by the fire");
+        }
+
+        [Test]
+        public void GoingBackInCountsTheFireBesideTheDoor()
+        {
+            // Held-out seed 920, robot A: from outside, re-entry skipped the route within escape_ignore_m (2 m) of the robot,
+            // which was the door, and went in with the fire 1.97 m from it; the leave rule turned it round 2 s later. A way
+            // in from the robot straight through a door 1.2 m ahead, fire 1.9 m beside the door: under the margin. Control:
+            // fire 2.6 m beside it.
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            float Near(float fireX)
+            {
+                var c = Settings(); c.grid_size_m = 12;
+                var b = new RobotBrain(Calibration(), c, "A", 0); var g = Map(b);
+                g.ObserveHeat(g.Cell(new Vector2(fireX, 1.2f)), 500, 0);
+                typeof(OccupancyGrid).GetMethod("PrepareNavigation", flags).Invoke(g, null);
+                var path = new List<Vector2>(); for (float y = 0; y <= 6f; y += .1f) path.Add(new Vector2(0, y));
+                return (float)typeof(RobotBrain).GetMethod("ReentryFireDistance", flags).Invoke(b, new object[] { path });
+            }
+            Assert.That(Near(1.9f), Is.LessThan(Settings().escape_fire_margin_m), "fire beside the door blocks the way in");
+            Assert.That(Near(2.6f), Is.GreaterThanOrEqualTo(Settings().escape_fire_margin_m), "control: fire clear of the door");
+        }
+
+        [Test]
+        public void ARobotThatWalksBackInFromANewSpotCanLeaveThere()
+        {
+            // Held-out seed 920, robot A: after following the wall it went back in 5.7 m from its first door and turned round
+            // at once, because its way out was still planned to that first door, 1.3 m from the fire. Here its first door is
+            // 2.2 m behind it with a fire line 1.8 m beyond that; it goes back in where it stands. The spot it walked in from
+            // is a way out, so it searches on; without it (the first door its only way out) the leave rule turns it round.
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            (int reentries, int turned) Run(bool remember)
+            {
+                var c = Settings(); c.grid_size_m = 16; c.robot_radius_m = .25f;
+                var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -6, 6, -2.5f, 7);
+                typeof(RobotBrain).GetField("completed", flags).SetValue(b, true);
+                typeof(RobotBrain).GetField("canReenter", flags).SetValue(b, true);
+                typeof(RobotBrain).GetField("home", flags).SetValue(b, new Vector2(0, -2.2f));
+                var walked = (List<Vector2>)typeof(RobotBrain).GetField("walkedIn", flags).GetValue(b);
+                int n = 0, turned = 0;
+                for (int i = 0; i < 150; i++)
+                {
+                    double t = i / 15.0; Motion(b, t); b.OnRgbd(Image(t, true)); b.OnAirTemperature(t, 20);
+                    var g = Map(b);
+                    for (float x = -7.5f; x <= 7.5f; x += .1f) g.ObserveHeat(g.Cell(new Vector2(x, -4.0f)), 500, t);
+                    b.Step(t, 1f / 15);
+                    if (!remember) walked.Clear();
+                    foreach (var e in b.DrainEvents())
+                    {
+                        if (e.kind == "reenter") n++;
+                        if (n > 0 && e.kind == "escape_closing") turned++;
+                    }
+                }
+                return (n, turned);
+            }
+            var kept = Run(true);
+            Assert.That(kept.reentries, Is.EqualTo(1));
+            Assert.That(kept.turned, Is.Zero, "it may leave where it walked in, so it searches on");
+            var lost = Run(false);
+            Assert.That(lost.reentries, Is.EqualTo(1));
+            Assert.That(lost.turned, Is.GreaterThan(0), "control: only the first door, by the fire, turns it round");
         }
 
         [Test]
@@ -2204,6 +2270,41 @@ namespace SmokeRescue.Tests.EditMode
             for (float x = -.3f; x <= .3f; x += .05f) g.ObserveOccupied(g.Cell(new Vector2(x, .25f)));
             Assert.That(SafeForward(b, .6f), Is.Zero);
             Assert.That(b.DrainEvents().Count(e => e.kind == "collision_risk"), Is.EqualTo(1), "One event per blocked episode.");
+        }
+
+        [Test]
+        public void TheBodyIsTheCapsuleUnityCollidesNotARoundRobot()
+        {
+            // Held-out seed 920, robot B: five stalls turning at the foyer-kitchen opening with its face 0.2 to 0.4 m from the
+            // wall edge. Unity's body is a capsule 0.75 m long (radius 0.18 m); the brain treated it as a 0.25 m circle, so it
+            // drove its nose to the wall and swung it into corners. Forward: a wall 0.40 m ahead leaves no forward room (the
+            // nose reaches 0.375 m); control 0.60 m does. Turning: a wall cell 0.2 to 0.3 m to the front right (inside the 0.375 m the ends sweep) blocks
+            // a 90 degree turn toward it;
+            // control: a 90 degree turn the other way is clear.
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            RobotBrain Fresh(out OccupancyGrid g)
+            {
+                var c = Settings(); c.robot_radius_m = .25f; c.body_half_length_m = .375f; c.body_radius_m = .18f;
+                var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -3, 3, -3, 3);
+                Motion(b, 0); b.OnAirTemperature(0, 20); b.Step(0, 1f / 60); g = Map(b); return b;
+            }
+            float Room0(float wallY)
+            {
+                var b = Fresh(out var g);
+                for (float x = -.3f; x <= .3f; x += .05f) g.ObserveOccupied(g.Cell(new Vector2(x, wallY)));
+                return (float)typeof(RobotBrain).GetMethod("SweptClearance", flags).Invoke(b, null) - Settings().collision_margin_m;
+            }
+            Assert.That(Room0(.40f), Is.LessThanOrEqualTo(0f), "the nose is at the wall 0.40 m ahead");
+            Assert.That(Room0(.60f), Is.GreaterThan(0f), "control: room to move 0.60 m from a wall");
+            bool Swing(float deg)
+            {
+                var b = Fresh(out var g); g.ObserveOccupied(g.Cell(new Vector2(.26f, .26f)));
+                typeof(OccupancyGrid).GetMethod("PrepareNavigation", flags).Invoke(g, null);
+                return (bool)typeof(RobotBrain).GetMethod("SwingClear", flags).Invoke(b, new object[] { deg });
+            }
+            float toward = -90f;   // from facing +y to facing +x: the brain's heading is atan2(-x, y)
+            Assert.That(Swing(toward), Is.False, "the nose would swing into the corner");
+            Assert.That(Swing(-toward), Is.True, "control: turning away from it");
         }
 
         [Test]
