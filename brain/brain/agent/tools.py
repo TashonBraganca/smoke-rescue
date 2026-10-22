@@ -39,6 +39,7 @@ CAMERA_HALF_HFOV_DEG = math.degrees(math.atan(_CAMERA["width"] / 2 / _CAMERA["fx
 from pathlib import Path
 
 from brain.agent import vision
+from brain.agent.team import TeamState
 
 
 def _fn(name: str, description: str, properties: dict | None = None, required: list[str] | None = None) -> dict:
@@ -112,7 +113,13 @@ ACTIONS = [
         "robot holds still while spraying.", {"bearing_deg": NUM, "seconds": NUM, "evidence_id": EVIDENCE},
         ["bearing_deg", "seconds", "evidence_id"]),
     _fn("send_team_message", "Radio a short message to the partner robot and the commander. It may be delayed or "
-        "lost if walls or distance block the link.", {"text": STR}, ["text"]),
+        "lost if walls or distance block the link. kind: finding (what you sensed) or outcome (how an agreed task ended).",
+        {"text": STR, "kind": {"type": "string", "enum": ["finding", "outcome"]}}, ["text"]),
+    _fn("propose_plan", "Radio a proposed division of work to the partner: what you will do and what you ask of it, with why. "
+        "It stays open for the partner's answer for a limited time (team.json proposal_ttl_s).",
+        {"my_part": STR, "your_part": STR, "why": STR}, ["my_part", "your_part", "why"]),
+    _fn("answer_proposal", "Accept or reject a plan your partner proposed (team.awaiting_your_answer), with the reason.",
+        {"proposal_id": STR, "accept": {"type": "boolean"}, "reason": STR}, ["proposal_id", "accept", "reason"]),
     _fn("request_human_approval", "Ask the human incident commander before a risky move, citing evidence.",
         {"question": STR, "evidence_id": EVIDENCE}, ["question", "evidence_id"]),
     _fn("finish", "End this decision step with a one-sentence summary of what you decided and why.",
@@ -507,6 +514,22 @@ class ToolRegistry:
             if refused:
                 state += "; a confirmation was refused this step: " + str(refused[-1].get("reason", ""))[:90]
             args = {**args, "text": f"{str(args.get('text', '')).strip()} [robot state: {state}]"}
+            kind = args.get("kind") if args.get("kind") in ("finding", "outcome") else "finding"
+            args = {**args, **TeamState.of(self.ctx.robot).message(kind, args["text"], self.ctx.t)}
+        elif name == "propose_plan":
+            msg = TeamState.of(self.ctx.robot).propose(str(args.get("my_part", "")), str(args.get("your_part", "")),
+                                                       str(args.get("why", "")), self.ctx.t)
+            self.orders.append({"type": "send_team_message", **msg, "robot": self.ctx.robot})
+            return {"ok": True, "queued": "proposal", "proposal_id": msg["proposal_id"], "expires_t": msg["expires_t"]}
+        elif name == "answer_proposal":
+            team = TeamState.of(self.ctx.robot)
+            why = team.answer_refusal(str(args.get("proposal_id")), self.ctx.t)
+            if why is not None:
+                refusal = {"refused": True, "reason": why}
+            else:
+                msg = team.answer(str(args["proposal_id"]), bool(args.get("accept")), str(args.get("reason", "")), self.ctx.t)
+                self.orders.append({"type": "send_team_message", **msg, "robot": self.ctx.robot})
+                return {"ok": True, "queued": msg["kind"], "reply_to": msg["reply_to"]}
         elif name == "request_human_approval":
             refusal = self._need(args, tuple(f["function"]["name"] for f in PERCEPTION))
         elif name == "finish":
