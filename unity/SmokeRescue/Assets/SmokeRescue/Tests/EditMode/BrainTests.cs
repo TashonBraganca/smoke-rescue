@@ -2072,6 +2072,26 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void OpenGroundTheLidarSawDoesNotWinAWideSlotForAnUnprovenFrontier()
+        {
+            // Held-out seed 917, robot B: with wide slots ranked across unproven frontiers too, all three went to frontiers by
+            // the front door whose "large area beyond" was the yard; B spent 40 s turning to check them while its proven list
+            // flickered empty. Its own LiDAR had marked that yard as open ground at its outdoor spawn. For ranking, unproven
+            // floor the LiDAR saw as open ground does not count; mapped floor behind an interior opening still does.
+            var c = Settings(); c.grid_size_m = 12;
+            var g = new OccupancyGrid(c);   // nothing searched by a camera; the LiDAR maps the floor below
+            var lidar = (float[])typeof(OccupancyGrid).GetField("lidarOdds", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(g);
+            var open = (bool[])typeof(OccupancyGrid).GetField("openGround", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(g);
+            var yard = new List<int>();
+            for (int i = 0; i < g.Count; i++) { var p = g.Centre(i); if (p.y > 0 && p.y < 4 && Mathf.Abs(p.x) < 3) { lidar[i] = -c.log_odds_cap; yard.Add(i); } }
+            typeof(OccupancyGrid).GetField("dirty", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).SetValue(g, true);
+            float mapped = g.UnsearchedFloorBeyond(new Vector2(0, .5f), 12f, false);
+            Assert.That(mapped, Is.GreaterThan(10f), "control: mapped unsearched floor counts while nothing marks it open ground");
+            foreach (int i in yard) open[i] = true;
+            Assert.That(g.UnsearchedFloorBeyond(new Vector2(0, .5f), 12f, false), Is.LessThan(1f), "the same floor seen as open ground does not");
+        }
+
+        [Test]
         public void TheShippedViewingWindowLiesWhereTheCameraCanSeeALyingPerson()
         {
             // Since 20 Oct the camera sits on a 1.6 m mast (it was 0.5 m). The 1.0 to 1.5 m viewing window set for the old mount
