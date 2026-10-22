@@ -406,7 +406,8 @@ def test_the_lift_description_states_both_ways_the_check_accepts():
 
 def test_walking_back_to_a_person_this_robot_confirmed_is_not_another_uncertain_look(tmp_path, monkeypatch):
     # Run 5, robot A: it confirmed a person, then cited a newer uncertain look at them and was refused after two looks.
-    # Control: the same uncertain looks at a spot nobody confirmed are still limited.
+    # Control: the same uncertain looks at a spot nobody confirmed are still limited. With the rescue arm on only.
+    monkeypatch.setattr(T, "RESCUE_ENABLED", True)
     for confirmed, refused in ((True, False), (False, True)):
         T.ToolRegistry._looks.clear(); T.ToolRegistry._pending.clear(); T.ToolRegistry._confirmed.clear()
         if confirmed:
@@ -670,3 +671,26 @@ def test_a_fire_heating_the_robot_is_a_spray_option(tmp_path):
     assert spray_option({"water_l": 12.0}) is None, "control: no fire near the robot, no option"
     blocked = {"bearing_deg": 0.0, "distance_m": 2.0, "burning_m2": 1.0}
     assert spray_option({"fire_blocks_exit": blocked, "fire_near_robot": near, "water_l": 12.0})["blocks"] == "exit", "a blocked route still comes first"
+
+
+def test_without_the_rescue_arm_walking_to_a_confirmed_person_is_refused(tmp_path, monkeypatch):
+    # One-door seed 930, robot A at 50.5 s: it walked back toward the person it confirmed at 0 s "to lift them" with the
+    # rescue arm off, and lost 6 s before the route failed. Without the arm a confirmed person is reported and stays put.
+    # Controls: a person confirmed by nobody can still be approached for a closer look; with the arm on, the walk is allowed.
+    def approach(confirmed, rescue):
+        monkeypatch.setattr(T, "RESCUE_ENABLED", rescue)
+        RobotAgent._new_run(request(tmp_path) | {"t": 49.0})   # start this recording first, so its reset does not clear the setup
+        T.ToolRegistry._looks.clear(); T.ToolRegistry._pending.clear(); T.ToolRegistry._confirmed.clear()
+        if confirmed:
+            T.ToolRegistry._confirmed["robot_A"] = [{"id": "old", "x": 5.0, "y": 10.0}]
+        fake_vision(monkeypatch, "person")
+        out = RobotAgent(Scripted([[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": 5})],
+                                   [ToolCall("approach_candidate", {"evidence_id": "ev1"})]]), tmp_path / "t.jsonl").step(request(tmp_path) | {"t": 50.0})
+        T.ToolRegistry._confirmed.clear()
+        return out
+    refused = approach(True, False)
+    assert refused["orders"] == [] and "already confirmed" in refused["refusals"][0]["reason"]
+    allowed = approach(False, False)
+    assert [o["type"] for o in allowed["orders"]] == ["go_to"], "control: an unconfirmed person can be approached"
+    assert "closer look to confirm" in allowed["orders"][0]["reason"]
+    assert [o["type"] for o in approach(True, True)["orders"]] == ["go_to"], "control: with the arm on, walk to lift"

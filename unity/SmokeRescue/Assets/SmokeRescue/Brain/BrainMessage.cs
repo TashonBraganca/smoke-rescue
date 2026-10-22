@@ -80,8 +80,8 @@ namespace SmokeRescue.Brain
         public const int MaxVisualPayloadBytes = 8192;
         public int EstimatedBytes => ToBytes().Length;
         internal static bool Bit(byte[] mask, int cell) => (mask[cell >> 3] & (1 << (cell & 7))) != 0;
-        internal static void Set(byte[] mask, int cell) { mask[cell >> 3] |= (byte)(1 << (cell & 7)); }
-        internal int Cell(Vector2 p)
+        public static void Set(byte[] mask, int cell) { mask[cell >> 3] |= (byte)(1 << (cell & 7)); }
+        public int Cell(Vector2 p)
         {
             int x = Mathf.FloorToInt((p.x - Origin.x) / ResolutionM), y = Mathf.FloorToInt((p.y - Origin.y) / ResolutionM);
             return x >= 0 && y >= 0 && x < GridSize && y < GridSize ? y * GridSize + x : -1;

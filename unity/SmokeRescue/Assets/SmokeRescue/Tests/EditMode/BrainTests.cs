@@ -3252,6 +3252,28 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void StayingInsideARobotNotYetInsideKeepsScanningInsteadOfHolding()
+        {
+            // One-door seed 930, robot B: at its pad, with no floor proven indoors on its own map, it found nothing to search,
+            // and the stay-inside rule "nothing left: hold here, inside" stopped it for good, outside, so it never saw the
+            // ceiling through the door and never went in. Holding is for a robot that is inside; outside it keeps turning.
+            var c = Settings(); c.stay_inside = true; c.search_requires_ceiling = true; c.mission_time_limit_s = 1000;
+            var b = new RobotBrain(Calibration(), c, "B", 0); Room(b, -3, 3, -3, 3);
+            BrainCommand cmd = default; double last = 0; var events = new List<BrainEvent>(); float turned = 0;
+            for (int i = 0; i <= 15 * 30; i++)
+            {
+                double t = i / 15.0;
+                Motion(b, t, 0, cmd.yawRateDeg * Mathf.Deg2Rad); b.OnRgbd(Image(t, true, 0)); b.OnAirTemperature(t, 20);
+                cmd = b.Step(t, i == 0 ? .05f : (float)(t - last)); last = t; events.AddRange(b.DrainEvents());
+                if (t > c.no_frontier_scan_s + 2) turned += Mathf.Abs(cmd.yawRateDeg) / 15f;
+            }
+            Assert.That(b.InSearchArea(b.Snapshot().pose.position), Is.False, "control: the robot is not inside");
+            Assert.That(events.Any(e => e.kind == "no_frontier"), Is.True, "control: it found nothing to search");
+            Assert.That(events.Any(e => e.reason.StartsWith("Nothing reachable is left to search after a full scan")), Is.False, "no hold outside");
+            Assert.That(turned, Is.GreaterThan(90f), "it keeps scanning after the first full scan");
+        }
+
+        [Test]
         public void BehindAPartnerJustAheadOnTheWayInARobotWaitsItsTurnForALimitedTime()
         {
             // One-door seed 925, robot B: in the doorway with A 1.85 m ahead, standing to confirm a person, B had nothing it
