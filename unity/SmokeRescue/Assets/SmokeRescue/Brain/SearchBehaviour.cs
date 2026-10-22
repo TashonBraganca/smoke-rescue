@@ -140,6 +140,14 @@ namespace SmokeRescue.Brain
         /// <summary>Take one bounded look at a nearby mapped wall opening before walking past it. The camera goes
         /// only to the wall line; the body stays its calibrated camera offset behind it. A doorway is never labelled
         /// indoors just because it exists. Depth frames from the look still have to supply valid ceiling evidence.</summary>
+        /// <summary>An opening within threshold_exit_clear_m of a known way out is the entrance, whose far side is the yard.
+        /// A robot staying inside never goes back out through it, so a ceiling look through it proves nothing it can use
+        /// (one-door seed 928, robot A at 9 s turned back to its own front door and looked out at the yard for 9.8 s).</summary>
+        bool NearWayOut(Vector2 p)
+        {
+            foreach (var e in Exits()) if (Vector2.Distance(e, p) <= c.threshold_exit_clear_m) return true;
+            return false;
+        }
         bool TryStartDoorwayProbe(double t)
         {
             if (!c.search_requires_ceiling || !c.ceiling_sight_lines || c.frontier_peek_m <= 0 || nearFire ||
@@ -161,7 +169,8 @@ namespace SmokeRescue.Brain
                     Vector2 beyond = camera + forward * c.frontier_peek_m; int cell = grid.Cell(beyond);
                     if (grid.OwnOccupancy(cell) != 1 || !grid.Unsearched(cell) ||
                         !grid.DoorwayFromInside(camera, forward, out var openingCentre) || !grid.OwnFreeLine(camera, beyond) || InSearchArea(beyond) ||
-                        doorwayProbes.Exists(p => Vector2.Distance(p.position, openingCentre) <= 2 * c.robot_radius_m)) continue;
+                        doorwayProbes.Exists(p => Vector2.Distance(p.position, openingCentre) <= 2 * c.robot_radius_m) ||
+                        (c.stay_inside && NearWayOut(openingCentre))) continue;
                     Vector2 target = camera - forward * sensors.camera.mount.forward_offset_m;
                     float distance = Vector2.Distance(motion.Pose.position, target);
                     if (distance > c.frontier_peek_m || !grid.Walkable(grid.Cell(target)) ||

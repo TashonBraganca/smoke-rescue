@@ -87,6 +87,10 @@ namespace SmokeRescue.Editor
         public static void HouseOneDoor927NoLimit() => WithAgents(() => Run("scenario_house_onedoor_seed927_nolimit.json", "unity_house_onedoor_seed927_nolimit"));
         [MenuItem("Tools/Smoke Rescue/Record/House one-door seed 928 run (agents, random people)")]
         public static void HouseOneDoor928() => WithAgents(() => Run("scenario_house_onedoor_seed928.json", "unity_house_onedoor_seed928"));
+        [MenuItem("Tools/Smoke Rescue/Record/House one-door seed 929 run (agents, random people)")]
+        public static void HouseOneDoor929() => WithAgents(() => Run("scenario_house_onedoor_seed929.json", "unity_house_onedoor_seed929"));
+        [MenuItem("Tools/Smoke Rescue/Record/House one-door seed 930, no time limit")]
+        public static void HouseOneDoor930NoLimit() => WithAgents(() => Run("scenario_house_onedoor_seed930_nolimit.json", "unity_house_onedoor_seed930_nolimit"));
 
         [MenuItem("Tools/Smoke Rescue/Record/Triggers/heat")]
         public static void TriggerHeat() => WithAgents(() => Run("scenario_trigger_heat.json", "unity_trigger_heat"));

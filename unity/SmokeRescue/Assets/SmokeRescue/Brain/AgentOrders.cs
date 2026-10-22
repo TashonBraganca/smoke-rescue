@@ -19,7 +19,9 @@ namespace SmokeRescue.Brain
 
         /// <summary>Drive to target; with face set, turn in place on arrival until the robot faces that point, and only
         /// then tell the agent it arrived (the camera sees about 37 degrees either side, the arm grips within 60).</summary>
-        public void AgentGoTo(Vector2 target, double t, double holdS, string reason, Vector2? face = null)
+        public void AgentGoTo(Vector2 target, double t, double holdS, string reason, Vector2? face = null) => GoTo(target, t, holdS, reason, face, false);
+
+        void GoTo(Vector2 target, double t, double holdS, string reason, Vector2? face, bool exploring)
         {
             // Turning where the robot stands (turn_to_face) goes nowhere new, so it needs no indoor evidence (Codex review:
             // near an entrance the robot's own cell may not be known to be inside yet).
@@ -29,7 +31,7 @@ namespace SmokeRescue.Brain
             if (busy != null) { Emit(t, "agent_order", "Refused go_to: " + busy + ".", "x_m", target.x, "y_m", target.y); return; }
             agentGoal = target; agentGoalUntil = t + holdS; agentGoalReason = reason ?? ""; agentGoalIsFrontier = false;
             agentFace = face; facing = null; agentHoldUntil = double.NegativeInfinity;
-            if (active == null) ClearPath();
+            if (active == null && !KeepEvidenceLook(exploring)) ClearPath();
             Emit(t, "agent_order", "go_to: " + agentGoalReason, "x_m", target.x, "y_m", target.y, "hold_s", holdS);
         }
 
@@ -227,14 +229,21 @@ namespace SmokeRescue.Brain
                 // Floor the robot cannot prove is indoors, chosen by the agent on an OpenCV indoor check of its own frame.
                 agentGoal = target; agentGoalUntil = t + holdS; agentGoalReason = "explore (unproven, OpenCV indoor check " + indoorEvidence + "): " + (reason ?? "");
                 agentGoalIsFrontier = true; agentFace = null; facing = null; agentHoldUntil = double.NegativeInfinity;
-                if (active == null) ClearPath();
+                if (active == null && !KeepEvidenceLook(true)) ClearPath();
                 Emit(t, "agent_order", "explore_frontier on floor not yet proven indoors, citing OpenCV evidence " + indoorEvidence + ": " + (reason ?? ""),
                     "x_m", target.x, "y_m", target.y, "hold_s", holdS);
                 return;
             }
-            AgentGoTo(target, t, holdS, "explore: " + (reason ?? ""));
+            GoTo(target, t, holdS, "explore: " + (reason ?? ""), null, true);
             agentGoalIsFrontier = agentGoal.HasValue;
         }
+
+        /// <summary>An exploration order arriving during a bounded evidence look leaves the look's path alone: the order is
+        /// kept as the agent goal and driven once the look ends (at most sweep_max_s). One-door seed 928: the agents re-sent
+        /// their exploration order every 4 to 7 s; each one cleared the look's path and the look ended as "no longer safe" at
+        /// 20 C (8 of 18 looks, every one at an exploration order; 3 finished), and neither robot left the foyer and kitchen in 120 s.
+        /// Approaches, faces and other go_to orders still take over at once.</summary>
+        bool KeepEvidenceLook(bool exploring) => exploring && c.frontier_doorway_looks && doorwayProbeGoal.HasValue;
 
         public void AgentConfirmSurvivor(Vector2 p, double t, string evidence)
         {
@@ -269,11 +278,17 @@ namespace SmokeRescue.Brain
             {
                 if (Vector2.Distance(track.position, p) > c.survivor_merge_m) continue;
                 track.confirmed = false; track.candidate = false; track.retryAfter = double.PositiveInfinity;
-                track.rejected = true; track.rejectedFrom = motion.Pose.position;
+                MarkRejected(track, t);
                 if (active == track) { active = null; dwell = 0; inspecting = false; ClearPath(); }
             }
             Emit(t, "survivor_withdrawn", "Agent withdrew a confirmation: a fresh close look found nobody there, OpenCV evidence " + evidence + ".",
                 "x_m", p.x, "y_m", p.y, "removed", removed);
+        }
+
+        void MarkRejected(Track track, double t)
+        {
+            track.rejected = true; track.rejectedFrom = motion.Pose.position; track.rejectedAt = t;
+            track.rejectedUntil = double.PositiveInfinity; track.peerRejected = false;
         }
 
         public void AgentRejectCandidate(Vector2 p, double t, string evidence)
@@ -283,7 +298,7 @@ namespace SmokeRescue.Brain
             foreach (var track in tracks)
             {
                 if (track.confirmed || Vector2.Distance(track.position, p) > 1.0f) continue;
-                track.candidate = false; track.retryAfter = double.PositiveInfinity; track.rejected = true; track.rejectedFrom = motion.Pose.position; n++;
+                track.candidate = false; track.retryAfter = double.PositiveInfinity; MarkRejected(track, t); n++;
                 if (active == track) { active = null; dwell = 0; inspecting = false; ClearPath(); }
             }
             Emit(t, "candidate_rejected", "Agent rejected a warm region as not a person, OpenCV evidence " + evidence + ".",
