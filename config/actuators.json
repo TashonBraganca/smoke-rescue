@@ -14,6 +14,8 @@
     "aim_tolerance_deg_reason": "An agent may spray only toward a hot spot its cited thermal scan found within this bearing of the requested direction (half the thermal camera's 50 degree field is 25 degrees; 15 keeps the stream on the measured fire)."
   },
   "rescue": {
+    "enabled": false,
+    "enabled_reason": "Carrying people out is switched off (22 Oct, by the project owner): one lift in five runs since the reach was measured, because confirmed positions sit 0.4 to 1.0 m from the body and the arm reaches 0.85 m, while attempts cost search time (seed 914 run 5: robot B spent 70 s on one person). Robots confirm and report people; the rescue code stays behind this switch.",
     "reach_m": 0.85,
     "reach_m_reason": "A person may be gripped when the nearest point of their body is within this distance of the robot's centre, ahead. Measured, not assumed: RobotBodyActionTests.ArmReachProbe steps a lying body's near edge out from 0.3 m and the arm's own link check (0.45 m upper arm, 0.5 m forearm and gripper, from the body top) admits the strap up to 0.85 m, lying along or across the heading. The old 1.6 m let the tools accept lifts the arm then refused (held-out seed 914 run 6, robot B at 1.54 m).",
     "approach_m": 0.6,

@@ -242,6 +242,7 @@ def test_spray_water_needs_a_measured_hot_spot_on_that_bearing_and_water(tmp_pat
 
 
 def test_extract_survivor_needs_a_close_person_verdict_and_a_free_sled(tmp_path, monkeypatch):
+    monkeypatch.setattr(T, "RESCUE_ENABLED", True)   # rescue is switched off in actuators.json; this tests the code behind the switch
     fake_vision(monkeypatch, "person")
     monkeypatch.setattr(T.vision, "inspect_candidate", lambda f, b, r, output_dir: {
         "id": f"ev{r:g}", "tool": "inspect_candidate", "verdict": "person", "candidate": {"bearing_deg": b, "range_m": r}})
@@ -270,6 +271,7 @@ class Recording(Scripted):
 
 
 def test_a_confirmation_says_how_to_get_the_person_out(tmp_path, monkeypatch):
+    monkeypatch.setattr(T, "RESCUE_ENABLED", True)   # rescue is switched off in actuators.json; this tests the code behind the switch
     # Run 15: robot A confirmed a person 2.7 m away and searched on. The confirm result names the next step: an approach
     # when the inspection was beyond the arm's reach, a lift when it was within it.
     def told(range_m):
@@ -351,6 +353,7 @@ def test_memory_of_close_looks_and_lifts_resets_with_a_new_recording(tmp_path, m
 
 
 def test_lift_may_cite_the_confirming_inspection_once_within_reach_and_facing(tmp_path, monkeypatch):
+    monkeypatch.setattr(T, "RESCUE_ENABLED", True)   # rescue is switched off in actuators.json; this tests the code behind the switch
     # Run 25: robot A stood 1.34 m from the person it had confirmed, facing them, and the re-inspection was uncertain:
     # a person lying that close is below the colour camera's view. The lift may cite the confirming inspection when the
     # robot is within reach and facing them. Controls: beyond reach, and facing away, are refused.
@@ -482,3 +485,19 @@ def test_where_fire_blocks_the_way_out_reaches_the_model(tmp_path):
 
     RobotAgent(Model(), tmp_path / "t.jsonl").step(request(tmp_path) | {"fire_blocks_exit": {"bearing_deg": 170.5, "distance_m": 2.1, "exit_path_m": 9.5}})
     assert "fire_blocks_exit" in seen["ctx"] and "170.5" in seen["ctx"]
+
+
+def test_with_rescue_switched_off_nothing_about_lifting_reaches_the_model(tmp_path, monkeypatch):
+    # 22 Oct: carrying people out is switched off (actuators.json rescue.enabled). The lift tool, the rescue list and the
+    # prompt's rescue text must not reach the model, and a scripted lift is refused. Control: switched on, all three appear.
+    from brain.agent import robot_agent as R
+    fake_vision(monkeypatch, "person")
+    monkeypatch.setattr(T, "RESCUE_ENABLED", False)
+    assert "extract_survivor" not in [t["function"]["name"] for t in T.tool_specs()]
+    assert "extract" not in R.system_prompt() and "survivors_to_rescue" not in R.system_prompt()
+    out, trace = run(tmp_path, [[ToolCall("extract_survivor", {"evidence_id": "ev1"})]])
+    assert out["orders"] == [] and "switched off" in out["refusals"][0]["reason"]
+    start = [r for r in trace if r["kind"] == "step_start"][-1]
+    assert "survivors_to_rescue" not in start.get("context", {})
+    monkeypatch.setattr(T, "RESCUE_ENABLED", True)
+    assert "extract_survivor" in [t["function"]["name"] for t in T.tool_specs()] and "extract_survivor" in R.system_prompt()

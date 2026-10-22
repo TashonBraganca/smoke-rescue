@@ -15,6 +15,7 @@ import time
 from pathlib import Path
 
 from brain.agent.llm import Reply, append_jsonl, request_key
+from brain.agent import tools as _tools
 from brain.agent.tools import ALL_TOOLS, AgentContext, ToolRegistry, survivors_to_rescue
 
 MAX_ROUNDS = 4
@@ -84,6 +85,32 @@ Facts about your robot and the context:
 Finish every step with one sentence saying what you decided and why."""
 
 
+_RESCUE_TEXT = [
+    ("find every person in the building and get them out alive", "find every person in the building and report where they are"),
+    (""" extract_survivor
+  needs the person within the rescue reach and the grip cone (numbers in its description), cited either by the evidence
+  that confirmed them (survivors_to_rescue) or by a person verdict taken within that reach. The robot never confirms a
+  person by itself.""", """ The robot never confirms a person by itself."""),
+    ("""- survivors_to_rescue: people already confirmed whom nobody has lifted, with bearing, distance, in_view and the
+  evidence that confirmed them. Getting a person out means extract_survivor within the rescue reach.
+  A confirmation stays until that person is lifted or withdraw_survivor removes it; the robot's own reflexes never drop it.""",
+     """- A confirmation stays until withdraw_survivor removes it; the robot's own reflexes never drop it."""),
+]
+
+
+def system_prompt() -> str:
+    """The system prompt for this step: with carrying people out switched off (actuators.json rescue.enabled), the goal,
+    limits and facts say nothing about lifting, so the model is never told of a tool it does not have."""
+    if _tools.RESCUE_ENABLED:
+        return SYSTEM
+    text = SYSTEM
+    for old, new in _RESCUE_TEXT:
+        if text.count(old) != 1:
+            raise RuntimeError(f"system prompt changed; rescue text not found once: {old[:60]!r}")
+        text = text.replace(old, new)
+    return text
+
+
 class RobotAgent:
     def __init__(self, backend, trace_path: Path, max_rounds: int = MAX_ROUNDS):
         self.backend = backend
@@ -151,11 +178,12 @@ class RobotAgent:
         context = {k: req[k] for k in ("robot", "t", "pose", "torch", "mode", "state", "goal", "heat_budget", "air_c", "event",
                                        "inbox", "orders", "survivors", "frontiers", "lidar", "partners", "blocked_unsearched", "fire_blocks_frontier", "fire_blocks_exit", "mission_time_left_s",
                                        "water_l", "carrying_person") if k in req}
-        context["survivors_to_rescue"] = survivors_to_rescue(req["robot"], pose, req.get("survivors") or [])
+        if _tools.RESCUE_ENABLED:
+            context["survivors_to_rescue"] = survivors_to_rescue(req["robot"], pose, req.get("survivors") or [])
         pending = tools.pending()
         if pending is not None:
             context["pending_candidate"] = pending
-        messages = [{"role": "system", "content": SYSTEM},
+        messages = [{"role": "system", "content": system_prompt()},
                     {"role": "user", "content": "Decision needed. Context:\n" + json.dumps(context, default=str)}]
         step_id = f"{req['robot']}@{float(req['t']):.3f}"
         # The full context the model saw, so every decision can be audited against what the robot knew at that moment.
@@ -167,9 +195,9 @@ class RobotAgent:
                 self._trace({"kind": "step_deadline", "step": step_id, "after_rounds": rounds})
                 break
             rounds += 1
-            key = request_key(messages, ALL_TOOLS)
+            key = request_key(messages, _tools.tool_specs())
             try:
-                reply: Reply = self.backend.chat(messages, ALL_TOOLS)
+                reply: Reply = self.backend.chat(messages, _tools.tool_specs())
             except Exception as e:                       # model down or replay miss: the reflex brain carries on
                 self._trace({"kind": "model_error", "step": step_id, "error": repr(e)})
                 break
