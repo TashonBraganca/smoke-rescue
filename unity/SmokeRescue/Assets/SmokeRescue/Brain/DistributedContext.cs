@@ -117,7 +117,8 @@ namespace SmokeRescue.Brain
             var visual = VisualKeyframesToSend();
             var m = new BrainMessage { Sender = id, BaseSequence = full ? 0 : baseline, GridSize = SharedSize,
                 Origin = grid.Origin, Pose = motion.Pose, Goal = goal,
-                Explored = new byte[bytes], Occupied = new byte[bytes], Survivors = confirmed.ToArray(), Keyframes = KeyframesToSend(visual.Length > 0 ? c.visual_lidar_keyframes_per_message : c.keyframes_per_message, visual), CarriedOut = carriedOut.ToArray(), VisualKeyframes = visual, Rejected = RejectedToSend(t) };
+                Explored = new byte[bytes], Occupied = new byte[bytes], Survivors = confirmed.ToArray(), Keyframes = KeyframesToSend(visual.Length > 0 ? c.visual_lidar_keyframes_per_message : c.keyframes_per_message, visual), CarriedOut = carriedOut.ToArray(), VisualKeyframes = visual, Rejected = RejectedToSend(t),
+                Air = airTrack.Skip(Math.Max(0, airTrack.Count - BrainMessage.MaxAir)).Select(a => new BrainAirSample { position = a.position, c = a.c, at = a.t }).ToArray() };
             if (frontierGoal && frontierRadius > 0 && goal.HasValue && !completed && !returning && !retreating && active == null)
                 m.Claim = new BrainClaim { centre = frontierCentre, radiusM = frontierRadius, expiresAt = t + c.peer_claim_s };
             for (int i = 0; i < grid.Count; i++)
@@ -232,6 +233,14 @@ namespace SmokeRescue.Brain
                 Emit(t, "survivor_carried_by_peer", carried.sourceRobot + " carried out the person confirmed here.", "x_m", p.x, "y_m", p.y);
             }
             foreach (var rejected in m.Rejected) ReceiveRejected(rejected, sender, link, t);
+            foreach (var air in m.Air)
+            {
+                // A partner's reading of the air where it stood: the retreat uses the newest reading near each spot.
+                var p = link.Transform(air.position.x, air.position.y);
+                if (peerAir.Exists(a => a.t == air.at && Vector2.Distance(a.position, p) < .05f)) continue;
+                peerAir.Add((p, air.c, air.at));
+                if (peerAir.Count > 2000) peerAir.RemoveAt(0);
+            }
             foreach (var survivor in m.Survivors)
             {
                 var s = survivor; s.position = link.Transform(survivor.position.x, survivor.position.y);
