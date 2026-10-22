@@ -40,6 +40,18 @@ namespace SmokeRescue.World
         {
             public bool spread;
             public float head_start_s = 60f;   // fire time when the robots enter
+            // World setup only. Both heat and fluid smoke must run this same fire configuration.
+            public string config_file = "fire.json";
+            public string ConfigPath
+            {
+                get
+                {
+                    if (string.IsNullOrEmpty(config_file) || Path.GetFileName(config_file) != config_file ||
+                        config_file.Contains("\\") || !config_file.StartsWith("fire") || !config_file.EndsWith(".json"))
+                        throw new InvalidDataException("fire.config_file must be a fire*.json basename in config");
+                    return Path.Combine(FloorPlan.ConfigDir, config_file);
+                }
+            }
         }
 
         [Serializable]

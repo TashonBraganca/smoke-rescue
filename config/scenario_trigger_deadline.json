@@ -1,0 +1,44 @@
+{
+  "inherits": "scenario_house_onedoor_seed925.json",
+  "survivors": [],
+  "survivor_placement": "fixed",
+  "warm_objects": [],
+  "dark_rooms": [],
+  "obstacles": [
+    {
+      "room": "foyer",
+      "kind": "obstacle_wood_pile",
+      "at": [
+        10,
+        1.8
+      ],
+      "yaw": 0
+    },
+    {
+      "room": "foyer",
+      "kind": "obstacle_burnt_crate",
+      "at": [
+        10.9,
+        4.4
+      ],
+      "yaw": 0
+    }
+  ],
+  "duration_s": 40,
+  "door_states": {},
+  "id": "trigger_deadline",
+  "seed": 1408,
+  "description": "Exercise #43 deadline return cut by fire and #55 overheating on the way out. The recorder sets the operating deadline to this 40 s duration. A pile just inside the gate ignites at 27 s while robots return. Evidence is a deadline goal before escape_closing/emergency_exit and thermocouple heating for #55.",
+  "target_fixes": [
+    "43",
+    "55"
+  ],
+  "duration_s_reason": "Test observation window; also the existing recorder operating deadline. Meeting and heat re-entry require their full physical waiting periods.",
+  "fire": {
+    "spread": true,
+    "head_start_s": 0,
+    "head_start_s_reason": "Fire age when robots reach the launch pads. Zero for delayed ignition, 6 s to develop a local flame, 60 s for a heated compartment.",
+    "config_file": "fire_trigger_deadline.json",
+    "config_file_reason": "World-only fuel ignition experiment. Heat and smoke load the same file."
+  }
+}

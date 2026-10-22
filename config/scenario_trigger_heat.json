@@ -1,0 +1,36 @@
+{
+  "inherits": "scenario_house_onedoor_seed925.json",
+  "survivors": [],
+  "survivor_placement": "fixed",
+  "warm_objects": [],
+  "dark_rooms": [],
+  "obstacles": [
+    {
+      "room": "foyer",
+      "kind": "obstacle_burnt_crate",
+      "at": [
+        10.9,
+        4.4
+      ],
+      "yaw": 0
+    }
+  ],
+  "duration_s": 55,
+  "door_states": {},
+  "id": "trigger_heat",
+  "seed": 1404,
+  "description": "Exercise #12 heat retreat motion, #14 delayed heat re-entry and #55 emergency travel in heating air. A broad living-room ignition has a 60 s head start; the secondary foyer crate ignites 20 s after entry. Evidence is retreat/emergency_exit with air_temp.txt, followed by motion; heat_again after any reenter. 55 s allows the unchanged 30 s heat-exit wait. Re-entry is contingent on observed cooling, not forced.",
+  "target_fixes": [
+    "12",
+    "14",
+    "55"
+  ],
+  "duration_s_reason": "Test observation window; also the existing recorder operating deadline. Meeting and heat re-entry require their full physical waiting periods.",
+  "fire": {
+    "spread": true,
+    "head_start_s": 60,
+    "head_start_s_reason": "Fire age when robots reach the launch pads. Zero for delayed ignition, 6 s to develop a local flame, 60 s for a heated compartment.",
+    "config_file": "fire_trigger_heat.json",
+    "config_file_reason": "World-only fuel ignition experiment. Heat and smoke load the same file."
+  }
+}

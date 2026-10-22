@@ -888,6 +888,104 @@ def track_fire_spread(frames: list[Frame], *, hot_min_c=200.) -> dict:
         evidence=["Farneback tracks the thermal hot boundary; all motion is apparent and includes camera motion."])
 
 
+def detect_closed_door(frame: Frame, bearing_deg: float) -> dict:
+    """A sensor candidate, never a door identity, hinge direction, or permission to push.
+
+    RGB supplies a complete convex panel boundary. Registered RGB-D supplies a vertical leaf plane and an
+    independent recess or handle protrusion. A flush, textureless closed door is indistinguishable from a wall.
+    """
+    if not math.isfinite(bearing_deg):
+        raise ValueError("door bearing must be finite")
+    cfg = _perception()
+    settings = {k: value for k, value in cfg.items() if k.startswith('door_') and not k.endswith('_reason')}
+    result = _base('detect_closed_door', frame, dict(bearing_deg=bearing_deg, **settings),
+                   verdict='unknown', bearing_deg=float(bearing_deg), panel_width_m=None, panel_height_m=None, panel_bbox=None,
+                   plane=None, handles=[], opening_direction='unknown', openable=None,
+                   evidence=['No measured closed-door candidate at this bearing.'])
+    d, k = frame.depth_m, frame.K
+    u = k[0, 2] + k[0, 0] * math.tan(math.radians(bearing_deg))
+    if not 0 <= u < d.shape[1]:
+        return result
+    sensor = json.loads((Path(__file__).resolve().parents[3] / 'config/sensors.json').read_text())
+    pitch = math.radians(sensor['camera']['mount']['pitch_down_deg'])
+    gravity = np.array([0., math.cos(pitch), math.sin(pitch)])
+    gray = cv2.cvtColor(frame.rgb, cv2.COLOR_RGB2GRAY)
+    edges = cv2.Canny(gray, cfg['door_edge_low'], cfg['door_edge_high'])
+    contours, _ = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    candidates = []
+    for contour in contours:
+        perimeter = cv2.arcLength(contour, True)
+        polygon = cv2.approxPolyDP(contour, cfg['door_polygon_fraction'] * perimeter, True)
+        if len(polygon) != 4 or not cv2.isContourConvex(polygon):
+            continue
+        x, y, w, h = cv2.boundingRect(polygon)
+        if not x < u < x+w or x <= 0 or y <= 0 or x+w >= d.shape[1] or y+h >= d.shape[0]:
+            continue
+        mask = np.zeros(d.shape, np.uint8)
+        cv2.fillConvexPoly(mask, polygon, 1)
+        valid = (mask > 0) & np.isfinite(d) & (d > 0)
+        if valid.sum() < cfg['door_min_valid_fraction'] * mask.sum():
+            continue
+        yy, xx = np.where(valid); z = d[valid].astype(np.float64)
+        points = np.column_stack(((xx-k[0, 2])*z/k[0, 0], (yy-k[1, 2])*z/k[1, 1], z))
+        range_m = float(np.median(z))
+        tolerance = max(cfg['door_plane_floor_m'], cfg['door_plane_noise_sigma'] *
+                        sensor['depth']['sigma_coeff_mm_per_m2'] / 1000 * range_m**2)
+        width, height = w*range_m/k[0, 0], h*range_m/k[1, 1]
+        if not (cfg['door_min_width_m'] <= width <= cfg['door_max_width_m'] and
+                cfg['door_min_height_m'] <= height <= cfg['door_max_height_m']):
+            continue
+        bottom_y = (y+h-1-k[1, 2])*range_m/k[1, 1]
+        bottom_height = sensor['camera']['mount']['height_m'] - (bottom_y*math.cos(pitch)+range_m*math.sin(pitch))
+        if abs(bottom_height) > cfg['door_bottom_max_height_m']:
+            continue
+        inliers = np.ones(len(points), bool)
+        for _ in range(cfg['door_plane_refits']):
+            mean, axes, _ = cv2.PCACompute2(points[inliers], mean=None)
+            centre, normal = mean[0], axes[-1]
+            if normal[2] > 0:
+                normal = -normal
+            signed = (points-centre) @ normal
+            inliers = np.abs(signed) <= tolerance
+            if inliers.mean() < cfg['door_plane_fraction']:
+                break
+        if inliers.mean() < cfg['door_plane_fraction'] or abs(float(normal @ gravity)) > math.sin(math.radians(cfg['surface_tilt_tolerance_deg'])):
+            continue
+        protruding = (signed >= max(tolerance, cfg['door_handle_min_protrusion_m'])) & (signed <= cfg['door_handle_max_protrusion_m'])
+        handle_mask = np.zeros(d.shape, np.uint8); handle_mask[yy[protruding], xx[protruding]] = 1
+        n, _, stats, centres = cv2.connectedComponentsWithStats(handle_mask, 8)
+        handles = []
+        for i in range(1, n):
+            hx, hy, hw, hh, _ = stats[i]
+            mw, mh = hw*range_m/k[0, 0], hh*range_m/k[1, 1]
+            side = (centres[i, 0]-x)/w
+            if (cfg['door_handle_min_width_m'] <= mw <= cfg['door_handle_max_width_m'] and
+                    cfg['door_handle_min_height_m'] <= mh <= cfg['door_handle_max_height_m'] and
+                    min(side, 1-side) <= cfg['door_handle_edge_fraction']):
+                handles.append(dict(bbox=[int(hx), int(hy), int(hw), int(hh)], width_m=_number(mw), height_m=_number(mh)))
+        # Compare with a narrow measured ring outside the RGB panel. Missing ring depth supplies no recess cue.
+        border = max(1, int(sensor['depth']['edge_dropout_px']) + 1)
+        ring = cv2.dilate(mask, np.ones((2*border+1, 2*border+1), np.uint8)) > mask
+        ry, rx = np.where(ring & np.isfinite(d) & (d > 0))
+        recess = None
+        if len(rx):
+            rz = d[ry, rx].astype(np.float64)
+            rp = np.column_stack(((rx-k[0, 2])*rz/k[0, 0], (ry-k[1, 2])*rz/k[1, 1], rz))
+            recess = float(np.median((rp-centre) @ normal))
+        if not handles and not (recess is not None and recess > max(tolerance, cfg['door_recess_min_m'])):
+            continue
+        candidates.append(dict(panel_bbox=[x, y, w, h], panel_width_m=_number(width), panel_height_m=_number(height),
+                               plane=dict(range_m=_number(range_m), normal=normal.round(6).tolist(),
+                                          inlier_fraction=_number(inliers.mean()), tolerance_m=_number(tolerance),
+                                          recess_m=_number(recess) if recess is not None else None), handles=handles))
+    if candidates:
+        candidates.sort(key=lambda p: (p['plane']['range_m'], p['panel_bbox']))
+        result.update(candidates[0], verdict='closed_door_candidate', evidence=[
+            'A complete RGB panel boundary encloses a vertical depth plane reaching floor level, with a measured recess or handle-shaped protrusion.',
+            'This may be another access panel. Opening direction, latch state, handle identity and safe opening remain unknown.'])
+    return result
+
+
 def measure_opening(frame: Frame, bearing_deg: float, *, body_width_m=.6, clearance_m=.1,
                     body_height_m=0., band_half_height_m=.1) -> dict:
     """Measure a bounded depth recess at optical y=body_height_m, positive down.
@@ -906,7 +1004,7 @@ def measure_opening(frame: Frame, bearing_deg: float, *, body_width_m=.6, cleara
     params = dict(bearing_deg=bearing_deg,body_width_m=body_width_m,clearance_m=clearance_m,
                   body_height_m=body_height_m,band_half_height_m=band_half_height_m)
     r = _base("measure_opening",frame,params,clear_width_m=None,passable=False,jamb_pixels=None,
-        wall_z_m=None,gap_depth_missing=None,evidence=["No bounded depth gap with two measured jambs at the requested bearing."])
+        wall_z_m=None,gap_depth_missing=None,door=detect_closed_door(frame, bearing_deg),evidence=["No bounded depth gap with two measured jambs at the requested bearing."])
     d = frame.depth_m; k=frame.K
     u = int(round(k[0,2]+k[0,0]*math.tan(math.radians(bearing_deg))))
     if not 0<=u<d.shape[1]: return r

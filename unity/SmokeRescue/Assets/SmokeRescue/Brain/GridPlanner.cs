@@ -220,10 +220,20 @@ namespace SmokeRescue.Brain
                 int cell = grid.Cell(person + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * c.survivor_standoff_m);
                 if (cell < 0 || !grid.Walkable(cell) || distance[cell] >= score) continue;
                 float range = Vector2.Distance(grid.Centre(cell), person);
-                if (range < c.survivor_stop_min_m || range > c.survivor_stop_max_m) continue;
+                if (range < c.survivor_stop_min_m || range > c.survivor_stop_max_m || !ClearView(grid.Centre(cell), person)) continue;
                 score = distance[cell]; best = cell;
             }
             return best < 0 ? new List<Vector2>() : Join(lead, Reconstruct(parent, start, best));
+        }
+        /// <summary>No mapped wall on the straight line from a standpoint to a person, ignoring the last
+        /// survivor_view_clear_m before the person (a body against a wall, or the body itself, may be mapped there). A
+        /// standoff on the far side of a wall sees nothing of the person.</summary>
+        bool ClearView(Vector2 from, Vector2 person)
+        {
+            float length = Vector2.Distance(from, person) - c.survivor_view_clear_m; if (length <= 0) return true;
+            Vector2 dir = (person - from).normalized; int steps = Mathf.CeilToInt(length / (grid.CellM * .5f));
+            for (int i = 1; i <= steps; i++) if (grid.OwnOccupancy(grid.Cell(from + dir * (length * i / steps))) == 255) return false;
+            return true;
         }
         internal List<Vector2> CoolestPath(Vector2 from)
         {

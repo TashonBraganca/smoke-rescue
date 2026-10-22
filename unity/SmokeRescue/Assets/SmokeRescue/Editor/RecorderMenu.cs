@@ -82,6 +82,19 @@ namespace SmokeRescue.Editor
         [MenuItem("Tools/Smoke Rescue/Record/House one-door seed 926 run (agents, random people)")]
         public static void HouseOneDoor926() => WithAgents(() => Run("scenario_house_onedoor_seed926.json", "unity_house_onedoor_seed926"));
 
+        [MenuItem("Tools/Smoke Rescue/Record/Triggers/heat")]
+        public static void TriggerHeat() => WithAgents(() => Run("scenario_trigger_heat.json", "unity_trigger_heat"));
+        [MenuItem("Tools/Smoke Rescue/Record/Triggers/cutoff")]
+        public static void TriggerCutoff() => WithAgents(() => Run("scenario_trigger_cutoff.json", "unity_trigger_cutoff"));
+        [MenuItem("Tools/Smoke Rescue/Record/Triggers/deadline")]
+        public static void TriggerDeadline() => WithAgents(() => Run("scenario_trigger_deadline.json", "unity_trigger_deadline"));
+        [MenuItem("Tools/Smoke Rescue/Record/Triggers/spray")]
+        public static void TriggerSpray() => WithAgents(() => Run("scenario_trigger_spray.json", "unity_trigger_spray"));
+        [MenuItem("Tools/Smoke Rescue/Record/Triggers/two streams")]
+        public static void TriggerTwoStreams() => WithAgents(() => Run("scenario_trigger_two_streams.json", "unity_trigger_two_streams"));
+        [MenuItem("Tools/Smoke Rescue/Record/Triggers/meeting")]
+        public static void TriggerMeeting() => WithAgents(() => Run("scenario_trigger_meeting.json", "unity_trigger_meeting"));
+
         [MenuItem("Tools/Smoke Rescue/Record/House hidden corner run (agents)")]
         public static void HouseHiddenCorner() => WithAgents(() => Run("scenario_house_hidden_corner.json", "unity_house_hidden_v1"));
 
