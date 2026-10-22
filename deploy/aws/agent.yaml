@@ -17,8 +17,8 @@ Parameters:
     Type: Number
     Default: 0
     MinValue: 0
-    MaxValue: 4
-    Description: Keep 0 until the first image is pushed. deploy.sh sets it to 1 afterwards.
+    MaxValue: 1
+    Description: One task owns the in-memory maps, place databases and approvals. Keep 0 until the first image is pushed. deploy.sh sets it to 1 afterwards.
   TaskCpu:
     Type: String
     Default: "1024"
@@ -30,10 +30,15 @@ Parameters:
   AgentBackend:
     Type: String
     Default: bedrock
-    AllowedValues: [bedrock, replay, ollama]
+    AllowedValues: [bedrock, azure]
+    Description: Bedrock uses the ECS task role and needs no API key.
+  AzureSecretArn:
+    Type: String
+    Default: ""
+    Description: Existing Secrets Manager ARN with AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY and AZURE_OPENAI_API_VERSION JSON keys. Required for azure.
   AgentModelId:
     Type: String
-    Description: Value of AGENT_MODEL, a Bedrock model id or inference profile id.
+    Description: Value of AGENT_MODEL. For Mumbai use in.anthropic.claude-haiku-4-5-20251001-v1:0; for us-east-1 use us.anthropic.claude-haiku-4-5-20251001-v1:0. Azure uses its deployment name.
   BedrockModelArns:
     Type: CommaDelimitedList
     Description: Exact model and inference profile ARNs the task may invoke. Nothing else is granted.
@@ -55,7 +60,15 @@ Parameters:
     MinValue: 100
     Description: Requests per 5 minutes per source IP (a CloudFront edge address) before the ALB blocks.
 
+Rules:
+  AzureRequiresSecret:
+    RuleCondition: !Equals [!Ref AgentBackend, azure]
+    Assertions:
+      - Assert: !Not [!Equals [!Ref AzureSecretArn, ""]]
+        AssertDescription: Azure needs an existing Secrets Manager ARN.
+
 Conditions:
+  UseAzure: !Equals [!Ref AgentBackend, azure]
   UsePrefixList: !Not [!Equals [!Ref CloudFrontPrefixListId, ""]]
   NoPrefixList: !Equals [!Ref CloudFrontPrefixListId, ""]
   WafOn: !Equals [!Ref EnableWaf, "true"]
@@ -280,11 +293,18 @@ Resources:
                 Action: ecr:GetAuthorizationToken
                 Resource: "*"
               - Effect: Allow
-                Action: [ecr:BatchGetImage, ecr:GetDownloadUrlForLayer]
+                Action: [ecr:BatchGetImage, ecr:GetDownloadUrlForLayer, ecr:BatchCheckLayerAvailability]
                 Resource: !GetAtt AgentRepository.Arn
               - Effect: Allow
                 Action: [logs:CreateLogStream, logs:PutLogEvents]
                 Resource: !Sub "${AgentLogGroup.Arn}:*"
+
+              - !If
+                - UseAzure
+                - Effect: Allow
+                  Action: secretsmanager:GetSecretValue
+                  Resource: !Ref AzureSecretArn
+                - !Ref AWS::NoValue
 
   TaskRole:
     Type: AWS::IAM::Role
@@ -374,6 +394,18 @@ Resources:
             - { Name: RUNS_BUCKET, Value: !Ref RunsBucketName }
             - { Name: RUNS_PREFIX, Value: agent/ }
             - { Name: METRICS_NAMESPACE, Value: SmokeRescue }
+            # AWS calls use shorter per-call bounds so the proxy can return a whole step.
+            - { Name: AZURE_OPENAI_TIMEOUT_S, Value: "15" }
+            - { Name: AZURE_OPENAI_MAX_ATTEMPTS, Value: "1" }
+          Secrets: !If
+            - UseAzure
+            - - Name: AZURE_OPENAI_ENDPOINT
+                ValueFrom: !Sub "${AzureSecretArn}:AZURE_OPENAI_ENDPOINT::"
+              - Name: AZURE_OPENAI_API_KEY
+                ValueFrom: !Sub "${AzureSecretArn}:AZURE_OPENAI_API_KEY::"
+              - Name: AZURE_OPENAI_API_VERSION
+                ValueFrom: !Sub "${AzureSecretArn}:AZURE_OPENAI_API_VERSION::"
+            - !Ref AWS::NoValue
           HealthCheck:
             Command:
               - CMD
@@ -399,7 +431,7 @@ Resources:
       Subnets: [!Ref SubnetA, !Ref SubnetB]
       SecurityGroups: [!Ref AlbSecurityGroup]
       LoadBalancerAttributes:
-        - { Key: idle_timeout.timeout_seconds, Value: "60" }
+        - { Key: idle_timeout.timeout_seconds, Value: "150" }
         - { Key: routing.http.drop_invalid_header_fields.enabled, Value: "true" }
         - { Key: deletion_protection.enabled, Value: "false" }
     DependsOn: GatewayAttachment
@@ -460,8 +492,8 @@ Resources:
       TaskDefinition: !Ref TaskDefinition
       HealthCheckGracePeriodSeconds: 60
       DeploymentConfiguration:
-        MinimumHealthyPercent: 100
-        MaximumPercent: 200
+        MinimumHealthyPercent: 0
+        MaximumPercent: 100
         DeploymentCircuitBreaker: { Enable: true, Rollback: true }
       NetworkConfiguration:
         AwsvpcConfiguration:
@@ -509,6 +541,7 @@ Outputs:
   VpcId: { Value: !Ref Vpc }
   SubnetIds: { Value: !Join [",", [!Ref SubnetA, !Ref SubnetB]] }
   AlbDnsName: { Value: !GetAtt LoadBalancer.DNSName }
+  AlbSecurityGroupId: { Value: !Ref AlbSecurityGroup }
   AlbFullName: { Value: !GetAtt LoadBalancer.LoadBalancerFullName }
   TargetGroupFullName: { Value: !GetAtt TargetGroup.TargetGroupFullName }
   ClusterName: { Value: !Ref Cluster }

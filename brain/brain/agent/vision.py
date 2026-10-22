@@ -20,6 +20,7 @@ import cv2
 import numpy as np
 
 from brain.io import load_opencv_yaml, read_camera, required_number
+from brain.agent.recording_transport import frame_source
 
 cv2.setNumThreads(1)
 cv2.ocl.setUseOpenCL(False)
@@ -235,7 +236,7 @@ def load_frame(robot_dir: str | Path, t: float) -> Frame:
         stamps["lidar"] = lidar.t
     frame = Frame(t=stamps["thermal"],rgb=cv2.cvtColor(images["rgb"],cv2.COLOR_BGR2RGB),
         depth_m=images["depth"].astype(np.float32)/cam.depth_factor,thermal=images["thermal"],
-        K=k,thermal_K=kt,rgb_to_thermal=transform,stamps=stamps,source=str(folder),requested_t=t,lidar=lidar)
+        K=k,thermal_K=kt,rgb_to_thermal=transform,stamps=stamps,source=frame_source(folder),requested_t=t,lidar=lidar)
     # Force registration during load and retain it for immutable cached recordings.
     frame._registered = frame.registered_depth_m
     for a in (frame.rgb,frame.depth_m,frame.thermal,frame.K,frame.thermal_K,frame._registered): a.flags.writeable = False
