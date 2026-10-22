@@ -176,7 +176,7 @@ Resources:
             CustomOriginConfig:
               OriginProtocolPolicy: http-only
               HTTPPort: 80
-              OriginReadTimeout: 60
+              OriginReadTimeout: 120
               OriginKeepaliveTimeout: 30
             OriginCustomHeaders:
               - HeaderName: X-Origin-Verify
