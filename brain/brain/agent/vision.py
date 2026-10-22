@@ -246,6 +246,14 @@ def _depth(f):
     return f._registered if hasattr(f,"_registered") else f.registered_depth_m
 
 
+def _blind_floor_m() -> float:
+    """Nearest floor the colour camera sees ahead (mast height, pitch, vertical field of view, forward offset): about
+    2.16 m on the 1.6 m mast. A body nearer than that runs off the bottom of the image."""
+    cam = json.loads((Path(__file__).resolve().parents[3] / "config/sensors.json").read_text())["camera"]
+    m = cam["mount"]; bottom = math.radians(float(m["pitch_down_deg"])) + math.atan((cam["height"] - cam["cy"]) / cam["fy"])
+    return float(m["forward_offset_m"]) + float(m["height_m"]) / math.tan(bottom)
+
+
 def _above_floor(frame, depth, floor_band_m=None):
     """Thermal pixels that are not floor: height above the floor (thermal-registered depth back-projected with the
     camera mast's real mount) above floor_band_m, or no depth (smoke, beyond range), which is kept rather than guessed.
@@ -505,7 +513,13 @@ def inspect_candidate(frame: Frame, bearing_deg: float, range_m: float, *, outpu
             if plane["large_plane"]: reasons.append("Warm pixels lie on a plane larger than the warm component.")
             if window: reasons.append("Warm region is at least 0.8 m behind its surrounding depth, consistent with an opening.")
             if size_negative: reasons.append("Metric dimensions fall outside the body-size bounds.")
-        elif truncated: reasons.append("Warm component touches the image edge, so its size is clipped and cannot confirm a body.")
+        elif truncated:
+            reasons.append("Warm component touches the image edge, so its size is clipped and cannot confirm a body.")
+            blind = _blind_floor_m()
+            if region["range_m"] is not None and region["range_m"] < blind + .3:
+                result["too_close"] = True
+                reasons.append(f"It is {region['range_m']:.1f} m away and the camera sees the floor only from {blind:.1f} m: "
+                               "view it from further back (approach_candidate citing this inspection steps back to the viewing distance).")
         elif ramp: reasons.append("Warm component is a slope between hotter and cooler surfaces, not a distinct body.")
         elif not single_surface: reasons.append("Warm component spans more than 1.5 m of depth, so it covers several surfaces rather than one body.")
         elif temp_ok and nonplanar:
