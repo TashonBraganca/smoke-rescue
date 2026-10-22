@@ -246,6 +246,21 @@ def _depth(f):
     return f._registered if hasattr(f,"_registered") else f.registered_depth_m
 
 
+def _above_floor(frame, depth, floor_band_m=None):
+    """Thermal pixels that are not floor: height above the floor (thermal-registered depth back-projected with the
+    camera mast's real mount) above floor_band_m, or no depth (smoke, beyond range), which is kept rather than guessed.
+    Floor heated by a fire glows in the human band and joined a person lying in front of it into one fire-sized warm
+    region (one-door seeds 922 and 923: both people beside a burning sofa were judged not_person)."""
+    band = float(_perception().get("floor_band_m", .08)) if floor_band_m is None else floor_band_m
+    mount = json.loads((Path(__file__).resolve().parents[3] / "config/sensors.json").read_text())["camera"]["mount"]
+    p = math.radians(float(mount["pitch_down_deg"])); K = frame.thermal_K
+    rows = np.arange(depth.shape[0], dtype=float)[:, None]
+    y = (rows - K[1, 2]) * depth / K[1, 1]
+    height = float(mount["height_m"]) - math.sin(p) * depth - math.cos(p) * y
+    known = np.isfinite(depth) & (depth > 0)
+    return ~known | (height > band)
+
+
 def _lidar_component_depth(frame, mask, depth, tolerance):
     """Fill only missing warm pixels, using the pitched ray's horizontal bearing."""
     scan = frame.lidar
@@ -422,7 +437,7 @@ def inspect_candidate(frame: Frame, bearing_deg: float, range_m: float, *, outpu
     min_depth_fraction = config["inspection_min_depth_fraction"]
     depth = _depth(frame); c = frame.thermal.astype(float)/10-273.15
     options = []
-    for mask,stats in _components((frame.thermal>0)&(c>=human_band_c[0])&(c<=human_band_c[1]),8):
+    for mask,stats in _components((frame.thermal>0)&(c>=human_band_c[0])&(c<=human_band_c[1])&_above_floor(frame,depth),8):
         region = _region(frame,mask,stats,depth)
         da = abs(region["bearing_deg"]-bearing_deg)
         dr = abs(region["range_m"]-range_m) if region["range_m"] is not None else 0
