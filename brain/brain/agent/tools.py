@@ -532,7 +532,9 @@ class ToolRegistry:
                 ev = self.evidence[args["evidence_id"]]
                 dx, dy = ev["x"] - self.ctx.x, ev["y"] - self.ctx.y
                 dist = max(1e-6, (dx * dx + dy * dy) ** 0.5)
-                k = max(0.0, dist - (RESCUE_APPROACH_M if RESCUE_ENABLED else APPROACH_STANDOFF_M)) / dist
+                # Signed: a robot already closer than the standoff steps back to it on the same line (one-door seed 923,
+                # robot A stood about 1 m from a woman, inside its camera's blind floor, and re-centred six times).
+                k = (dist - (RESCUE_APPROACH_M if RESCUE_ENABLED else APPROACH_STANDOFF_M)) / dist
                 args = {**args, "x": round(self.ctx.x + dx * k, 2), "y": round(self.ctx.y + dy * k, 2),
                         "face_x": ev["x"], "face_y": ev["y"],
                         "reason": f"reach the person seen at ({ev['x']}, {ev['y']}) to lift them"}
@@ -550,7 +552,7 @@ class ToolRegistry:
                 self._looks[key] = looks + [self.ctx.t]
                 dx, dy = ev["x"] - self.ctx.x, ev["y"] - self.ctx.y
                 dist = max(1e-6, (dx * dx + dy * dy) ** 0.5)
-                k = max(0.0, dist - APPROACH_STANDOFF_M) / dist
+                k = (dist - APPROACH_STANDOFF_M) / dist            # signed: closer than the standoff, step back to it
                 args = {**args, "x": round(self.ctx.x + dx * k, 2), "y": round(self.ctx.y + dy * k, 2),
                         "face_x": ev["x"], "face_y": ev["y"],
                         "reason": f"closer look at an uncertain warm region ({ev['x']}, {ev['y']})"}

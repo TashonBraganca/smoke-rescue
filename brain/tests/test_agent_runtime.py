@@ -558,3 +558,26 @@ def test_an_approach_the_brain_refused_is_no_longer_pending(tmp_path, monkeypatc
         "reason": "Refused go_to: no ceiling has been seen over that point, so it is not known to be inside."}) + "\n")
     reg = T.ToolRegistry(tmp_path, T.AgentContext(robot="robot_A", t=13.0, x=5.0, y=5.0, heading_deg=0.0), tmp_path)
     assert reg.pending() is None
+
+
+
+def test_approaching_from_too_close_steps_back_to_the_viewing_distance(tmp_path, monkeypatch):
+    # One-door seed 923: robot A stood about 1 m from a woman (inside its camera's blind floor) and re-centred six times;
+    # approach_candidate's point was its own position, because the standoff was floored at zero. Now a robot 1 m from
+    # the spot steps back to the standoff on the same line. Control: from 5 m it still stops the standoff short.
+    def target(range_m):
+        fake_vision(monkeypatch, "uncertain")
+        out, _ = run(tmp_path, [[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": range_m})],
+                                [ToolCall("approach_candidate", {"evidence_id": "ev1"})]])
+        T.ToolRegistry._looks.clear()
+        (o,) = out["orders"]; return o
+    near = target(1.0)                                  # robot at (5, 5) facing +y; the spot is at (5, 6)
+    assert near["y"] == pytest.approx(6.0 - T.APPROACH_STANDOFF_M) and near["y"] < 5.0, near
+    far = target(5.0)
+    assert far["y"] == pytest.approx(10.0 - T.APPROACH_STANDOFF_M), "control"
+
+
+def test_a_clipped_body_closer_than_the_cameras_floor_view_says_so():
+    # The clipped inspections at 1 m gave the agent no reason why they kept failing.
+    from brain.agent import vision as v
+    assert 2.0 < v._blind_floor_m() < 2.3, "the 1.6 m mast sees the floor from about 2.16 m"
