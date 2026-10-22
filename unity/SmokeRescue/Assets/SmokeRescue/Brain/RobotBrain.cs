@@ -210,7 +210,7 @@ namespace SmokeRescue.Brain
                 }
                 if (arrived)
                 {
-                    completed = true; completedAt = t; relocateGoal = null; ClearPath(); carryClearFrom = stepAwayFrom = new Vector2(float.NaN, float.NaN);
+                    completed = true; completedAt = t; relocateGoal = null; relocateFrom = null; ClearPath(); carryClearFrom = stepAwayFrom = new Vector2(float.NaN, float.NaN);
                     // Left early to stay safe, or carried someone out: it may go back in once that is safe (CheckReenter).
                     // NoFrontierLeft too: the exclusions that emptied the list (fire-cut blacklist, visited circles, a
                     // partner's claim) expire, and CheckReenter still needs a reachable frontier with the fire clear of the way
@@ -971,9 +971,7 @@ namespace SmokeRescue.Brain
             GridPlanner.FrontierChoice frontier = null; float closest = float.PositiveInfinity;
             foreach (var candidate in planner.Frontiers(motion.Pose.position, excluded))
             {
-                float near = float.PositiveInfinity;
-                foreach (var p in candidate.path)
-                    if (Vector2.Distance(p, motion.Pose.position) > c.escape_ignore_m) near = Mathf.Min(near, grid.FireDistance(grid.Cell(p)));
+                float near = ReentryFireDistance(candidate.path);
                 if (near < c.escape_fire_margin_m) continue;
                 frontier = candidate; closest = near; break;
             }
@@ -984,7 +982,12 @@ namespace SmokeRescue.Brain
             if (!ReentryFrontSteady(t, frontier.path, closest)) return;
             reenterCells.Clear(); reenterRates.Clear(); reenterThenT = double.NaN;
             completed = false; canReenter = false; emergencyExit = false; returning = false; hadWayOut = false; ClearPath();
-            noFrontierAt = double.NaN; cutOff = false; relocateGoal = null;
+            noFrontierAt = double.NaN; cutOff = false; relocateGoal = null; relocateFrom = null;
+            // The spot it goes back in from is outside, where it stands: a way out proven on foot. Held-out seed 920, robot A
+            // walked 5.7 m along the wall, went back in, and turned round at once because its way out was still planned to
+            // its first door, by the fire (174.5 s, fire 1.3 m from that route).
+            if (Vector2.Distance(motion.Pose.position, home) > c.survivor_merge_m && !walkedIn.Exists(e => Vector2.Distance(e, motion.Pose.position) <= c.survivor_merge_m))
+                walkedIn.Add(motion.Pose.position);
             Emit(t, "reenter", "Heat budget recovered and a frontier is reachable with the fire clear of the way: go back in.",
                 "fire_distance_m", closest, "information_cells", frontier.information, "heat_budget", budget);
         }
@@ -1014,7 +1017,17 @@ namespace SmokeRescue.Brain
             float routeM = 0; for (int i = 1; i < route.Count; i++) routeM += Vector2.Distance(route[i - 1], route[i]);
             return Mathf.Max(0, closest - c.fire_clearance_m) / rate >= routeM / c.open_speed_mps * c.escape_time_factor;
         }
-        double completedAt; Vector2? relocateGoal;
+        /// <summary>The fire distance along a way back in, over every point of it. The leave rule skips the stretch within
+        /// escape_ignore_m of the robot, but from outside that stretch is the door, the part the leave rule measures once the
+        /// robot is in: held-out seed 920, robot A went back in at 113.5 s (4.8 m clear beyond the door) and turned round at
+        /// 115.6 s with the fire 1.97 m from its way out.</summary>
+        float ReentryFireDistance(List<Vector2> path)
+        {
+            float near = float.PositiveInfinity;
+            foreach (var p in path) near = Mathf.Min(near, grid.FireDistance(grid.Cell(p)));
+            return near;
+        }
+        double completedAt; Vector2? relocateGoal, relocateFrom;
         /// <summary>
         /// Outside after leaving for safety, allowed back in, and every way in still blocked after exterior_dwell_s: drive to
         /// unexplored floor along the building's wall (outside the search area, within facade_band_m of a mapped wall) to
@@ -1031,19 +1044,25 @@ namespace SmokeRescue.Brain
                 if (Vector2.Distance(motion.Pose.position, relocateGoal.Value) <= c.goal_tolerance_m || path.Count == 0 || !planner.PathSafe(path, cursor))
                 {
                     visited.Add(new Visited { position = relocateGoal.Value, radius = c.visited_radius_m, until = t + c.visited_hold_s });
-                    Emit(t, "relocate_done", "At the wall: wait for the re-entry check before moving on.", "x_m", motion.Pose.position.x, "y_m", motion.Pose.position.y);
-                    relocateGoal = null; ClearPath(); completedAt = t;
+                    Emit(t, "relocate_done", "At the wall: one re-entry check here, then on along the wall.", "x_m", motion.Pose.position.x, "y_m", motion.Pose.position.y);
+                    // One re-entry check (escape_check_s) at each stop, not another full dwell: held-out seed 920, robot A
+                    // moved 0.6 m in its first relocation and would then have waited 15 s again before each next step.
+                    relocateGoal = null; ClearPath(); completedAt = t - c.exterior_dwell_s + c.escape_check_s;
                     return null;
                 }
                 return FollowOrHold(t, dt);
             }
             if (t - completedAt < c.exterior_dwell_s) return null;
             grid.FireClearance = c.fire_clearance_m; grid.FirePrediction = true;
+            // Onward only: a goal farther from where the robot first waited than it is now, so it keeps one direction along
+            // the wall rather than stepping back and forth beside the blocked door (seed 920, robot A: the nearest edge was
+            // 0.6 m from where it stood).
+            var from = relocateFrom ?? motion.Pose.position; float here = Vector2.Distance(motion.Pose.position, from);
             var options = planner.Frontiers(motion.Pose.position, p => InSearchArea(p) || VisitedGoal(p, t) || GoalBlacklisted(p, t) ||
-                grid.ObstacleDistance(grid.Cell(p)) > c.facade_band_m);
+                grid.ObstacleDistance(grid.Cell(p)) > c.facade_band_m || Vector2.Distance(p, from) <= here + c.visited_radius_m);
             if (options.Count == 0) { completedAt = t; return null; }
             var f = options[0];
-            SetPath(f.path); relocateGoal = f.position; lastPlan = t;
+            SetPath(f.path); relocateGoal = f.position; relocateFrom = from; lastPlan = t;
             Emit(t, "relocate", "Every way in is still blocked after waiting outside: follow the building's wall to look for another way in.",
                 "x_m", f.position.x, "y_m", f.position.y, "waited_s", t - completedAt);
             return FollowOrHold(t, dt);
@@ -1192,7 +1211,9 @@ namespace SmokeRescue.Brain
             // whose entry is cut need not leave if another sensed way out is open (held-out seed 914 run 5: robot A held
             // at 185 C with the front door 5.5 m away, its LiDAR seeing open ground through it).
             foreach (var exit in sensedExits) yield return exit;
+            foreach (var exit in walkedIn) yield return exit;
         }
+        readonly List<Vector2> walkedIn = new List<Vector2>();
         List<Vector2> sensedExits = new List<Vector2>(); double nextExitScan;
         void RefreshSensedExits(double t)
         {
@@ -1233,6 +1254,7 @@ namespace SmokeRescue.Brain
             ResetStuckRecovery(); ResetWayOutAndArrival(); returning = true; active = null; dwell = 0; returnReason = reason; ClearPath();
             Emit(t, "goal", reason + " Return to the estimated start.", "x_m", home.x, "y_m", home.y);
         }
+        bool swingBlocked;
         BrainCommand FollowOrHold(double t, float dt, float? arriveM = null)
         {
             if (path.Count == 0 || !goal.HasValue) return Command(0, 0, dt, true);
@@ -1273,6 +1295,16 @@ namespace SmokeRescue.Brain
                 speed = 0; policy = "turn";
                 // Brake before rotating, so the acceleration ramp cannot make a turn drift into a wall.
                 yaw = commandedSpeed > c.survivor_stop_speed_mps ? 0 : error * c.heading_gain;
+                // A turn that would swing the nose or tail into a mapped wall backs straight off first, through the
+                // mapped free footprint, then turns (seed 920, robot B at the foyer-kitchen opening).
+                if (yaw != 0 && !SwingClear(error))
+                {
+                    if (!swingBlocked) { swingBlocked = true; Emit(t, "body_swing_blocked", "Turning here would swing the body into a mapped wall; back off first.", "heading_error_deg", error); }
+                    float back = Mathf.Min(c.stuck_reverse_mps, c.limits.max_reverse_mps);
+                    if (back > 0 && planner.ReverseSafe(position, position - motion.Pose.Forward * c.body_half_length_m))
+                        return Command(-back, 0, dt, false);
+                }
+                else swingBlocked = false;
             }
             float nextSpeed = Mathf.MoveTowards(commandedSpeed, speed, c.limits.max_accel_mps2 * dt);
             float nextYaw = Mathf.Clamp(yaw, -c.limits.max_yaw_rate_dps, c.limits.max_yaw_rate_dps);
@@ -1300,8 +1332,10 @@ namespace SmokeRescue.Brain
         float SweptClearance()
         {
             float best = float.PositiveInfinity, r = c.robot_radius_m + grid.CellM * .5f;
+            // The nose: the body is a capsule (body_half_length_m, body_radius_m), its front cap centred this far ahead.
+            float nose = Mathf.Max(0, c.body_half_length_m - c.body_radius_m), rn = c.body_radius_m + grid.CellM * .5f;
             Vector2 position = motion.Pose.position, forward = motion.Pose.Forward;
-            float reach = r + c.collision_margin_m + c.limits.max_forward_mps * c.limits.max_forward_mps / (2 * c.limits.max_accel_mps2) + grid.CellM;
+            float reach = Mathf.Max(r, nose + rn) + c.collision_margin_m + c.limits.max_forward_mps * c.limits.max_forward_mps / (2 * c.limits.max_accel_mps2) + grid.CellM;
             int cell = grid.Cell(position); if (cell < 0) return 0;
             int n = Mathf.CeilToInt(reach / grid.CellM), col = cell % grid.Size, row = cell / grid.Size;
             for (int dy = -n; dy <= n; dy++) for (int dx = -n; dx <= n; dx++)
@@ -1310,14 +1344,46 @@ namespace SmokeRescue.Brain
                 int i = (row + dy) * grid.Size + col + dx; if (grid.Occupancy(i) != 255) continue;
                 Vector2 delta = grid.Centre(i) - position;
                 float along = Vector2.Dot(delta, forward), lateral = forward.x * delta.y - forward.y * delta.x;
+                if (along - nose > 0 && Mathf.Abs(lateral) < rn) best = Mathf.Min(best, along - nose - Mathf.Sqrt(rn * rn - lateral * lateral));
                 if (along <= 0 || Mathf.Abs(lateral) >= r) continue;
                 best = Mathf.Min(best, along - Mathf.Sqrt(r * r - lateral * lateral));
             }
             return best;
         }
 
+        /// <summary>Whether the body's two end caps stay clear of mapped walls while it turns in place from its heading by up
+        /// to swingDeg (signed). The body is a capsule 2 x body_half_length_m long, not round: held-out seed 920, robot B
+        /// stalled five times turning at the foyer-kitchen opening, its nose 0.375 m from its centre against the wall
+        /// edge, where the 0.25 m planning circle was clear. A pose already touching is not judged (turning may free it).</summary>
+        bool SwingClear(float swingDeg)
+        {
+            float nose = Mathf.Max(0, c.body_half_length_m - c.body_radius_m), h = grid.CellM * .5f, r2 = c.body_radius_m * c.body_radius_m;
+            Vector2 at = motion.Pose.position; int cell = grid.Cell(at); if (cell < 0) return true;
+            // Mapped wall cells within reach of the ends, tested as squares: an end cap touches a cell when the nearest point
+            // of the square lies within body_radius_m of the cap's centre.
+            var walls = new List<Vector2>(); int n = Mathf.CeilToInt((c.body_half_length_m + grid.CellM) / grid.CellM), col = cell % grid.Size, row = cell / grid.Size;
+            for (int dy = -n; dy <= n; dy++) for (int dx = -n; dx <= n; dx++)
+                if (grid.Inside(col + dx, row + dy) && grid.Occupancy((row + dy) * grid.Size + col + dx) == 255) walls.Add(grid.Centre((row + dy) * grid.Size + col + dx));
+            bool Clear(float yaw)
+            {
+                var f = new Vector2(-Mathf.Sin(yaw), Mathf.Cos(yaw));            // BrainPose.Forward
+                foreach (var end in new[] { at + f * nose, at - f * nose })
+                    foreach (var w in walls)
+                    {
+                        float ex = Mathf.Max(Mathf.Abs(end.x - w.x) - h, 0), ey = Mathf.Max(Mathf.Abs(end.y - w.y) - h, 0);
+                        if (ex * ex + ey * ey < r2) return false;
+                    }
+                return true;
+            }
+            float yaw0 = motion.Pose.yawRad;
+            if (!Clear(yaw0)) return true;
+            int steps = Mathf.Max(1, Mathf.CeilToInt(Mathf.Abs(swingDeg) / 5f));
+            for (int i = 1; i <= steps; i++) if (!Clear(yaw0 + swingDeg * Mathf.Deg2Rad * i / steps)) return false;
+            return true;
+        }
+
         /// <summary>Highest forward speed that can still stop collision_margin_m short of the swept clearance at the
-        /// acceleration limit. Turning is never limited: the body is round, so turning in place cannot hit anything.</summary>
+        /// acceleration limit, counting the capsule's nose. Turning is checked separately (SwingClear).</summary>
         float SafeForward(float requested)
         {
             double t = lastStep;

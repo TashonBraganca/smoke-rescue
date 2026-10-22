@@ -27,6 +27,7 @@ namespace SmokeRescue.Brain
         public float free_threshold = -0.4f;
         public float occupied_threshold = 0.7f;
         public float robot_radius_m = 0.4f;
+        public float body_half_length_m = 0.375f, body_radius_m = 0.18f;
         public float obstacle_cost_margin_m = 0.15f;
         public float obstacle_cost_weight = 2.0f;
         public float stuck_command_mps = 0.15f;
