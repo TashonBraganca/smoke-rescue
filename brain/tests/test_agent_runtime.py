@@ -544,3 +544,17 @@ def test_every_radio_message_carries_the_state_the_tools_accepted(tmp_path, monk
     (msg,) = [o for o in out["orders"] if o["type"] == "send_team_message"]
     assert "(5.0, 8.0)" in msg["text"] and "refused" not in msg["text"]
     T.ToolRegistry._confirmed.clear()
+
+
+def test_an_approach_the_brain_refused_is_no_longer_pending(tmp_path, monkeypatch):
+    # Codex review #28: the agent kept "walking to look closer" for up to 60 s after the brain refused the walk (for
+    # example "no ceiling has been seen over that point") or found no path. The brain's decision log says so; the
+    # pending approach ends. Control: with nothing in the log, it stays pending.
+    fake_vision(monkeypatch, "uncertain")
+    run(tmp_path, [[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": 5})], [ToolCall("approach_candidate", {"evidence_id": "ev1"})]])
+    reg = T.ToolRegistry(tmp_path, T.AgentContext(robot="robot_A", t=12.0, x=5.0, y=5.0, heading_deg=0.0), tmp_path)
+    assert reg.pending() is not None, "control: nothing says the walk failed"
+    (tmp_path / "decisions.jsonl").write_text(json.dumps({"t": 10.0, "robot": "robot_A", "kind": "agent_order",
+        "reason": "Refused go_to: no ceiling has been seen over that point, so it is not known to be inside."}) + "\n")
+    reg = T.ToolRegistry(tmp_path, T.AgentContext(robot="robot_A", t=13.0, x=5.0, y=5.0, heading_deg=0.0), tmp_path)
+    assert reg.pending() is None

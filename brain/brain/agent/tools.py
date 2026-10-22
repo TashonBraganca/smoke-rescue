@@ -222,13 +222,37 @@ class ToolRegistry:
         p = self._pending.get(self.ctx.robot)
         if p is None:
             return None
-        if self.ctx.event_kind in self.APPROACH_FAILED or self.ctx.t - p["t"] > float(_PERCEPTION["pending_candidate_s"]):
+        if (self.ctx.event_kind in self.APPROACH_FAILED or self.ctx.t - p["t"] > float(_PERCEPTION["pending_candidate_s"])
+                or self._brain_dropped_order(p["t"])):
             self._pending.pop(self.ctx.robot, None)
             return None
         dx, dy = p["x"] - self.ctx.x, p["y"] - self.ctx.y
         bearing = (math.degrees(math.atan2(dx, dy)) - self.ctx.heading_deg + 180) % 360 - 180
         return {"x": p["x"], "y": p["y"], "distance_m": round(math.hypot(dx, dy), 2), "bearing_deg": round(bearing, 1),
                 "since_s": round(self.ctx.t - p["t"], 1), "evidence_id": p["evidence_id"]}
+
+    # What the brain does with an agent's walk order, from its own decision log (written before every agent call). The
+    # agent's memory of an approach in progress was kept until a failure event or the 60 s timeout, even when the brain
+    # had refused the order or found no path to it (Codex review #28: the approach state was not synced with Unity).
+    _DROPPED = ("Refused go_to", "Agent goal has no known free path")
+
+    def _brain_dropped_order(self, since_t: float) -> bool:
+        path = self.robot_dir / "decisions.jsonl"
+        if not path.exists():
+            return False
+        with path.open("rb") as f:                      # the log grows all run: read only its recent end
+            f.seek(0, 2); size = f.tell(); start = max(0, size - 262144); f.seek(start)
+            tail = f.read().decode("utf-8", "ignore").splitlines()[1 if start > 0 else 0:]   # a mid-file start cuts a line
+        for line in tail:
+            if '"agent_order"' not in line and '"replan"' not in line:
+                continue
+            try:
+                e = json.loads(line)
+            except ValueError:
+                continue
+            if float(e.get("t", -1)) >= since_t - 1e-6 and str(e.get("reason", "")).startswith(self._DROPPED):
+                return True
+        return False
 
     # ----- geometry --------------------------------------------------------------------------------------------
     def world(self, bearing_deg: float, range_m: float) -> tuple[float, float]:
