@@ -98,6 +98,8 @@ namespace SmokeRescue.World
         sealed class Furniture { public string material; public double[] size_m; }
         sealed class Spread
         {
+            // Zero retains the uncapped model for older standalone diagnostic configs.
+            public double growth_alpha_kw_s2;
             public double neighbour_heat_per_s, surface_cooling_per_s, gas_surface_heat_per_s;
             public double flashover_surface_heat_c_s, fuel_burn_kg_m2_s, flame_ramp_s, flame_relaxation_s;
             public double flame_min_c, flame_max_c, max_temperature_c, fuel_variation_fraction, heat_of_combustion_kj_kg;
@@ -127,7 +129,8 @@ namespace SmokeRescue.World
         internal sealed class Cell
         {
             public int room = -1;
-            public double initialFuel, fuel, temperature, flame, wetUntil, heatReleaseKw, ignition = double.MaxValue;
+            public int origin = -1;
+            public double initialFuel, fuel, temperature, flame, burnIntensity, wetUntil, heatReleaseKw, ignition = double.MaxValue;
             public bool burning, collapsed, protectedApproach;
         }
         internal sealed class Gas
@@ -166,6 +169,11 @@ namespace SmokeRescue.World
         readonly ReadOnlyCollection<CollapseEvent> collapseView;
         readonly int[][] neighbours;
         readonly double[] nextTemperature, nextFlame, heatKw, smokeProduction, gasHeatFlow, smokeFlow, volumeFlow;
+        readonly double[] nextBurnIntensity, potentialMass, originPotentialKw, originScale, originStart;
+        readonly int[] nextOrigin;
+        // Attribute room temperature excess to origins using the same linear gas balance.
+        // A gas-ignited cell inherits the largest contribution; it does not create another growth budget.
+        readonly double[,] originGasTemperature, originGasFlow, originRoomHeatKw;
         readonly bool[] ignitionApplied, hotPreviously;
         // Walls are stored as separate segments with the door gaps already removed, for preview only.
         readonly List<double[]> walls = new List<double[]>();
@@ -177,8 +185,8 @@ namespace SmokeRescue.World
         public float CellSize => (float)config.cell_size_m;
         public Vector2 Origin => new Vector2((float)originX, (float)originZ);
         public double Time => tick * config.step_s;
-        internal double StepSeconds => config.step_s;
-        internal double HeatOfCombustionKjKg => config.spread.heat_of_combustion_kj_kg;
+        public double StepSeconds => config.step_s;
+        public double HeatOfCombustionKjKg => config.spread.heat_of_combustion_kj_kg;
         public IReadOnlyList<CollapseEvent> Collapses => collapseView;
         // A snapshot prevents a caller from modifying live room state.
         public IReadOnlyList<RoomState> RoomStates
@@ -208,7 +216,15 @@ namespace SmokeRescue.World
             Width = GridCount(plan.footprint[2] - originX); Height = GridCount(plan.footprint[3] - originZ);
             cells = new Cell[checked(Width * Height)];
             nextTemperature = new double[cells.Length]; nextFlame = new double[cells.Length];
+            nextBurnIntensity = new double[cells.Length]; potentialMass = new double[cells.Length];
+            nextOrigin = new int[cells.Length];
+            originPotentialKw = new double[cfg.ignitions.Count]; originScale = new double[cfg.ignitions.Count];
+            originStart = new double[cfg.ignitions.Count];
+            for (int n = 0; n < originStart.Length; n++) originStart[n] = -1;
             rooms = new Gas[plan.rooms.Count];
+            originGasTemperature = new double[cfg.ignitions.Count, rooms.Length];
+            originGasFlow = new double[cfg.ignitions.Count, rooms.Length];
+            originRoomHeatKw = new double[cfg.ignitions.Count, rooms.Length];
             roomRects = new Rect[rooms.Length];
             waterLitres = new double[cells.Length];
             for (int r = 0; r < rooms.Length; r++)
@@ -410,8 +426,10 @@ namespace SmokeRescue.World
                 {
                     int i = Index(x, z); var c = cells[i]; var p = CellCentre(x, z);
                     double dx = p.x - fire.at[0], dz = p.y - fire.at[1];
-                    if (c.wetUntil > Time || c.room != room || c.fuel <= 0 || (i != centre && dx * dx + dz * dz > fire.radius_m * fire.radius_m)) continue;
-                    c.burning = true; c.temperature = Math.Max(c.temperature, c.ignition); c.flame = Math.Max(c.flame, .01);
+                    if (c.burning || c.wetUntil > Time || c.room != room || c.fuel <= 0 || (i != centre && dx * dx + dz * dz > fire.radius_m * fire.radius_m)) continue;
+                    c.origin = n; originStart[n] = Time;
+                    c.burning = true; c.temperature = Math.Max(c.temperature, c.ignition);
+                    c.burnIntensity = Math.Max(c.burnIntensity, .01); c.flame = c.burnIntensity;
                 }
                 ignitionApplied[n] = true;
             }
@@ -423,42 +441,80 @@ namespace SmokeRescue.World
             var s = config.spread; var g = config.gas;
             ApplyWater(dt);
             Array.Clear(heatKw, 0, heatKw.Length); Array.Clear(smokeProduction, 0, smokeProduction.Length);
+            Array.Clear(originPotentialKw, 0, originPotentialKw.Length);
+            Array.Clear(originRoomHeatKw, 0, originRoomHeatKw.Length);
             // Every neighbour read comes from the previous tick, never a partly updated row.
             for (int i = 0; i < cells.Length; i++)
             {
                 var c = cells[i]; nextTemperature[i] = c.temperature; nextFlame[i] = 0; c.heatReleaseKw = 0;
+                nextBurnIntensity[i] = 0; potentialMass[i] = 0;
+                nextOrigin[i] = c.origin;
                 if (c.room < 0) continue;
                 var room = rooms[c.room];
-                double warming = 0;
+                double warming = 0, strongest = 0;
+                // Fuel reheated while wet may still be above ignition when it dries,
+                // even if the heat source has since cooled. Keep that source's lineage.
+                int source = c.origin >= 0 ? c.origin : GasOrigin(c.room);
                 // One-sided radiative preheating proxy, not energy-conserving solid conduction.
-                foreach (int j in neighbours[i]) warming += Math.Max(0, cells[j].temperature - c.temperature) * s.neighbour_heat_per_s;
-                warming += Math.Max(0, room.temperature - c.temperature) * s.gas_surface_heat_per_s;
+                foreach (int j in neighbours[i])
+                {
+                    double heat = Math.Max(0, cells[j].temperature - c.temperature) * s.neighbour_heat_per_s;
+                    warming += heat;
+                    if (cells[j].origin >= 0 && heat > strongest) { strongest = heat; source = cells[j].origin; }
+                }
+                double gasWarming = Math.Max(0, room.temperature - c.temperature) * s.gas_surface_heat_per_s;
                 if (room.temperature >= config.flashover_threshold_c)
-                    warming += s.flashover_surface_heat_c_s * Math.Max(0, (room.temperature - c.temperature) / room.temperature);
+                    gasWarming += s.flashover_surface_heat_c_s * Math.Max(0, (room.temperature - c.temperature) / room.temperature);
+                warming += gasWarming;
+                if (gasWarming > strongest) source = GasOrigin(c.room);
                 double temperature = c.temperature + dt * (warming - s.surface_cooling_per_s * (c.temperature - config.ambient_c));
+                nextTemperature[i] = temperature;
+                if (c.fuel > 0 && (c.burning || (c.wetUntil <= Time && temperature >= c.ignition && source >= 0)))
+                {
+                    if (!c.burning) nextOrigin[i] = source;
+                    double intensity = Math.Min(1, c.burnIntensity + dt / s.flame_ramp_s);
+                    intensity = Math.Min(intensity, c.fuel / (s.fuel_burn_kg_m2_s * area));
+                    nextBurnIntensity[i] = intensity;
+                    potentialMass[i] = Math.Min(c.fuel, dt * s.fuel_burn_kg_m2_s * area * intensity);
+                    originPotentialKw[nextOrigin[i]] += potentialMass[i] * s.heat_of_combustion_kj_kg / dt;
+                }
+            }
+            for (int n = 0; n < originScale.Length; n++)
+            {
+                double age = originStart[n] < 0 ? 0 : Math.Max(0, Time - originStart[n]);
+                // Exact mean of alpha*t^2 over this tick. The factor 1/3 is its integral,
+                // not a fitted coefficient. NFPA 72 (2002), Annex B, equations B.4/B.5.
+                double budget = s.growth_alpha_kw_s2 * (age * age + age * dt + dt * dt / 3);
+                originScale[n] = s.growth_alpha_kw_s2 == 0 || originPotentialKw[n] <= budget
+                    ? 1 : budget / originPotentialKw[n];
+            }
+            for (int i = 0; i < cells.Length; i++)
+            {
+                var c = cells[i];
+                if (c.room < 0) continue;
+                double temperature = nextTemperature[i];
                 double waterEnergy = waterLitres[i] * (config.water.latent_heat_kj_l + config.water.sensible_heat_kj_l) *
                     config.water.application_efficiency;
                 double remainingWaterEnergy = waterEnergy;
                 bool flameAbsorbed = false;
-                if (c.fuel > 0 && (c.burning || (c.wetUntil <= Time && temperature >= c.ignition)))
+                if (potentialMass[i] > 0)
                 {
-                    double flame = Math.Min(1, c.flame + dt / s.flame_ramp_s);
-                    // Taper during the final second of fuel. Consumed mass, rather than a free
-                    // intensity multiplier, supplies the room's heat release and smoke.
-                    flame = Math.Min(flame, c.fuel / (s.fuel_burn_kg_m2_s * area));
-                    double consumed = Math.Min(c.fuel, dt * s.fuel_burn_kg_m2_s * area * flame);
+                    c.origin = nextOrigin[i];
+                    double consumed = potentialMass[i] * originScale[c.origin];
+                    double flame = consumed / (dt * s.fuel_burn_kg_m2_s * area);
                     c.fuel -= consumed; c.burning = c.fuel > 1e-10;
                     if (!c.burning) { c.fuel = 0; flame = 0; }
                     double release = consumed * s.heat_of_combustion_kj_kg;
                     double absorbed = Math.Min(release, remainingWaterEnergy);
                     remainingWaterEnergy -= absorbed;
-                    flameAbsorbed = absorbed >= release;
+                    flameAbsorbed = waterEnergy > 0 && absorbed >= release;
                     double retained = release > 0 ? (release - absorbed) / release : 0;
                     nextFlame[i] = flame * retained;
                     double flameC = s.flame_min_c + (s.flame_max_c - s.flame_min_c) * flame;
-                    temperature += (flameC - temperature) * Math.Min(1, dt / s.flame_relaxation_s) * retained;
+                    temperature += (flameC - temperature) * Math.Min(1, dt / s.flame_relaxation_s) * flame * retained;
                     c.heatReleaseKw = (release - absorbed) / dt;
                     heatKw[c.room] += c.heatReleaseKw;
+                    originRoomHeatKw[c.origin, c.room] += c.heatReleaseKw;
                     smokeProduction[c.room] += g.smoke_production_per_cell_s * g.smoke_reference_volume_m3 *
                         consumed * retained / (dt * s.fuel_burn_kg_m2_s * area);
                 }
@@ -472,7 +528,11 @@ namespace SmokeRescue.World
                     remainingWaterEnergy -= cooling;
                 }
                 TotalWaterEnergyRemovedKj += waterEnergy - remainingWaterEnergy;
+                // Extinction is a state transition, not a visual fade. A subsequent ignition
+                // needs dry fuel and neighbour/room heating in the first pass above.
+                // Grimwood (2005), p.6; NISTIR 6191 (1998), chapter 2.
                 if (flameAbsorbed && temperature < c.ignition) { c.burning = false; nextFlame[i] = 0; }
+                c.burnIntensity = c.burning ? nextBurnIntensity[i] : 0;
                 nextTemperature[i] = Clamp(temperature, config.ambient_c, s.max_temperature_c);
             }
             for (int i = 0; i < cells.Length; i++) { cells[i].temperature = nextTemperature[i]; cells[i].flame = nextFlame[i]; }
@@ -484,6 +544,7 @@ namespace SmokeRescue.World
         {
             var g = config.gas;
             Array.Clear(gasHeatFlow, 0, rooms.Length); Array.Clear(smokeFlow, 0, rooms.Length); Array.Clear(volumeFlow, 0, rooms.Length);
+            Array.Clear(originGasFlow, 0, originGasFlow.Length);
             // Symmetric exchange uses old layer states. No room can heat another through a wall.
             foreach (var d in openings)
             {
@@ -497,6 +558,11 @@ namespace SmokeRescue.World
                     double smoke = v * (a.smoke - b.smoke);
                     double volume = v * (b.height - a.height) / ceiling;
                     gasHeatFlow[d.a] -= heat; gasHeatFlow[d.b] += heat;
+                    for (int n = 0; n < originStart.Length; n++)
+                    {
+                        double transfer = v * g.gas_heat_capacity_kj_m3_k * (originGasTemperature[n, d.a] - originGasTemperature[n, d.b]);
+                        originGasFlow[n, d.a] -= transfer; originGasFlow[n, d.b] += transfer;
+                    }
                     smokeFlow[d.a] -= smoke; smokeFlow[d.b] += smoke;
                     volumeFlow[d.a] -= volume; volumeFlow[d.b] += volume;
                 }
@@ -506,6 +572,8 @@ namespace SmokeRescue.World
                     double spill = Clamp((doorHead - room.height) / doorHead, 0, 1);
                     double v = d.width * g.outside_exchange_m3_s_m * spill;
                     gasHeatFlow[r] -= v * g.gas_heat_capacity_kj_m3_k * (room.temperature - config.ambient_c);
+                    for (int n = 0; n < originStart.Length; n++)
+                        originGasFlow[n, r] -= v * g.gas_heat_capacity_kj_m3_k * originGasTemperature[n, r];
                     smokeFlow[r] -= v * room.smoke;
                     volumeFlow[r] -= v * (ceiling - room.height) / ceiling;
                 }
@@ -520,6 +588,19 @@ namespace SmokeRescue.World
                     (g.convective_fraction * heatKw[i] + gasHeatFlow[i] - g.heat_loss_kw_m2_k * room.area *
                      (room.temperature - config.ambient_c)) / (g.effective_heat_capacity_kj_m2_k * room.area),
                     config.ambient_c, config.spread.max_temperature_c);
+                double attributed = 0;
+                for (int n = 0; n < originStart.Length; n++)
+                {
+                    originGasTemperature[n, i] = Math.Max(0, originGasTemperature[n, i] + dt *
+                        (g.convective_fraction * originRoomHeatKw[n, i] + originGasFlow[n, i] -
+                         g.heat_loss_kw_m2_k * room.area * originGasTemperature[n, i]) /
+                        (g.effective_heat_capacity_kj_m2_k * room.area));
+                    attributed += originGasTemperature[n, i];
+                }
+                // Apply the scalar temperature clamp to all source contributions equally.
+                if (attributed > 0)
+                    for (int n = 0; n < originStart.Length; n++)
+                        originGasTemperature[n, i] *= (room.temperature - config.ambient_c) / attributed;
                 room.smoke = Clamp((room.smoke * volume + dt * (smokeProduction[i] + smokeFlow[i] -
                     g.smoke_decay_per_s * room.smoke * volume)) / newVolume, 0, 1);
                 room.height = ceiling - newVolume / room.area;
@@ -535,6 +616,14 @@ namespace SmokeRescue.World
                 }
                 else { room.hotTicks = 0; room.hotSeconds = 0; hotPreviously[i] = false; }
             }
+        }
+
+        int GasOrigin(int room)
+        {
+            int source = -1; double hottest = 0;
+            for (int n = 0; n < originStart.Length; n++)
+                if (originGasTemperature[n, room] > hottest) { hottest = originGasTemperature[n, room]; source = n; }
+            return source;
         }
 
         void TryCollapse(double time)
@@ -639,7 +728,10 @@ namespace SmokeRescue.World
                 {
                     writer.Write(c.room); writer.Write(c.initialFuel); writer.Write(c.fuel); writer.Write(c.temperature);
                     writer.Write(c.flame); writer.Write(c.wetUntil); writer.Write(c.ignition); writer.Write(c.burning); writer.Write(c.collapsed); writer.Write(c.protectedApproach);
+                    writer.Write(c.burnIntensity); writer.Write(c.origin);
                 }
+                foreach (double start in originStart) writer.Write(start);
+                foreach (double temperature in originGasTemperature) writer.Write(temperature);
                 for (int i = 0; i < rooms.Length; i++)
                 {
                     var g = rooms[i]; writer.Write(g.id); writer.Write(g.temperature); writer.Write(g.height);
@@ -847,6 +939,7 @@ namespace SmokeRescue.World
             Fraction(c.water.application_efficiency, "water.application_efficiency");
             Require(Finite(c.water.latent_heat_kj_l + c.water.sensible_heat_kj_l), "water energy overflow");
             var s = c.spread; var g = c.gas; var r = c.collapse; var q = c.query;
+            Nonnegative(s.growth_alpha_kw_s2, "spread.growth_alpha_kw_s2");
             Nonnegative(s.neighbour_heat_per_s, "neighbour_heat_per_s"); Nonnegative(s.surface_cooling_per_s, "surface_cooling_per_s");
             Nonnegative(s.gas_surface_heat_per_s, "gas_surface_heat_per_s"); Nonnegative(s.flashover_surface_heat_c_s, "flashover_surface_heat_c_s");
             Positive(s.fuel_burn_kg_m2_s, "fuel_burn_kg_m2_s"); Positive(s.flame_ramp_s, "flame_ramp_s"); Positive(s.flame_relaxation_s, "flame_relaxation_s");

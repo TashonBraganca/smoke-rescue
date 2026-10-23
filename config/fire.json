@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "model_note": "Fixed-step grid plus room hot-gas layers. Approximation for a residential fire demonstration, not a validated fire engineering or structural solver. Thin wall barriers separate cells. Mixed floor, wall finish, ceiling and furniture fuel in each cell share the lowest combustible ignition temperature. Imported room gas mixes instantly within each layer. Door states are fixed at load. Ceiling panels do not open the roof or alter ventilation. Legacy floorplan fires are ignored. Oxygen depletion, wind, window breakage and structural load paths are not solved. Room heat release is fuel-driven; do not use this model to infer ventilation-limited fire safety.",
+  "model_note": "Fixed-step grid plus room hot-gas layers. Approximation for a residential fire demonstration, not a validated fire engineering or structural solver. Thin wall barriers separate cells. Mixed floor, wall finish, ceiling and furniture fuel in each cell share the lowest combustible ignition temperature. Imported room gas mixes instantly within each layer. Door states are fixed at load. Ceiling panels do not open the roof or alter ventilation. Legacy floorplan fires are ignored. Oxygen depletion, wind, window breakage and structural load paths are not solved. Each configured origin has a medium t-squared heat-release ceiling shared across its burning descendants. Available burning fuel can limit output below that ceiling. Only the living-room source is prescribed in this house configuration. Neighbour and room heating determine every later ignition and spread; do not use this model to infer ventilation-limited fire safety.",
   "cell_size_m": 0.25,
   "step_s": 0.1,
   "ambient_c": 20,
@@ -12,74 +12,89 @@
         1.25
       ],
       "time_s": 0,
-      "radius_m": 0.3
-    },
-    {
-      "room": "hallway",
-      "at": [
-        6.3,
-        7.4
-      ],
-      "time_s": 75,
-      "radius_m": 0.35,
-      "note": "burning wood pile in the hallway (scenario obstacle), lit by embers; robots enter at 60 s"
+      "radius_m": 0.3,
+      "at_reason": "Existing scenario fire origin in world x/z metres. Source: config/floorplan.json and config/scenario_house_onedoor_seed932_nolimit.json obstacles; not an experimental ignition location.",
+      "time_s_reason": "Existing living-room source at fire time 0 s. Run 932 uses head_start_s=0, so the fire and robot clocks agree. Source: baseline c2314c9 config/fire.json and run 932 oracle/fire_events.json. Growth age starts when this origin is applied.",
+      "radius_m_reason": "Existing scenario radius of initially involved fuel around this origin; the centre cell is always included. This is an assumed ignition footprint. Source: baseline config/fire.json and FireSim.ApplyIgnitions."
     }
   ],
   "materials": {
     "wood": {
       "fuel_kg_m2": 8,
       "ignition_c": 330,
-      "justification": "Estimate of 8 kg/m2 accessible wood, not the full structure. 330 C is within the USDA 300 to 400 C piloted ignition range."
+      "justification": "Estimate of 8 kg/m2 accessible wood, not the full structure. 330 C is within the USDA 300 to 400 C piloted ignition range.",
+      "fuel_kg_m2_reason": "Estimate of 8 kg/m2 accessible wood, not the full structure. 330 C is within the USDA 300 to 400 C piloted ignition range. Source: existing scenario material inventory in config/fire.json, mapped to config/floorplan.json surfaces and landmarks. No measured fuel inventory is available.",
+      "ignition_c_reason": "Estimate of 8 kg/m2 accessible wood, not the full structure. 330 C is within the USDA 300 to 400 C piloted ignition range. Wood ignition basis: USDA Wood Handbook, 2010, chapter 18, https://research.fs.usda.gov/download/treesearch/37415.pdf Non-wood values are existing effective ignition assumptions; the inert value is a sentinel."
     },
     "carpet": {
       "fuel_kg_m2": 2.5,
       "ignition_c": 300,
-      "justification": "Estimated textile and backing load of 2.5 kg/m2 and effective piloted ignition at 300 C; composition is unknown."
+      "justification": "Estimated textile and backing load of 2.5 kg/m2 and effective piloted ignition at 300 C; composition is unknown.",
+      "fuel_kg_m2_reason": "Estimated textile and backing load of 2.5 kg/m2 and effective piloted ignition at 300 C; composition is unknown. Source: existing scenario material inventory in config/fire.json, mapped to config/floorplan.json surfaces and landmarks. No measured fuel inventory is available.",
+      "ignition_c_reason": "Estimated textile and backing load of 2.5 kg/m2 and effective piloted ignition at 300 C; composition is unknown. Wood ignition basis: USDA Wood Handbook, 2010, chapter 18, https://research.fs.usda.gov/download/treesearch/37415.pdf Non-wood values are existing effective ignition assumptions; the inert value is a sentinel."
     },
     "paper_finish": {
       "fuel_kg_m2": 0.18,
       "ignition_c": 300,
-      "justification": "Estimated wallpaper plus adhesive mass of 0.18 kg/m2 of wall, ignition at 300 C. No hidden timber studs are assumed."
+      "justification": "Estimated wallpaper plus adhesive mass of 0.18 kg/m2 of wall, ignition at 300 C. No hidden timber studs are assumed.",
+      "fuel_kg_m2_reason": "Estimated wallpaper plus adhesive mass of 0.18 kg/m2 of wall, ignition at 300 C. No hidden timber studs are assumed. Source: existing scenario material inventory in config/fire.json, mapped to config/floorplan.json surfaces and landmarks. No measured fuel inventory is available.",
+      "ignition_c_reason": "Estimated wallpaper plus adhesive mass of 0.18 kg/m2 of wall, ignition at 300 C. No hidden timber studs are assumed. Wood ignition basis: USDA Wood Handbook, 2010, chapter 18, https://research.fs.usda.gov/download/treesearch/37415.pdf Non-wood values are existing effective ignition assumptions; the inert value is a sentinel."
     },
     "wood_panels": {
       "fuel_kg_m2": 6,
       "ignition_c": 330,
-      "justification": "Estimated 6 kg/m2 accessible wall panelling; 330 C follows the wood ignition range."
+      "justification": "Estimated 6 kg/m2 accessible wall panelling; 330 C follows the wood ignition range.",
+      "fuel_kg_m2_reason": "Estimated 6 kg/m2 accessible wall panelling; 330 C follows the wood ignition range. Source: existing scenario material inventory in config/fire.json, mapped to config/floorplan.json surfaces and landmarks. No measured fuel inventory is available.",
+      "ignition_c_reason": "Estimated 6 kg/m2 accessible wall panelling; 330 C follows the wood ignition range. Wood ignition basis: USDA Wood Handbook, 2010, chapter 18, https://research.fs.usda.gov/download/treesearch/37415.pdf Non-wood values are existing effective ignition assumptions; the inert value is a sentinel."
     },
     "paint_finish": {
       "fuel_kg_m2": 0.08,
       "ignition_c": 350,
-      "justification": "Estimated thin combustible paint film of 0.08 kg/m2 and effective ignition at 350 C; substrate stays inert."
+      "justification": "Estimated thin combustible paint film of 0.08 kg/m2 and effective ignition at 350 C; substrate stays inert.",
+      "fuel_kg_m2_reason": "Estimated thin combustible paint film of 0.08 kg/m2 and effective ignition at 350 C; substrate stays inert. Source: existing scenario material inventory in config/fire.json, mapped to config/floorplan.json surfaces and landmarks. No measured fuel inventory is available.",
+      "ignition_c_reason": "Estimated thin combustible paint film of 0.08 kg/m2 and effective ignition at 350 C; substrate stays inert. Wood ignition basis: USDA Wood Handbook, 2010, chapter 18, https://research.fs.usda.gov/download/treesearch/37415.pdf Non-wood values are existing effective ignition assumptions; the inert value is a sentinel."
     },
     "inert": {
       "fuel_kg_m2": 0,
       "ignition_c": 1100,
-      "justification": "Zero combustible fuel for stone, tile, plaster, concrete, steel and ceramics. 1100 C is a finite sentinel, not an ignition claim; zero fuel prevents ignition."
+      "justification": "Zero combustible fuel for stone, tile, plaster, concrete, steel and ceramics. 1100 C is a finite sentinel, not an ignition claim; zero fuel prevents ignition.",
+      "fuel_kg_m2_reason": "Zero combustible fuel for stone, tile, plaster, concrete, steel and ceramics. 1100 C is a finite sentinel, not an ignition claim; zero fuel prevents ignition. Source: existing scenario material inventory in config/fire.json, mapped to config/floorplan.json surfaces and landmarks. No measured fuel inventory is available.",
+      "ignition_c_reason": "Zero combustible fuel for stone, tile, plaster, concrete, steel and ceramics. 1100 C is a finite sentinel, not an ignition claim; zero fuel prevents ignition. Wood ignition basis: USDA Wood Handbook, 2010, chapter 18, https://research.fs.usda.gov/download/treesearch/37415.pdf Non-wood values are existing effective ignition assumptions; the inert value is a sentinel."
     },
     "upholstery": {
       "fuel_kg_m2": 22,
       "ignition_c": 300,
-      "justification": "Estimated 22 kg/m2 of foam, fabric and frame in a sofa or mattress footprint; effective piloted ignition at 300 C. No product test exists."
+      "justification": "Estimated 22 kg/m2 of foam, fabric and frame in a sofa or mattress footprint; effective piloted ignition at 300 C. No product test exists.",
+      "fuel_kg_m2_reason": "Estimated 22 kg/m2 of foam, fabric and frame in a sofa or mattress footprint; effective piloted ignition at 300 C. No product test exists. Source: existing scenario material inventory in config/fire.json, mapped to config/floorplan.json surfaces and landmarks. No measured fuel inventory is available.",
+      "ignition_c_reason": "Estimated 22 kg/m2 of foam, fabric and frame in a sofa or mattress footprint; effective piloted ignition at 300 C. No product test exists. Wood ignition basis: USDA Wood Handbook, 2010, chapter 18, https://research.fs.usda.gov/download/treesearch/37415.pdf Non-wood values are existing effective ignition assumptions; the inert value is a sentinel."
     },
     "furniture_wood": {
       "fuel_kg_m2": 18,
       "ignition_c": 330,
-      "justification": "Estimated 18 kg/m2 accessible wood in furniture; piloted ignition at 330 C. Does not include metal or glass mass."
+      "justification": "Estimated 18 kg/m2 accessible wood in furniture; piloted ignition at 330 C. Does not include metal or glass mass.",
+      "fuel_kg_m2_reason": "Estimated 18 kg/m2 accessible wood in furniture; piloted ignition at 330 C. Does not include metal or glass mass. Source: existing scenario material inventory in config/fire.json, mapped to config/floorplan.json surfaces and landmarks. No measured fuel inventory is available.",
+      "ignition_c_reason": "Estimated 18 kg/m2 accessible wood in furniture; piloted ignition at 330 C. Does not include metal or glass mass. Wood ignition basis: USDA Wood Handbook, 2010, chapter 18, https://research.fs.usda.gov/download/treesearch/37415.pdf Non-wood values are existing effective ignition assumptions; the inert value is a sentinel."
     },
     "textiles": {
       "fuel_kg_m2": 9,
       "ignition_c": 300,
-      "justification": "Estimated 9 kg/m2 of clothing or rug, effective ignition at 300 C; fibre types are unknown."
+      "justification": "Estimated 9 kg/m2 of clothing or rug, effective ignition at 300 C; fibre types are unknown.",
+      "fuel_kg_m2_reason": "Estimated 9 kg/m2 of clothing or rug, effective ignition at 300 C; fibre types are unknown. Source: existing scenario material inventory in config/fire.json, mapped to config/floorplan.json surfaces and landmarks. No measured fuel inventory is available.",
+      "ignition_c_reason": "Estimated 9 kg/m2 of clothing or rug, effective ignition at 300 C; fibre types are unknown. Wood ignition basis: USDA Wood Handbook, 2010, chapter 18, https://research.fs.usda.gov/download/treesearch/37415.pdf Non-wood values are existing effective ignition assumptions; the inert value is a sentinel."
     },
     "books": {
       "fuel_kg_m2": 35,
       "ignition_c": 300,
-      "justification": "Estimated 35 kg/m2 books and wooden shelving in a narrow footprint; effective paper ignition at 300 C."
+      "justification": "Estimated 35 kg/m2 books and wooden shelving in a narrow footprint; effective paper ignition at 300 C.",
+      "fuel_kg_m2_reason": "Estimated 35 kg/m2 books and wooden shelving in a narrow footprint; effective paper ignition at 300 C. Source: existing scenario material inventory in config/fire.json, mapped to config/floorplan.json surfaces and landmarks. No measured fuel inventory is available.",
+      "ignition_c_reason": "Estimated 35 kg/m2 books and wooden shelving in a narrow footprint; effective paper ignition at 300 C. Wood ignition basis: USDA Wood Handbook, 2010, chapter 18, https://research.fs.usda.gov/download/treesearch/37415.pdf Non-wood values are existing effective ignition assumptions; the inert value is a sentinel."
     },
     "appliance_contents": {
       "fuel_kg_m2": 1,
       "ignition_c": 350,
-      "justification": "Estimated 1 kg/m2 of plastic, wiring or residual contents in otherwise metal appliances; effective ignition at 350 C. No gas supply or explosion is modelled."
+      "justification": "Estimated 1 kg/m2 of plastic, wiring or residual contents in otherwise metal appliances; effective ignition at 350 C. No gas supply or explosion is modelled.",
+      "fuel_kg_m2_reason": "Estimated 1 kg/m2 of plastic, wiring or residual contents in otherwise metal appliances; effective ignition at 350 C. No gas supply or explosion is modelled. Source: existing scenario material inventory in config/fire.json, mapped to config/floorplan.json surfaces and landmarks. No measured fuel inventory is available.",
+      "ignition_c_reason": "Estimated 1 kg/m2 of plastic, wiring or residual contents in otherwise metal appliances; effective ignition at 350 C. No gas supply or explosion is modelled. Wood ignition basis: USDA Wood Handbook, 2010, chapter 18, https://research.fs.usda.gov/download/treesearch/37415.pdf Non-wood values are existing effective ignition assumptions; the inert value is a sentinel."
     }
   },
   "surfaces": {
@@ -116,7 +131,8 @@
         2.4,
         1
       ],
-      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow upholstery."
+      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow upholstery.",
+      "size_m_reason": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow upholstery. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "brick_fireplace": {
       "material": "inert",
@@ -124,7 +140,8 @@
         1.4,
         0.65
       ],
-      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow inert."
+      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow inert.",
+      "size_m_reason": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow inert. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "large_rug_patterned": {
       "material": "textiles",
@@ -132,7 +149,8 @@
         3,
         2
       ],
-      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow textiles."
+      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow textiles.",
+      "size_m_reason": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow textiles. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "coat_rack_with_coats": {
       "material": "textiles",
@@ -140,7 +158,8 @@
         0.65,
         0.65
       ],
-      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow textiles."
+      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow textiles.",
+      "size_m_reason": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow textiles. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "large_landscape_painting": {
       "material": "furniture_wood",
@@ -148,7 +167,8 @@
         1.4,
         0.3
       ],
-      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood."
+      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood.",
+      "size_m_reason": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "console_table_with_vase": {
       "material": "furniture_wood",
@@ -156,7 +176,8 @@
         1.2,
         0.5
       ],
-      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood."
+      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood.",
+      "size_m_reason": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "kitchen_island": {
       "material": "furniture_wood",
@@ -164,7 +185,8 @@
         2,
         1
       ],
-      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood."
+      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood.",
+      "size_m_reason": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "tall_steel_fridge": {
       "material": "appliance_contents",
@@ -172,7 +194,8 @@
         0.9,
         0.8
       ],
-      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow appliance_contents."
+      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow appliance_contents.",
+      "size_m_reason": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow appliance_contents. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "dining_table_six_chairs": {
       "material": "furniture_wood",
@@ -180,7 +203,8 @@
         2.5,
         2
       ],
-      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood."
+      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood.",
+      "size_m_reason": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "stove_and_hood": {
       "material": "appliance_contents",
@@ -188,7 +212,8 @@
         0.8,
         0.7
       ],
-      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow appliance_contents."
+      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow appliance_contents.",
+      "size_m_reason": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow appliance_contents. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "framed_family_photos": {
       "material": "furniture_wood",
@@ -196,7 +221,8 @@
         1.8,
         0.25
       ],
-      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood."
+      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood.",
+      "size_m_reason": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "grandfather_clock": {
       "material": "furniture_wood",
@@ -204,7 +230,8 @@
         0.65,
         0.45
       ],
-      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood."
+      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood.",
+      "size_m_reason": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "blue_double_bed": {
       "material": "upholstery",
@@ -212,7 +239,8 @@
         1.8,
         2.1
       ],
-      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow upholstery."
+      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow upholstery.",
+      "size_m_reason": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow upholstery. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "tall_wardrobe": {
       "material": "furniture_wood",
@@ -220,7 +248,8 @@
         1.6,
         0.6
       ],
-      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood."
+      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood.",
+      "size_m_reason": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "clawfoot_bathtub": {
       "material": "inert",
@@ -228,7 +257,8 @@
         1.8,
         0.8
       ],
-      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow inert."
+      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow inert.",
+      "size_m_reason": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow inert. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "sink_with_mirror": {
       "material": "inert",
@@ -236,7 +266,8 @@
         0.7,
         0.5
       ],
-      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow inert."
+      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow inert.",
+      "size_m_reason": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow inert. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "clothes_racks_both_sides": {
       "material": "textiles",
@@ -244,7 +275,8 @@
         2.6,
         1.8
       ],
-      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow textiles."
+      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow textiles.",
+      "size_m_reason": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow textiles. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "floor_to_ceiling_bookshelves": {
       "material": "books",
@@ -252,7 +284,8 @@
         4,
         0.5
       ],
-      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow books."
+      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow books.",
+      "size_m_reason": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow books. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "wooden_desk_with_lamp": {
       "material": "furniture_wood",
@@ -260,7 +293,8 @@
         1.5,
         0.7
       ],
-      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood."
+      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood.",
+      "size_m_reason": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "antique_globe": {
       "material": "furniture_wood",
@@ -268,7 +302,8 @@
         0.65,
         0.65
       ],
-      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood."
+      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood.",
+      "size_m_reason": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "bunk_bed": {
       "material": "upholstery",
@@ -276,7 +311,8 @@
         1,
         2
       ],
-      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow upholstery."
+      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow upholstery.",
+      "size_m_reason": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow upholstery. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "toy_chest_and_toys": {
       "material": "furniture_wood",
@@ -284,7 +320,8 @@
         1,
         0.7
       ],
-      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood."
+      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood.",
+      "size_m_reason": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "washer_and_dryer": {
       "material": "appliance_contents",
@@ -292,7 +329,8 @@
         1.4,
         0.7
       ],
-      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow appliance_contents."
+      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow appliance_contents.",
+      "size_m_reason": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow appliance_contents. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "water_heater_and_pipes": {
       "material": "inert",
@@ -300,7 +338,8 @@
         0.65,
         0.65
       ],
-      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow inert."
+      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow inert.",
+      "size_m_reason": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow inert. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "hallway_art_a": {
       "material": "furniture_wood",
@@ -308,7 +347,8 @@
         1.1,
         0.25
       ],
-      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood."
+      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood.",
+      "size_m_reason": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "hallway_art_b": {
       "material": "furniture_wood",
@@ -316,7 +356,8 @@
         0.9,
         0.25
       ],
-      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood."
+      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood.",
+      "size_m_reason": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "hallway_art_c": {
       "material": "furniture_wood",
@@ -324,7 +365,8 @@
         0.45,
         0.25
       ],
-      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood."
+      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood.",
+      "size_m_reason": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "hallway_art_d": {
       "material": "furniture_wood",
@@ -332,7 +374,8 @@
         0.8,
         0.25
       ],
-      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood."
+      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood.",
+      "size_m_reason": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "hallway_art_e": {
       "material": "furniture_wood",
@@ -340,7 +383,8 @@
         0.6,
         0.25
       ],
-      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood."
+      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood.",
+      "size_m_reason": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "hallway_art_f": {
       "material": "furniture_wood",
@@ -348,7 +392,8 @@
         1.2,
         0.25
       ],
-      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood."
+      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood.",
+      "size_m_reason": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "hallway_art_g": {
       "material": "furniture_wood",
@@ -356,7 +401,8 @@
         0.34,
         0.25
       ],
-      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood."
+      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood.",
+      "size_m_reason": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "hallway_art_h": {
       "material": "furniture_wood",
@@ -364,7 +410,8 @@
         1.1,
         0.25
       ],
-      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood."
+      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood.",
+      "size_m_reason": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "bedroom1_art_dartboard": {
       "material": "furniture_wood",
@@ -372,7 +419,8 @@
         0.6,
         0.25
       ],
-      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood."
+      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood.",
+      "size_m_reason": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "bedroom1_art_clock": {
       "material": "furniture_wood",
@@ -380,7 +428,8 @@
         0.4,
         0.25
       ],
-      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood."
+      "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood.",
+      "size_m_reason": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow furniture_wood. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "obstacle_wood_pile": {
       "material": "wood",
@@ -388,7 +437,8 @@
         1.3,
         0.9
       ],
-      "justification": "Loose dry planks and boards: wood fuel over the pile's footprint."
+      "justification": "Loose dry planks and boards: wood fuel over the pile's footprint.",
+      "size_m_reason": "Loose dry planks and boards: wood fuel over the pile's footprint. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "obstacle_waste_pile": {
       "material": "inert",
@@ -396,7 +446,8 @@
         1.1,
         1.0
       ],
-      "justification": "Plaster, brick and tile rubble does not burn."
+      "justification": "Plaster, brick and tile rubble does not burn.",
+      "size_m_reason": "Plaster, brick and tile rubble does not burn. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "obstacle_burnt_crate": {
       "material": "furniture_wood",
@@ -404,7 +455,8 @@
         0.7,
         0.7
       ],
-      "justification": "Wooden crate, already partly burnt."
+      "justification": "Wooden crate, already partly burnt.",
+      "size_m_reason": "Wooden crate, already partly burnt. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "obstacle_rubble": {
       "material": "inert",
@@ -412,7 +464,8 @@
         1.1,
         1.1
       ],
-      "justification": "Fallen ceiling plaster and roof tiles do not burn."
+      "justification": "Fallen ceiling plaster and roof tiles do not burn.",
+      "size_m_reason": "Fallen ceiling plaster and roof tiles do not burn. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "apartment_modern_sofa": {
       "material": "upholstery",
@@ -420,7 +473,8 @@
         2.3,
         1.1
       ],
-      "justification": "Estimated upholstered sofa footprint at 2.2 m fitted width; foam, fabric and frame supply the fuel."
+      "justification": "Estimated upholstered sofa footprint at 2.2 m fitted width; foam, fabric and frame supply the fuel.",
+      "size_m_reason": "Estimated upholstered sofa footprint at 2.2 m fitted width; foam, fabric and frame supply the fuel. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "apartment_counter": {
       "material": "furniture_wood",
@@ -428,7 +482,8 @@
         1.6,
         1.0
       ],
-      "justification": "Estimated timber kitchenette cabinet footprint at 1.5 m fitted width; metal fittings excluded."
+      "justification": "Estimated timber kitchenette cabinet footprint at 1.5 m fitted width; metal fittings excluded.",
+      "size_m_reason": "Estimated timber kitchenette cabinet footprint at 1.5 m fitted width; metal fittings excluded. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "apartment_fridge": {
       "material": "appliance_contents",
@@ -436,7 +491,8 @@
         0.9,
         0.8
       ],
-      "justification": "Estimated refrigerator footprint at 0.8 m fitted width; only wiring and plastic contents burn."
+      "justification": "Estimated refrigerator footprint at 0.8 m fitted width; only wiring and plastic contents burn.",
+      "size_m_reason": "Estimated refrigerator footprint at 0.8 m fitted width; only wiring and plastic contents burn. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "apartment_bed": {
       "material": "upholstery",
@@ -444,7 +500,8 @@
         1.7,
         2.2
       ],
-      "justification": "Estimated bed footprint after fitting its 2.04 m length to 2.1 m; mattress and frame are fuel."
+      "justification": "Estimated bed footprint after fitting its 2.04 m length to 2.1 m; mattress and frame are fuel.",
+      "size_m_reason": "Estimated bed footprint after fitting its 2.04 m length to 2.1 m; mattress and frame are fuel. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "office_workstation": {
       "material": "furniture_wood",
@@ -452,7 +509,8 @@
         1.8,
         0.9
       ],
-      "justification": "Estimated 1.8 by 0.9 m desk and lamp envelope; timber desktop supplies fuel and the steel frame is excluded."
+      "justification": "Estimated 1.8 by 0.9 m desk and lamp envelope; timber desktop supplies fuel and the steel frame is excluded.",
+      "size_m_reason": "Estimated 1.8 by 0.9 m desk and lamp envelope; timber desktop supplies fuel and the steel frame is excluded. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "office_task_chair": {
       "material": "upholstery",
@@ -460,7 +518,8 @@
         0.75,
         0.75
       ],
-      "justification": "Estimated chair footprint at 0.65 m fitted width; seat padding and plastic are approximated as upholstery."
+      "justification": "Estimated chair footprint at 0.65 m fitted width; seat padding and plastic are approximated as upholstery.",
+      "size_m_reason": "Estimated chair footprint at 0.65 m fitted width; seat padding and plastic are approximated as upholstery. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "steel_storage_shelf": {
       "material": "furniture_wood",
@@ -468,7 +527,8 @@
         1.2,
         0.65
       ],
-      "justification": "Estimated shelf footprint at 1.1 m fitted width and about 2.15 m height; timber shelf inserts supply fuel."
+      "justification": "Estimated shelf footprint at 1.1 m fitted width and about 2.15 m height; timber shelf inserts supply fuel.",
+      "size_m_reason": "Estimated shelf footprint at 1.1 m fitted width and about 2.15 m height; timber shelf inserts supply fuel. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "workshop_bench": {
       "material": "furniture_wood",
@@ -476,7 +536,8 @@
         2.1,
         1.1
       ],
-      "justification": "Estimated timber-topped steel workbench footprint at 2 m fitted width; metal frame is excluded from fuel."
+      "justification": "Estimated timber-topped steel workbench footprint at 2 m fitted width; metal frame is excluded from fuel.",
+      "size_m_reason": "Estimated timber-topped steel workbench footprint at 2 m fitted width; metal frame is excluded from fuel. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "workshop_drawers": {
       "material": "furniture_wood",
@@ -484,7 +545,8 @@
         1.7,
         1.1
       ],
-      "justification": "Estimated timber drawer cabinet footprint at 1.6 m fitted width; drawers hold hand tools."
+      "justification": "Estimated timber drawer cabinet footprint at 1.6 m fitted width; drawers hold hand tools.",
+      "size_m_reason": "Estimated timber drawer cabinet footprint at 1.6 m fitted width; drawers hold hand tools. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "utility_washer": {
       "material": "appliance_contents",
@@ -492,7 +554,8 @@
         0.8,
         0.75
       ],
-      "justification": "Estimated washer footprint at 0.7 m fitted width; wiring and plastic supply a small fuel load."
+      "justification": "Estimated washer footprint at 0.7 m fitted width; wiring and plastic supply a small fuel load.",
+      "size_m_reason": "Estimated washer footprint at 0.7 m fitted width; wiring and plastic supply a small fuel load. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "hall_plant": {
       "material": "wood",
@@ -500,7 +563,8 @@
         0.75,
         0.75
       ],
-      "justification": "Estimated potted plant footprint; dry organic matter is approximated as wood and the ceramic pot is excluded."
+      "justification": "Estimated potted plant footprint; dry organic matter is approximated as wood and the ceramic pot is excluded.",
+      "size_m_reason": "Estimated potted plant footprint; dry organic matter is approximated as wood and the ceramic pot is excluded. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "supply_boxes": {
       "material": "furniture_wood",
@@ -508,7 +572,8 @@
         1.4,
         0.7
       ],
-      "justification": "Estimated cardboard boxes and stored timber contents over 1.4 by 0.7 m; equivalent wood fuel is a scenario estimate."
+      "justification": "Estimated cardboard boxes and stored timber contents over 1.4 by 0.7 m; equivalent wood fuel is a scenario estimate.",
+      "size_m_reason": "Estimated cardboard boxes and stored timber contents over 1.4 by 0.7 m; equivalent wood fuel is a scenario estimate. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     },
     "office_meeting_table": {
       "material": "furniture_wood",
@@ -516,7 +581,8 @@
         1.9,
         1.9
       ],
-      "justification": "Estimated 1.9 m square envelope of a 1.8 m fitted timber meeting table and four 0.5 m chairs; timber supplies fuel."
+      "justification": "Estimated 1.9 m square envelope of a 1.8 m fitted timber meeting table and four 0.5 m chairs; timber supplies fuel.",
+      "size_m_reason": "Estimated 1.9 m square envelope of a 1.8 m fitted timber meeting table and four 0.5 m chairs; timber supplies fuel. Source: existing config/fire.json footprint estimate for the landmark kind in config/floorplan.json or scenario obstacles. No mesh measurement is claimed."
     }
   },
   "water": {
@@ -527,10 +593,13 @@
     "application_efficiency": 0.5,
     "application_efficiency_reason": "Selected 50 percent effective hose-stream cooling, following Grimwood 2005, pp.26 to 28, especially example 6 for a jet nozzle. This is an estimate for this nozzle, not a measurement. https://highrisefire.co.uk/docs/FLOW-RATE%20202004.pdf",
     "wet_seconds_per_litre": 30,
-    "wet_seconds_per_litre_reason": "Scenario estimate of 30 seconds of ignition inhibition per litre delivered to a cell, additive after the last application. NISTIR 6191 motivates fuel cooling and surface contact, but does not measure this dry-out coefficient. https://www.nist.gov/publications/fire-fighting-properties-nistir-6191",
-    "_reason": "Flow is shared equally across visible cone cell centres, including cold fuel. Tick-interval overlap conserves litres for non-grid times. Exact room boundaries block water except within current door widths; no furniture occlusion. Flame heat is absorbed first; surplus cools toward ambient using gas.effective_heat_capacity_kj_m2_k times cell area, the existing effective heated-lining capacity. There is no separate solid-cell capacity in this model. Smoke and room gas use the remaining heat release. Wetting is a dry-out timer, not moisture transport or a validated suppression model. Sources accessed 2026-10-21."
+    "wet_seconds_per_litre_reason": "Scenario estimate of 30 seconds of ignition inhibition per litre delivered to a cell, additive after the last application. NISTIR 6191 motivates fuel cooling and surface contact, but does not measure this dry-out coefficient. https://www.nist.gov/publications/fire-fighting-properties-nistir-6191 The existing dry-out credit accumulates from each wetted tick and elapsed time consumes credit during a continuing spray. It does not clamp the reheated surface to the boiling point or solve evaporation.",
+    "_reason": "Flow is shared equally across visible cone cell centres, including cold fuel. Tick-interval overlap conserves litres for non-grid times. Exact room boundaries block water except within current door widths; no furniture occlusion. Flame heat is absorbed first; surplus cools toward ambient using gas.effective_heat_capacity_kj_m2_k times cell area, the existing effective heated-lining capacity. There is no separate solid-cell capacity in this model. Smoke and room gas use the remaining heat release. Wetting is a dry-out timer, not moisture transport or a validated suppression model. Sources accessed 2026-10-21.",
+    "extinction_reason": "Retained heat and displayed flame may reach zero while fuel remains hot. Extinguish only when a positive delivered water budget absorbs the full step heat release and the remaining cooling takes the fuel below its material ignition temperature. Extinguished fuel stops consuming mass. It can ignite again only when dry and heated by neighbours or room gas. The unquenched combustion ramp is independent of displayed flame. Mechanisms: Grimwood, Fire-fighting Flow-rate, January 2005, p.6, fuel and flame cooling; pp.24 and 26 to 28, water heat capacity and stream efficiency, https://highrisefire.co.uk/docs/FLOW-RATE%20202004.pdf . Stroup and Madrzykowski, Fire Fighting Properties, NISTIR 6191, July 1998, chapter 2, https://www.nist.gov/publications/fire-fighting-properties-nistir-6191 . The strict ignition-temperature extinction criterion is a model rule supported by these mechanisms, not an experimentally fitted extinction law."
   },
   "spread": {
+    "growth_alpha_kw_s2": 0.01172,
+    "growth_alpha_kw_s2_reason": "Medium design-fire coefficient per independent configured origin. NFPA 72, National Fire Alarm Code, 2002 edition, Annex B, pp.72-168 to 72-169, equations B.4/B.5 give Q=alpha*(t-tv)^2 and alpha=1055/tg^2; choosing tg=300 s gives 0.0117222, rounded here to the requested 0.01172 kW/s^2, or 1054.8 kW at 300 s. https://previewnorm.com/nfpa/NFPA%2072-2002%20PDF.pdf . One budget is shared by all cells descended from that origin, across rooms. Mass loss cannot exceed burning fuel capacity. Step energy integrates the quadratic exactly. Zero explicitly selects the legacy uncapped model for diagnostic configurations; older files without this field retain that behaviour. No growth clock ignites a new room. Accessed 2026-10-23.",
     "neighbour_heat_per_s": 0.028,
     "surface_cooling_per_s": 0.012,
     "gas_surface_heat_per_s": 0.05,
@@ -542,7 +611,19 @@
     "flame_max_c": 1100,
     "max_temperature_c": 1100,
     "fuel_variation_fraction": 0.08,
-    "heat_of_combustion_kj_kg": 18000
+    "heat_of_combustion_kj_kg": 18000,
+    "neighbour_heat_per_s_reason": "Existing value 0.028, retained without recalibration. This is an unvalidated model estimate; see sources.spread_estimates. Source: https://www.nist.gov/el/fcd/room-flashover-experiments-demonstrate-effectiveness-barrier-fabrics",
+    "surface_cooling_per_s_reason": "Existing value 0.012, retained without recalibration. This is an unvalidated model estimate; see sources.spread_estimates. Source: https://www.nist.gov/el/fcd/room-flashover-experiments-demonstrate-effectiveness-barrier-fabrics",
+    "gas_surface_heat_per_s_reason": "Existing value 0.05, retained without recalibration. This is an unvalidated model estimate; see sources.spread_estimates. Source: https://www.nist.gov/el/fcd/room-flashover-experiments-demonstrate-effectiveness-barrier-fabrics",
+    "flashover_surface_heat_c_s_reason": "Existing value 18, retained without recalibration. This is an unvalidated model estimate; see sources.spread_estimates. Source: https://www.nist.gov/el/fcd/room-flashover-experiments-demonstrate-effectiveness-barrier-fabrics",
+    "fuel_burn_kg_m2_s_reason": "Existing value 0.018, retained without recalibration. This is an unvalidated model estimate; see sources.spread_estimates. Source: https://www.nist.gov/el/fcd/room-flashover-experiments-demonstrate-effectiveness-barrier-fabrics",
+    "flame_ramp_s_reason": "Existing 8 s local combustion ramp, now stored separately from displayed flame intensity. Water and the origin heat budget cannot reduce this stored ramp by visually dimming a flame. This is a numerical estimate, not a measured material response. Source: baseline FireSim.Step; fuel and flame cooling mechanism: https://www.nist.gov/publications/fire-fighting-properties-nistir-6191",
+    "flame_relaxation_s_reason": "Existing 4 s surface-temperature response at full cell heat release. The response now scales with actual heat-release intensity, so growth-limited cells cannot supply full flame feedback. This temperature proxy is not a solved solid heat balance. Source: baseline FireSim.Step and the heat-transfer principle at https://www.nist.gov/el/fire-research-division-73300/firegov-fire-service/fire-dynamics",
+    "flame_min_c_reason": "Existing value 650, retained without recalibration. This is an unvalidated model estimate; see sources.spread_estimates. Source: https://www.nist.gov/el/fcd/room-flashover-experiments-demonstrate-effectiveness-barrier-fabrics",
+    "flame_max_c_reason": "Existing value 1100, retained without recalibration. This is an unvalidated model estimate; see sources.spread_estimates. Source: https://www.nist.gov/el/fcd/room-flashover-experiments-demonstrate-effectiveness-barrier-fabrics",
+    "max_temperature_c_reason": "Existing value 1100, retained without recalibration. This is an unvalidated model estimate; see sources.spread_estimates. Source: https://www.nist.gov/el/fcd/room-flashover-experiments-demonstrate-effectiveness-barrier-fabrics",
+    "fuel_variation_fraction_reason": "Existing value 0.08, retained without recalibration. This is an unvalidated model estimate; see sources.spread_estimates. Source: https://www.nist.gov/el/fcd/room-flashover-experiments-demonstrate-effectiveness-barrier-fabrics",
+    "heat_of_combustion_kj_kg_reason": "Existing value 18000, retained without recalibration. This is an unvalidated model estimate; see sources.spread_estimates. Source: https://www.nist.gov/el/fcd/room-flashover-experiments-demonstrate-effectiveness-barrier-fabrics"
   },
   "gas": {
     "effective_heat_capacity_kj_m2_k": 6.5,
@@ -558,7 +639,21 @@
     "smoke_production_per_cell_s": 0.012,
     "smoke_reference_volume_m3": 1,
     "smoke_decay_per_s": 0.002,
-    "lower_smoke_fraction": 0.08
+    "lower_smoke_fraction": 0.08,
+    "effective_heat_capacity_kj_m2_k_reason": "Existing value 6.5, retained without recalibration. This is an unvalidated model estimate; see sources.zone_model. Source: https://pages.nist.gov/cfast/",
+    "heat_loss_kw_m2_k_reason": "Existing value 0.055, retained without recalibration. This is an unvalidated model estimate; see sources.zone_model. Source: https://pages.nist.gov/cfast/",
+    "convective_fraction_reason": "Existing value 0.65, retained without recalibration. This is an unvalidated model estimate; see sources.zone_model. Source: https://pages.nist.gov/cfast/",
+    "door_exchange_m3_s_m_reason": "Existing value 3.5, retained without recalibration. This is an unvalidated model estimate; see sources.zone_model. Source: https://pages.nist.gov/cfast/",
+    "outside_exchange_m3_s_m_reason": "Existing value 0.4, retained without recalibration. This is an unvalidated model estimate; see sources.zone_model. Source: https://pages.nist.gov/cfast/",
+    "gas_heat_capacity_kj_m3_k_reason": "Existing value 1.2, retained without recalibration. This is an unvalidated model estimate; see sources.zone_model. Source: https://pages.nist.gov/cfast/",
+    "entrainment_m3_s_kw_reason": "Existing value 0.0012, retained without recalibration. This is an unvalidated model estimate; see sources.zone_model. Source: https://pages.nist.gov/cfast/",
+    "min_layer_height_m_reason": "Existing value 0.4, retained without recalibration. This is an unvalidated model estimate; see sources.zone_model. Source: https://pages.nist.gov/cfast/",
+    "initial_layer_depth_m_reason": "Existing value 0.05, retained without recalibration. This is an unvalidated model estimate; see sources.zone_model. Source: https://pages.nist.gov/cfast/",
+    "lower_temperature_fraction_reason": "Existing value 0.12, retained without recalibration. This is an unvalidated model estimate; see sources.zone_model. Source: https://pages.nist.gov/cfast/",
+    "smoke_production_per_cell_s_reason": "Existing value 0.012, retained without recalibration. This is an unvalidated model estimate; see sources.zone_model. Source: https://pages.nist.gov/cfast/",
+    "smoke_reference_volume_m3_reason": "Existing value 1, retained without recalibration. This is an unvalidated model estimate; see sources.zone_model. Source: https://pages.nist.gov/cfast/",
+    "smoke_decay_per_s_reason": "Existing value 0.002, retained without recalibration. This is an unvalidated model estimate; see sources.zone_model. Source: https://pages.nist.gov/cfast/",
+    "lower_smoke_fraction_reason": "Existing value 0.08, retained without recalibration. This is an unvalidated model estimate; see sources.zone_model. Source: https://pages.nist.gov/cfast/"
   },
   "flashover_threshold_c": 600,
   "collapse": {
@@ -570,12 +665,20 @@
     "eligible_ceilings": [
       "plaster_white"
     ],
-    "note": "Estimate for local ceiling-panel fall after sustained hot-gas exposure. Concrete ceiling excluded. Continuous exposure resets below the threshold. Protect full 0.9 m approach strips inside rooms on both sides of every door, including closed doors; this is not a proof of a navigable path after physical debris."
+    "note": "Estimate for local ceiling-panel fall after sustained hot-gas exposure. Concrete ceiling excluded. Continuous exposure resets below the threshold. Protect full 0.9 m approach strips inside rooms on both sides of every door, including closed doors; this is not a proof of a navigable path after physical debris.",
+    "temperature_c_reason": "Existing value 650, retained without recalibration. This is an unvalidated model estimate; see sources.collapse_estimate. Source: https://www.nist.gov/el/fire-research-division-73300/firegov-fire-service/fire-dynamics",
+    "duration_s_reason": "Existing value 45, retained without recalibration. This is an unvalidated model estimate; see sources.collapse_estimate. Source: https://www.nist.gov/el/fire-research-division-73300/firegov-fire-service/fire-dynamics",
+    "max_events_reason": "Existing value 6, retained without recalibration. This is an unvalidated model estimate; see sources.collapse_estimate. Source: https://www.nist.gov/el/fire-research-division-73300/firegov-fire-service/fire-dynamics",
+    "interval_s_reason": "Existing value 8, retained without recalibration. This is an unvalidated model estimate; see sources.collapse_estimate. Source: https://www.nist.gov/el/fire-research-division-73300/firegov-fire-service/fire-dynamics",
+    "door_clear_width_m_reason": "Existing value 0.9, retained without recalibration. This is an unvalidated model estimate; see sources.collapse_estimate. Source: https://www.nist.gov/el/fire-research-division-73300/firegov-fire-service/fire-dynamics"
   },
   "query": {
     "flame_heating_radius_m": 1.5,
     "flame_heating_c": 450,
-    "plume_height_scale_m": 1.5
+    "plume_height_scale_m": 1.5,
+    "flame_heating_radius_m_reason": "Existing value 1.5, retained without recalibration. This is an unvalidated model estimate; see sources.spread_estimates. Source: https://www.nist.gov/el/fcd/room-flashover-experiments-demonstrate-effectiveness-barrier-fabrics",
+    "flame_heating_c_reason": "Existing value 450, retained without recalibration. This is an unvalidated model estimate; see sources.spread_estimates. Source: https://www.nist.gov/el/fcd/room-flashover-experiments-demonstrate-effectiveness-barrier-fabrics",
+    "plume_height_scale_m_reason": "Existing value 1.5, retained without recalibration. This is an unvalidated model estimate; see sources.spread_estimates. Source: https://www.nist.gov/el/fcd/room-flashover-experiments-demonstrate-effectiveness-barrier-fabrics"
   },
   "sources": [
     {
@@ -590,7 +693,7 @@
       "url": "https://www.nist.gov/el/fire-research-division-73300/firegov-fire-service/fire-dynamics",
       "accessed": "2026-10-20",
       "parameters": "ambient_c, flashover_threshold_c, spread.flame_min_c, spread.flame_max_c, spread.max_temperature_c",
-      "justification": "20 C ambient is a scenario choice. NIST describes flashover with fire gases over 600 C and about 20 kW/m2 floor heat flux. Use 600 C as a gas-temperature trigger. 650 to 1100 C flame temperature and 1100 C hard bound are selected plausible ranges, not material-specific measurements. Flashover timing depends on ventilation and contents; the requested 180 to 300 s is a calibration target, not a universal rule."
+      "justification": "20 C ambient is a scenario choice. NIST describes flashover with fire gases over 600 C and about 20 kW/m2 floor heat flux. Use 600 C as a gas-temperature trigger. 650 to 1100 C flame temperature and 1100 C hard bound are selected plausible ranges, not material-specific measurements. Flashover timing depends on ventilation and contents; no flashover time is forced. The earlier 180 to 300 s calibration target is retired in favour of medium t-squared origin growth."
     },
     {
       "id": "wood",
@@ -619,6 +722,21 @@
       "accessed": "2026-10-20",
       "parameters": "collapse.*",
       "justification": "650 C for 45 continuous seconds, six events total and at least 8 s between events are unvalidated ceiling-panel scenario rules, not a structural failure correlation. The 0.9 m protected width follows the floorplan clear-path rule. Only plaster ceilings may shed panels; collapse does not consume fuel or remove walls."
+    },
+    {
+      "id": "medium_growth",
+      "url": "https://previewnorm.com/nfpa/NFPA%2072-2002%20PDF.pdf",
+      "accessed": "2026-10-23",
+      "edition": "NFPA 72, National Fire Alarm Code, 2002 edition",
+      "printed_pages": "72-168 to 72-169",
+      "parameters": "spread.growth_alpha_kw_s2",
+      "justification": "Annex B equations B.4 and B.5 prescribe quadratic growth after established burning; the medium classification includes 300 s to 1055 kW. The selected coefficient 0.01172 kW/s^2 gives 1054.8 kW at 300 s. This is a design-fire choice, not a claim that every residential fire has this growth rate."
     }
-  ]
+  ],
+  "version_reason": "Schema version 1 matches FireSim.ValidateConfig; this is a file-format identifier, not a physical parameter. Source: unity/SmokeRescue/Assets/SmokeRescue/World/FireSim.cs.",
+  "cell_size_m_reason": "Existing 0.25 m numerical grid, aligned to config/floorplan.json. This is a discretisation choice, not a measured fire constant. Source: FireSim.GridCount and config/floorplan.json.",
+  "step_s_reason": "Existing 0.1 s fixed integration step. FireSim.ValidateConfig checks the explicit surface-exchange stability bound. Source: unity/SmokeRescue/Assets/SmokeRescue/World/FireSim.cs.",
+  "ambient_c_reason": "Scenario ambient air at 20 C. This is a selected initial condition. Temperature convention and heat transfer basis: https://www.nist.gov/el/fire-research-division-73300/firegov-fire-service/fire-dynamics",
+  "flashover_threshold_c_reason": "Existing 600 C upper-gas flashover trigger. NIST describes gases above 600 C at flashover. This is a temperature criterion, not a scheduled flashover time. https://www.nist.gov/el/fire-research-division-73300/firegov-fire-service/fire-dynamics",
+  "ignitions_reason": "The baseline also forced a hallway wood-pile ignition at 75 s and described it as ember spread. That timed secondary ignition is removed so the hallway must reach ignition through neighbour or room heating and its openings. The pile stays in the scenario fuel inventory. Source: baseline c2314c9 config/fire.json, config/scenario_house_onedoor_seed932_nolimit.json obstacles, and the requested requirement that room-to-room spread follow physics."
 }

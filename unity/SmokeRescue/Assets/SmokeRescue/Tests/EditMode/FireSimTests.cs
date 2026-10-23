@@ -63,6 +63,157 @@ namespace SmokeRescue.Tests.EditMode
         string SmallFire() => Config(j => j["ignitions"] = JArray.Parse(
             "[{\"room\":\"living\",\"at\":[2,2],\"time_s\":0,\"radius_m\":0.3}]"));
 
+        static double Release(FireSim sim, string room) => Cells(sim).Where(c => c.Room == room).Sum(c => c.HeatReleaseKw);
+
+        // NFPA 72, 2002, Annex B, pp.72-168 to 72-169, equations B.4 and B.5.
+        // Mean of alpha*t^2 over the last fixed step, rather than an endpoint sample.
+        static double MediumStep(double end, double dt = .1) =>
+            .01172 * (end * end - end * dt + dt * dt / 3);
+
+        [Test]
+        public void MediumGrowthSharesOneBudgetAcrossAllCellsOfAnOrigin()
+        {
+            string path = Config(j => j["ignitions"] = JArray.Parse(
+                "[{\"room\":\"living\",\"at\":[2,2],\"time_s\":0,\"radius_m\":100}]"));
+            var sim = FireSim.Load(TwoRooms("closed"), path, 7);
+            foreach (double t in new[] { 30d, 150d, 300d })
+            {
+                sim.AdvanceTo(t);
+                Assert.That(Release(sim, "living"), Is.EqualTo(MediumStep(t)).Within(1e-7), "t=" + t);
+            }
+        }
+
+        [Test]
+        public void IndependentOriginsUseTheirOwnIgnitionAges()
+        {
+            string path = Config(j => j["ignitions"] = JArray.Parse(
+                "[{\"room\":\"living\",\"at\":[2,2],\"time_s\":0,\"radius_m\":100}," +
+                "{\"room\":\"hallway\",\"at\":[6,2],\"time_s\":75,\"radius_m\":100}]"));
+            var sim = FireSim.Load(TwoRooms("closed"), path, 7);
+            sim.AdvanceTo(74.9); Assert.AreEqual(0, Release(sim, "hallway"));
+            sim.AdvanceTo(300);
+            Assert.That(Release(sim, "living"), Is.EqualTo(MediumStep(300)).Within(1e-7));
+            Assert.That(Release(sim, "hallway"), Is.EqualTo(MediumStep(225)).Within(1e-7));
+        }
+
+        [Test]
+        public void IndependentOriginsInOneRoomDoNotBecomeOneRoomClock()
+        {
+            string path = Config(j => j["ignitions"] = JArray.Parse(
+                "[{\"room\":\"living\",\"at\":[0.875,2.125],\"time_s\":0,\"radius_m\":1.5}," +
+                "{\"room\":\"living\",\"at\":[3.125,2.125],\"time_s\":75,\"radius_m\":1.5}]"));
+            var sim = FireSim.Load(TwoRooms("closed"), path, 7);
+            sim.AdvanceTo(300);
+            Assert.That(Release(sim, "living"), Is.EqualTo(MediumStep(300) + MediumStep(225)).Within(1e-7));
+        }
+
+        [Test]
+        public void SpreadThroughAnOpeningSharesTheOriginalGrowthBudget()
+        {
+            var sim = FireSim.Load(TwoRooms("open"), SmallFire(), 7);
+            for (int tick = 1; tick <= 6000; tick++)
+            {
+                sim.AdvanceTo(tick * .1);
+                Assert.LessOrEqual(Cells(sim).Sum(c => c.HeatReleaseKw), MediumStep(sim.Time) + 1e-7,
+                    "Spreading cells must not create a new origin's budget.");
+            }
+            Assert.Greater(Release(sim, "hallway"), 0, "The limit must still allow physical spread.");
+        }
+
+        [Test]
+        public void RoomGasIgnitesFuelWithoutNeighbourHeatingAndKeepsItsOriginBudget()
+        {
+            string path = Config(j =>
+            {
+                j["ignitions"] = JArray.Parse(
+                    "[{\"room\":\"living\",\"at\":[1,1],\"time_s\":0,\"radius_m\":1.5}]");
+                // Isolate room-gas heating from direct neighbour heating and heat losses.
+                j["spread"]["neighbour_heat_per_s"] = 0;
+                j["gas"]["heat_loss_kw_m2_k"] = 0;
+            });
+            var sim = FireSim.Load(TwoRooms("closed"), path, 7);
+            sim.AdvanceTo(200);
+            Assert.AreEqual(0, sim.GetCell(14, 14).FlameIntensity, "The distant target is outside the ignition footprint.");
+            sim.AdvanceTo(300);
+            Assert.Greater(sim.GetCell(14, 14).FlameIntensity, 0, "Hot room gas must be able to ignite distant fuel.");
+            Assert.LessOrEqual(Release(sim, "living"), MediumStep(300) + 1e-7,
+                "Gas ignition inherits the existing origin rather than adding another heat budget.");
+            AssertRoomUnburnt(sim, "hallway");
+        }
+
+        [Test]
+        public void GrowthConsumesOnlyTheFuelNeededForTheIntegratedHeatRelease()
+        {
+            string path = Config(j => j["ignitions"] = JArray.Parse(
+                "[{\"room\":\"living\",\"at\":[2,2],\"time_s\":0,\"radius_m\":100}]"));
+            var sim = FireSim.Load(TwoRooms("closed"), path, 7);
+            double initial = Cells(sim).Sum(c => (double)c.FuelRemainingKg);
+            sim.AdvanceTo(300);
+            double used = initial - Cells(sim).Sum(c => (double)c.FuelRemainingKg);
+            // Integral alpha*t^3/3 divided by the configured heat of combustion.
+            Assert.That(used, Is.EqualTo(.01172 * 300 * 300 * 300 / (3 * sim.HeatOfCombustionKjKg)).Within(.0001));
+        }
+
+        [TestCase(-.01)]
+        [TestCase(double.NaN)]
+        [TestCase(double.PositiveInfinity)]
+        public void InvalidGrowthCoefficientIsRejected(double alpha)
+        {
+            string path = Config(j => j["spread"]["growth_alpha_kw_s2"] = alpha);
+            Assert.Throws<InvalidDataException>(() => FireSim.Load(TwoRooms("closed"), path, 7));
+        }
+
+        [Test]
+        public void SubcriticalWaterCannotExtinguishByFeedingBackTheDimmedFlame()
+        {
+            string path = WaterFire();
+            var sim = FireSim.Load(TwoRooms("closed"), path, 7);
+            sim.AdvanceTo(20);
+            double before = sim.GetCell(8, 8).HeatReleaseKw;
+            // 0.003 L/s absorbs 3.885 kW in total. The helper's cone shares water
+            // between the nozzle cell and target, so this cell gets only 1.9425 kW.
+            TargetWater(sim, .003, 20, 280); sim.AdvanceTo(30);
+            Assert.Greater(sim.GetCell(8, 8).FlameIntensity, 0);
+            Assert.Greater(sim.GetCell(8, 8).HeatReleaseKw, before / 2);
+            sim.AdvanceTo(300);
+            Assert.Greater(sim.GetCell(8, 8).FlameIntensity, 0, "Insufficient water must not latch extinction.");
+            sim.AdvanceTo(301);
+            Assert.Greater(sim.GetCell(8, 8).FlameIntensity, 0, "The fire must still burn after the insufficient stream stops.");
+        }
+
+        [Test]
+        public void ExtinguishedFuelStaysOutAfterSprayAndAfterDryingWithoutReheating()
+        {
+            string path = WaterFire();
+            var sim = FireSim.Load(TwoRooms("closed"), path, 7);
+            sim.AdvanceTo(20); TargetWater(sim, 1, 20, 1); sim.AdvanceTo(21);
+            Assert.AreEqual(0, sim.GetCell(8, 8).FlameIntensity);
+            Assert.Less(sim.GetCell(8, 8).SurfaceTemperatureC, 330);
+            float fuel = sim.GetCell(8, 8).FuelRemainingKg;
+            foreach (double t in new[] { 30d, 50d, 60d, 120d })
+            {
+                sim.AdvanceTo(t);
+                Assert.AreEqual(0, sim.GetCell(8, 8).FlameIntensity, "t=" + t);
+                Assert.AreEqual(fuel, sim.GetCell(8, 8).FuelRemainingKg, "Extinction must stop fuel consumption.");
+            }
+        }
+
+        [Test]
+        public void GrowingOriginCannotRestartExtinguishedFuelWithoutReheating()
+        {
+            string path = WaterFire();
+            var json = JObject.Parse(File.ReadAllText(path));
+            json["spread"]["growth_alpha_kw_s2"] = .01172;
+            File.WriteAllText(path, json.ToString());
+            var sim = FireSim.Load(TwoRooms("closed"), path, 7);
+            sim.AdvanceTo(20); TargetWater(sim, 1, 20, 1); sim.AdvanceTo(21);
+            Assert.AreEqual(0, sim.GetCell(8, 8).FlameIntensity);
+            float fuel = sim.GetCell(8, 8).FuelRemainingKg;
+            sim.AdvanceTo(120);
+            Assert.AreEqual(0, Release(sim, "living"), "A growing heat budget cannot supply ignition by itself.");
+            Assert.AreEqual(fuel, sim.GetCell(8, 8).FuelRemainingKg);
+        }
+
         [Test]
         public void SameSeedHasIdenticalStateHashesAt60And240Seconds()
         {
@@ -153,30 +304,36 @@ namespace SmokeRescue.Tests.EditMode
         {
             var plan = FloorPlan.Load();
             foreach (var d in plan.doors.Where(d => d.between.Contains("living"))) d.state = "closed";
-            // Only the living-room ignition: the scenario's burning hallway wood pile is a separate fire by design.
+            // The default house now prescribes only the living-room source; the hallway
+            // pile must ignite through heat transfer. Keep the isolation explicit here.
             var cfg = Newtonsoft.Json.Linq.JObject.Parse(File.ReadAllText(firePath));
             cfg["ignitions"] = new Newtonsoft.Json.Linq.JArray(cfg["ignitions"].Where(i => (string)i["room"] == "living"));
             string livingOnly = Path.Combine(Path.GetTempPath(), "fire_living_only.json");
             File.WriteAllText(livingOnly, cfg.ToString());
-            var sim = FireSim.Load(plan, livingOnly, 7); sim.AdvanceTo(360);
+            var sim = FireSim.Load(plan, livingOnly, 7); sim.AdvanceTo(900);
             AssertRoomUnburnt(sim, "hallway");
-            var open = House(); open.AdvanceTo(360);
+            var open = House(); open.AdvanceTo(900);
             Assert.IsTrue(Cells(open).Any(c => c.Room == "hallway" && c.BurntFraction > 0));
         }
 
         [Test]
-        public void IgnitionRoomReachesFlashoverBetween180And300Seconds()
+        public void MediumHouseGrowthDoesNotForceEarlyFlashover()
         {
             var sim = House(); sim.AdvanceTo(300);
-            Assert.That(sim.GetRoomState("living").FlashoverTime, Is.InRange(180d, 300d));
+            Assert.AreEqual(-1, sim.GetRoomState("living").FlashoverTime);
+            Assert.Less(sim.GetRoomState("living").UpperTemperatureC, 200);
+            sim.AdvanceTo(900);
+            Assert.Greater(sim.GetRoomState("living").FlashoverTime, 300,
+                "Flashover must still occur when gas heating reaches its configured threshold.");
         }
 
         [Test]
-        public void FireReachesEveryCombustibleRoomWithinSixMinutes()
+        public void MediumHouseFireHasNotBurntEveryRoomAtSixMinutes()
         {
             var sim = House(); sim.AdvanceTo(360);
-            foreach (string room in new[] { "living", "foyer", "kitchen", "hallway", "bedroom_1", "closet", "study", "bedroom_2", "laundry" })
-                Assert.IsTrue(Cells(sim).Any(c => c.Room == room && c.BurntFraction > 0), room);
+            Assert.IsTrue(Cells(sim).Any(c => c.Room == "living" && c.BurntFraction > 0));
+            AssertRoomUnburnt(sim, "hallway");
+            AssertRoomUnburnt(sim, "kitchen");
             AssertRoomUnburnt(sim, "bathroom");
             Assert.AreEqual(-1, sim.GetRoomState("bathroom").FlashoverTime);
         }
@@ -224,7 +381,7 @@ namespace SmokeRescue.Tests.EditMode
         {
             var sim = House(); sim.AdvanceTo(30);
             float early = sim.GetRoomState("living").LayerHeight;
-            sim.AdvanceTo(120);
+            sim.AdvanceTo(300);
             var room = sim.GetRoomState("living");
             Assert.That(room.LayerHeight, Is.LessThan(early));
             Assert.That(room.SmokeDensity, Is.GreaterThan(0));
@@ -242,7 +399,7 @@ namespace SmokeRescue.Tests.EditMode
             var sim = House(); var hotSince = new Dictionary<string, double>();
             int seen = 0;
             var plan = FloorPlan.Load();
-            for (int tick = 1; tick <= 6000; tick++)
+            for (int tick = 1; tick <= 12000; tick++)
             {
                 sim.AdvanceTo(tick * .1);
                 foreach (var room in sim.RoomStates)
@@ -329,6 +486,8 @@ namespace SmokeRescue.Tests.EditMode
         // Isolate spray effects from room heating; the reignition test restores neighbour heating.
         string WaterFire(bool neighbour = false) => Config(j =>
         {
+            // These tests isolate suppression of an established fire. Growth has separate tests.
+            j["spread"]["growth_alpha_kw_s2"] = 0;
             j["spread"]["neighbour_heat_per_s"] = neighbour ? 1 : 0;
             j["spread"]["gas_surface_heat_per_s"] = 0;
             j["spread"]["flashover_surface_heat_c_s"] = 0;
@@ -353,6 +512,49 @@ namespace SmokeRescue.Tests.EditMode
             Assert.Greater(dry.GetCell(8, 8).FlameIntensity, 0, "Zero-flow control must still burn.");
             Assert.Greater(wet.GetCell(8, 8).FuelRemainingKg, dry.GetCell(8, 8).FuelRemainingKg,
                 "Water must stop burning before fuel exhaustion.");
+        }
+
+        [Test]
+        public void AbsorbingTheFlameWithoutCoolingFuelBelowIgnitionDoesNotExtinguish()
+        {
+            string path = WaterFire();
+            var sim = FireSim.Load(TwoRooms("closed"), path, 7);
+            sim.AdvanceTo(20);
+            double release = sim.GetCell(8, 8).HeatReleaseKw;
+            var water = JObject.Parse(File.ReadAllText(path))["water"];
+            double capacity = ((double)water["latent_heat_kj_l"] + (double)water["sensible_heat_kj_l"]) *
+                (double)water["application_efficiency"];
+            TargetWater(sim, 2 * release / capacity, 20, .1); sim.AdvanceTo(20.1);
+            Assert.LessOrEqual(sim.GetCell(8, 8).FlameIntensity, 1e-6);
+            Assert.Greater(sim.GetCell(8, 8).SurfaceTemperatureC, 330,
+                "Heat-release absorption alone must leave this control above ignition.");
+            sim.AdvanceTo(20.2);
+            Assert.Greater(sim.GetCell(8, 8).FlameIntensity, 0,
+                "Fuel above ignition remains burning even if wet and momentarily flame-cooled.");
+        }
+
+        [Test]
+        public void ExtinguishedCellRelightsFromHotNeighboursOnlyAfterItsWaterDries()
+        {
+            string path = WaterFire(true);
+            var sim = FireSim.Load(TwoRooms("closed"), path, 7);
+            sim.AdvanceTo(20); TargetWater(sim, 2, 20, 1); sim.AdvanceTo(21);
+            Assert.AreEqual(0, sim.GetCell(8, 8).FlameIntensity);
+            Assert.Less(sim.GetCell(8, 8).SurfaceTemperatureC, 330, "The spray must cool the fuel, not just absorb its flame.");
+            float fuel = sim.GetCell(8, 8).FuelRemainingKg;
+            double coefficient = (double)JObject.Parse(File.ReadAllText(path))["water"]["wet_seconds_per_litre"];
+            // ApplyWater accumulates dry-out credit after the first wetted tick, with elapsed
+            // time using that credit during the spray. The helper divides two litres
+            // between two cells, so the target dries at 20.1 + 1 * 30 s.
+            double dryAt = 20 + sim.StepSeconds + coefficient;
+            sim.AdvanceTo(dryAt - sim.StepSeconds);
+            Assert.Greater(sim.GetCell(9, 8).FlameIntensity, 0, "The adjacent fire must stay lit.");
+            Assert.Greater(sim.GetCell(8, 8).SurfaceTemperatureC, 330, "Neighbour heating must reheat the wet fuel.");
+            Assert.AreEqual(0, sim.GetCell(8, 8).FlameIntensity);
+            Assert.AreEqual(fuel, sim.GetCell(8, 8).FuelRemainingKg);
+            sim.AdvanceTo(dryAt + 3 * sim.StepSeconds);
+            Assert.Greater(sim.GetCell(8, 8).FlameIntensity, 0, "The dry, reheated cell must relight.");
+            Assert.Less(sim.GetCell(8, 8).FuelRemainingKg, fuel);
         }
 
         [TestCase(2.125f, 1.625f)]
