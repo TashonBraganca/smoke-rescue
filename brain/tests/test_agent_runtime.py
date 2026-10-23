@@ -296,6 +296,7 @@ def test_a_confirmation_says_how_to_get_the_person_out(tmp_path, monkeypatch):
     # Run 15: robot A confirmed a person 2.7 m away and searched on. The confirm result names the next step: an approach
     # when the inspection was beyond the arm's reach, a lift when it was within it.
     def told(range_m):
+        T.ToolRegistry._confirmed.clear()   # each call confirms the same spot afresh (one person per survivor_merge_m)
         monkeypatch.setattr(T.vision, "load_frame", lambda d, t: object())
         monkeypatch.setattr(T.vision, "inspect_candidate", lambda f, b, r, output_dir: {
             "id": "ev1", "tool": "inspect_candidate", "verdict": "person", "candidate": {"range_m": range_m}})
@@ -511,6 +512,7 @@ def test_a_person_this_robot_carried_out_is_not_confirmed_again(tmp_path, monkey
     # a set-down point 7 m away, and one logged after the step's time, do not block it.
     fake_vision(monkeypatch, "person")
     def confirm(set_down_x, set_down_y, at_t):
+        T.ToolRegistry._confirmed.clear()   # each call confirms the same spot afresh (one person per survivor_merge_m)
         line = {"t": at_t, "robot": "robot_A", "kind": "person_carried_out", "reason": "Set the person down.",
                 "numbers": {"distance_to_exit_m": 2.2, "person_x_m": set_down_x, "person_y_m": set_down_y}}
         (tmp_path / "decisions.jsonl").write_text(json.dumps({"t": 1.0, "kind": "replan", "numbers": {}}) + "\n" + json.dumps(line) + "\n")
@@ -854,3 +856,19 @@ def test_a_warm_surface_measured_flat_can_be_rejected(tmp_path, monkeypatch):
     body = {"depth": {"valid_fraction": .9, "nonplanar": True}, "plane": {"large_plane": False}, "rgb_dnn": {"hits": []}}
     out = reject(body)
     assert out["orders"] == [] and out["refusals"][0]["tool"] == "reject_candidate", "control: a protruding shape is not"
+
+
+def test_a_person_already_confirmed_nearby_is_not_confirmed_again(tmp_path, monkeypatch):
+    # Seed 934, robot A confirmed the study survivor twice (18.8 s and 193.6 s, 0.46 m apart) and radioed a new survivor.
+    # Within survivor_merge_m of this robot's or the team's confirmations, confirm_survivor is refused. Control: a person
+    # 3 m from the known one is confirmed.
+    def confirm(survivors, rng):
+        RobotAgent._new_run(request(tmp_path) | {"t": 49.0})
+        T.ToolRegistry._looks.clear(); T.ToolRegistry._pending.clear(); T.ToolRegistry._confirmed.clear()
+        fake_vision(monkeypatch, "person")
+        return RobotAgent(Scripted([[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": rng})],
+                                    [ToolCall("confirm_survivor", {"x": 5.0, "y": 5.0 + rng, "evidence_id": "ev1"})]]),
+                          tmp_path / "t.jsonl").step(request(tmp_path) | {"t": 50.0, "survivors": survivors})
+    dup = confirm([[5.3, 8.2]], 3.0)
+    assert dup["orders"] == [] and "already confirmed" in dup["refusals"][0]["reason"]
+    assert [o["type"] for o in confirm([[5.0, 11.0]], 3.0)["orders"]] == ["confirm_survivor"], "control: 3 m away is someone else"

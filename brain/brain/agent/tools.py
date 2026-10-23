@@ -649,6 +649,16 @@ class ToolRegistry:
                                    f"standpoint at least {TWO_VIEW_BASELINE_M:.1f} m away that agrees within {TWO_VIEW_AGREE_M:.1f} m "
                                    "also confirms her: inspect again after moving."}
             if refusal is None:
+                # Seed 934, robot A confirmed the study survivor again at 193.6 s, 0.46 m from its first confirmation at
+                # 18.8 s, and radioed a "new survivor". One person per survivor_merge_m, whoever confirmed her first.
+                x, y = float(args["x"]), float(args["y"])
+                known = [(c["x"], c["y"]) for c in self._confirmed.get(self.ctx.robot, [])] + [(float(q[0]), float(q[1])) for q in self.ctx.survivors]
+                near = [k for k in known if math.hypot(k[0] - x, k[1] - y) <= SURVIVOR_MERGE_M]
+                if near:
+                    refusal = {"refused": True, "reason": f"a person is already confirmed at ({near[0][0]:.1f}, {near[0][1]:.1f}), "
+                               f"within {SURVIVOR_MERGE_M:.1f} m: this is the same person, not a new survivor. Do not report her "
+                               "again; search unsearched floor."}
+            if refusal is None:
                 spot = self._set_down_near(float(args["x"]), float(args["y"]))
                 if spot is not None:
                     refusal = {"refused": True, "reason": f"this robot set down a person it carried out at ({spot[0]:.1f}, "

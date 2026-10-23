@@ -280,3 +280,14 @@ def test_an_empty_spot_in_full_view_with_no_colour_person_anywhere_is_not_a_pers
     assert verdict(0.0, 1.0, []) == "uncertain", "control: nearer than the floor the camera sees"
     weak = {"confidence": 0.4, "bbox_rgb": [100, 30, 30, 70], "bearing_deg": 20.0, "range_m": 4.0}
     assert verdict(0.0, 3.0, [weak]) == "uncertain", "control: a colour person somewhere in the frame"
+
+
+def test_an_empty_spot_beside_a_warm_shape_is_not_called_not_a_person(tmp_path, monkeypatch):
+    # opencv-bc's check of the 934 video (2:06): the empty-spot rule fired on wall patches with a real person partly in the
+    # frame. A warm human-band shape within twice the bearing tolerance of the asked spot, at any range, keeps the verdict
+    # uncertain even when the colour detector sees nobody. Control: asked well away from the warm shape it is not_person.
+    monkeypatch.setattr(v, "detect_people_rgb", lambda frame, **k: [])
+    near = v.inspect_candidate(scene(), 12.0, 3.0, output_dir=tmp_path)   # the warm body sits near 0 deg, outside the 8 deg match
+    assert near["verdict"] == "uncertain"
+    far = v.inspect_candidate(scene(), -25.0, 3.0, output_dir=tmp_path)
+    assert far["verdict"] == "not_person", "control: 25 deg from the only warm shape, the asked spot is empty"
