@@ -16,7 +16,7 @@ namespace SmokeRescue.World
         public string id;
         public string description;
         /// <summary>World-side hinge overrides applied by DoorRuntime after the house is built.</summary>
-        public Dictionary<string, string> door_states = new Dictionary<string, string>();
+        [UnityEngine.SerializeField] public Dictionary<string, string> door_states = new Dictionary<string, string>();   // read from JSON; the attribute only silences Unity's serializer check
         public int seed;
         public float duration_s;
         // false: no mission deadline for the robots; the recording still ends at duration_s (owner toggle, 22 Oct).
@@ -164,28 +164,47 @@ namespace SmokeRescue.World
         /// furniture. The floor plan only lists landmarks; filler props (an ottoman, armchairs) are placed by the house
         /// builder, and held-out seed 914 put s6 inside the foyer ottoman with only head and legs outside it.</summary>
         public static System.Func<Vector2, bool> PlacementBlocked;
+        /// <summary>SplitMix64 of the seed: System.Random seeded with nearby integers (seed * 7919 + 101) gave correlated
+        /// first draws, and the first person landed in the laundry in all nine one-door runs 922 to 932.</summary>
+        static int MixSeed(int s)
+        {
+            ulong z = unchecked((ulong)s + 0x9E3779B97F4A7C15UL);
+            z = unchecked((z ^ (z >> 30)) * 0xBF58476D1CE4E5B9UL); z = unchecked((z ^ (z >> 27)) * 0x94D049BB133111EBUL);
+            return (int)((z ^ (z >> 31)) & 0x7FFFFFFF);
+        }
         void PlaceSurvivorsRandomly(FloorPlan plan)
         {
-            var rng = new System.Random(seed * 7919 + 101);
+            var rng = new System.Random(MixSeed(seed));
             var taken = new List<Vector2>();
             var avoid = new List<(Vector2 p, float r)>();
             foreach (var l in plan.landmarks) avoid.Add((new Vector2(l.at[0], l.at[1]), 0.9f));
             foreach (var o in obstacles) avoid.Add((new Vector2(o.at[0], o.at[1]), 0.9f));
             foreach (var d in plan.doors) avoid.Add((new Vector2(d.at[0], d.at[1]), 1.2f));
             foreach (var r in robots) avoid.Add((new Vector2(r.spawn.at[0], r.spawn.at[1]), 1.2f));
+            // A scripted robot follows its route blind (sensor tests, not search runs): nobody lies within 1.2 m of it.
+            var routeSegments = robots.Where(r => r.route != null && r.route.Count > 0)
+                .SelectMany(r => new[] { r.spawn.at }.Concat(r.route).Zip(r.route, (p0, p1) => (new Vector2(p0[0], p0[1]), new Vector2(p1[0], p1[1])))).ToList();
+            bool OnRoute(Vector2 q) => routeSegments.Any(seg =>
+            {
+                Vector2 d = seg.Item2 - seg.Item1; float u = d.sqrMagnitude > 0 ? Mathf.Clamp01(Vector2.Dot(q - seg.Item1, d) / d.sqrMagnitude) : 0;
+                return Vector2.Distance(q, seg.Item1 + u * d) < 1.2f;
+            });
             // Only rooms inside the scenario's search area (held-out run 1: four of five people landed in the apartment,
-            // office and workshop of the larger building, beyond the house the robots search).
-            var rooms = plan.rooms.Where(r => r.id != "hallway" && InSearchArea(r.Rect)).ToList();
+            // office and workshop of the larger building, beyond the house the robots search). Every room, the hallway
+            // included, with a chance in proportion to its floor area: a point is drawn over the whole area and kept only
+            // where it lies 0.6 m inside a room. Drawing the room first and the point second gave a 6.6 m2 bathroom the same
+            // pull as a 36.6 m2 living room, and the margins then rejected most bathroom points (no one in the bathroom or
+            // closet in runs 922 to 932, someone in the laundry in all of them).
+            var rooms = plan.rooms.Where(r => InSearchArea(r.Rect) && r.Rect.width >= 1.4f && r.Rect.height >= 1.4f).ToList();
+            float xMin = rooms.Min(r => r.Rect.xMin), xMax = rooms.Max(r => r.Rect.xMax), yMin = rooms.Min(r => r.Rect.yMin), yMax = rooms.Max(r => r.Rect.yMax);
             foreach (var s in survivors)
             {
-                for (int attempt = 0; attempt < 2000; attempt++)
+                for (int attempt = 0; attempt < 20000; attempt++)
                 {
-                    var room = rooms[rng.Next(rooms.Count)];
-                    var rect = room.Rect;
-                    if (rect.width < 1.4f || rect.height < 1.4f) continue;
-                    var p = new Vector2(rect.xMin + 0.6f + (float)rng.NextDouble() * (rect.width - 1.2f),
-                                        rect.yMin + 0.6f + (float)rng.NextDouble() * (rect.height - 1.2f));
-                    if (avoid.Any(a => Vector2.Distance(a.p, p) < a.r) || taken.Any(q => Vector2.Distance(q, p) < 3f)) continue;
+                    var p = new Vector2(xMin + (float)rng.NextDouble() * (xMax - xMin), yMin + (float)rng.NextDouble() * (yMax - yMin));
+                    var room = rooms.FirstOrDefault(r => p.x >= r.Rect.xMin + 0.6f && p.x <= r.Rect.xMax - 0.6f && p.y >= r.Rect.yMin + 0.6f && p.y <= r.Rect.yMax - 0.6f);
+                    if (room == null) continue;
+                    if (avoid.Any(a => Vector2.Distance(a.p, p) < a.r) || taken.Any(q => Vector2.Distance(q, p) < 3f) || OnRoute(p)) continue;
                     if (PlacementBlocked != null && PlacementBlocked(p)) continue;
                     s.at = new[] { p.x, p.y };
                     s.room = room.id;

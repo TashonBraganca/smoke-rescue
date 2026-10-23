@@ -595,11 +595,25 @@ namespace SmokeRescue.Brain
             dirty = true;
         }
         bool[] keepOut; float[] keepSoft;
+        /// <summary>The entrance lock: floor within radius of where this robot first stood on floor it had proven indoors
+        /// becomes an obstacle for every route and goal. Owner's rule (23 Oct): a robot that is in never goes back to, or
+        /// near, the way it came in (seed 932: robot B's retreat ended 1 m inside the front door, looking out at the yard).</summary>
+        public void SetEntranceLock(Vector2 entry, float radius)
+        {
+            entranceLock ??= new bool[Count]; System.Array.Clear(entranceLock, 0, Count);
+            int c0 = Cell(entry); if (c0 < 0) return;
+            int r = Mathf.CeilToInt(radius / CellM), cx = c0 % Size, cy = c0 / Size;
+            for (int dy = -r; dy <= r; dy++) for (int dx = -r; dx <= r; dx++)
+                if (Inside(cx + dx, cy + dy) && Vector2.Distance(Centre((cy + dy) * Size + cx + dx), entry) <= radius) entranceLock[(cy + dy) * Size + cx + dx] = true;
+            dirty = true;
+        }
+        public bool EntranceLocked(Vector2 p) { int i = Cell(p); return entranceLock != null && i >= 0 && entranceLock[i]; }
+        bool[] entranceLock;
         internal void PrepareNavigation()
         {
             if (!dirty) return;
             if (obstacleDistance == null) { obstacleDistance = new float[Count]; fireDistance = new float[Count]; }
-            Distances(i => Occupancy(i) == 255 || (keepOut != null && keepOut[i]), obstacleDistance);
+            Distances(i => Occupancy(i) == 255 || (keepOut != null && keepOut[i]) || (entranceLock != null && entranceLock[i]), obstacleDistance);
             Distances(Dangerous, fireDistance); dirty = false;
         }
         /// <summary>Distance planned routes keep from fire: fire_clearance_m, lowered to emergency_fire_clearance_m only for an

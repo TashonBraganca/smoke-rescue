@@ -82,6 +82,39 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void RandomPeopleReachEveryRoomInProportionToItsFloor()
+        {
+            // One-door runs 922 to 932: someone was in the laundry in all nine runs and no one ever in the bathroom, closet or
+            // hallway: nearby seeds gave correlated first draws, and the room was drawn before the point. Over 300 seeds each
+            // room in the search area must get people, none more than 1.6 times its share of floor (sampling noise at n = 1500
+            // is about 0.1 of a share).
+            var saved = Scenario.PlacementBlocked; Scenario.PlacementBlocked = null;
+            try
+            {
+                var scenario = Scenario.Load("scenario_house_onedoor_seed932_nolimit.json");
+                var plan = FloorPlan.Load(); var a = scenario.search_area;
+                var rooms = plan.rooms.Where(r => r.Rect.xMin >= a[0] - 1e-3f && r.Rect.yMin >= a[1] - 1e-3f && r.Rect.xMax <= a[2] + 1e-3f && r.Rect.yMax <= a[3] + 1e-3f).ToList();
+                float total = rooms.Sum(r => (r.Rect.width - 1.2f) * (r.Rect.height - 1.2f));
+                var counts = rooms.ToDictionary(r => r.id, r => 0); int n = 0;
+                var place = typeof(Scenario).GetMethod("PlaceSurvivorsRandomly", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                for (int seed = 1; seed <= 300; seed++)
+                {
+                    scenario.seed = seed; place.Invoke(scenario, new object[] { plan });
+                    foreach (var p in scenario.survivors) { counts[p.room]++; n++; }
+                }
+                var report = string.Join(", ", rooms.Select(r => $"{r.id} {counts[r.id]} ({100.0 * counts[r.id] / n:F1} % vs floor {100.0 * (r.Rect.width - 1.2f) * (r.Rect.height - 1.2f) / total:F1} %)"));
+                foreach (var r in rooms)
+                {
+                    double share = counts[r.id] / (double)n, floor = (r.Rect.width - 1.2f) * (r.Rect.height - 1.2f) / total;
+                    Assert.That(counts[r.id], Is.GreaterThan(0), $"{r.id} never gets anyone: {report}");
+                    Assert.That(share, Is.LessThan(1.6 * floor + .01), $"{r.id} over-represented: {report}");
+                }
+                TestContext.WriteLine(report);
+            }
+            finally { Scenario.PlacementBlocked = saved; Scenario.ForgetRandomPlacements(); }
+        }
+
+        [Test]
         public void RandomlyPlacedPeopleStayInsideTheScenarioSearchArea()
         {
             // Held-out run 1: four of five randomly placed people landed in the apartment, office and workshop of the larger

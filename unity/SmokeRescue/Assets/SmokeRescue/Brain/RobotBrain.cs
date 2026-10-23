@@ -143,6 +143,7 @@ namespace SmokeRescue.Brain
                 Emit(t, "goal", "Cool air and a recovered heat budget permit travel again.", "air_c", airC, "heat_budget", budget);
             }
             NoteBodyTrack();
+            NoteEntrance(t);
             if (survivors.Count != keptOut) { keptOut = survivors.Count; grid.SetKeepOut(survivors, c.survivor_keepout_core_m, c.survivor_keepout_m + c.robot_radius_m); }   // the ring is for the robot's centre
             CheckReenter(t);
             if (doorwayProbeGoal.HasValue && (returning || retreating || completed || nearFire || active != null ||
@@ -936,6 +937,20 @@ namespace SmokeRescue.Brain
         void SetPath(List<Vector2> value, bool isFrontier = false) { frontierGoal = isFrontier && value.Count > 0; throughCentre = null; path = value; cursor = 0; goal = path.Count > 0 ? path[path.Count - 1] : (Vector2?)null; }
         void ClearPath() { frontierGoal = false; throughCentre = null; path.Clear(); cursor = 0; goal = null; lastPlan = double.NegativeInfinity; }
         Vector2? throughCentre;   // the frontier a follow-through path leads to, when the path is one
+        Vector2? entryPoint; bool entranceLocked;
+        /// <summary>Staying inside, the first point where this robot stands on floor it has proven indoors is its way in. Once
+        /// it is entrance_lock_m beyond that point, the floor within entrance_lock_m of it is locked for good (OccupancyGrid
+        /// .SetEntranceLock). Only the robot's own track decides; nothing about the building is given.</summary>
+        void NoteEntrance(double t)
+        {
+            if (!c.stay_inside || c.entrance_lock_m <= 0 || entranceLocked) return;
+            var p = motion.Pose.position;
+            if (!entryPoint.HasValue) { if (InSearchArea(p)) entryPoint = p; return; }
+            if (Vector2.Distance(p, entryPoint.Value) <= c.entrance_lock_m + c.robot_radius_m) return;
+            grid.SetEntranceLock(entryPoint.Value, c.entrance_lock_m); entranceLocked = true;
+            Emit(t, "entrance_locked", "Inside and clear of the way in: floor near the way in is now locked; this robot never goes back to it.",
+                "x_m", entryPoint.Value.x, "y_m", entryPoint.Value.y, "radius_m", c.entrance_lock_m);
+        }
         double nextWayOutCheck; bool hadWayOut;
         /// <summary>
         /// Keep a way out. Every escape_check_s while searching, plan the route home; if fire comes within

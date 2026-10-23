@@ -41,6 +41,19 @@ BURNING_KW_PER_M2 = float(_PERCEPTION["burning_kw_per_m2"])
 ONE_ROBOT_COOLS_KW = float(_NOZZLE["flow_lps"]) * float(_NOZZLE["cooling_kj_per_l"]) * float(_NOZZLE["application_efficiency"])
 
 
+def _flat_warm_surface(ev: dict) -> bool:
+    """An inspection that measured its warm region as flat: enough registered depth, a large plane or no non-planar
+    shape, and no colour person detection. Unknown shape (too little depth) is not flat."""
+    cues = ev.get("cues") or {}
+    depth, plane = cues.get("depth") or {}, cues.get("plane") or {}
+    if ev.get("verdict") == "person" or (cues.get("rgb_dnn") or {}).get("hits"):
+        return False
+    valid = depth.get("valid_fraction")
+    if valid is None or valid < float(_PERCEPTION["inspection_min_depth_fraction"]):
+        return False
+    return bool(plane.get("large_plane")) or depth.get("nonplanar") is False
+
+
 def spray_option(req: dict) -> dict | None:
     """The fire blocking this robot's way out (or, failing that, its way to unsearched floor), judged against its water.
 
@@ -577,6 +590,14 @@ class ToolRegistry:
         elif name == "approach_candidate":
             refusal = self._need(args, ("inspect_candidate",), lambda ev: ev.get("x") is not None,
                                  "the cited inspection has no position")
+            if refusal is None and _flat_warm_surface(self.evidence[str(args["evidence_id"])]):
+                # A body protrudes from what it lies on; a heated wall or panel does not. Seed 932: in the 96 s before the
+                # fire took the house, robot A spent about 37 s and robot B about 17 s turning to and walking up to warm
+                # shapes on walls. Over the recorded inspections 922 to 932 this rule marks 30 of 60 non-person views flat
+                # and 0 of 17 views of real people (n is small).
+                refusal = {"refused": True, "reason": "the cited inspection measured this warm region as a flat surface "
+                           "(enough registered depth, no protrusion from the plane, no colour person): a heated wall or panel. "
+                           "Reject it with reject_candidate and search on; look again only from a clearly different side."}
             if refusal is None and not RESCUE_ENABLED and (self._confirmed_near(self.evidence[args["evidence_id"]]) or any(
                     self.evidence[args["evidence_id"]].get("x") is not None and
                     math.hypot(float(p[0]) - float(self.evidence[args["evidence_id"]]["x"]), float(p[1]) - float(self.evidence[args["evidence_id"]]["y"])) <= SURVIVOR_MERGE_M
