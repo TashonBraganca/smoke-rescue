@@ -284,9 +284,9 @@ class RobotAgent:
                 self._trace({"kind": "step_deadline", "step": step_id, "after_rounds": rounds})
                 break
             rounds += 1
-            key = request_key(messages, _tools.tool_specs())
+            key = request_key(messages, _tools.tool_specs(ctx.event_kind))
             try:
-                reply: Reply = self.backend.chat(messages, _tools.tool_specs())
+                reply: Reply = self.backend.chat(messages, _tools.tool_specs(ctx.event_kind))
             except Exception as e:                       # model down or replay miss: the reflex brain carries on
                 self._trace({"kind": "model_error", "step": step_id, "error": repr(e)})
                 break

@@ -190,9 +190,20 @@ ACTIONS = [
 ALL_TOOLS = PERCEPTION + ACTIONS
 
 
-def tool_specs() -> list:
-    """The tools offered to the model this step: all of them, less the lift when rescue is switched off."""
-    return [t for t in ALL_TOOLS if RESCUE_ENABLED or t["function"]["name"] != "extract_survivor"]
+# Tools that the code refuses outright on a heat event (go_to, explore_frontier, turn_to_face: "no exploring during a heat
+# event") and tools with no use there. Offering them only draws calls that are refused; tool-calling accuracy also falls
+# with the number of tools and arguments offered (ROSBag MCP benchmark, arXiv 2511.03497, eight models).
+_NOT_ON_HEAT = {"go_to", "explore_frontier", "turn_to_face", "approach_candidate", "open_door", "clear_debris", "extract_survivor",
+                "propose_plan", "answer_proposal", "request_human_approval", "check_indoors", "measure_opening"}
+
+
+def tool_specs(event_kind: str | None = None) -> list:
+    """The tools offered to the model this step: all of them, less the lift when rescue is switched off, and on a heat
+    event (avoid_fire, retreat) only the tools that can act there: perception, confirm or reject, spray, keep-out, radio."""
+    out = [t for t in ALL_TOOLS if RESCUE_ENABLED or t["function"]["name"] != "extract_survivor"]
+    if event_kind in ("avoid_fire", "retreat"):
+        out = [t for t in out if t["function"]["name"] not in _NOT_ON_HEAT]
+    return out
 ACTION_NAMES = {t["function"]["name"] for t in ACTIONS}
 
 
