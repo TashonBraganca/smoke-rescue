@@ -310,8 +310,11 @@ class RobotAgent:
         # The step's thermal scan runs in code before the first round, so the model can inspect or act in round 1. Seed
         # 934: 62 of 72 steps spent a whole round (about 3 s) on scan_thermal first, steps averaged 15 s and reached 28 s
         # at 6 rounds. It is this step's evidence like any other scan; calling scan_thermal again returns the same result.
+        # Local recordings only: through the recording transport (remote_frames, set by the server for run:// and pull-v1)
+        # frames are fetched on request, and a scan the model did not ask for broke that protocol (8 transport tests).
+        scan = {"error": "remote frames: no pre-scan"} if req.get("remote_frames") else None
         try:
-            scan = tools.call("scan_thermal", {})
+            scan = scan or tools.call("scan_thermal", {})
         except Exception as e:                      # no usable frame: the model can still scan, or act without it
             scan = {"error": repr(e)}
         if scan.get("id") and not scan.get("error"):
