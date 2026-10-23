@@ -248,3 +248,35 @@ def test_negative_shape_still_wins_when_colour_box_overlaps_it(tmp_path, monkeyp
     hit = {'confidence':.9,'bbox_rgb':[65,25,30,70],'bearing_deg':0.,'range_m':3.}
     monkeypatch.setattr(v,'detect_people_rgb',lambda frame:[hit])
     assert v.inspect_candidate(f,0.,3.,output_dir=tmp_path)['verdict']=='not_person'
+
+
+def test_a_whole_colour_person_away_from_the_asked_spot_is_reported_not_dropped(tmp_path, monkeypatch):
+    # Seed 932: in 5 of 18 uncertain inspections a whole person box of 0.52 to 0.88 lay outside the bearing filter and
+    # was dropped; every such box was a real person, two not yet confirmed. Control: the same box at the asked bearing
+    # confirms, and is not also listed as another person.
+    f = scene(); f.thermal[:] = 2932
+    box = {"confidence": 0.8, "bbox_rgb": [60, 30, 30, 70], "bearing_deg": -15.0, "range_m": 3.2}
+    monkeypatch.setattr(v, "detect_people_rgb", lambda frame, **k: [box])
+    r = v.inspect_candidate(f, 10.0, 3.0, output_dir=tmp_path)
+    assert r["verdict"] == "uncertain"
+    assert [(p["bearing_deg"], p["range_m"]) for p in r["other_people"]] == [(-15.0, 3.2)]
+    g = scene(); g.thermal[:] = 2932
+    monkeypatch.setattr(v, "detect_people_rgb", lambda frame, **k: [box | {"bearing_deg": 10.0, "range_m": 3.0}])
+    s = v.inspect_candidate(g, 10.0, 3.0, output_dir=tmp_path)
+    assert s["verdict"] == "person" and "other_people" not in s, "control: at the asked spot it is the person"
+
+
+def test_an_empty_spot_in_full_view_with_no_colour_person_anywhere_is_not_a_person(tmp_path, monkeypatch):
+    # Held-out runs 1 and 2: 22 of 25 uncertain verdicts were not on a person, and only not_person lets a spot be
+    # rejected. Nothing warm at a spot in full view, and no colour person anywhere even at the detector's 0.35 floor, is
+    # now not_person. Controls: the spot outside the view, nearer than the blind floor, or any colour person in the frame
+    # (a real person with no warm match was rescued that way in run 2) stays uncertain.
+    def verdict(bearing, rng, boxes):
+        f = scene(); f.thermal[:] = 2932
+        monkeypatch.setattr(v, "detect_people_rgb", lambda frame, **k: boxes)
+        return v.inspect_candidate(f, bearing, rng, output_dir=tmp_path)["verdict"]
+    assert verdict(0.0, 3.0, []) == "not_person"
+    assert verdict(80.0, 3.0, []) == "uncertain", "control: outside the camera's view"
+    assert verdict(0.0, 1.0, []) == "uncertain", "control: nearer than the floor the camera sees"
+    weak = {"confidence": 0.4, "bbox_rgb": [100, 30, 30, 70], "bearing_deg": 20.0, "range_m": 4.0}
+    assert verdict(0.0, 3.0, [weak]) == "uncertain", "control: a colour person somewhere in the frame"

@@ -423,6 +423,9 @@ class ToolRegistry:
             else (float(bearing_deg), float(range_m))
         r["x"], r["y"] = (round(v, 2) for v in self.world(float(at[0]), float(at[1])))
         r["requested"] = {"bearing_deg": float(bearing_deg), "range_m": float(range_m)}
+        for other in r.get("other_people", []):
+            if other.get("range_m") is not None:
+                other["x"], other["y"] = (round(v, 2) for v in self.world(float(other["bearing_deg"]), float(other["range_m"])))
         # Per recording and per robot. Sensor time, not request time, rejects replayed frames.
         if r.get("t") is not None:
             key = (str(self.robot_dir.resolve()), self.ctx.robot)
