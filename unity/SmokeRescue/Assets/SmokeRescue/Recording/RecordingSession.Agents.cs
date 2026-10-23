@@ -175,10 +175,15 @@ namespace SmokeRescue.Recording
                 rig.trigger = null; rig.lastAgent = t;
                 FlushForAgent(rig, pending, cfg);
                 var s = rig.brain.Snapshot();
-                var frontiers = new JArray(rig.brain.FrontierOptions(t, FrontierOptions).Select(f => (object)new JObject
+                var frontiers = new JArray(rig.brain.FrontierOptions(t, FrontierOptions).Select(f =>
                 {
-                    ["id"] = f.id, ["x"] = Math.Round(f.position.x, 2), ["y"] = Math.Round(f.position.y, 2),
-                    ["path_m"] = Math.Round(f.pathM, 1), ["unsearched_m2"] = Math.Round(f.unsearchedM2, 1), ["mapped_unsearched_m2"] = Math.Round(f.mappedUnsearchedM2, 1), ["proven_indoors"] = f.provenIndoors, ["toward_partner"] = f.towardPartner,
+                    var option = new JObject
+                    {
+                        ["id"] = f.id, ["x"] = Math.Round(f.position.x, 2), ["y"] = Math.Round(f.position.y, 2),
+                        ["path_m"] = Math.Round(f.pathM, 1), ["unsearched_m2"] = Math.Round(f.unsearchedM2, 1), ["mapped_unsearched_m2"] = Math.Round(f.mappedUnsearchedM2, 1), ["proven_indoors"] = f.provenIndoors, ["toward_partner"] = f.towardPartner,
+                    };
+                    if (f.roomId >= 0) option["room_id"] = f.roomId;
+                    return (object)option;
                 }));
                 var req = new JObject
                 {
@@ -221,6 +226,14 @@ namespace SmokeRescue.Recording
                     ["partners"] = new JArray(s.peers.Select(p => (object)new JObject { ["robot"] = p.robot, ["maps_linked"] = p.linked,
                         ["position"] = p.linked ? new JArray(Math.Round(p.pose.position.x, 2), Math.Round(p.pose.position.y, 2)) : null })),
                 };
+                var rooms = rig.brain.RoomOptions(t);
+                if (rooms.Count > 0)
+                    req["rooms"] = new JArray(rooms.Select(room => (object)new JObject
+                    {
+                        ["id"] = room.id, ["x"] = Math.Round(room.centre.x, 2), ["y"] = Math.Round(room.centre.y, 2),
+                        ["covered_share"] = room.coveredShare, ["entered"] = room.entered,
+                        ["dwell_s"] = Math.Round(room.dwellS, 1), ["indoor_floor_m2"] = Math.Round(room.indoorFloorM2, 1),
+                    }));
                 calls.Add((rig, req));
             }
             // Every due robot's step goes out at once, so the sim waits for the slowest model call, not their sum.

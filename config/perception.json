@@ -1,6 +1,8 @@
 {
   "frame_tolerance_s": 0.5,
   "frame_tolerance_s_reason": "Preserve the camera loader's existing half-second tolerance for matching recorded frames and reject LiDAR scans farther than this from the thermal frame.",
+  "inspection_shape_min_points": 80,
+  "inspection_shape_min_points_reason": "With 80 independent Gaussian range samples, RMS noise has about 8 percent relative standard error, below the existing 50 percent residual-above-noise margin. Eighty also matches the inspection plane segmenter minimum. Below the fractional coverage gate, require at least 20 real camera rays in each of the four image quadrants and a measured body-sized footprint. Four quadrants constrain both image axes; a surviving patch cannot certify the whole body. Correlation and mixed surfaces can violate the ideal noise model, so all negative recordings still need audit. Missing rays and planar LiDAR ranges never count as camera points. This is a fitting-support requirement, not a cutoff fitted to a recording.",
   "inspection_min_depth_fraction": 0.6,
   "inspection_min_depth_fraction_reason": "Preserve inspect_candidate's existing 60 percent valid registered-depth gate. Below it, fill only missing warm-component pixels from a matching LiDAR scan before applying the same inspection checks.",
   "bearing_tolerance_deg": 5.0,

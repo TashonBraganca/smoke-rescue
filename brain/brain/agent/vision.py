@@ -347,6 +347,28 @@ def _size_plausible(width, height):
                 and max(width, height) / min(width, height) <= 7)
 
 
+def _camera_shape_support(frame, mask, depth, region, config):
+    """Check measured rays without counting missing floor or LiDAR as body points.
+
+    The floor cut removes measured floor but retains unknown pixels. Distributed
+    camera points can still constrain body shape when the valid fraction falls.
+    A small surviving patch cannot certify the whole warm component.
+    """
+    yy, xx = np.nonzero(mask & np.isfinite(depth) & (depth > 0))
+    x, y, w, h = region["bbox"]
+    quadrants = (xx >= x + w / 2).astype(int) + 2 * (yy >= y + h / 2)
+    counts = np.bincount(quadrants, minlength=4)
+    z = float(np.median(depth[yy, xx])) if len(xx) else None
+    width = float(np.ptp(xx) + 1) * z / frame.thermal_K[0, 0] if len(xx) else None
+    height = float(np.ptp(yy) + 1) * z / frame.thermal_K[1, 1] if len(xx) else None
+    minimum = int(config["inspection_shape_min_points"])
+    sufficient = bool(len(xx) >= minimum and np.all(counts >= minimum / 4)
+                      and _size_plausible(width, height))
+    return {"sufficient": sufficient, "points": len(xx), "quadrant_points": counts.tolist(),
+            "measured_width_m": _number(width) if width is not None else None,
+            "measured_height_m": _number(height) if height is not None else None}
+
+
 def scan_thermal(frame: Frame, *, human_band_c=(28.,40.), hot_min_c=200., min_pixels=8) -> dict:
     """Return unconfirmed warm components and >=200 C projected hot footprints."""
     lo,hi = map(float,human_band_c)
@@ -480,8 +502,10 @@ def inspect_candidate(frame: Frame, bearing_deg: float, range_m: float, *, outpu
     """Inspect nearest warm component. Output directory is required for evidence.
 
     Person needs body dimensions, temperature structure and nonplanar depth.
-    Below the configured depth coverage, a matching LiDAR sweep fills missing
-    warm pixels before these checks. Measured depth always takes precedence.
+    Distributed camera points with a measured body-sized footprint can support
+    shape below the fractional coverage gate. Otherwise a matching LiDAR sweep
+    can supply range, but never body shape. Missing camera rays stay missing
+    when enough camera points constrain the fit.
     A large plane or >=0.8 m background recess is a negative cue. Uniform
     temperature alone is uncertain because clothing can hide skin structure.
     Body size accepts standing or recumbent components, 0.45 to 2.2 m long.
@@ -513,8 +537,10 @@ def inspect_candidate(frame: Frame, bearing_deg: float, range_m: float, *, outpu
     else:
         _,mask,region = min(options,key=lambda o:o[0])
         registered_fraction = region["depth_fraction"]
+        camera_support = _camera_shape_support(frame, mask, depth, region, config)
+        camera_shape_supported = registered_fraction >= min_depth_fraction or camera_support["sufficient"]
         lidar_cue = None
-        if registered_fraction < min_depth_fraction:
+        if not camera_shape_supported:
             depth, lidar_cue = _lidar_component_depth(frame, mask, depth, config["frame_tolerance_s"])
             if lidar_cue is not None:
                 x, y, w, h = region["bbox"]
@@ -565,13 +591,13 @@ def inspect_candidate(frame: Frame, bearing_deg: float, range_m: float, *, outpu
                 "recess_m":_number(recess) if recess is not None else None},"rgb":rgb,
             "depth":{"valid_fraction":region["depth_fraction"],"registered_fraction":registered_fraction,"nonplanar":nonplanar,
                 "span_m":_number(depth_span) if depth_span is not None else None,"single_surface":single_surface,
-                "body_shape_supported":registered_fraction>=min_depth_fraction}}
+                "body_shape_supported":camera_shape_supported,"camera_support":camera_support}}
         reasons = []
         if lidar_cue is not None:
             result["cues"]["lidar"] = lidar_cue
             reasons.append("Inspection uses LiDAR range for missing registered depth; the scan measures the horizontal plane, not vertical body shape.")
         size_negative = (not size_ok) and (not truncated or too_big)
-        if region["depth_fraction"]<min_depth_fraction: reasons.append("Too little registered depth to judge shape.")
+        if region["depth_fraction"]<min_depth_fraction and not camera_shape_supported: reasons.append("Too little registered depth to judge shape.")
         elif plane["large_plane"] or window or size_negative:
             result["verdict"] = "not_person"
             if plane["large_plane"]: reasons.append("Warm pixels lie on a plane larger than the warm component.")
@@ -586,7 +612,7 @@ def inspect_candidate(frame: Frame, bearing_deg: float, range_m: float, *, outpu
                                "view it from further back (approach_candidate citing this inspection steps back to the viewing distance).")
         elif ramp: reasons.append("Warm component is a slope between hotter and cooler surfaces, not a distinct body.")
         elif not single_surface: reasons.append("Warm component spans more than 1.5 m of depth, so it covers several surfaces rather than one body.")
-        elif temp_ok and nonplanar and registered_fraction>=min_depth_fraction:
+        elif temp_ok and nonplanar and camera_shape_supported:
             result["verdict"] = "person"
             reasons.append("Body-sized warm component has temperature structure and nonplanar depth without a background recess.")
         elif temp_ok and nonplanar and lidar_cue is not None:
@@ -631,12 +657,16 @@ def inspect_candidate(frame: Frame, bearing_deg: float, range_m: float, *, outpu
                     "verdict":"not_person", "candidate":result["candidate"], "reasons":result["reasons"]}
                 result["candidate"] = None
                 result["reasons"] = ["The rejected warm object projects outside the colour person's box; its negative shape cues do not describe that person."]
+            if result.get("candidate") is not None:
+                result["cues"]["thermal_candidate"] = result["candidate"]
             result["verdict"] = "person"
-            # With no warm body matched, the person is where the colour detector measured them, not where the agent asked.
-            if result.get("candidate") is None and best.get("range_m") is not None:
-                result["candidate"] = {"bearing_deg": best["bearing_deg"], "range_m": best["range_m"], "source": "rgb_dnn",
-                                       "range_source": best.get("range_source", "depth"), "range_evidence": best.get("range_evidence"),
-                                       "bbox_rgb": best["bbox_rgb"]}
+            # The colour detection supplies this verdict, so its own measured
+            # geometry must supply the location. A nearby clipped warm patch
+            # cannot lend it a shorter range. Unknown colour range stays unknown.
+            result["candidate"] = {"bearing_deg": best["bearing_deg"], "range_m": best.get("range_m"), "source": "rgb_dnn",
+                                   "range_source": best.get("range_source", "depth"), "range_evidence": best.get("range_evidence"),
+                                   "bbox_rgb": best["bbox_rgb"]}
+            result["cues"]["range_source"] = best.get("range_source")
             result["reasons"] = result["reasons"] + [f"OpenCV dnn person detector (YOLO11m) confidence {best['confidence']:.2f} "
                                                      f"at bearing {best['bearing_deg']:.1f} deg, range {best['range_m']} m."]
         elif not thermal_negative and any(h["confidence"] >= 0.5 for h in hits):
@@ -679,9 +709,10 @@ class InspectionHistory:
         size, depth, thermal = (cues.get(k, {}) for k in ("size", "depth", "temperature"))
         if out.get("verdict") == "not_person":
             self.observations = [o for o in self.observations if not near(o)]
-        qualified = bool(candidate.get("range_m") is not None and
+        qualified = bool(candidate.get("range_m") is not None and candidate.get("source") != "rgb_dnn" and
             out.get("verdict") != "not_person" and cues.get("range_source") == "depth" and
-            size.get("plausible") and depth.get("registered_fraction", 0) >= cfg["inspection_min_depth_fraction"] and
+            size.get("plausible") and (depth.get("registered_fraction", 0) >= cfg["inspection_min_depth_fraction"] or
+                                      depth.get("camera_support", {}).get("sufficient", False)) and
             depth.get("nonplanar") and depth.get("single_surface") and thermal.get("structured") and
             not thermal.get("band_crossing_ramp") and not cues.get("plane", {}).get("large_plane") and
             not cues.get("window", {}).get("opening"))

@@ -79,6 +79,8 @@ namespace SmokeRescue.Brain
         /// <summary>Indoor floor this robot mapped beyond the frontier that no camera has searched
         /// (OccupancyGrid.UnsearchedFloorBeyond).</summary>
         public float mappedUnsearchedM2;
+        /// <summary>Local sensed-map room estimate, or -1 when the ledger is off or no room is known.</summary>
+        public int roomId;
     }
     public readonly struct PersonDetection
     {

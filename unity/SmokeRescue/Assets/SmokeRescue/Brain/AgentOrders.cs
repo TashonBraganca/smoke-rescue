@@ -77,6 +77,7 @@ namespace SmokeRescue.Brain
         public IReadOnlyList<BrainFrontier> FrontierOptions(double t, int max)
         {
             if (max <= 0) return Array.Empty<BrainFrontier>();
+            planner.Rooms.Update(t, motion.Pose.position, InSearchArea);
             // Keep the indoor boundary when clustering, so a nearby proven standpoint cannot hide an unproven
             // doorway in the same cluster. Wide slots compete across both sets before either set is truncated.
             int claimed = 0, blacklisted = 0, visited = 0, outside = 0;
@@ -112,7 +113,9 @@ namespace SmokeRescue.Brain
             while (pi < proven.Count || ui < unproven.Count)
                 if (ui >= unproven.Count || (pi < proven.Count && proven[pi].score <= unproven[ui].score)) all.Add(proven[pi++]);
                 else all.Add(unproven[ui++]);
+            planner.Rooms.Rank(all, motion.Pose.position);
             var picked = new List<int>(); int wide = 0, wideUnproven = 0;
+            if (c.room_ledger && all.Count > 0) picked.Add(0);
             if (c.frontier_wide_options > 0 && all.Count > max)
             {
                 var label = grid.UnsearchedRegions(); var nearestOf = new Dictionary<int, int>();
@@ -127,9 +130,9 @@ namespace SmokeRescue.Brain
                     if (m2 >= c.frontier_wide_min_m2) regions.Add((i, m2));
                 }
                 regions.Sort((a, b) => { int k = b.m2.CompareTo(a.m2); return k != 0 ? k : a.index.CompareTo(b.index); });
-                for (int k = 0; k < regions.Count && wide < Math.Min(max, c.frontier_wide_options); k++)
+                for (int k = 0; k < regions.Count && picked.Count < max && wide < Math.Min(max, c.frontier_wide_options); k++)
                 {
-                    int i = regions[k].index; picked.Add(i); wide++;
+                    int i = regions[k].index; if (picked.Contains(i)) continue; picked.Add(i); wide++;
                     if (!InSearchArea(all[i].position)) wideUnproven++;
                 }
             }
@@ -143,12 +146,21 @@ namespace SmokeRescue.Brain
                 var f = all[index];
                 list.Add(new BrainFrontier { id = list.Count, position = f.position, pathM = f.cost, towardPartner = f.towardPartner,
                     unsearchedM2 = f.information * grid.CellM * grid.CellM, provenIndoors = InSearchArea(f.position),
-                    mappedUnsearchedM2 = grid.UnsearchedFloorBeyond(f.position, c.frontier_beyond_m) });
+                    mappedUnsearchedM2 = grid.UnsearchedFloorBeyond(f.position, c.frontier_beyond_m),
+                    roomId = c.room_ledger ? planner.Rooms.RoomForFrontier(f.position) : -1 });
             }
             Emit(t, "frontier_options", $"{proven.Count} proven and {unproven.Count} unproven frontiers; boundary cells dropped from the proven set as claimed by a partner, blacklisted, visited, or not known to be indoors.",
                 "frontiers", proven.Count, "cells_claimed", claimed, "cells_blacklisted", blacklisted, "cells_visited", visited, "cells_not_indoors", outside,
                 "unproven_frontiers", unproven.Count, "wide_options", wide, "wide_unproven_options", wideUnproven);
             return list;
+        }
+
+        /// <summary>Estimated room labels for agent context, in this robot's frame. IDs are local to this robot.
+        /// A split or merge can change IDs; visit time stays attached to sensed pose cells.</summary>
+        public IReadOnlyList<RoomLedger.Room> RoomOptions(double t)
+        {
+            planner.Rooms.Update(t, motion.Pose.position, InSearchArea);
+            return c.room_ledger ? planner.Rooms.Rooms : Array.Empty<RoomLedger.Room>();
         }
 
         /// <summary>For the agent: the nearest unsearched floor this robot's map shows but cannot reach, with its bearing
