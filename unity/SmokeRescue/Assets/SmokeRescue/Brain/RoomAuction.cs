@@ -84,8 +84,15 @@ namespace SmokeRescue.Brain
             return m;
         }
 
-        /// <summary>Seconds of travel left along the current path.</summary>
-        float RemainingBid() => PathLength(path) / c.open_speed_mps;
+        /// <summary>Seconds of travel left along the current path, from the waypoint being followed. Summing the whole path made
+        /// the bid grow as the robot walked: 9 m into a 10 m route it bid 19 m, lost the room to a partner 6 m away, and
+        /// re-claimed it on the next plan (review of 23 Oct).</summary>
+        float RemainingBid()
+        {
+            float m = 0; var at = motion.Pose.position;
+            for (int i = Mathf.Clamp(cursor, 0, path.Count); i < path.Count; i++) { m += Vector2.Distance(at, path[i]); at = path[i]; }
+            return m / c.open_speed_mps;
+        }
 
         BrainRoomClaim RoomClaimToSend(double t, bool searching)
         {

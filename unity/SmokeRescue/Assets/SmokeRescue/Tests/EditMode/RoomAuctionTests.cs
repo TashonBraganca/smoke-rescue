@@ -274,6 +274,24 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void ARoomBidCountsOnlyThePathStillToWalk()
+        {
+            // Review of 23 Oct: the bid summed the whole path, so it grew as the robot walked and a partner farther away won the room.
+            var c = AuctionSettings(); var b = new RobotBrain(Calibration(), c, "robot_A", 0);
+            var route = new List<Vector2>(); for (int i = 1; i <= 10; i++) route.Add(new Vector2(0, i));
+            typeof(RobotBrain).GetField("path", Private).SetValue(b, route);
+            var bid = typeof(RobotBrain).GetMethod("RemainingBid", Private);
+            float atStart = (float)bid.Invoke(b, null);
+            Assert.That(atStart, Is.EqualTo(10 / c.open_speed_mps).Within(.01f), "control: the whole 10 m route at the start");
+            typeof(RobotBrain).GetField("cursor", Private).SetValue(b, 9);   // following the last waypoint
+            Assert.That((float)bid.Invoke(b, null), Is.EqualTo(10 / c.open_speed_mps).Within(.01f), "from the pose straight to the last waypoint");
+            route[0] = new Vector2(5, 0);   // a passed waypoint far off the route no longer counts
+            Assert.That((float)bid.Invoke(b, null), Is.EqualTo(10 / c.open_speed_mps).Within(.01f), "waypoints already passed are not counted");
+            typeof(RobotBrain).GetField("cursor", Private).SetValue(b, 0);
+            Assert.That((float)bid.Invoke(b, null), Is.GreaterThan(10 / c.open_speed_mps + 1), "control: from waypoint 0 the detour counts");
+        }
+
+        [Test]
         public void TheEntranceLockLetsARouteCrossTheWayInOnlyIndoorsAndNeverStopsThere()
         {
             // Headless house 5015: the way in opened onto the hallway beside the living room door. A whole-disc lock walled both
