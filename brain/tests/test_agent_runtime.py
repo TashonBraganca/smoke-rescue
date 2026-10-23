@@ -888,3 +888,16 @@ def test_the_step_scan_is_in_the_first_rounds_context_and_citable(tmp_path, monk
     out = RobotAgent(Scripted([[ToolCall("finish", {"summary": "no frame"})]]), tmp_path / "u.jsonl").step(request(tmp_path) | {"t": 20.0})
     start = [json.loads(l) for l in (tmp_path / "u.jsonl").read_text().splitlines() if '"step_start"' in l][-1]
     assert "scan_thermal" not in start["context"] and out["summary"] == "no frame", "control: no scan, step still runs"
+
+
+def test_confirmed_people_are_marked_for_the_model_with_bearing_and_distance(tmp_path, monkeypatch):
+    # Seed 934: both robots confirmed one person twice; the context held only raw survivor coordinates. Each confirmed
+    # person is now listed with bearing, distance and in_view. Control: with nobody confirmed, no list.
+    fake_vision(monkeypatch, "uncertain")
+    RobotAgent(Scripted([[ToolCall("finish", {"summary": "ok"})]]), tmp_path / "t.jsonl").step(request(tmp_path) | {"survivors": [[5.0, 8.0]]})
+    ctx = [json.loads(l) for l in (tmp_path / "t.jsonl").read_text().splitlines() if '"step_start"' in l][-1]["context"]
+    (p,) = ctx["confirmed_people"]
+    assert (p["x"], p["y"], p["distance_m"], p["bearing_deg"], p["in_view"]) == (5.0, 8.0, 3.0, 0.0, True)
+    RobotAgent(Scripted([[ToolCall("finish", {"summary": "ok"})]]), tmp_path / "u.jsonl").step(request(tmp_path) | {"t": 30.0})
+    ctx = [json.loads(l) for l in (tmp_path / "u.jsonl").read_text().splitlines() if '"step_start"' in l][-1]["context"]
+    assert "confirmed_people" not in ctx, "control: nobody confirmed"
