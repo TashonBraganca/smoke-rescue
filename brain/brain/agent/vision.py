@@ -751,7 +751,7 @@ class InspectionHistory:
         return out
 
 
-PERSON_ONNX = Path(__file__).resolve().parents[3] / "data" / "models" / "onnx" / "yolo11m.onnx"
+PERSON_ONNX = Path(__file__).resolve().parents[3] / "data" / "models" / "onnx" / str(_perception().get("person_onnx", "yolo11m.onnx"))
 _net = None
 _net_lock = threading.Lock()   # one cv2.dnn.Net is not safe to run from two server threads at once
 
