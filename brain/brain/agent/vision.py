@@ -645,10 +645,17 @@ def inspect_candidate(frame: Frame, bearing_deg: float, range_m: float, *, outpu
         if thermal_negative:
             # A negative shape cue applies to the selected warm object. It cannot
             # reject a separate body elsewhere in the calibrated colour image.
-            # Any overlap preserves the negative, including partial silhouettes.
+            # Any overlap preserves the negative, including partial silhouettes,
+            # except when the only negative is that the warm object is too SMALL to be a body: exposed skin (a head, a
+            # hand) is a small warm patch inside a clothed person, so a whole colour person whose box contains it is that
+            # person, not a separate object. Seed 932, robot A at 0 s: a 21 x 17 px head at 4 m (0.20 x 0.24 m) was
+            # "outside the body-size bounds" while YOLO saw a whole person at 0.83 within 5 deg and 0.55 m; the overlap
+            # kept the negative and a real person two rooms from the fire was not confirmed. A warm object too big, on a
+            # large plane or in a recess still vetoes any colour box it overlaps.
+            small_only = size_negative and not too_big and not plane["large_plane"] and not window
             def separate(hit):
                 x,y,w,h = hit["bbox_rgb"]
-                return hit.get("range_m") is not None and not aligned[y:y+h,x:x+w].any()
+                return hit.get("range_m") is not None and (small_only or not aligned[y:y+h,x:x+w].any())
             whole = [h for h in whole if separate(h)]
         if whole and max(h["confidence"] for h in whole) >= 0.5:
             best = max(whole, key=lambda h: h["confidence"])
@@ -656,7 +663,9 @@ def inspect_candidate(frame: Frame, bearing_deg: float, range_m: float, *, outpu
                 result["cues"]["rejected_thermal_object"] = {
                     "verdict":"not_person", "candidate":result["candidate"], "reasons":result["reasons"]}
                 result["candidate"] = None
-                result["reasons"] = ["The rejected warm object projects outside the colour person's box; its negative shape cues do not describe that person."]
+                result["reasons"] = [("The rejected warm object is smaller than a body and lies inside the colour person's box: exposed skin of that person, not a separate object."
+                                      if small_only and aligned[best["bbox_rgb"][1]:best["bbox_rgb"][1]+best["bbox_rgb"][3], best["bbox_rgb"][0]:best["bbox_rgb"][0]+best["bbox_rgb"][2]].any()
+                                      else "The rejected warm object projects outside the colour person's box; its negative shape cues do not describe that person.")]
             if result.get("candidate") is not None:
                 result["cues"]["thermal_candidate"] = result["candidate"]
             result["verdict"] = "person"
