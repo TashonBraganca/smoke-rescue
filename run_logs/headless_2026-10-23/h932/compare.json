@@ -1,0 +1,42 @@
+{
+ "now240": {
+  "932": {
+   "room_mean_pct": 22,
+   "rooms_under_50": 23,
+   "rooms": 30,
+   "sighted": 4,
+   "confirmed": 4,
+   "people": 5,
+   "false": 0,
+   "walked_m": 129.3,
+   "turning_s": 78,
+   "still_s": 48,
+   "outside_s": 18,
+   "stuck_events": 12,
+   "yields": 0,
+   "peak_air_c": 21,
+   "over_60_s": 0,
+   "min_robot_rooms": 5
+  }
+ },
+ "pinned240": {
+  "932": {
+   "room_mean_pct": 22,
+   "rooms_under_50": 23,
+   "rooms": 30,
+   "sighted": 4,
+   "confirmed": 4,
+   "people": 5,
+   "false": 0,
+   "walked_m": 129.3,
+   "turning_s": 78,
+   "still_s": 48,
+   "outside_s": 18,
+   "stuck_events": 12,
+   "yields": 0,
+   "peak_air_c": 21,
+   "over_60_s": 0,
+   "min_robot_rooms": 5
+  }
+ }
+}

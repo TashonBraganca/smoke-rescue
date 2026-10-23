@@ -1,0 +1,169 @@
+<title>Seed 932 Inspections</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chivo:wght@500;700&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one column of verdict groups, each a wrapping grid of inspection cards; jump bar on top. */
+:root{--bg:#f3f4f2;--panel:#ffffff;--fg:#1d2321;--muted:#5d6763;--line:#d7dcd9;--person:#1f8a4c;--unsure:#b7791f;--reject:#b23a3a;--check:#4a6fa5;
+--display:"Chivo",system-ui,sans-serif;--body:"Source Sans 3",system-ui,sans-serif;--mono:"JetBrains Mono",ui-monospace,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121614;--panel:#1b201e;--fg:#e6ebe8;--muted:#9aa6a1;--line:#2c3431;--person:#4cc285;--unsure:#e0a84a;--reject:#e57373;--check:#86a8dc;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#121614;--panel:#1b201e;--fg:#e6ebe8;--muted:#9aa6a1;--line:#2c3431;--person:#4cc285;--unsure:#e0a84a;--reject:#e57373;--check:#86a8dc;color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font:16px/1.5 var(--body);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:24px 48px}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:32px}
+h1{font:700 clamp(1.6rem,4vw,2.3rem)/1.15 var(--display);margin:0;text-wrap:balance}
+.lede{color:var(--muted);max-width:68ch;margin:8px 0 0}
+.lede code,.file{font-family:var(--mono);font-size:.8rem}
+nav{display:flex;flex-wrap:wrap;gap:8px}
+nav a{text-decoration:none;color:var(--fg);border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:4px 12px;font-weight:600;font-variant-numeric:tabular-nums}
+nav a:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+nav a span{color:var(--muted);font-weight:400;margin-left:6px}
+.group header{border-left:4px solid var(--c);padding-left:12px}
+.g-person{--c:var(--person)}.g-uncertain{--c:var(--unsure)}.g-not_person{--c:var(--reject)}.g-check{--c:var(--check)}
+h2{font:700 1.3rem/1.2 var(--display);margin:0;color:var(--c)}
+h2 .n{font-family:var(--mono);font-size:.95rem;color:var(--muted);font-weight:400}
+.group header p{margin:4px 0 0;color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));gap:16px;margin-top:16px}
+.card{margin:0;background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow:hidden;display:flex;flex-direction:column;min-width:0}
+.card img{display:block;width:100%;height:auto;image-rendering:pixelated;border-bottom:1px solid var(--line)}
+figcaption{padding:10px 12px 12px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.meta{font-family:var(--mono);font-size:.8rem;color:var(--c);font-variant-numeric:tabular-nums}
+figcaption ul{margin:0;padding-left:18px;font-size:.92rem}
+.file{color:var(--muted);overflow-wrap:anywhere}
+.pair{display:grid;grid-template-columns:1fr;gap:1px;background:var(--line)}
+.pair img{border-bottom:0}
+.lab{font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:4px 12px;background:var(--panel)}
+.scores{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-family:var(--mono);font-size:.8rem;font-variant-numeric:tabular-nums}
+.scores dt{color:var(--muted)}.scores dd{margin:0}
+.hi{color:var(--reject);font-weight:600}
+.flag{align-self:flex-start;background:var(--reject);color:var(--panel);font:600 .75rem var(--mono);padding:2px 8px;border-radius:3px}
+.card.missed{border-color:var(--reject);box-shadow:0 0 0 1px var(--reject)}
+.note{max-width:72ch;color:var(--muted);margin:0}
+.key{display:flex;flex-wrap:wrap;gap:16px;font-size:.9rem;color:var(--muted)}
+.key b{font-family:var(--mono)}
+</style>
+<div class="wrap">
+<header><h1>What the agent saw at each inspection</h1>
+<p class="lede">Seed 932, the last complete Unity run (22 Oct, one entrance). Each card: the agent's own view at that inspection, then the full camera frame with every person box the detector (YOLO11m, OpenCV dnn) finds, re-run at a 0.10 floor. A score of 0.5 or more counts as a person. The agent's tool keeps only boxes within 8° and 1.5 m of the spot it was asked to inspect; "Score near spot" is that. "Whole frame" is everything.</p></header>
+<p class="note"><b>Finding:</b> in none of the 18 uncertain inspections did the detector see a person at the spot inspected; those spots were warm walls, door frames and objects at 28 to 38 °C. In 5 of them it saw a person elsewhere in the same frame at 0.52 to 0.88, and the tool discarded it (red cards). Not yet checked: whether those were people already confirmed or people missed.</p>
+<nav aria-label="Verdicts"><a href="#person">Confirmed<span>6</span></a><a href="#uncertain">Uncertain<span>18</span></a></nav>
+<section id="person" class="group g-person"><header><h2>Confirmed <span class="n">6</span></h2><p>The agent judged these a person.</p></header><div class="grid"><figure class="card"><div class="pair">
+<img src="img/72cf3478122d4e80.png" alt="Agent's thermal and colour view" loading="lazy" width="512" height="256"><div class="lab">What the agent's tool looked at (thermal | colour)</div>
+<img src="frames/72cf3478122d4e80.jpg" alt="Full camera frame with detector boxes" loading="lazy" width="640" height="480"><div class="lab">Full camera frame, every YOLO11m box (green = 0.5 or more)</div></div>
+<figcaption><div class="meta">Robot A · 0.0 s · 4.3 m</div>
+<dl class="scores"><dt>Looked at</dt><dd>+6.2°</dd><dt>Score near spot</dt><dd>0.83</dd><dt>Whole frame</dt><dd><span class="hi">0.83 at +6.1°</span></dd></dl>
+<ul><li>Temperature structure or nonplanar body shape is insufficient for confirmation.</li><li>OpenCV dnn person detector (YOLO11m) confidence 0.83 at bearing 6.1 deg, range 4.502251 m.</li></ul><div class="file">agent_debug/72cf3478122d4e80.png</div></figcaption></figure><figure class="card"><div class="pair">
+<img src="img/54af812568324a40.png" alt="Agent's thermal and colour view" loading="lazy" width="512" height="256"><div class="lab">What the agent's tool looked at (thermal | colour)</div>
+<img src="frames/54af812568324a40.jpg" alt="Full camera frame with detector boxes" loading="lazy" width="640" height="480"><div class="lab">Full camera frame, every YOLO11m box (green = 0.5 or more)</div></div>
+<figcaption><div class="meta">Robot B · 5.4 s · 5.7 m</div>
+<dl class="scores"><dt>Looked at</dt><dd>+13.7°</dd><dt>Score near spot</dt><dd>0.90</dd><dt>Whole frame</dt><dd><span class="hi">0.75 at +13.0°</span></dd></dl>
+<ul><li>Too little registered depth to judge shape.</li><li>OpenCV dnn person detector (YOLO11m) confidence 0.90 at bearing 15.6 deg, range 5.411728 m.</li></ul><div class="file">agent_debug/54af812568324a40.png</div></figcaption></figure><figure class="card"><div class="pair">
+<img src="img/b06cc7ab87ccdf57.png" alt="Agent's thermal and colour view" loading="lazy" width="512" height="256"><div class="lab">What the agent's tool looked at (thermal | colour)</div>
+<img src="frames/b06cc7ab87ccdf57.jpg" alt="Full camera frame with detector boxes" loading="lazy" width="640" height="480"><div class="lab">Full camera frame, every YOLO11m box (green = 0.5 or more)</div></div>
+<figcaption><div class="meta">Robot B · 14.1 s · 4.6 m</div>
+<dl class="scores"><dt>Looked at</dt><dd>+13.3°</dd><dt>Score near spot</dt><dd>none</dd><dt>Whole frame</dt><dd><span class="hi">0.91 at -18.5°</span>, 0.26 at +11.5°</dd></dl>
+<ul><li>Body-sized warm component has temperature structure and nonplanar depth without a background recess.</li></ul><div class="file">agent_debug/b06cc7ab87ccdf57.png</div></figcaption></figure><figure class="card"><div class="pair">
+<img src="img/4337b142ac964696.png" alt="Agent's thermal and colour view" loading="lazy" width="512" height="256"><div class="lab">What the agent's tool looked at (thermal | colour)</div>
+<img src="frames/4337b142ac964696.jpg" alt="Full camera frame with detector boxes" loading="lazy" width="640" height="480"><div class="lab">Full camera frame, every YOLO11m box (green = 0.5 or more)</div></div>
+<figcaption><div class="meta">Robot A · 45.0 s · 5.3 m</div>
+<dl class="scores"><dt>Looked at</dt><dd>-15.4°</dd><dt>Score near spot</dt><dd>0.83</dd><dt>Whole frame</dt><dd><span class="hi">0.83 at -15.5°</span></dd></dl>
+<ul><li>Too little registered depth to judge shape.</li><li>OpenCV dnn person detector (YOLO11m) confidence 0.83 at bearing -15.5 deg, range 5.566421 m.</li></ul><div class="file">agent_debug/4337b142ac964696.png</div></figcaption></figure><figure class="card"><div class="pair">
+<img src="img/b5dc1cbd40c7f6b1.png" alt="Agent's thermal and colour view" loading="lazy" width="512" height="256"><div class="lab">What the agent's tool looked at (thermal | colour)</div>
+<img src="frames/b5dc1cbd40c7f6b1.jpg" alt="Full camera frame with detector boxes" loading="lazy" width="640" height="480"><div class="lab">Full camera frame, every YOLO11m box (green = 0.5 or more)</div></div>
+<figcaption><div class="meta">Robot B · 45.5 s · 2.8 m</div>
+<dl class="scores"><dt>Looked at</dt><dd>+21.6°</dd><dt>Score near spot</dt><dd>0.92</dd><dt>Whole frame</dt><dd><span class="hi">0.92 at +20.8°</span>, 0.30 at +16.5°</dd></dl>
+<ul><li>Warm component touches the image edge, so its size is clipped and cannot confirm a body.</li><li>OpenCV dnn person detector (YOLO11m) confidence 0.92 at bearing 20.8 deg, range 3.1426 m.</li></ul><div class="file">agent_debug/b5dc1cbd40c7f6b1.png</div></figcaption></figure><figure class="card"><div class="pair">
+<img src="img/29f01947530f0d98.png" alt="Agent's thermal and colour view" loading="lazy" width="512" height="256"><div class="lab">What the agent's tool looked at (thermal | colour)</div>
+<img src="frames/29f01947530f0d98.jpg" alt="Full camera frame with detector boxes" loading="lazy" width="640" height="480"><div class="lab">Full camera frame, every YOLO11m box (green = 0.5 or more)</div></div>
+<figcaption><div class="meta">Robot A · 49.0 s · 3.7 m</div>
+<dl class="scores"><dt>Looked at</dt><dd>+16.0°</dd><dt>Score near spot</dt><dd>0.93</dd><dt>Whole frame</dt><dd><span class="hi">0.93 at +17.2°</span></dd></dl>
+<ul><li>Too little registered depth to judge shape.</li><li>OpenCV dnn person detector (YOLO11m) confidence 0.93 at bearing 17.2 deg, range 3.901165 m.</li></ul><div class="file">agent_debug/29f01947530f0d98.png</div></figcaption></figure></div></section>
+<section id="uncertain" class="group g-uncertain"><header><h2>Uncertain <span class="n">18</span></h2><p>The agent could not decide. Red cards: a person was detected elsewhere in the same frame.</p></header><div class="grid"><figure class="card missed"><div class="pair">
+<img src="img/b5a6c49c83b5e21e.png" alt="Agent's thermal and colour view" loading="lazy" width="512" height="256"><div class="lab">What the agent's tool looked at (thermal | colour)</div>
+<img src="frames/b5a6c49c83b5e21e.jpg" alt="Full camera frame with detector boxes" loading="lazy" width="640" height="480"><div class="lab">Full camera frame, every YOLO11m box (green = 0.5 or more)</div></div>
+<figcaption><div class="meta">Robot B · 13.4 s · 5.3 m</div><span class="flag">Person in frame, not inspected</span>
+<dl class="scores"><dt>Looked at</dt><dd>+34.7°</dd><dt>Score near spot</dt><dd>0.38</dd><dt>Whole frame</dt><dd><span class="hi">0.87 at +8.4°</span>, <span class="hi">0.59 at -1.3°</span>, 0.13 at +34.4°</dd></dl>
+<ul><li>No warm component matches the requested bearing and depth.</li></ul><div class="file">agent_debug/b5a6c49c83b5e21e.png</div></figcaption></figure><figure class="card"><div class="pair">
+<img src="img/07db2cdce8cb4133.png" alt="Agent's thermal and colour view" loading="lazy" width="512" height="256"><div class="lab">What the agent's tool looked at (thermal | colour)</div>
+<img src="frames/07db2cdce8cb4133.jpg" alt="Full camera frame with detector boxes" loading="lazy" width="640" height="480"><div class="lab">Full camera frame, every YOLO11m box (green = 0.5 or more)</div></div>
+<figcaption><div class="meta">Robot B · 22.1 s · 5.8 m</div>
+<dl class="scores"><dt>Looked at</dt><dd>-15.0°</dd><dt>Score near spot</dt><dd>none</dd><dt>Whole frame</dt><dd>0.19 at +36.7°</dd></dl>
+<ul><li>Too little registered depth to judge shape.</li></ul><div class="file">agent_debug/07db2cdce8cb4133.png</div></figcaption></figure><figure class="card"><div class="pair">
+<img src="img/68f97526f7ab45ad.png" alt="Agent's thermal and colour view" loading="lazy" width="512" height="256"><div class="lab">What the agent's tool looked at (thermal | colour)</div>
+<img src="frames/68f97526f7ab45ad.jpg" alt="Full camera frame with detector boxes" loading="lazy" width="640" height="480"><div class="lab">Full camera frame, every YOLO11m box (green = 0.5 or more)</div></div>
+<figcaption><div class="meta">Robot B · 29.5 s · 3.3 m</div>
+<dl class="scores"><dt>Looked at</dt><dd>+17.7°</dd><dt>Score near spot</dt><dd>none</dd><dt>Whole frame</dt><dd>none</dd></dl>
+<ul><li>No warm component matches the requested bearing and depth.</li></ul><div class="file">agent_debug/68f97526f7ab45ad.png</div></figcaption></figure><figure class="card"><div class="pair">
+<img src="img/02f5880b1caa0b9b.png" alt="Agent's thermal and colour view" loading="lazy" width="512" height="256"><div class="lab">What the agent's tool looked at (thermal | colour)</div>
+<img src="frames/02f5880b1caa0b9b.jpg" alt="Full camera frame with detector boxes" loading="lazy" width="640" height="480"><div class="lab">Full camera frame, every YOLO11m box (green = 0.5 or more)</div></div>
+<figcaption><div class="meta">Robot B · 37.5 s · 3.2 m</div>
+<dl class="scores"><dt>Looked at</dt><dd>-6.7°</dd><dt>Score near spot</dt><dd>none</dd><dt>Whole frame</dt><dd>none</dd></dl>
+<ul><li>Too little registered depth to judge shape.</li></ul><div class="file">agent_debug/02f5880b1caa0b9b.png</div></figcaption></figure><figure class="card missed"><div class="pair">
+<img src="img/c378ffd87fa22606.png" alt="Agent's thermal and colour view" loading="lazy" width="512" height="256"><div class="lab">What the agent's tool looked at (thermal | colour)</div>
+<img src="frames/c378ffd87fa22606.jpg" alt="Full camera frame with detector boxes" loading="lazy" width="640" height="480"><div class="lab">Full camera frame, every YOLO11m box (green = 0.5 or more)</div></div>
+<figcaption><div class="meta">Robot A · 45.0 s · 5.6 m</div><span class="flag">Person in frame, not inspected</span>
+<dl class="scores"><dt>Looked at</dt><dd>+10.5°</dd><dt>Score near spot</dt><dd>none</dd><dt>Whole frame</dt><dd><span class="hi">0.83 at -15.5°</span></dd></dl>
+<ul><li>No warm component matches the requested bearing and depth.</li></ul><div class="file">agent_debug/c378ffd87fa22606.png</div></figcaption></figure><figure class="card"><div class="pair">
+<img src="img/78ab701c407e462c.png" alt="Agent's thermal and colour view" loading="lazy" width="512" height="256"><div class="lab">What the agent's tool looked at (thermal | colour)</div>
+<img src="frames/78ab701c407e462c.jpg" alt="Full camera frame with detector boxes" loading="lazy" width="640" height="480"><div class="lab">Full camera frame, every YOLO11m box (green = 0.5 or more)</div></div>
+<figcaption><div class="meta">Robot A · 58.7 s · 5.4 m</div>
+<dl class="scores"><dt>Looked at</dt><dd>-9.8°</dd><dt>Score near spot</dt><dd>none</dd><dt>Whole frame</dt><dd>0.46 at -36.5°</dd></dl>
+<ul><li>Too little registered depth to judge shape.</li></ul><div class="file">agent_debug/78ab701c407e462c.png</div></figcaption></figure><figure class="card missed"><div class="pair">
+<img src="img/23edfa0b3337087c.png" alt="Agent's thermal and colour view" loading="lazy" width="512" height="256"><div class="lab">What the agent's tool looked at (thermal | colour)</div>
+<img src="frames/23edfa0b3337087c.jpg" alt="Full camera frame with detector boxes" loading="lazy" width="640" height="480"><div class="lab">Full camera frame, every YOLO11m box (green = 0.5 or more)</div></div>
+<figcaption><div class="meta">Robot B · 59.8 s · 10.4 m</div><span class="flag">Person in frame, not inspected</span>
+<dl class="scores"><dt>Looked at</dt><dd>+7.4°</dd><dt>Score near spot</dt><dd>none</dd><dt>Whole frame</dt><dd><span class="hi">0.88 at -18.0°</span>, <span class="hi">0.82 at -5.4°</span></dd></dl>
+<ul><li>Too little registered depth to judge shape.</li></ul><div class="file">agent_debug/23edfa0b3337087c.png</div></figcaption></figure><figure class="card missed"><div class="pair">
+<img src="img/3b59bca8f0f72771.png" alt="Agent's thermal and colour view" loading="lazy" width="512" height="256"><div class="lab">What the agent's tool looked at (thermal | colour)</div>
+<img src="frames/3b59bca8f0f72771.jpg" alt="Full camera frame with detector boxes" loading="lazy" width="640" height="480"><div class="lab">Full camera frame, every YOLO11m box (green = 0.5 or more)</div></div>
+<figcaption><div class="meta">Robot A · 62.7 s · 3.6 m</div><span class="flag">Person in frame, not inspected</span>
+<dl class="scores"><dt>Looked at</dt><dd>+6.6°</dd><dt>Score near spot</dt><dd>none</dd><dt>Whole frame</dt><dd><span class="hi">0.52 at -35.5°</span></dd></dl>
+<ul><li>Warm component touches the image edge, so its size is clipped and cannot confirm a body.</li></ul><div class="file">agent_debug/3b59bca8f0f72771.png</div></figcaption></figure><figure class="card missed"><div class="pair">
+<img src="img/6a73bf5ef26c4abb.png" alt="Agent's thermal and colour view" loading="lazy" width="512" height="256"><div class="lab">What the agent's tool looked at (thermal | colour)</div>
+<img src="frames/6a73bf5ef26c4abb.jpg" alt="Full camera frame with detector boxes" loading="lazy" width="640" height="480"><div class="lab">Full camera frame, every YOLO11m box (green = 0.5 or more)</div></div>
+<figcaption><div class="meta">Robot A · 62.7 s · 3.6 m</div><span class="flag">Person in frame, not inspected</span>
+<dl class="scores"><dt>Looked at</dt><dd>+5.9°</dd><dt>Score near spot</dt><dd>none</dd><dt>Whole frame</dt><dd><span class="hi">0.52 at -35.5°</span></dd></dl>
+<ul><li>Warm component touches the image edge, so its size is clipped and cannot confirm a body.</li></ul><div class="file">agent_debug/6a73bf5ef26c4abb.png</div></figcaption></figure><figure class="card"><div class="pair">
+<img src="img/c30cdbd1aeb43fd3.png" alt="Agent's thermal and colour view" loading="lazy" width="512" height="256"><div class="lab">What the agent's tool looked at (thermal | colour)</div>
+<img src="frames/c30cdbd1aeb43fd3.jpg" alt="Full camera frame with detector boxes" loading="lazy" width="640" height="480"><div class="lab">Full camera frame, every YOLO11m box (green = 0.5 or more)</div></div>
+<figcaption><div class="meta">Robot B · 78.2 s · 2.9 m</div>
+<dl class="scores"><dt>Looked at</dt><dd>-9.0°</dd><dt>Score near spot</dt><dd>none</dd><dt>Whole frame</dt><dd>none</dd></dl>
+<ul><li>Too little registered depth to judge shape.</li></ul><div class="file">agent_debug/c30cdbd1aeb43fd3.png</div></figcaption></figure><figure class="card"><div class="pair">
+<img src="img/519c7a77b1265dfe.png" alt="Agent's thermal and colour view" loading="lazy" width="512" height="256"><div class="lab">What the agent's tool looked at (thermal | colour)</div>
+<img src="frames/519c7a77b1265dfe.jpg" alt="Full camera frame with detector boxes" loading="lazy" width="640" height="480"><div class="lab">Full camera frame, every YOLO11m box (green = 0.5 or more)</div></div>
+<figcaption><div class="meta">Robot B · 78.2 s · 2.5 m</div>
+<dl class="scores"><dt>Looked at</dt><dd>-7.2°</dd><dt>Score near spot</dt><dd>none</dd><dt>Whole frame</dt><dd>none</dd></dl>
+<ul><li>Warm component touches the image edge, so its size is clipped and cannot confirm a body.</li></ul><div class="file">agent_debug/519c7a77b1265dfe.png</div></figcaption></figure><figure class="card"><div class="pair">
+<img src="img/e3a0585425c9efe7.png" alt="Agent's thermal and colour view" loading="lazy" width="512" height="256"><div class="lab">What the agent's tool looked at (thermal | colour)</div>
+<img src="frames/e3a0585425c9efe7.jpg" alt="Full camera frame with detector boxes" loading="lazy" width="640" height="480"><div class="lab">Full camera frame, every YOLO11m box (green = 0.5 or more)</div></div>
+<figcaption><div class="meta">Robot B · 85.3 s · 1.3 m</div>
+<dl class="scores"><dt>Looked at</dt><dd>-1.4°</dd><dt>Score near spot</dt><dd>none</dd><dt>Whole frame</dt><dd>none</dd></dl>
+<ul><li>Warm component touches the image edge, so its size is clipped and cannot confirm a body.</li><li>It is 1.3 m away and the camera sees the floor only from 2.2 m: view it from further back (approach_candidate citing this inspection steps back to the viewing distance).</li></ul><div class="file">agent_debug/e3a0585425c9efe7.png</div></figcaption></figure><figure class="card"><div class="pair">
+<img src="img/78e359ae12af5ccb.png" alt="Agent's thermal and colour view" loading="lazy" width="512" height="256"><div class="lab">What the agent's tool looked at (thermal | colour)</div>
+<img src="frames/78e359ae12af5ccb.jpg" alt="Full camera frame with detector boxes" loading="lazy" width="640" height="480"><div class="lab">Full camera frame, every YOLO11m box (green = 0.5 or more)</div></div>
+<figcaption><div class="meta">Robot B · 90.0 s · 2.0 m</div>
+<dl class="scores"><dt>Looked at</dt><dd>+15.2°</dd><dt>Score near spot</dt><dd>none</dd><dt>Whole frame</dt><dd>none</dd></dl>
+<ul><li>Warm component touches the image edge, so its size is clipped and cannot confirm a body.</li><li>It is 2.0 m away and the camera sees the floor only from 2.2 m: view it from further back (approach_candidate citing this inspection steps back to the viewing distance).</li></ul><div class="file">agent_debug/78e359ae12af5ccb.png</div></figcaption></figure><figure class="card"><div class="pair">
+<img src="img/97825700752b60f9.png" alt="Agent's thermal and colour view" loading="lazy" width="512" height="256"><div class="lab">What the agent's tool looked at (thermal | colour)</div>
+<img src="frames/97825700752b60f9.jpg" alt="Full camera frame with detector boxes" loading="lazy" width="640" height="480"><div class="lab">Full camera frame, every YOLO11m box (green = 0.5 or more)</div></div>
+<figcaption><div class="meta">Robot A · 93.8 s · 3.2 m</div>
+<dl class="scores"><dt>Looked at</dt><dd>+17.6°</dd><dt>Score near spot</dt><dd>none</dd><dt>Whole frame</dt><dd>none</dd></dl>
+<ul><li>Too little registered depth to judge shape.</li></ul><div class="file">agent_debug/97825700752b60f9.png</div></figcaption></figure><figure class="card"><div class="pair">
+<img src="img/e4332c94cc1f7073.png" alt="Agent's thermal and colour view" loading="lazy" width="512" height="256"><div class="lab">What the agent's tool looked at (thermal | colour)</div>
+<img src="frames/e4332c94cc1f7073.jpg" alt="Full camera frame with detector boxes" loading="lazy" width="640" height="480"><div class="lab">Full camera frame, every YOLO11m box (green = 0.5 or more)</div></div>
+<figcaption><div class="meta">Robot B · 94.0 s · 2.5 m</div>
+<dl class="scores"><dt>Looked at</dt><dd>-22.6°</dd><dt>Score near spot</dt><dd>none</dd><dt>Whole frame</dt><dd>none</dd></dl>
+<ul><li>Warm component touches the image edge, so its size is clipped and cannot confirm a body.</li></ul><div class="file">agent_debug/e4332c94cc1f7073.png</div></figcaption></figure><figure class="card"><div class="pair">
+<img src="img/fcc05c77a28b14cb.png" alt="Agent's thermal and colour view" loading="lazy" width="512" height="256"><div class="lab">What the agent's tool looked at (thermal | colour)</div>
+<img src="frames/fcc05c77a28b14cb.jpg" alt="Full camera frame with detector boxes" loading="lazy" width="640" height="480"><div class="lab">Full camera frame, every YOLO11m box (green = 0.5 or more)</div></div>
+<figcaption><div class="meta">Robot A · 94.1 s · 3.3 m</div>
+<dl class="scores"><dt>Looked at</dt><dd>+9.9°</dd><dt>Score near spot</dt><dd>none</dd><dt>Whole frame</dt><dd>0.19 at +34.3°</dd></dl>
+<ul><li>Too little registered depth to judge shape.</li></ul><div class="file">agent_debug/fcc05c77a28b14cb.png</div></figcaption></figure><figure class="card"><div class="pair">
+<img src="img/ef3a4f4d22155ce8.png" alt="Agent's thermal and colour view" loading="lazy" width="512" height="256"><div class="lab">What the agent's tool looked at (thermal | colour)</div>
+<img src="frames/ef3a4f4d22155ce8.jpg" alt="Full camera frame with detector boxes" loading="lazy" width="640" height="480"><div class="lab">Full camera frame, every YOLO11m box (green = 0.5 or more)</div></div>
+<figcaption><div class="meta">Robot B · 108.0 s · 1.8 m</div>
+<dl class="scores"><dt>Looked at</dt><dd>-18.3°</dd><dt>Score near spot</dt><dd>none</dd><dt>Whole frame</dt><dd>0.13 at -0.4°</dd></dl>
+<ul><li>Warm component touches the image edge, so its size is clipped and cannot confirm a body.</li><li>It is 1.8 m away and the camera sees the floor only from 2.2 m: view it from further back (approach_candidate citing this inspection steps back to the viewing distance).</li></ul><div class="file">agent_debug/ef3a4f4d22155ce8.png</div></figcaption></figure><figure class="card"><div class="pair">
+<img src="img/ef73777dfb458970.png" alt="Agent's thermal and colour view" loading="lazy" width="512" height="256"><div class="lab">What the agent's tool looked at (thermal | colour)</div>
+<img src="frames/ef73777dfb458970.jpg" alt="Full camera frame with detector boxes" loading="lazy" width="640" height="480"><div class="lab">Full camera frame, every YOLO11m box (green = 0.5 or more)</div></div>
+<figcaption><div class="meta">Robot A · 114.1 s · 1.9 m</div>
+<dl class="scores"><dt>Looked at</dt><dd>+16.0°</dd><dt>Score near spot</dt><dd>none</dd><dt>Whole frame</dt><dd>none</dd></dl>
+<ul><li>Warm component touches the image edge, so its size is clipped and cannot confirm a body.</li><li>It is 1.9 m away and the camera sees the floor only from 2.2 m: view it from further back (approach_candidate citing this inspection steps back to the viewing distance).</li></ul><div class="file">agent_debug/ef73777dfb458970.png</div></figcaption></figure></div></section>
+</div>

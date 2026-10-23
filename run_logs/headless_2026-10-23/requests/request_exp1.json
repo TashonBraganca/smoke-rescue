@@ -1,0 +1,104 @@
+{
+ "runs": [
+  {
+   "world": "data/runs/headless/world_5001.json",
+   "out": "data/runs/headless/exp1/5001_v0_default",
+   "duration_s": 300,
+   "settings": {}
+  },
+  {
+   "world": "data/runs/headless/world_5001.json",
+   "out": "data/runs/headless/exp1/5001_v1_rooms",
+   "duration_s": 300,
+   "settings": {
+    "room_ledger": true,
+    "room_auction": true
+   }
+  },
+  {
+   "world": "data/runs/headless/world_5001.json",
+   "out": "data/runs/headless/exp1/5001_v2_rooms_nolocal",
+   "duration_s": 300,
+   "settings": {
+    "room_ledger": true,
+    "room_auction": true,
+    "frontier_local_evidence": false
+   }
+  },
+  {
+   "world": "data/runs/headless/world_5002.json",
+   "out": "data/runs/headless/exp1/5002_v0_default",
+   "duration_s": 300,
+   "settings": {}
+  },
+  {
+   "world": "data/runs/headless/world_5002.json",
+   "out": "data/runs/headless/exp1/5002_v1_rooms",
+   "duration_s": 300,
+   "settings": {
+    "room_ledger": true,
+    "room_auction": true
+   }
+  },
+  {
+   "world": "data/runs/headless/world_5002.json",
+   "out": "data/runs/headless/exp1/5002_v2_rooms_nolocal",
+   "duration_s": 300,
+   "settings": {
+    "room_ledger": true,
+    "room_auction": true,
+    "frontier_local_evidence": false
+   }
+  },
+  {
+   "world": "data/runs/headless/world_5003.json",
+   "out": "data/runs/headless/exp1/5003_v0_default",
+   "duration_s": 300,
+   "settings": {}
+  },
+  {
+   "world": "data/runs/headless/world_5003.json",
+   "out": "data/runs/headless/exp1/5003_v1_rooms",
+   "duration_s": 300,
+   "settings": {
+    "room_ledger": true,
+    "room_auction": true
+   }
+  },
+  {
+   "world": "data/runs/headless/world_5003.json",
+   "out": "data/runs/headless/exp1/5003_v2_rooms_nolocal",
+   "duration_s": 300,
+   "settings": {
+    "room_ledger": true,
+    "room_auction": true,
+    "frontier_local_evidence": false
+   }
+  },
+  {
+   "world": "data/runs/headless/world_5004.json",
+   "out": "data/runs/headless/exp1/5004_v0_default",
+   "duration_s": 300,
+   "settings": {}
+  },
+  {
+   "world": "data/runs/headless/world_5004.json",
+   "out": "data/runs/headless/exp1/5004_v1_rooms",
+   "duration_s": 300,
+   "settings": {
+    "room_ledger": true,
+    "room_auction": true
+   }
+  },
+  {
+   "world": "data/runs/headless/world_5004.json",
+   "out": "data/runs/headless/exp1/5004_v2_rooms_nolocal",
+   "duration_s": 300,
+   "settings": {
+    "room_ledger": true,
+    "room_auction": true,
+    "frontier_local_evidence": false
+   }
+  }
+ ]
+}

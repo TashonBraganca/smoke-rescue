@@ -1,0 +1,239 @@
+{
+ "run": "/Volumes/Tashon/opencv/smoke-rescue/data/runs/headless/exp8/5006_v10_lost_in_view",
+ "settings": {
+  "room_ledger": true,
+  "room_auction": true,
+  "room_indoor_promotion": true,
+  "frontier_turn_cost": true,
+  "room_ledger_corridor_first": true,
+  "survivor_squeeze": true,
+  "frontier_local_evidence": false,
+  "sweep_once_per_room": true,
+  "survivor_lost_in_view": true
+ },
+ "sim_s": 240.0,
+ "wall_s": 317,
+ "bad_trace_lines": 0,
+ "robots": {
+  "robot_A": {
+   "walked_m": 56.7,
+   "final_state": "explore",
+   "peak_air_c": 20,
+   "air_over_60_s": 0,
+   "outside_s": 4.0,
+   "turning_in_place_s": 35.0,
+   "turned_in_place_deg": 1860.9,
+   "still_s": 29.0,
+   "turned_in_place_turns": 5.2,
+   "states_s": {
+    "explore": 224,
+    "survivor": 16
+   },
+   "rooms_in_order": [
+    [
+     "r06:corridor",
+     4.0
+    ],
+    [
+     "r08:study",
+     91.0
+    ],
+    [
+     "r06:corridor",
+     133.5
+    ],
+    [
+     "r04:bedroom",
+     139.0
+    ],
+    [
+     "r06:corridor",
+     158.5
+    ],
+    [
+     "r03:kitchen",
+     167.5
+    ],
+    [
+     "r06:corridor",
+     189.5
+    ],
+    [
+     "r04:bedroom",
+     198.5
+    ],
+    [
+     "r05:laundry",
+     210.0
+    ]
+   ],
+   "stuck_events": {
+    "no_progress": 2
+   },
+   "room_claimed": 13,
+   "room_yielded": 0,
+   "events": {
+    "replan": 330,
+    "room_searched": 51,
+    "localization": 49,
+    "goal": 46,
+    "peer_message_received": 43,
+    "room_claimed": 13,
+    "sweep_look_skipped": 8,
+    "doorway_probe_started": 4,
+    "doorway_probe_done": 4,
+    "sweep_started": 4,
+    "area_searched": 4,
+    "body_swing_blocked": 4
+   }
+  },
+  "robot_B": {
+   "walked_m": 49.1,
+   "final_state": "explore",
+   "peak_air_c": 20,
+   "air_over_60_s": 0,
+   "outside_s": 10.5,
+   "turning_in_place_s": 49.5,
+   "turned_in_place_deg": 2235.5,
+   "still_s": 45.5,
+   "turned_in_place_turns": 6.2,
+   "states_s": {
+    "explore": 228,
+    "survivor": 9,
+    "recover": 3
+   },
+   "rooms_in_order": [
+    [
+     "r06:corridor",
+     10.5
+    ],
+    [
+     "r10:bedroom",
+     30.0
+    ]
+   ],
+   "stuck_events": {
+    "collision_hold": 1,
+    "no_progress": 5,
+    "collision_risk": 1
+   },
+   "room_claimed": 6,
+   "room_yielded": 0,
+   "events": {
+    "replan": 296,
+    "room_searched": 123,
+    "localization": 49,
+    "peer_message_received": 43,
+    "goal": 42,
+    "room_claimed": 6,
+    "no_frontier": 5,
+    "no_progress": 5,
+    "sweep_look": 2,
+    "survivor_from_peer": 2,
+    "body_swing_blocked": 2,
+    "map_shared": 1
+   }
+  }
+ },
+ "rooms": {
+  "r01:bedroom": {
+   "searched_pct": 5,
+   "by_robot_pct": [
+    5,
+    0
+   ]
+  },
+  "r02:closet": {
+   "searched_pct": 79,
+   "by_robot_pct": [
+    79,
+    0
+   ]
+  },
+  "r03:kitchen": {
+   "searched_pct": 87,
+   "by_robot_pct": [
+    87,
+    3
+   ]
+  },
+  "r04:bedroom": {
+   "searched_pct": 87,
+   "by_robot_pct": [
+    87,
+    2
+   ]
+  },
+  "r05:laundry": {
+   "searched_pct": 95,
+   "by_robot_pct": [
+    95,
+    0
+   ]
+  },
+  "r06:corridor": {
+   "searched_pct": 95,
+   "by_robot_pct": [
+    92,
+    37
+   ]
+  },
+  "r07:bathroom": {
+   "searched_pct": 8,
+   "by_robot_pct": [
+    8,
+    0
+   ]
+  },
+  "r08:study": {
+   "searched_pct": 97,
+   "by_robot_pct": [
+    97,
+    1
+   ]
+  },
+  "r09:living": {
+   "searched_pct": 39,
+   "by_robot_pct": [
+    31,
+    25
+   ]
+  },
+  "r10:bedroom": {
+   "searched_pct": 94,
+   "by_robot_pct": [
+    37,
+    94
+   ]
+  }
+ },
+ "people": {
+  "s1:bedroom": {
+   "first_sighting_s": 55.0,
+   "confirmed_s": 65.0
+  },
+  "s2:corridor": {
+   "first_sighting_s": 37.0,
+   "confirmed_s": 51.0
+  },
+  "s3:living": {
+   "first_sighting_s": null,
+   "confirmed_s": null
+  },
+  "s4:kitchen": {
+   "first_sighting_s": 32.0,
+   "confirmed_s": 36.0
+  },
+  "s5:bedroom": {
+   "first_sighting_s": null,
+   "confirmed_s": null
+  }
+ },
+ "house_searched_pct_mean_over_rooms": 69,
+ "false_confirmations": 0,
+ "radio": {
+  "sent": 240,
+  "delivered": 88,
+  "with_room_claim": 149
+ }
+}

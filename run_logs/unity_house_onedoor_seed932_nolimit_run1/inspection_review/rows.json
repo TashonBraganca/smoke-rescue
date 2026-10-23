@@ -1,0 +1,430 @@
+[
+ {
+  "id": "72cf3478122d4e80",
+  "robot": "A",
+  "t": 0.017,
+  "verdict": "person",
+  "reasons": [
+   "Temperature structure or nonplanar body shape is insufficient for confirmation.",
+   "OpenCV dnn person detector (YOLO11m) confidence 0.83 at bearing 6.1 deg, range 4.502251 m."
+  ],
+  "range": 4.2965,
+  "asked": 6.200243,
+  "near": [
+   0.83
+  ],
+  "whole": [
+   [
+    0.83,
+    6.1
+   ]
+  ]
+ },
+ {
+  "id": "54af812568324a40",
+  "robot": "B",
+  "t": 5.383,
+  "verdict": "person",
+  "reasons": [
+   "Too little registered depth to judge shape.",
+   "OpenCV dnn person detector (YOLO11m) confidence 0.90 at bearing 15.6 deg, range 5.411728 m."
+  ],
+  "range": 5.7,
+  "asked": 13.7,
+  "near": [
+   0.9
+  ],
+  "whole": [
+   [
+    0.75,
+    13.0
+   ]
+  ]
+ },
+ {
+  "id": "b5a6c49c83b5e21e",
+  "robot": "B",
+  "t": 13.4,
+  "verdict": "uncertain",
+  "reasons": [
+   "No warm component matches the requested bearing and depth."
+  ],
+  "range": 5.31,
+  "asked": 34.7,
+  "near": [
+   0.38
+  ],
+  "whole": [
+   [
+    0.87,
+    8.4
+   ],
+   [
+    0.59,
+    -1.3
+   ],
+   [
+    0.13,
+    34.4
+   ]
+  ]
+ },
+ {
+  "id": "b06cc7ab87ccdf57",
+  "robot": "B",
+  "t": 14.133,
+  "verdict": "person",
+  "reasons": [
+   "Body-sized warm component has temperature structure and nonplanar depth without a background recess."
+  ],
+  "range": 4.604,
+  "asked": 13.259221,
+  "near": [],
+  "whole": [
+   [
+    0.91,
+    -18.5
+   ],
+   [
+    0.26,
+    11.5
+   ]
+  ]
+ },
+ {
+  "id": "07db2cdce8cb4133",
+  "robot": "B",
+  "t": 22.133,
+  "verdict": "uncertain",
+  "reasons": [
+   "Too little registered depth to judge shape."
+  ],
+  "range": 5.8065,
+  "asked": -14.95857,
+  "near": [],
+  "whole": [
+   [
+    0.19,
+    36.7
+   ]
+  ]
+ },
+ {
+  "id": "68f97526f7ab45ad",
+  "robot": "B",
+  "t": 29.483,
+  "verdict": "uncertain",
+  "reasons": [
+   "No warm component matches the requested bearing and depth."
+  ],
+  "range": 3.3,
+  "asked": 17.7,
+  "near": [],
+  "whole": []
+ },
+ {
+  "id": "02f5880b1caa0b9b",
+  "robot": "B",
+  "t": 37.483,
+  "verdict": "uncertain",
+  "reasons": [
+   "Too little registered depth to judge shape."
+  ],
+  "range": 3.24,
+  "asked": -6.66418,
+  "near": [],
+  "whole": []
+ },
+ {
+  "id": "c378ffd87fa22606",
+  "robot": "A",
+  "t": 45.017,
+  "verdict": "uncertain",
+  "reasons": [
+   "No warm component matches the requested bearing and depth."
+  ],
+  "range": 5.57,
+  "asked": 10.5,
+  "near": [],
+  "whole": [
+   [
+    0.83,
+    -15.5
+   ]
+  ]
+ },
+ {
+  "id": "4337b142ac964696",
+  "robot": "A",
+  "t": 45.017,
+  "verdict": "person",
+  "reasons": [
+   "Too little registered depth to judge shape.",
+   "OpenCV dnn person detector (YOLO11m) confidence 0.83 at bearing -15.5 deg, range 5.566421 m."
+  ],
+  "range": 5.262,
+  "asked": -15.4,
+  "near": [
+   0.83
+  ],
+  "whole": [
+   [
+    0.83,
+    -15.5
+   ]
+  ]
+ },
+ {
+  "id": "b5dc1cbd40c7f6b1",
+  "robot": "B",
+  "t": 45.483,
+  "verdict": "person",
+  "reasons": [
+   "Warm component touches the image edge, so its size is clipped and cannot confirm a body.",
+   "OpenCV dnn person detector (YOLO11m) confidence 0.92 at bearing 20.8 deg, range 3.1426 m."
+  ],
+  "range": 2.826,
+  "asked": 21.641718,
+  "near": [
+   0.92
+  ],
+  "whole": [
+   [
+    0.92,
+    20.8
+   ],
+   [
+    0.3,
+    16.5
+   ]
+  ]
+ },
+ {
+  "id": "29f01947530f0d98",
+  "robot": "A",
+  "t": 49.017,
+  "verdict": "person",
+  "reasons": [
+   "Too little registered depth to judge shape.",
+   "OpenCV dnn person detector (YOLO11m) confidence 0.93 at bearing 17.2 deg, range 3.901165 m."
+  ],
+  "range": 3.671,
+  "asked": 16.01286,
+  "near": [
+   0.93
+  ],
+  "whole": [
+   [
+    0.93,
+    17.2
+   ]
+  ]
+ },
+ {
+  "id": "78ab701c407e462c",
+  "robot": "A",
+  "t": 58.717,
+  "verdict": "uncertain",
+  "reasons": [
+   "Too little registered depth to judge shape."
+  ],
+  "range": 5.44,
+  "asked": -9.8,
+  "near": [],
+  "whole": [
+   [
+    0.46,
+    -36.5
+   ]
+  ]
+ },
+ {
+  "id": "23edfa0b3337087c",
+  "robot": "B",
+  "t": 59.833,
+  "verdict": "uncertain",
+  "reasons": [
+   "Too little registered depth to judge shape."
+  ],
+  "range": 10.45,
+  "asked": 7.421616,
+  "near": [],
+  "whole": [
+   [
+    0.88,
+    -18.0
+   ],
+   [
+    0.82,
+    -5.4
+   ]
+  ]
+ },
+ {
+  "id": "3b59bca8f0f72771",
+  "robot": "A",
+  "t": 62.717,
+  "verdict": "uncertain",
+  "reasons": [
+   "Warm component touches the image edge, so its size is clipped and cannot confirm a body."
+  ],
+  "range": 3.557,
+  "asked": 6.6,
+  "near": [],
+  "whole": [
+   [
+    0.52,
+    -35.5
+   ]
+  ]
+ },
+ {
+  "id": "6a73bf5ef26c4abb",
+  "robot": "A",
+  "t": 62.733,
+  "verdict": "uncertain",
+  "reasons": [
+   "Warm component touches the image edge, so its size is clipped and cannot confirm a body."
+  ],
+  "range": 3.557,
+  "asked": 5.9,
+  "near": [],
+  "whole": [
+   [
+    0.52,
+    -35.5
+   ]
+  ]
+ },
+ {
+  "id": "c30cdbd1aeb43fd3",
+  "robot": "B",
+  "t": 78.15,
+  "verdict": "uncertain",
+  "reasons": [
+   "Too little registered depth to judge shape."
+  ],
+  "range": 2.93,
+  "asked": -9,
+  "near": [],
+  "whole": []
+ },
+ {
+  "id": "519c7a77b1265dfe",
+  "robot": "B",
+  "t": 78.167,
+  "verdict": "uncertain",
+  "reasons": [
+   "Warm component touches the image edge, so its size is clipped and cannot confirm a body."
+  ],
+  "range": 2.467,
+  "asked": -7.233713,
+  "near": [],
+  "whole": []
+ },
+ {
+  "id": "e3a0585425c9efe7",
+  "robot": "B",
+  "t": 85.333,
+  "verdict": "uncertain",
+  "reasons": [
+   "Warm component touches the image edge, so its size is clipped and cannot confirm a body.",
+   "It is 1.3 m away and the camera sees the floor only from 2.2 m: view it from further back (approach_candidate citing this inspection steps back to the viewing distance)."
+  ],
+  "range": 1.337,
+  "asked": -1.427,
+  "near": [],
+  "whole": []
+ },
+ {
+  "id": "78e359ae12af5ccb",
+  "robot": "B",
+  "t": 90.017,
+  "verdict": "uncertain",
+  "reasons": [
+   "Warm component touches the image edge, so its size is clipped and cannot confirm a body.",
+   "It is 2.0 m away and the camera sees the floor only from 2.2 m: view it from further back (approach_candidate citing this inspection steps back to the viewing distance)."
+  ],
+  "range": 1.997,
+  "asked": 15.1662,
+  "near": [],
+  "whole": []
+ },
+ {
+  "id": "97825700752b60f9",
+  "robot": "A",
+  "t": 93.783,
+  "verdict": "uncertain",
+  "reasons": [
+   "Too little registered depth to judge shape."
+  ],
+  "range": 3.1775,
+  "asked": 17.64136,
+  "near": [],
+  "whole": []
+ },
+ {
+  "id": "e4332c94cc1f7073",
+  "robot": "B",
+  "t": 94.017,
+  "verdict": "uncertain",
+  "reasons": [
+   "Warm component touches the image edge, so its size is clipped and cannot confirm a body."
+  ],
+  "range": 2.467,
+  "asked": -22.611432,
+  "near": [],
+  "whole": []
+ },
+ {
+  "id": "fcc05c77a28b14cb",
+  "robot": "A",
+  "t": 94.1,
+  "verdict": "uncertain",
+  "reasons": [
+   "Too little registered depth to judge shape."
+  ],
+  "range": 3.324,
+  "asked": 9.9,
+  "near": [],
+  "whole": [
+   [
+    0.19,
+    34.3
+   ]
+  ]
+ },
+ {
+  "id": "ef3a4f4d22155ce8",
+  "robot": "B",
+  "t": 108.017,
+  "verdict": "uncertain",
+  "reasons": [
+   "Warm component touches the image edge, so its size is clipped and cannot confirm a body.",
+   "It is 1.8 m away and the camera sees the floor only from 2.2 m: view it from further back (approach_candidate citing this inspection steps back to the viewing distance)."
+  ],
+  "range": 1.783,
+  "asked": -18.327912,
+  "near": [],
+  "whole": [
+   [
+    0.13,
+    -0.4
+   ]
+  ]
+ },
+ {
+  "id": "ef73777dfb458970",
+  "robot": "A",
+  "t": 114.133,
+  "verdict": "uncertain",
+  "reasons": [
+   "Warm component touches the image edge, so its size is clipped and cannot confirm a body.",
+   "It is 1.9 m away and the camera sees the floor only from 2.2 m: view it from further back (approach_candidate citing this inspection steps back to the viewing distance)."
+  ],
+  "range": 1.904,
+  "asked": 16.045792,
+  "near": [],
+  "whole": []
+ }
+]
