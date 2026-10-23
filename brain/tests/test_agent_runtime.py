@@ -780,3 +780,40 @@ def test_air_heat_time_and_nearest_fire_reach_the_model(tmp_path, monkeypatch):
     assert ctx["air_c"] == 96.4 and ctx["air_trend_c_per_min"] == 140.0 and ctx["heat_seconds_left"] == 9.1
     assert ctx["nearest_fire"] == fire and "fire_near_robot" in ctx
     assert "not_a_field" not in ctx, "control: unnamed fields are not passed"
+
+
+def test_close_looks_count_per_shape_not_per_grid_square_and_a_twice_looked_shape_can_be_dropped(tmp_path, monkeypatch):
+    # Held-out run 2, robot A: 5 close looks at one blob from 80 to 108 s; its measured position wandered over three
+    # 1.5 m squares, so the two-look limit never fired, and only not_person could reject it. Now looks within 1.0 m
+    # (survivor_merge_m) are one shape: the third from the same side is refused, and reject_candidate may cite the
+    # uncertain look. Controls: a shape 2 m away is a new shape; a third look from 90 deg round is allowed; one look is
+    # not enough to drop an uncertain shape.
+    fake_vision(monkeypatch, "uncertain")
+
+    def look(t, rng, pose=(5.0, 5.0, 0.0), bearing=0.0, then="approach_candidate"):
+        req = request(tmp_path) | {"t": t, "pose": {"x": pose[0], "y": pose[1], "heading_deg": pose[2]}}
+        second = (ToolCall("approach_candidate", {"evidence_id": "ev1"}) if then == "approach_candidate" else
+                  ToolCall("reject_candidate", {"x": pose[0], "y": pose[1] + rng, "evidence_id": "ev1"}))
+        return RobotAgent(Scripted([[ToolCall("inspect_candidate", {"bearing_deg": bearing, "range_m": rng})], [second]]),
+                          tmp_path / "t.jsonl").step(req)
+
+    def fresh():
+        T.ToolRegistry._looks.clear(); T.ToolRegistry._pending.clear()
+
+    fresh()
+    for k, rng in enumerate((4.45, 5.0)):                     # shape at y 9.45 then 10.0: grid squares 6 and 7
+        assert look(10.0 + k, rng)["orders"], "first two looks go ahead"
+    third = look(12.0, 5.3)                                   # y 10.3: within 1 m of both
+    assert third["orders"] == [] and "already looked closer 2 times at this shape" in third["refusals"][0]["reason"]
+    assert look(13.0, 5.3, then="reject")["orders"][0]["type"] == "reject_candidate", "a twice-looked shape can be dropped"
+
+    fresh()
+    look(10.0, 5.0); look(11.0, 5.0)
+    assert look(12.0, 7.0)["orders"], "control: a shape 2 m further on is a new shape"
+    fresh()
+    look(10.0, 5.0); look(11.0, 5.0)
+    assert look(12.0, 5.0, pose=(10.0, 10.0, -90.0), bearing=0.0)["orders"], "control: a third look from 90 deg round"
+    fresh()
+    look(10.0, 5.0)
+    out = look(11.0, 5.0, then="reject")
+    assert out["orders"] == [] and out["refusals"][0]["tool"] == "reject_candidate", "control: one look cannot drop it"
