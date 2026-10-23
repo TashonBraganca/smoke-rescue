@@ -207,25 +207,43 @@ namespace SmokeRescue.Brain
             }
             return null;
         }
-        /// <summary>The nearest floor this robot measured burning within fire_near_m (the nozzle's throw), while its own air is
-        /// at or above air_warm_c: the fire that is heating the robot itself, whether or not it blocks a route. Seed 929,
-        /// robot B: retreating in its own living room, its air rose from 30 to 211 C; the spray option appeared only for a
-        /// fire blocking a way out or a frontier, so its agent was never offered the water it carried (12 L, none used).</summary>
-        public BrainFireBlock? FireNearRobot(double t)
+        /// <summary>The nearest floor this robot measured burning within fire_near_m (the nozzle's throw), whatever the air at
+        /// the robot: the fire water can reach from here, whether or not it blocks a route. Seed 929, robot B: retreating in its
+        /// own living room, its air rose from 30 to 211 C; the spray option appeared only for a fire blocking a way out or a
+        /// frontier, so its agent was never offered the water it carried (12 L, none used). Held-out runs 1 and 2 (seed 913):
+        /// with the offer also gated on the robot's air reaching air_warm_c, a fire in reach in cool air was never offered;
+        /// the air gate is gone (issue list 23 Oct, item 8).</summary>
+        public BrainFireBlock? FireNearRobot(double t) => NearestFire(c.fire_near_m);
+        /// <summary>The nearest floor this robot's own thermal map holds burning (heat at or above fire_c, never a forecast and
+        /// never the simulator's fire), within reachM, or anywhere in the map when reachM is infinite: bearing (right positive),
+        /// straight-line distance and the burning area around it. Null when the map holds no burning floor.</summary>
+        public BrainFireBlock? NearestFire(float reachM = float.PositiveInfinity)
         {
-            if (t - lastAir > c.frame_max_age_s || airC < c.air_warm_c) return null;
             Vector2 here = motion.Pose.position; int centre = grid.Cell(here); if (centre < 0) return null;
-            int r = Mathf.CeilToInt(c.fire_near_m / grid.CellM), cx = centre % grid.Size, cy = centre / grid.Size, best = -1; float bestM = float.PositiveInfinity;
-            for (int dy = -r; dy <= r; dy++) for (int dx = -r; dx <= r; dx++)
-            {
-                if (!grid.Inside(cx + dx, cy + dy)) continue;
-                int i = (cy + dy) * grid.Size + cx + dx; float m = Vector2.Distance(grid.Centre(i), here);
-                if (m <= c.fire_near_m && m < bestM && grid.Heat(i) >= c.fire_c) { bestM = m; best = i; }
-            }
+            int r = float.IsPositiveInfinity(reachM) ? grid.Size : Mathf.CeilToInt(reachM / grid.CellM), cx = centre % grid.Size, cy = centre / grid.Size, best = -1;
+            float bestM = float.PositiveInfinity;
+            for (int y = Math.Max(0, cy - r); y <= Math.Min(grid.Size - 1, cy + r); y++)
+                for (int x = Math.Max(0, cx - r); x <= Math.Min(grid.Size - 1, cx + r); x++)
+                {
+                    int i = y * grid.Size + x; if (grid.Heat(i) < c.fire_c) continue;
+                    float m = Vector2.Distance(grid.Centre(i), here);
+                    if (m <= reachM && m < bestM) { bestM = m; best = i; }
+                }
             if (best < 0) return null;
             Vector2 p = grid.Centre(best), d = p - here;
             return new BrainFireBlock { blockAt = p, frontier = p, bearingDegRight = -BrainMath.Angle(motion.Pose.yawRad, Mathf.Atan2(-d.x, d.y)),
                 distanceM = d.magnitude, frontierPathM = 0, unsearchedM2 = 0, burningM2 = grid.BurningAreaNear(p, c.burning_radius_m) };
+        }
+        /// <summary>The air at this robot's own sensor for the agent, null when no reading is recent. Held-out run 2 (seed 913),
+        /// robot A: the agent saw only heat_budget, which read 1.0 at 122 s and 0 at 128 s while the air jumped from 44 to
+        /// 375 C as the hot layer came down past the 0.6 m sensor; it radioed "no fire seen" at 378 C. The budget drains at
+        /// heat_drain_per_degree_s per degree above heat_drain_start_c, so heatSecondsLeft = budget / that rate.</summary>
+        public BrainAirState? AirState(double t)
+        {
+            if (t - lastAir > c.frame_max_age_s) return null;
+            float drain = airC > c.heat_drain_start_c ? (airC - c.heat_drain_start_c) * c.heat_drain_per_degree_s : 0;
+            return new BrainAirState { airC = airC, trendCPerMin = AirSlopePerMin(t), heatBudget = budget,
+                heatSecondsLeft = drain > 0 ? budget / drain : (float?)null };
         }
         public BrainFireBlock? FireBlockedFrontier(double t)
         {

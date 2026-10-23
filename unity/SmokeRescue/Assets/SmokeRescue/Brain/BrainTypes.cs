@@ -65,6 +65,14 @@ namespace SmokeRescue.Brain
         /// blockAt: the fire water would have to knock down to open the way.</summary>
         public float burningM2;
     }
+    /// <summary>The air at this robot's own sensor for the agent (RobotBrain.AirState): the reading (C), its least-squares
+    /// trend over air_rise_window_s (C per minute), the heat budget (1 full, 0 empty) and how many seconds the budget lasts
+    /// at this air (null while the air is below heat_drain_start_c, where it does not drain).</summary>
+    public struct BrainAirState
+    {
+        public float airC, trendCPerMin, heatBudget;
+        public float? heatSecondsLeft;
+    }
     /// <summary>A search target offered to the agent (RobotBrain.FrontierOptions).</summary>
     public struct BrainFrontier
     {

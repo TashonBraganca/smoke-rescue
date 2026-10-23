@@ -214,6 +214,15 @@ namespace SmokeRescue.Recording
                         ["bearing_deg"] = Math.Round(fn.bearingDegRight, 1), ["distance_m"] = Math.Round(fn.distanceM, 2),
                         ["burning_m2"] = Math.Round(fn.burningM2, 2),
                     } : null,
+                    // The robot's own air sensor and thermal map (never the simulator's fire): issue list 23 Oct, item 4.
+                    ["air_c"] = rig.brain.AirState(t) is Brain.BrainAirState air ? Math.Round(air.airC, 1) : (double?)null,
+                    ["air_trend_c_per_min"] = rig.brain.AirState(t) is Brain.BrainAirState trend ? Math.Round(trend.trendCPerMin, 1) : (double?)null,
+                    ["heat_seconds_left"] = rig.brain.AirState(t) is Brain.BrainAirState left && left.heatSecondsLeft.HasValue ? Math.Round(left.heatSecondsLeft.Value, 1) : (double?)null,
+                    ["nearest_fire"] = rig.brain.NearestFire() is Brain.BrainFireBlock nf ? new JObject
+                    {
+                        ["bearing_deg"] = Math.Round(nf.bearingDegRight, 1), ["distance_m"] = Math.Round(nf.distanceM, 2),
+                        ["burning_m2"] = Math.Round(nf.burningM2, 2),
+                    } : null,
                     ["lidar"] = LidarSummary(rig.lastScan),
                     ["water_l"] = Math.Round(rig.actions?.WaterLitres ?? 0, 2),
                     ["carrying_person"] = rig.actions?.Carrying != null,
