@@ -601,25 +601,35 @@ namespace SmokeRescue.Brain
         /// an obstacle. With one (entrance_lock_passage), only the part not inside is an obstacle, so no route leaves by the way
         /// in; the indoor part costs entrance_lock_cost_weight per cell and is never a goal (Standable), so routes cross it only
         /// when no other way leads on. Headless house 5015 (23 Oct): the way in opened onto the hallway beside the living room
-        /// door, the whole-disc lock walled both robots into the living room, and 8 of 9 rooms went unsearched. Called again
+        /// door, the whole-disc lock walled both robots into the living room, and 8 of 9 rooms went unsearched. Called again every 0.5 s
         /// as the map grows, since floor unmapped at the lock may later prove indoors.</summary>
         public void SetEntranceLock(Vector2 entry, float radius, Func<Vector2, bool> inside = null)
         {
-            var disc = new bool[Count]; var hard = new bool[Count];
             int c0 = Cell(entry); if (c0 < 0) return;
-            int r = Mathf.CeilToInt(radius / CellM), cx = c0 % Size, cy = c0 / Size;
-            for (int dy = -r; dy <= r; dy++) for (int dx = -r; dx <= r; dx++)
+            if (entranceLock == null || entranceEntry != entry || entranceRadius != radius)
             {
-                if (!Inside(cx + dx, cy + dy)) continue;
-                int i = (cy + dy) * Size + cx + dx; var p = Centre(i);
-                if (Vector2.Distance(p, entry) > radius) continue;
-                disc[i] = true; hard[i] = inside == null || !inside(p);
+                entranceLock = new bool[Count]; entranceHard = new bool[Count]; var cells = new List<int>();
+                int r = Mathf.CeilToInt(radius / CellM), cx = c0 % Size, cy = c0 / Size;
+                for (int dy = -r; dy <= r; dy++) for (int dx = -r; dx <= r; dx++)
+                {
+                    if (!Inside(cx + dx, cy + dy)) continue;
+                    int i = (cy + dy) * Size + cx + dx;
+                    if (Vector2.Distance(Centre(i), entry) <= radius) { entranceLock[i] = true; cells.Add(i); }
+                }
+                entranceCells = cells.ToArray(); entranceEntry = entry; entranceRadius = radius; dirty = true;
             }
-            if (entranceHard != null && System.Linq.Enumerable.SequenceEqual(hard, entranceHard)) { entranceLock = disc; return; }
-            entranceLock = disc; entranceHard = hard; dirty = true;
+            // Only mapped free floor not proven indoors is shut: unmapped cells are not walkable anyway, and counting them as
+            // walls would narrow the clearance of the passage beside them. A cell is looked at again on the next refresh.
+            bool changed = false;
+            foreach (int i in entranceCells)
+            {
+                bool hard = inside == null || (Occupancy(i) == 1 && !inside(Centre(i)));
+                if (hard != entranceHard[i]) { entranceHard[i] = hard; changed = true; }
+            }
+            if (changed) dirty = true;
         }
         public bool EntranceLocked(Vector2 p) { int i = Cell(p); return entranceLock != null && i >= 0 && entranceLock[i]; }
-        bool[] entranceLock, entranceHard;
+        bool[] entranceLock, entranceHard; int[] entranceCells; Vector2 entranceEntry; float entranceRadius;
         /// <summary>Walkable and allowed as a goal: not on the entrance lock's passage (SetEntranceLock).</summary>
         internal bool Standable(int i) => Walkable(i) && (entranceLock == null || !entranceLock[i]);
         internal void PrepareNavigation()

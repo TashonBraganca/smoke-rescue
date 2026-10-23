@@ -984,14 +984,14 @@ namespace SmokeRescue.Brain
             // A passage lock follows the map: floor proven indoors after the lock becomes passage, not wall.
             if (entranceLocked)
             {
-                if (c.entrance_lock_passage && t >= nextLockRefresh) { grid.SetEntranceLock(entryPoint.Value, c.entrance_lock_m, InSearchArea); nextLockRefresh = t + 1; }
+                if (c.entrance_lock_passage && t >= nextLockRefresh) { grid.SetEntranceLock(entryPoint.Value, c.entrance_lock_m, InSearchArea); nextLockRefresh = t + .5; }
                 return;
             }
             var p = motion.Pose.position;
             if (!entryPoint.HasValue) { if (InSearchArea(p)) entryPoint = p; return; }
             if (Vector2.Distance(p, entryPoint.Value) <= c.entrance_lock_m + c.robot_radius_m) return;
             grid.SetEntranceLock(entryPoint.Value, c.entrance_lock_m, c.entrance_lock_passage ? InSearchArea : (System.Func<Vector2, bool>)null);
-            entranceLocked = true; nextLockRefresh = t + 1;
+            entranceLocked = true; nextLockRefresh = t + .5;
             Emit(t, "entrance_locked", "Inside and clear of the way in: floor near the way in is now locked; this robot never goes back to it.",
                 "x_m", entryPoint.Value.x, "y_m", entryPoint.Value.y, "radius_m", c.entrance_lock_m);
         }
