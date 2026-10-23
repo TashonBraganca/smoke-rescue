@@ -164,3 +164,14 @@ def test_a_move_still_under_way_is_not_replaced_on_a_periodic_step(tmp_path, mon
     out = RobotAgent(Scripted([[ToolCall("explore_frontier", {"frontier_id": 1, "reason": "other"})]]), tmp_path / "trace.jsonl").step(
         {**req, "t": 50.0, "event": {"kind": "survivor_candidate", "numbers": {"x_m": 9.0, "y_m": 9.0}}})
     assert [o["type"] for o in out["orders"]] == ["explore_frontier"]
+
+
+# ----- tools offered per event ----------------------------------------------------------------------------------------
+
+def test_heat_events_offer_only_the_tools_that_can_act_there():
+    names = {t["function"]["name"] for t in T.tool_specs("retreat")}
+    assert "go_to" not in names and "explore_frontier" not in names and "turn_to_face" not in names
+    assert {"scan_thermal", "inspect_candidate", "confirm_survivor", "reject_candidate", "spray_water", "avoid_area",
+            "send_team_message", "finish"} <= names
+    everything = {t["function"]["name"] for t in T.tool_specs("survivor_candidate")}
+    assert "go_to" in everything and "explore_frontier" in everything and len(everything) > len(names)
