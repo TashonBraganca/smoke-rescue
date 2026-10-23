@@ -12,3 +12,9 @@ exp11                                                passage refactor 326f0c3, w
 exp12                                                room-bid fix f409501, solid bodies, 5001-5004 (nobidfix runs: code at 326f0c3)
 unseen93                                             unseen houses 5017-5022, passage off vs on at 93cc0be, solid bodies
 coll1, entry1, h932                                  runs from the parallel session (collision check, room entry, seed 932 world)
+
+Added 24 Oct 02:20 (phase 3, all with "robot_collision": true):
+p1, p2, p3, p3b, p4, p6, p7, p8, r1   people fixes, watchdog, right-of-way yield, candidate split, relative doors, slivers, sweep
+p9                                   camera pitch 10/15/20 deg with the final config (15 and 20 lose ceiling evidence)
+unseen_final                         unseen houses 5017-5022: watchdog-only baseline vs final config (confirmed 24 -> 29 of 30)
+worlds/world_934_sealed.json         seed 934 house with the west, back and apartment openings walled

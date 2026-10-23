@@ -1,0 +1,377 @@
+{
+ "run": "/Volumes/Tashon/opencv/smoke-rescue/data/runs/headless/p4/934_pin",
+ "settings": {
+  "pinned_watchdog": true
+ },
+ "sim_s": 240.0,
+ "wall_s": 772,
+ "bad_trace_lines": 0,
+ "robots": {
+  "robot_A": {
+   "walked_m": 47.3,
+   "final_state": "explore",
+   "peak_air_c": 20,
+   "air_over_60_s": 0,
+   "outside_s": 4.0,
+   "turning_in_place_s": 62.5,
+   "turned_in_place_deg": 2539.3,
+   "still_s": 49.0,
+   "turned_in_place_turns": 7.1,
+   "states_s": {
+    "explore": 204,
+    "recover": 30,
+    "survivor": 6
+   },
+   "rooms_in_order": [
+    [
+     "foyer:foyer",
+     4.0
+    ],
+    [
+     "living:living",
+     31.0
+    ],
+    [
+     "foyer:foyer",
+     54.5
+    ],
+    [
+     "hallway:hallway",
+     62.0
+    ],
+    [
+     "study:study",
+     148.0
+    ],
+    [
+     "hallway:hallway",
+     200.5
+    ],
+    [
+     "foyer:foyer",
+     204.5
+    ],
+    [
+     "kitchen:kitchen",
+     215.0
+    ],
+    [
+     "foyer:foyer",
+     233.0
+    ]
+   ],
+   "stuck_events": {
+    "collision_hold": 11,
+    "goal_blacklisted": 9,
+    "collision_risk": 32
+   },
+   "room_claimed": 16,
+   "room_yielded": 0,
+   "events": {
+    "replan": 346,
+    "room_searched": 247,
+    "localization": 49,
+    "peer_message_received": 49,
+    "goal": 32,
+    "collision_risk": 32,
+    "room_claimed": 16,
+    "collision_hold": 11,
+    "goal_blacklisted": 9,
+    "sweep_look": 7,
+    "sweep_started": 3,
+    "area_searched": 3
+   }
+  },
+  "robot_B": {
+   "walked_m": 55.5,
+   "final_state": "explore",
+   "peak_air_c": 20,
+   "air_over_60_s": 0,
+   "outside_s": 13.5,
+   "turning_in_place_s": 48.0,
+   "turned_in_place_deg": 2457.5,
+   "still_s": 26.0,
+   "turned_in_place_turns": 6.8,
+   "states_s": {
+    "explore": 226,
+    "survivor": 14
+   },
+   "rooms_in_order": [
+    [
+     "foyer:foyer",
+     13.5
+    ],
+    [
+     "kitchen:kitchen",
+     27.5
+    ],
+    [
+     "hallway:hallway",
+     120.0
+    ],
+    [
+     "bedroom_2:bedroom_2",
+     218.5
+    ]
+   ],
+   "stuck_events": {},
+   "room_claimed": 12,
+   "room_yielded": 0,
+   "events": {
+    "replan": 374,
+    "room_searched": 203,
+    "localization": 49,
+    "goal": 49,
+    "peer_message_received": 49,
+    "room_claimed": 12,
+    "sweep_look": 7,
+    "sweep_started": 4,
+    "sweep_look_skipped": 4,
+    "area_searched": 3,
+    "survivor_candidate": 3,
+    "survivor_confirmed": 3
+   }
+  }
+ },
+ "rooms": {
+  "living:living": {
+   "searched_pct": 66,
+   "by_robot_pct": [
+    66,
+    4
+   ]
+  },
+  "foyer:foyer": {
+   "searched_pct": 99,
+   "by_robot_pct": [
+    99,
+    91
+   ]
+  },
+  "kitchen:kitchen": {
+   "searched_pct": 96,
+   "by_robot_pct": [
+    50,
+    92
+   ]
+  },
+  "hallway:hallway": {
+   "searched_pct": 66,
+   "by_robot_pct": [
+    29,
+    60
+   ]
+  },
+  "bedroom_1:bedroom_1": {
+   "searched_pct": 2,
+   "by_robot_pct": [
+    1,
+    1
+   ]
+  },
+  "bathroom:bathroom": {
+   "searched_pct": 12,
+   "by_robot_pct": [
+    5,
+    8
+   ]
+  },
+  "closet:closet": {
+   "searched_pct": 3,
+   "by_robot_pct": [
+    3,
+    0
+   ]
+  },
+  "study:study": {
+   "searched_pct": 97,
+   "by_robot_pct": [
+    97,
+    13
+   ]
+  },
+  "bedroom_2:bedroom_2": {
+   "searched_pct": 89,
+   "by_robot_pct": [
+    1,
+    89
+   ]
+  },
+  "laundry:laundry": {
+   "searched_pct": 71,
+   "by_robot_pct": [
+    1,
+    71
+   ]
+  },
+  "apt_living:apt_living": {
+   "searched_pct": 0,
+   "by_robot_pct": [
+    0,
+    0
+   ]
+  },
+  "apt_kitchen:apt_kitchen": {
+   "searched_pct": 0,
+   "by_robot_pct": [
+    0,
+    0
+   ]
+  },
+  "apt_hall:apt_hall": {
+   "searched_pct": 0,
+   "by_robot_pct": [
+    0,
+    0
+   ]
+  },
+  "apt_link:apt_link": {
+   "searched_pct": 0,
+   "by_robot_pct": [
+    0,
+    0
+   ]
+  },
+  "apt_bed_1:apt_bed_1": {
+   "searched_pct": 0,
+   "by_robot_pct": [
+    0,
+    0
+   ]
+  },
+  "apt_bed_2:apt_bed_2": {
+   "searched_pct": 0,
+   "by_robot_pct": [
+    0,
+    0
+   ]
+  },
+  "apt_bath:apt_bath": {
+   "searched_pct": 0,
+   "by_robot_pct": [
+    0,
+    0
+   ]
+  },
+  "office_reception:office_reception": {
+   "searched_pct": 0,
+   "by_robot_pct": [
+    0,
+    0
+   ]
+  },
+  "office_meeting:office_meeting": {
+   "searched_pct": 3,
+   "by_robot_pct": [
+    1,
+    2
+   ]
+  },
+  "office_link:office_link": {
+   "searched_pct": 3,
+   "by_robot_pct": [
+    0,
+    3
+   ]
+  },
+  "office_corridor:office_corridor": {
+   "searched_pct": 0,
+   "by_robot_pct": [
+    0,
+    0
+   ]
+  },
+  "office_open:office_open": {
+   "searched_pct": 0,
+   "by_robot_pct": [
+    0,
+    0
+   ]
+  },
+  "office_store:office_store": {
+   "searched_pct": 0,
+   "by_robot_pct": [
+    0,
+    0
+   ]
+  },
+  "office_wash:office_wash": {
+   "searched_pct": 0,
+   "by_robot_pct": [
+    0,
+    0
+   ]
+  },
+  "workshop_bay:workshop_bay": {
+   "searched_pct": 0,
+   "by_robot_pct": [
+    0,
+    0
+   ]
+  },
+  "workshop_utility:workshop_utility": {
+   "searched_pct": 0,
+   "by_robot_pct": [
+    0,
+    0
+   ]
+  },
+  "workshop_corridor:workshop_corridor": {
+   "searched_pct": 0,
+   "by_robot_pct": [
+    0,
+    0
+   ]
+  },
+  "workshop_tools:workshop_tools": {
+   "searched_pct": 0,
+   "by_robot_pct": [
+    0,
+    0
+   ]
+  },
+  "workshop_parts:workshop_parts": {
+   "searched_pct": 0,
+   "by_robot_pct": [
+    0,
+    0
+   ]
+  },
+  "workshop_wash:workshop_wash": {
+   "searched_pct": 0,
+   "by_robot_pct": [
+    0,
+    0
+   ]
+  }
+ },
+ "people": {
+  "s1:laundry": {
+   "first_sighting_s": 190.0,
+   "confirmed_s": 195.1
+  },
+  "s2:bedroom_1": {
+   "first_sighting_s": null,
+   "confirmed_s": null
+  },
+  "s3:bedroom_2": {
+   "first_sighting_s": 211.0,
+   "confirmed_s": 215.0
+  },
+  "s4:kitchen": {
+   "first_sighting_s": 48.0,
+   "confirmed_s": 55.0
+  },
+  "s6:study": {
+   "first_sighting_s": 61.0,
+   "confirmed_s": 68.2
+  }
+ },
+ "house_searched_pct_mean_over_rooms": 20,
+ "false_confirmations": 0,
+ "radio": {
+  "sent": 240,
+  "delivered": 98,
+  "with_room_claim": 171
+ }
+}
