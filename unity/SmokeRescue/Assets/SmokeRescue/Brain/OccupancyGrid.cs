@@ -595,25 +595,38 @@ namespace SmokeRescue.Brain
             dirty = true;
         }
         bool[] keepOut; float[] keepSoft;
-        /// <summary>The entrance lock: floor within radius of where this robot first stood on floor it had proven indoors
-        /// becomes an obstacle for every route and goal. Owner's rule (23 Oct): a robot that is in never goes back to, or
-        /// near, the way it came in (seed 932: robot B's retreat ended 1 m inside the front door, looking out at the yard).</summary>
-        public void SetEntranceLock(Vector2 entry, float radius)
+        /// <summary>The entrance lock: floor within radius of where this robot first stood on floor it had proven indoors.
+        /// Owner's rule (23 Oct): a robot that is in never goes back to, or near, the way it came in (seed 932: robot B's
+        /// retreat ended 1 m inside the front door, looking out at the yard). Without a passage (inside null) the whole disc is
+        /// an obstacle. With one (entrance_lock_passage), only the part not inside is an obstacle, so no route leaves by the way
+        /// in; the indoor part costs entrance_lock_cost_weight per cell and is never a goal (Standable), so routes cross it only
+        /// when no other way leads on. Headless house 5015 (23 Oct): the way in opened onto the hallway beside the living room
+        /// door, the whole-disc lock walled both robots into the living room, and 8 of 9 rooms went unsearched. Called again
+        /// as the map grows, since floor unmapped at the lock may later prove indoors.</summary>
+        public void SetEntranceLock(Vector2 entry, float radius, Func<Vector2, bool> inside = null)
         {
-            entranceLock ??= new bool[Count]; System.Array.Clear(entranceLock, 0, Count);
+            var disc = new bool[Count]; var hard = new bool[Count];
             int c0 = Cell(entry); if (c0 < 0) return;
             int r = Mathf.CeilToInt(radius / CellM), cx = c0 % Size, cy = c0 / Size;
             for (int dy = -r; dy <= r; dy++) for (int dx = -r; dx <= r; dx++)
-                if (Inside(cx + dx, cy + dy) && Vector2.Distance(Centre((cy + dy) * Size + cx + dx), entry) <= radius) entranceLock[(cy + dy) * Size + cx + dx] = true;
-            dirty = true;
+            {
+                if (!Inside(cx + dx, cy + dy)) continue;
+                int i = (cy + dy) * Size + cx + dx; var p = Centre(i);
+                if (Vector2.Distance(p, entry) > radius) continue;
+                disc[i] = true; hard[i] = inside == null || !inside(p);
+            }
+            if (entranceHard != null && System.Linq.Enumerable.SequenceEqual(hard, entranceHard)) { entranceLock = disc; return; }
+            entranceLock = disc; entranceHard = hard; dirty = true;
         }
         public bool EntranceLocked(Vector2 p) { int i = Cell(p); return entranceLock != null && i >= 0 && entranceLock[i]; }
-        bool[] entranceLock;
+        bool[] entranceLock, entranceHard;
+        /// <summary>Walkable and allowed as a goal: not on the entrance lock's passage (SetEntranceLock).</summary>
+        internal bool Standable(int i) => Walkable(i) && (entranceLock == null || !entranceLock[i]);
         internal void PrepareNavigation()
         {
             if (!dirty) return;
             if (obstacleDistance == null) { obstacleDistance = new float[Count]; fireDistance = new float[Count]; }
-            Distances(i => Occupancy(i) == 255 || (keepOut != null && keepOut[i]) || (entranceLock != null && entranceLock[i]), obstacleDistance);
+            Distances(i => Occupancy(i) == 255 || (keepOut != null && keepOut[i]) || (entranceHard != null && entranceHard[i]), obstacleDistance);
             Distances(Dangerous, fireDistance); dirty = false;
         }
         /// <summary>Distance planned routes keep from fire: fire_clearance_m, lowered to emergency_fire_clearance_m only for an
@@ -996,7 +1009,8 @@ namespace SmokeRescue.Brain
             float clearance = obstacleDistance[i] - c.robot_radius_m - CellM * .707107f;
             float edge = Mathf.Clamp01(1 - clearance / c.obstacle_cost_margin_m);
             float soft = keepSoft != null ? keepSoft[i] : 0;
-            return 1 + c.heat_cost_weight * (strength * strength + warm * warm) + c.obstacle_cost_weight * edge * edge + c.keepout_cost_weight * soft * soft;
+            float passage = entranceLock != null && entranceLock[i] ? c.entrance_lock_cost_weight : 0;
+            return 1 + c.heat_cost_weight * (strength * strength + warm * warm) + c.obstacle_cost_weight * edge * edge + c.keepout_cost_weight * soft * soft + passage;
         }
         internal float FireDistance(int i) => i < 0 ? 0 : fireDistance[i];
         public byte[] CopyOccupancy() { var result = new byte[Count]; for (int i = 0; i < Count; i++) result[i] = Occupancy(i); return result; }

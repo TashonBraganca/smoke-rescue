@@ -274,6 +274,36 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void TheEntranceLockLetsARouteCrossTheWayInOnlyIndoorsAndNeverStopsThere()
+        {
+            // Headless house 5015: the way in opened onto the hallway beside the living room door. A whole-disc lock walled both
+            // robots into the living room for 200 s and 8 of 9 rooms went unsearched. Here the way in is a door in the
+            // corridor's south wall at x = 0, with yard beyond it, and rooms off the corridor on either side of the lock.
+            var c = AuctionSettings();
+            var b = new RobotBrain(Calibration(), c, "robot_A", 0); var g = Map(b);
+            CorridorWithRooms(g, .8f, -4, 0, 4);
+            for (int i = 0; i < g.Count; i++)
+            {
+                var p = g.Centre(i);
+                if ((Mathf.Abs(p.x) < .45f && p.y >= -.9f && p.y < -.8f) || (Mathf.Abs(p.x) < 6 && p.y >= -3 && p.y < -.9f)) g.ObserveFree(i);
+            }
+            var planner = Planner(b); Vector2 entry = Vector2.zero, west = new Vector2(-4, 2.7f), east = new Vector2(4, 2.7f);
+            bool Inside(Vector2 p) => p.y > -.8f;
+            Assert.That(planner.Plan(west, east), Is.Not.Empty, "control: before any lock the corridor joins the rooms");
+            g.SetEntranceLock(entry, 2.5f);
+            Assert.That(planner.Plan(west, east), Is.Empty, "control: a whole-disc lock walls the west room off from the east one");
+            g.SetEntranceLock(entry, 2.5f, Inside);
+            var route = planner.Plan(west, east);
+            Assert.That(route, Is.Not.Empty, "with a passage the route crosses the lock indoors");
+            Assert.That(route.All(Inside), Is.True, "and never leaves by the way in");
+            Assert.That(planner.Plan(west, new Vector2(0, -2)), Is.Empty, "the yard beyond the way in stays shut");
+            Assert.That(planner.Plan(west, new Vector2(1, 0)), Is.Empty, "no goal on the passage");
+            var frontiers = planner.Frontiers(west, null, false, false);
+            Assert.That(frontiers, Is.Not.Empty, "control: unsearched floor is offered");
+            Assert.That(frontiers.All(f => Vector2.Distance(f.position, entry) > 2.5f), Is.True, "no frontier goal on the passage");
+        }
+
+        [Test]
         public void TheRoomAuctionGivesEachRoomToTheLowerBidForAnyNumberOfRobotsAndClaimsLapse()
         {
             var c = AuctionSettings();

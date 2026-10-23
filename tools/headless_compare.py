@@ -32,6 +32,8 @@ def summary(r: dict) -> dict:
         "stuck_events": sum(sum(x["stuck_events"].values()) for x in robots),
         "yields": sum(x["room_yielded"] for x in robots),
         "peak_air_c": max(x.get("peak_air_c", 20) for x in robots), "over_60_s": sum(x.get("air_over_60_s", 0) for x in robots),
+        # Fewest rooms any one robot searched past 30 %: 1 means a robot spent the run in one room (sealed in, 5013-5016).
+        "min_robot_rooms": min(sum(v["by_robot_pct"][k] >= 30 for v in r["rooms"].values()) for k in range(len(robots))),
     }
 
 
@@ -42,7 +44,7 @@ def main(folder: Path):
         r = report(run)
         (run / "report.json").write_text(json.dumps(r, indent=1))
         by_variant[variant][seed] = summary(r)
-    keys = ["room_mean_pct", "rooms_under_50", "sighted", "confirmed", "false", "walked_m", "turning_s", "still_s", "outside_s", "stuck_events", "yields", "peak_air_c", "over_60_s"]
+    keys = ["room_mean_pct", "rooms_under_50", "sighted", "confirmed", "false", "walked_m", "turning_s", "still_s", "outside_s", "stuck_events", "yields", "peak_air_c", "over_60_s", "min_robot_rooms"]
     print("variant".ljust(22) + "".join(k[:12].rjust(13) for k in keys))
     for variant, seeds in by_variant.items():
         mean = {k: round(sum(s[k] for s in seeds.values()) / len(seeds), 1) for k in keys}

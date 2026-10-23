@@ -186,7 +186,7 @@ namespace SmokeRescue.Brain
                         (c.stay_inside && NearWayOut(openingCentre))) continue;
                     Vector2 target = camera - forward * sensors.camera.mount.forward_offset_m;
                     float distance = Vector2.Distance(motion.Pose.position, target);
-                    if (distance > c.frontier_peek_m || !grid.Walkable(grid.Cell(target)) ||
+                    if (distance > c.frontier_peek_m || !grid.Standable(grid.Cell(target)) ||
                         ClaimBlocks(target, t) || GoalBlacklisted(target, t) || VisitedGoal(target, t)) continue;
                     candidates.Add((openingCentre, forward, target, distance));
                 }
