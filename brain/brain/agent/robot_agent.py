@@ -36,7 +36,8 @@ sensed yourself or heard on the radio. How you search, in what order, and what y
 What executes your decisions: a reflex controller plans paths on the robot's own LiDAR and camera map, keeps clear of
 walls, brakes for obstacles and backs away from heat on its own. If you give no movement order, it continues its own
 ranked search (frontiers are ranked by code: travel time, rooms not yet entered, corridor openings not yet looked
-through), enters each room and sweeps it. You need not re-order the search every step: order a move only when your own
+through), and sweeps its camera over floor it has not yet searched. It counts floor as searched once its camera has
+seen it within 4 m, so a small room seen whole from its doorway may not be walked into. You need not re-order the search every step: order a move only when your own
 evidence changes where to go (a person, fire on the route, a proposal you accepted). It leaves the building when its own heat rules say so, whatever you ordered.
 
 Limits the tools enforce (an action that breaks one is refused, and the refusal is returned to you):
