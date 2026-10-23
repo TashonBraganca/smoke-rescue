@@ -375,7 +375,7 @@ namespace SmokeRescue.Brain
             {
                 float range = Vector2.Distance(active.position, motion.Pose.position);
                 float error = BrainMath.Angle(motion.Pose.yawRad, BrainMath.Heading(active.position - motion.Pose.position));
-                if (range >= c.survivor_stop_min_m && range <= c.survivor_stop_max_m)
+                if (StartsViewingStop(range))
                 {
                     if (!inspecting)
                     {
@@ -756,6 +756,19 @@ namespace SmokeRescue.Brain
         {
             Vector2 then = track.position - track.rejectedFrom, now = track.position - motion.Pose.position;
             return Vector2.Angle(then, now) >= c.reject_new_view_deg || now.magnitude <= .5f * then.magnitude;
+        }
+        /// <summary>Whether the robot stops here to view the active candidate: inside the viewing band, and with
+        /// survivor_view_sight_line, a mapped line to it clear of walls (GridPlanner.ClearView, the test the approach path's
+        /// viewpoint already passed) or the robot at the end of its approach path. Headless house 5022 (23 Oct final), robot A:
+        /// it stopped 4.00 m from s1 at 132.5 s with a wall on the line between them, stood until the 40 s approach limit
+        /// (168 s), and s1 was the one person of 30 never confirmed. A stop already under way is kept.</summary>
+        bool StartsViewingStop(float range)
+        {
+            if (range < c.survivor_stop_min_m || range > c.survivor_stop_max_m) return false;
+            if (!c.survivor_view_sight_line || inspecting) return true;
+            var at = motion.Pose.position;
+            return planner.ClearView(at, active.position) ||
+                   (goal.HasValue && path.Count > 0 && Vector2.Distance(at, goal.Value) <= 2 * c.goal_tolerance_m);
         }
         /// <summary>Colour sightings arrive once per scan period, thermal blobs every frame, so freshness depends on the source.</summary>
         double FreshS(Track track) => track.rgb ? c.person_rgb_fresh_s : c.survivor_fresh_s;

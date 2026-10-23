@@ -9,7 +9,7 @@
     <Compile Include="$(Src)/Brain/*.cs" />
     <Compile Include="$(Src)/Sensors/SensorConfig.cs;$(Src)/Sensors/ImuSensor.cs;$(Src)/Sensors/OdometrySensor.cs;$(Src)/Sensors/AirTemperatureSensor.cs;$(Src)/Sensors/SensorRandom.cs;$(Src)/Sensors/FrameConvert.cs" />
     <Compile Include="$(Src)/World/FloorPlan.cs;$(Src)/World/Scenario.cs;$(Src)/World/FireSim.cs;$(Src)/World/FireSimHeat.cs" />
-    <Compile Include="$(Src)/Tests/EditMode/BrainTests.cs;$(Src)/Tests/EditMode/RoomAuctionTests.cs;$(Src)/Tests/EditMode/CameraLinkTests.cs;$(Src)/Tests/EditMode/TeamMapTests.cs;$(Src)/Tests/EditMode/StepClearanceTests.cs" />
+    <Compile Include="$(Src)/Tests/EditMode/BrainTests.cs;$(Src)/Tests/EditMode/RoomAuctionTests.cs;$(Src)/Tests/EditMode/CameraLinkTests.cs;$(Src)/Tests/EditMode/TeamMapTests.cs;$(Src)/Tests/EditMode/StepClearanceTests.cs;$(Src)/Tests/EditMode/ViewingStopTests.cs" />
     <Compile Include="Standalone.cs;LogicTests.cs" />
     <Compile Include="$(Src)/Tests/EditMode/MotionCostTests.cs" />
     <Compile Include="$(Src)/Tests/EditMode/HeadlessMotionErrors.cs" />

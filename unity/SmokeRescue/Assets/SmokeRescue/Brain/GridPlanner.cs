@@ -335,7 +335,7 @@ namespace SmokeRescue.Brain
         /// <summary>No mapped wall on the straight line from a standpoint to a person, ignoring the last
         /// survivor_view_clear_m before the person (a body against a wall, or the body itself, may be mapped there). A
         /// standoff on the far side of a wall sees nothing of the person.</summary>
-        bool ClearView(Vector2 from, Vector2 person)
+        internal bool ClearView(Vector2 from, Vector2 person)
         {
             float length = Vector2.Distance(from, person) - c.survivor_view_clear_m; if (length <= 0) return true;
             Vector2 dir = (person - from).normalized; int steps = Mathf.CeilToInt(length / (grid.CellM * .5f));
