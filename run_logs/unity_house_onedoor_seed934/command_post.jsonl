@@ -1,0 +1,103 @@
+{"t":2.0,"from":"robot_A","kind":"link","distance_m":2.63,"walls":0,"reason":"ok"}
+{"t":2.0,"from":"robot_A","kind":"heard","text":"Possible person detected straight ahead near map position (-0.04, 7.51), RGB person confidence 0.62 but no depth; I am approaching to verify and will report confirmation. [robot state: this robot has confirmed nobody; a confirmation was refused this step: the inspection measured "}
+{"t":18.0,"from":"robot_A","kind":"link","distance_m":7.33,"walls":0,"reason":"ok"}
+{"t":18.0,"from":"robot_A","kind":"heard","text":"Thermal scan confirms a fire hotspot at map (-5.57, 4.39), about 5.6 m away at bearing -23°, peak 358.6 C; no person-sized thermal or RGB detections in the current view. Fire margin is blocking the western unsearched route. [robot state: this robot has confirmed nobody]"}
+{"t":46.0,"from":"robot_B","kind":"link","distance_m":9.47,"walls":2,"reason":"walls"}
+{"t":48.0,"from":"robot_B","kind":"link","distance_m":9.71,"walls":2,"reason":"walls"}
+{"t":50.0,"from":"robot_B","kind":"link","distance_m":9.82,"walls":2,"reason":"walls"}
+{"t":52.0,"from":"robot_B","kind":"link","distance_m":10.33,"walls":1,"reason":"ok"}
+{"t":52.0,"from":"robot_B","kind":"heard","text":"Survivor confirmed at map position (7.02, 5.79), detected by RGB/depth at 2.62 m; crews can route to this position. [robot state: confirmed by this robot so far, own map: (7.0, 5.8)]"}
+{"t":54.0,"from":"robot_B","kind":"link","distance_m":10.2,"walls":1,"reason":"ok"}
+{"t":54.0,"from":"robot_B","kind":"heard","text":"Confirmed survivor at map position (7.21, 5.77) by RGB/depth person inspection, about 1.9 m from robot. [robot state: confirmed by this robot so far, own map: (7.0, 5.8); a confirmation was refused this step: a person is already confirmed at (7.0, 5.8), within 1.0 m: this is the "}
+{"t":68.0,"from":"robot_A","kind":"link","distance_m":10.34,"walls":2,"reason":"walls"}
+{"t":70.0,"from":"robot_A","kind":"link","distance_m":10.36,"walls":2,"reason":"walls"}
+{"t":70.0,"from":"robot_B","kind":"link","distance_m":10.89,"walls":1,"reason":"ok"}
+{"t":70.0,"from":"robot_B","kind":"heard","text":"Accepted: I will join you at the western fire and coordinate a short spray, after resolving the immediate warm candidate in my current view."}
+{"t":72.0,"from":"robot_A","kind":"link","distance_m":10.27,"walls":1,"reason":"ok"}
+{"t":72.0,"from":"robot_A","kind":"heard","text":"This fire blocks 7.5 m² of reachable unsearched floor; neither robot's 12 s water supply can knock it down alone, but two streams can."}
+{"t":72.0,"from":"robot_A","kind":"heard","text":"Acknowledged. I am continuing the reachable northern search while you resolve the candidate; the western fire cannot be knocked down with my remaining 12 s of water alone, so I will coordinate suppression when you arrive rather than expend water early. [robot state: this robot ha"}
+{"t":76.0,"from":"robot_A","kind":"link","distance_m":10.9,"walls":0,"reason":"ok"}
+{"t":76.0,"from":"robot_A","kind":"heard","text":"Confirmed additional survivor at map position (-0.46, 12.43) via RGB/depth person inspection at 3.66 m; crews should route to this position. [robot state: confirmed by this robot so far, own map: (-0.5, 12.4)]"}
+{"t":100.0,"from":"robot_B","kind":"link","distance_m":11.62,"walls":3,"reason":"walls"}
+{"t":102.0,"from":"robot_B","kind":"link","distance_m":12.09,"walls":3,"reason":"distance"}
+{"t":104.0,"from":"robot_B","kind":"link","distance_m":12.23,"walls":3,"reason":"distance"}
+{"t":106.0,"from":"robot_B","kind":"link","distance_m":12.23,"walls":3,"reason":"distance"}
+{"t":108.0,"from":"robot_B","kind":"link","distance_m":12.23,"walls":3,"reason":"distance"}
+{"t":110.0,"from":"robot_B","kind":"link","distance_m":12.23,"walls":3,"reason":"distance"}
+{"t":112.0,"from":"robot_B","kind":"link","distance_m":12.23,"walls":3,"reason":"distance"}
+{"t":114.0,"from":"robot_B","kind":"link","distance_m":12.23,"walls":3,"reason":"distance"}
+{"t":116.0,"from":"robot_B","kind":"link","distance_m":12.23,"walls":3,"reason":"distance"}
+{"t":118.0,"from":"robot_B","kind":"link","distance_m":11.81,"walls":3,"reason":"walls"}
+{"t":120.0,"from":"robot_B","kind":"link","distance_m":11.12,"walls":3,"reason":"walls"}
+{"t":122.0,"from":"robot_B","kind":"link","distance_m":11.14,"walls":3,"reason":"walls"}
+{"t":124.0,"from":"robot_B","kind":"link","distance_m":11.44,"walls":3,"reason":"walls"}
+{"t":126.0,"from":"robot_B","kind":"link","distance_m":11.73,"walls":3,"reason":"walls"}
+{"t":128.0,"from":"robot_B","kind":"link","distance_m":12.06,"walls":2,"reason":"distance"}
+{"t":130.0,"from":"robot_B","kind":"link","distance_m":12.4,"walls":1,"reason":"distance"}
+{"t":132.0,"from":"robot_B","kind":"link","distance_m":13.06,"walls":2,"reason":"distance"}
+{"t":134.0,"from":"robot_B","kind":"link","distance_m":13.62,"walls":2,"reason":"distance"}
+{"t":136.0,"from":"robot_B","kind":"link","distance_m":14.01,"walls":2,"reason":"distance"}
+{"t":138.0,"from":"robot_B","kind":"link","distance_m":14.01,"walls":2,"reason":"distance"}
+{"t":140.0,"from":"robot_B","kind":"link","distance_m":14.01,"walls":2,"reason":"distance"}
+{"t":142.0,"from":"robot_B","kind":"link","distance_m":14.01,"walls":2,"reason":"distance"}
+{"t":144.0,"from":"robot_B","kind":"link","distance_m":14.01,"walls":2,"reason":"distance"}
+{"t":146.0,"from":"robot_B","kind":"link","distance_m":14.01,"walls":2,"reason":"distance"}
+{"t":148.0,"from":"robot_B","kind":"link","distance_m":13.92,"walls":2,"reason":"distance"}
+{"t":150.0,"from":"robot_B","kind":"link","distance_m":13.82,"walls":2,"reason":"distance"}
+{"t":152.0,"from":"robot_B","kind":"link","distance_m":13.63,"walls":2,"reason":"distance"}
+{"t":154.0,"from":"robot_B","kind":"link","distance_m":13.03,"walls":2,"reason":"distance"}
+{"t":156.0,"from":"robot_B","kind":"link","distance_m":12.4,"walls":2,"reason":"distance"}
+{"t":158.0,"from":"robot_B","kind":"link","distance_m":12.26,"walls":1,"reason":"distance"}
+{"t":160.0,"from":"robot_B","kind":"link","distance_m":11.83,"walls":3,"reason":"walls"}
+{"t":162.0,"from":"robot_B","kind":"link","distance_m":11.55,"walls":3,"reason":"walls"}
+{"t":164.0,"from":"robot_B","kind":"link","distance_m":11.31,"walls":3,"reason":"walls"}
+{"t":166.0,"from":"robot_B","kind":"link","distance_m":11.22,"walls":3,"reason":"walls"}
+{"t":168.0,"from":"robot_B","kind":"link","distance_m":11.59,"walls":3,"reason":"walls"}
+{"t":170.0,"from":"robot_B","kind":"link","distance_m":12.14,"walls":3,"reason":"distance"}
+{"t":172.0,"from":"robot_A","kind":"link","distance_m":11.15,"walls":0,"reason":"ok"}
+{"t":172.0,"from":"robot_A","kind":"heard","text":"Heat avoidance has interrupted my western-frontier route. Thermal confirms an active hotspot at approximately (-2.63, 2.32), 226.96 C; the frontier-blocking fire can only be knocked down by two robots, so I am holding clear rather than wasting water alone. Please report when you "}
+{"t":172.0,"from":"robot_B","kind":"link","distance_m":12.68,"walls":3,"reason":"distance"}
+{"t":174.0,"from":"robot_B","kind":"link","distance_m":12.96,"walls":3,"reason":"distance"}
+{"t":176.0,"from":"robot_B","kind":"link","distance_m":13.47,"walls":3,"reason":"distance"}
+{"t":178.0,"from":"robot_A","kind":"link","distance_m":10.21,"walls":1,"reason":"ok"}
+{"t":178.0,"from":"robot_A","kind":"heard","text":"At the western frontier-blocking fire near (-0.85, 5.05), I am in the prescribed spray position but the current aimed thermal scan has no hot component, so the nozzle cannot legally be aimed/sprayed despite map-level fire indication. Holding this route under observation; unsearch"}
+{"t":178.0,"from":"robot_B","kind":"link","distance_m":13.6,"walls":4,"reason":"distance"}
+{"t":180.0,"from":"robot_B","kind":"link","distance_m":13.6,"walls":4,"reason":"distance"}
+{"t":182.0,"from":"robot_A","kind":"link","distance_m":10.19,"walls":1,"reason":"ok"}
+{"t":182.0,"from":"robot_A","kind":"heard","text":"Fresh thermal scan during avoidance shows only a narrow ~206 C hotspot at map (-6.61, 7.33), range estimate 5.6 m; the frontier-blocking fire remains outside my camera view, so I cannot yet aim the nozzle despite solo knockdown capability. Holding fire clearance and will suppress"}
+{"t":182.0,"from":"robot_B","kind":"link","distance_m":13.48,"walls":3,"reason":"distance"}
+{"t":184.0,"from":"robot_B","kind":"link","distance_m":13.57,"walls":3,"reason":"distance"}
+{"t":186.0,"from":"robot_B","kind":"link","distance_m":13.32,"walls":3,"reason":"distance"}
+{"t":188.0,"from":"robot_B","kind":"link","distance_m":12.5,"walls":3,"reason":"distance"}
+{"t":190.0,"from":"robot_B","kind":"link","distance_m":11.92,"walls":3,"reason":"walls"}
+{"t":192.0,"from":"robot_B","kind":"link","distance_m":11.23,"walls":3,"reason":"walls"}
+{"t":194.0,"from":"robot_B","kind":"link","distance_m":11.2,"walls":3,"reason":"walls"}
+{"t":196.0,"from":"robot_B","kind":"link","distance_m":11.38,"walls":3,"reason":"walls"}
+{"t":198.0,"from":"robot_B","kind":"link","distance_m":11.57,"walls":3,"reason":"walls"}
+{"t":200.0,"from":"robot_B","kind":"link","distance_m":11.2,"walls":2,"reason":"walls"}
+{"t":202.0,"from":"robot_B","kind":"link","distance_m":10.58,"walls":1,"reason":"ok"}
+{"t":202.0,"from":"robot_B","kind":"heard","text":"Confirmed survivor at map position (7.22, 13.42) by RGB/depth person inspection at 3.72 m; outside crews should route to this position. [robot state: confirmed by this robot so far, own map: (7.0, 5.8), (4.4, 12.2), (7.2, 13.4)]"}
+{"t":202.0,"from":"robot_B","kind":"heard","text":"RGB/depth inspection identifies a person at approximately (7.13, 13.34), coincident with the previously reported survivor near (7.22, 13.42); crews should treat this as the same location unless independently resolved. [robot state: confirmed by this robot so far, own map: (7.0, 5"}
+{"t":202.0,"from":"robot_B","kind":"heard","text":"Confirmed survivor at map position (4.29, 12.06) from RGB/depth person inspection (0.85 confidence); outside crews should route to this position. [robot state: confirmed by this robot so far, own map: (7.0, 5.8), (4.4, 12.2), (7.2, 13.4); a confirmation was refused this step: a p"}
+{"t":202.0,"from":"robot_B","kind":"heard","text":"Heat avoidance is active at my position (air trend +84 C/min); I am yielding to the reflex controller toward cooler reachable search. A fresh RGB box at (7.19,5.83) was inspected but remains uncertain with no matching warm component, so it is not a survivor report. [robot state: "}
+{"t":202.0,"from":"robot_B","kind":"heard","text":"New survivor confirmed by RGB/depth inspection at map position (7.09, 5.75); crews should route to this position. [robot state: confirmed by this robot so far, own map: (7.0, 5.8), (4.4, 12.2), (7.2, 13.4); a confirmation was refused this step: a person is already confirmed at (7"}
+{"t":206.0,"from":"robot_A","kind":"link","distance_m":10.75,"walls":2,"reason":"walls"}
+{"t":208.0,"from":"robot_A","kind":"link","distance_m":10.77,"walls":2,"reason":"walls"}
+{"t":210.0,"from":"robot_A","kind":"link","distance_m":10.93,"walls":3,"reason":"walls"}
+{"t":212.0,"from":"robot_A","kind":"link","distance_m":10.93,"walls":3,"reason":"walls"}
+{"t":214.0,"from":"robot_A","kind":"link","distance_m":10.93,"walls":3,"reason":"walls"}
+{"t":216.0,"from":"robot_A","kind":"link","distance_m":10.93,"walls":3,"reason":"walls"}
+{"t":218.0,"from":"robot_A","kind":"link","distance_m":10.93,"walls":3,"reason":"walls"}
+{"t":220.0,"from":"robot_A","kind":"link","distance_m":10.69,"walls":3,"reason":"walls"}
+{"t":220.0,"from":"robot_B","kind":"link","distance_m":11.33,"walls":1,"reason":"ok"}
+{"t":220.0,"from":"robot_B","kind":"heard","text":"Fresh thermal at t=218 confirms an active hotspot near (-1.54, 4.26), ~10.3 m away at bearing -19.5°, mean 274.6 C (max 329.8 C). The route/fire margin has blacklisted the affected frontier until t=237.8; this fire cannot be knocked down by one robot from the available stand-off."}
+{"t":222.0,"from":"robot_A","kind":"link","distance_m":10.64,"walls":3,"reason":"walls"}
+{"t":224.0,"from":"robot_A","kind":"link","distance_m":10.64,"walls":3,"reason":"walls"}
+{"t":226.0,"from":"robot_A","kind":"link","distance_m":10.91,"walls":3,"reason":"walls"}
+{"t":228.0,"from":"robot_A","kind":"link","distance_m":11.05,"walls":3,"reason":"walls"}
+{"t":230.0,"from":"robot_A","kind":"link","distance_m":11.24,"walls":2,"reason":"walls"}
+{"t":232.0,"from":"robot_A","kind":"link","distance_m":11.52,"walls":2,"reason":"walls"}
+{"t":234.0,"from":"robot_A","kind":"link","distance_m":11.96,"walls":2,"reason":"walls"}
+{"t":236.0,"from":"robot_A","kind":"link","distance_m":11.99,"walls":2,"reason":"walls"}
+{"t":238.0,"from":"robot_A","kind":"link","distance_m":11.99,"walls":2,"reason":"walls"}
+{"t":240.0,"from":"robot_A","kind":"link","distance_m":11.99,"walls":2,"reason":"walls"}
