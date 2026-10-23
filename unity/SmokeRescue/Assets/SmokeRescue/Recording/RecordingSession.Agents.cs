@@ -202,9 +202,12 @@ namespace SmokeRescue.Recording
                     ["inbox"] = new JArray(rig.inbox),
                     ["survivors"] = new JArray((s.confirmedSurvivors ?? new Vector2[0]).Select(p => new JArray(p.x, p.y))),
                     ["frontiers"] = frontiers,
-                    ["fire_blocks_frontier"] = frontiers.Count > 0 ? null : rig.brain.FireBlockedFrontier(t) is Brain.BrainFireBlock fb ? new JObject
+                    // Sent whenever fire cuts a route to unsearched floor, not only when no other frontier is left: seed 934, robot A
+                    // always had 7 or 8 other frontiers, so the agent never heard of the fire that cut its best ones.
+                    ["fire_blocks_frontier"] = rig.brain.FireBlockedFrontier(t) is Brain.BrainFireBlock fb ? new JObject
                     {
                         ["bearing_deg"] = Math.Round(fb.bearingDegRight, 1), ["distance_m"] = Math.Round(fb.distanceM, 2),
+                        ["x"] = Math.Round(fb.blockAt.x, 2), ["y"] = Math.Round(fb.blockAt.y, 2),
                         ["frontier_path_m"] = Math.Round(fb.frontierPathM, 1), ["unsearched_m2"] = Math.Round(fb.unsearchedM2, 1),
                         ["burning_m2"] = Math.Round(fb.burningM2, 2),
                     } : null,

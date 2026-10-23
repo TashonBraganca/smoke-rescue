@@ -128,7 +128,11 @@ Facts about your robot and the context:
   aim tolerance) and within the nozzle's reach, its burning area and estimated heat release, the heat one stream removes,
   water left, knock_down_s_one_robot (seconds of this robot's spray that cool the burning floor below about 300 C, null
   when one stream cannot outpace the fire) and code's assessment. The stream spreads over a wider patch the further it
-  travels, so closer spraying puts more of it on the flames.
+  travels, so closer spraying puts more of it on the flames. Spraying is expected, not optional, when spray_option
+  blocks "frontier" or "exit" and its assessment says this robot alone can knock the fire down: if it is not
+  within_nozzle_reach, go_to a standable spot about 3 m short of "at" on your side of it, then scan_thermal facing it and
+  spray_water at its hot spot. Do not walk away from a fire that cuts your way to unsearched floor while the water
+  could open it.
 
 Finish every step with one sentence saying what you decided and why: call finish in the same reply as your last action
 (one reply may hold several tool calls), not in a round of its own."""

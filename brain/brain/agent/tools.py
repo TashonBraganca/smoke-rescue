@@ -122,6 +122,7 @@ def spray_option(req: dict) -> dict | None:
             assessment += f"{math.radians(float(_NOZZLE['half_angle_deg'])) * max(distance, 1.0) ** 2:.1f} m2)"
     bearing = float(block.get("bearing_deg", 0.0))
     return {"blocks": which, "bearing_deg": round(bearing, 1), "distance_m": block.get("distance_m"),
+            "at": [block["x"], block["y"]] if block.get("x") is not None else None,
             "in_camera_view": abs(bearing) <= CAMERA_HALF_HFOV_DEG, "within_nozzle_reach": float(block.get("distance_m") or 99) <= float(_NOZZLE["range_m"]),
             "burning_m2": round(area, 2), "est_heat_release_kw": round(kw), "one_robot_stream_removes_kw": round(ONE_ROBOT_COOLS_KW),
             "water_s_left": round(water_s, 1), "assessment": assessment,

@@ -937,6 +937,28 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void AFireCutFrontierTheBrainBlacklistedIsStillReportedForWater()
+        {
+            // Seed 934 (23 Oct), robot A: when fire cut a route the brain blacklisted that frontier (6 times from 119 s), and the
+            // fire-blocked check skipped blacklisted goals, so the agent never heard of the fire it could spray: 0 sprays with
+            // 12 L aboard. The same burning corridor as above, with the floor beyond the fire blacklisted: still reported.
+            var b = new RobotBrain(Calibration(), Settings(), "A", 0); var g = Map(b);
+            for (float y = -1; y <= 4; y += .05f)
+            {
+                for (float x = -.95f; x <= .95f; x += .05f) g.ObserveFree(g.Cell(new Vector2(x, y)));
+                g.ObserveOccupied(g.Cell(new Vector2(-1.05f, y))); g.ObserveOccupied(g.Cell(new Vector2(1.05f, y)));
+            }
+            for (float x = -1; x <= 1; x += .05f) g.ObserveOccupied(g.Cell(new Vector2(x, -1.05f)));
+            for (float x = -.95f; x <= .95f; x += .1f) g.ObserveHeat(g.Cell(new Vector2(x, 2)), 600, 0);
+            Assert.That(b.FireBlockedFrontier(0).HasValue, Is.True, "control: reported before any blacklist");
+            typeof(RobotBrain).GetMethod("BlacklistGoal", Private).Invoke(b, new object[] { new Vector2(0, 4), 0.0, 1, 60.0,
+                "The fire margin cut the path to this frontier; leave it until the retry time.", 3f });
+            var blocked = b.FireBlockedFrontier(1);
+            Assert.That(blocked.HasValue, Is.True, "a fire-cut frontier the brain set aside is still a fire water could open");
+            Assert.That(blocked.Value.blockAt.y, Is.InRange(0f, 2f));
+        }
+
+        [Test]
         public void ThermalBlobsRejectFireAndTwoPixelNoise()
         {
             var s = Calibration(); var c = Settings();
