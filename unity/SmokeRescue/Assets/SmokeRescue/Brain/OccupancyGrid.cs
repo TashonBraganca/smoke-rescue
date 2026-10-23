@@ -934,15 +934,16 @@ namespace SmokeRescue.Brain
         /// <summary>Whether a camera sector can still search floor. Unknown floor keeps a look eligible; only known
         /// opaque obstacles hide it. A low obstacle with measured top height does not hide the whole view behind it.
         /// This is a prediction for choosing looks, never an observation or a searched-cell update.</summary>
-        internal bool HasUnsearchedFloorInView(Vector2 eye, float heading, float leftRad, float rightRad, float rangeM)
+        internal bool HasUnsearchedFloorInView(Vector2 eye, float heading, float leftRad, float rightRad, float rangeM, float minForwardM = 0)
         {
+            var forward = new Vector2(-Mathf.Sin(heading), Mathf.Cos(heading));
             int start = Cell(eye); if (start < 0) return true;
             int reach = Mathf.CeilToInt(rangeM / CellM), sx = start % Size, sy = start / Size;
             for (int dy = -reach; dy <= reach; dy++) for (int dx = -reach; dx <= reach; dx++)
             {
                 int x = sx + dx, y = sy + dy;
                 Vector2 d = Origin + new Vector2(x + .5f, y + .5f) * CellM - eye;
-                if (d.sqrMagnitude > rangeM * rangeM) continue;
+                if (d.sqrMagnitude > rangeM * rangeM || Vector2.Dot(d, forward) + CellM * .707107f < minForwardM) continue;
                 float bearing = BrainMath.Angle(heading, BrainMath.Heading(d));
                 if (bearing < -rightRad * Mathf.Rad2Deg || bearing > leftRad * Mathf.Rad2Deg) continue;
                 // Floor outside this finite map is unknown, so it cannot justify skipping a look.

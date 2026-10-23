@@ -88,7 +88,13 @@ namespace SmokeRescue.Brain
                 var camera = sensors.camera;
                 float left = Mathf.Atan((camera.cx + .5f) / camera.fx);
                 float right = Mathf.Atan((camera.width - .5f - camera.cx) / camera.fx);
-                if (!grid.HasUnsearchedFloorInView(eye, heading, left, right, c.search_max_range_m))
+                float minForward = 0;
+                if (c.motion_sweep_visible_floor && c.search_low_m > 0)
+                {
+                    float bottom = camera.mount.pitch_down_deg * Mathf.Deg2Rad + Mathf.Atan((camera.height - .5f - camera.cy) / camera.fy);
+                    minForward = bottom > 0 ? Mathf.Max(0, camera.mount.height_m - c.search_low_m) / Mathf.Tan(bottom) : float.PositiveInfinity;
+                }
+                if (!grid.HasUnsearchedFloorInView(eye, heading, left, right, c.search_max_range_m, minForward))
                 {
                     Emit(t, "sweep_look_skipped", "This camera sector contains only searched floor or mapped opaque obstacles within search range.",
                         "look_index", sweepIndex, "offset_deg", SweepOffsetsDeg[sweepIndex]);

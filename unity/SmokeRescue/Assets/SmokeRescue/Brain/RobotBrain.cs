@@ -379,12 +379,22 @@ namespace SmokeRescue.Brain
                 {
                     if (!inspecting)
                     {
-                        inspecting = true; SetPath(new List<Vector2>());
+                        inspecting = true; inspectionStarted = t; SetPath(new List<Vector2>());
                         Emit(t, "goal", "At survivor viewing distance; stop and face the person for confirmation.", "range_m", range);
                     }
                     bool steady = Mathf.Abs(error) <= c.survivor_face_tolerance_deg && motion.Speed <= c.survivor_stop_speed_mps &&
                         Mathf.Abs(motion.YawRate) * Mathf.Rad2Deg <= c.survivor_stop_yaw_dps && t - active.lastSeen <= FreshS(active);
                     dwell = steady ? dwell + elapsed : 0;
+                    if (c.motion_bounded_inspection && !steady &&
+                        t - inspectionStarted >= c.survivor_dwell_s + Math.Max(c.survivor_lost_s, FreshS(active)))
+                    {
+                        Emit(t, "survivor_view_timeout", "The viewing stop never produced a steady fresh dwell; defer this candidate and search on.",
+                            "elapsed_s", t - inspectionStarted, "dwell_s", dwell,
+                            "x_m", active.position.x, "y_m", active.position.y);
+                        active.retryAfter = t + c.stuck_blacklist_s; active = null; inspecting = false; dwell = 0;
+                        ClearPath(); nextSurvivorSearch = t + c.replan_s;
+                        return Command(0, 0, dt, true);
+                    }
                     if (dwell + 1e-6f >= c.survivor_dwell_s && AgentConfirms)
                     {
                         // The agent decides who is a person, from OpenCV evidence; the reflex layer only brings the
@@ -515,7 +525,9 @@ namespace SmokeRescue.Brain
                     }
                     else { Emit(t, "replan", "Agent goal has no known free path; back to exploring.", "x_m", agentGoal.Value.x, "y_m", agentGoal.Value.y); agentGoal = null; }
                 }
-                if ((path.Count == 0 || blocked) && c.room_walk_in && WalkIntoRoom(t, out var walkIn, out int walkRoom))
+                // An agent replacement above has already repaired the old blocked route. Test the new path before fallback.
+                bool fallback = path.Count == 0 || (blocked && (!c.motion_keep_agent_route || !planner.PathSafe(path, cursor)));
+                if (fallback && c.room_walk_in && WalkIntoRoom(t, out var walkIn, out int walkRoom))
                 {
                     // room_walk_in: a room searched from its doorway is still entered. Headless (23 Oct): 17 of 55 rooms were never
                     // entered, because floor seen from the door counts as searched and leaves no frontier inside.
@@ -523,8 +535,8 @@ namespace SmokeRescue.Brain
                     Emit(t, "goal", "This room was searched from outside but never entered: walk into it, then search on.",
                         "room_id", walkRoom, "x_m", walkIn[walkIn.Count - 1].x, "y_m", walkIn[walkIn.Count - 1].y);
                 }
-                else if (path.Count == 0 || blocked)
-{
+                else if (fallback)
+                {
                     System.Func<Vector2, bool> excluded = p => ClaimBlocks(p, t) || GoalBlacklisted(p, t) || VisitedGoal(p, t) || !InSearchArea(p);
                     var frontier = planner.Frontier(motion.Pose.position, excluded);
                     lastPlan = t;
@@ -747,6 +759,7 @@ namespace SmokeRescue.Brain
         }
         /// <summary>Colour sightings arrive once per scan period, thermal blobs every frame, so freshness depends on the source.</summary>
         double FreshS(Track track) => track.rgb ? c.person_rgb_fresh_s : c.survivor_fresh_s;
+        double inspectionStarted;
         double activeSince, lostClockFrom = double.NaN;
         /// <summary>Is the active candidate lost? A collapsed person does not move, so evidence is lost only when the camera
         /// looks at the spot (inside the horizontal view, past the blind floor for a body search_low_m high, within

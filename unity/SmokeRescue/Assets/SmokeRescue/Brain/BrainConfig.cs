@@ -10,6 +10,10 @@ namespace SmokeRescue.Brain
     [Serializable]
     public sealed class BrainConfig
     {
+        public bool motion_keep_agent_route = false;
+        public bool motion_sweep_visible_floor = false;
+        public bool motion_bounded_inspection = false;
+        public bool motion_face_visible = false;
         public bool room_ledger = false;
         public float room_ledger_period_s = 3;
         public float room_ledger_door_width_m = 1.2f;

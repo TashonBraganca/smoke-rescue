@@ -1,4 +1,12 @@
 {
+  "motion_keep_agent_route": false,
+  "motion_keep_agent_route_reason": "After a blocked old path, preserve a safe replacement just built for the agent. The old blocked flag otherwise runs frontier fallback in the same tick and discards it. Old seed 934 has 10 such overwrites for A and 5 for B. Default false as requested. Four no-agent tuning controls are byte-identical; the regression test proves the route repair, while live savings remain unmeasured.",
+  "motion_sweep_visible_floor": false,
+  "motion_sweep_visible_floor_reason": "A sweep needs unsearched floor beyond the calibrated bottom camera ray at search_low_m; rotation cannot reveal its blind floor. This filters look eligibility without adding evidence. Default false as requested. Six-house unseen pass, n=1 per house, solid robots, 240 s: total still 152.8 to 139.3 s per pair, room coverage 76.3 to 79.3 percent, confirmed 29/30 both, zero false. House 5021 loses one coverage point and keeps 47 stuck events; 85-90 percent is not achieved.",
+  "motion_bounded_inspection": false,
+  "motion_bounded_inspection_reason": "After survivor_dwell_s plus the larger of survivor_lost_s and freshness, end a stationary view on its next failed steady sample. Let a fresh steady dwell finish. Defer the candidate for stuck_blacklist_s without confirming or rejecting it. Old 934 A stood viewing for 22 s. The first timeout lost a valid 5004 dwell, which the revised rule preserves. Default false as requested; all four revised headless controls are byte-identical, and live savings remain unmeasured.",
+  "motion_face_visible": false,
+  "motion_face_visible_reason": "An agent arrival may finish facing when its point lies in the central half of both horizontal camera views, or within the existing survivor face tolerance. Offscreen points still need a turn; survivor confirmation keeps its stricter dwell. Default false as requested. Four no-agent controls are byte-identical. The regression test proves in-view arrival; live savings remain unmeasured.",
   "full_snapshot_s": 10.0,
   "full_snapshot_s_reason": "Recover lost radio state at least every ten seconds.",
   "peer_claim_s": 15.0,
