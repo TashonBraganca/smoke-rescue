@@ -833,3 +833,24 @@ def test_a_five_round_step_reaches_finish_and_a_cut_step_still_logs_its_decision
     T.ToolRegistry._looks.clear(); T.ToolRegistry._pending.clear()
     cut = RobotAgent(Scripted(turns()), tmp_path / "t.jsonl", max_rounds=4).step(request(tmp_path) | {"t": 40.0})
     assert cut["rounds"] == 4 and cut["summary"].startswith("(no summary") and "go_to" in cut["summary"], "control: 4 rounds"
+
+
+def test_a_warm_surface_measured_flat_can_be_rejected(tmp_path, monkeypatch):
+    # Seed 934, robot A: approach_candidate refused a flat warm surface with "reject it with reject_candidate", and
+    # reject_candidate then refused because the verdict was only uncertain; the robot looped 4 times, a full step each.
+    # Both now share _flat_warm_surface. Control: a protruding (non-flat) uncertain shape still cannot be rejected on one look.
+    def reject(cues):
+        RobotAgent._new_run(request(tmp_path) | {"t": 49.0})
+        T.ToolRegistry._looks.clear(); T.ToolRegistry._pending.clear(); T.ToolRegistry._confirmed.clear()
+        fake_vision(monkeypatch, "uncertain")
+        real = T.vision.inspect_candidate
+        def with_cues(*a, **k):
+            r = real(*a, **k); r["cues"] = cues; return r
+        monkeypatch.setattr(T.vision, "inspect_candidate", with_cues)
+        return RobotAgent(Scripted([[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": 3})],
+                                    [ToolCall("reject_candidate", {"x": 5.0, "y": 8.0, "evidence_id": "ev1"})]]), tmp_path / "t.jsonl").step(request(tmp_path) | {"t": 50.0})
+    flat = {"depth": {"valid_fraction": .9, "nonplanar": False}, "plane": {"large_plane": True}, "rgb_dnn": {"hits": []}}
+    assert [o["type"] for o in reject(flat)["orders"]] == ["reject_candidate"], "a flat warm surface is rejected"
+    body = {"depth": {"valid_fraction": .9, "nonplanar": True}, "plane": {"large_plane": False}, "rgb_dnn": {"hits": []}}
+    out = reject(body)
+    assert out["orders"] == [] and out["refusals"][0]["tool"] == "reject_candidate", "control: a protruding shape is not"

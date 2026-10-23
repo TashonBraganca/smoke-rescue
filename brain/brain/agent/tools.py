@@ -658,12 +658,15 @@ class ToolRegistry:
             # An uncertain shape looked at closely MAX_LOOKS times from one side may be dropped too: only not_person could
             # reject before, inspections rarely give it, and the brain kept raising the same shape (held-out run 2, robot A,
             # 5 looks in 28 s). The brain raises a rejected shape again from reject_new_view_deg round or on a colour person.
+            # A flat warm surface (_flat_warm_surface, the rule approach_candidate refuses with "reject it") is rejectable
+            # too: seed 934, robot A looped four times (22.8, 95.9, 99.9, 109.35 s), approach refused as flat, reject refused
+            # as only uncertain, each a full 6-round step (Codex rank 1, 23 Oct).
             refusal = self._need(args, ("inspect_candidate",), lambda ev: self._near(ev, args) and (ev.get("verdict") == "not_person" or (
-                                     ev.get("verdict") == "uncertain" and ev.get("x") is not None and len(self._shape_looks(
+                                     ev.get("verdict") == "uncertain" and (_flat_warm_surface(ev) or (ev.get("x") is not None and len(self._shape_looks(
                                          [l for l in self._looks.get(self.ctx.robot, []) if self.ctx.t - l[0] < self.LOOK_MEMORY_S],
-                                         ev["x"], ev["y"])) >= self.MAX_LOOKS)),
-                                 f"the cited inspection is not a not_person verdict at that position, nor an uncertain one at a shape "
-                                 f"looked at closely {self.MAX_LOOKS} times")
+                                         ev["x"], ev["y"])) >= self.MAX_LOOKS)))),
+                                 f"the cited inspection is not a not_person verdict at that position, nor an uncertain one measured "
+                                 f"flat, nor one at a shape looked at closely {self.MAX_LOOKS} times")
         elif name == "withdraw_survivor":
             refusal = self._withdraw_refusal(args)
         elif name == "avoid_area":
