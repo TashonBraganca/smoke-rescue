@@ -53,6 +53,7 @@ namespace SmokeRescue.Brain
         public bool candidate_wall_tall_only = false;
         public bool room_walk_in = false;
         public bool step_exact_clearance = false;
+        public bool survivor_view_sight_line = false;
         public float room_walk_in_min_m2 = 2f, room_walk_in_max_m = 8f;
         public float pinned_yield_m = 1.2f, pinned_yield_back_s = 3f, pinned_yield_speed_mps = .15f;
         public float pinned_window_s = 8f, pinned_move_m = .15f;
