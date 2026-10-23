@@ -128,8 +128,13 @@ class TeamState:
                     for p in self.received.values() if p["status"] == "pending" and t <= p["expires_t"]]
         mine = [{"proposal_id": p["proposal_id"], "status": p["status"] if p["status"] != "pending" or t <= p["expires_t"] else "expired",
                  "my_part": p["my_part"], "your_part": p["your_part"]} for p in list(self.sent.values())[-3:]]
+        # Age on every finding and the time since the partner was last heard: a stale report must read as stale (agents
+        # under message loss do worst when old facts look current; AgentComm-Bench, arXiv 2603.20285).
+        findings = [{**f, "age_s": round(t - float(f["t"]), 1) if f.get("t") is not None else None} for f in self.findings]
+        heard = [float(f["t"]) for f in self.findings if f.get("t") is not None and str(f.get("from", "")).startswith("robot")]
         return {"awaiting_your_answer": awaiting, "your_proposals": mine, "agreements_in_force": self.agreements(t),
-                "partner_findings": list(self.findings), "your_last_intent": self.intent}
+                "partner_findings": findings, "partner_last_heard_s": round(t - max(heard), 1) if heard else None,
+                "your_last_intent": self.intent}
 
     def note_intent(self, t: float, summary: str | None, orders: list) -> None:
         """What this robot set out to do at the end of a step, from the orders the tools accepted (not the model's words)."""
