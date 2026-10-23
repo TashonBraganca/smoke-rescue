@@ -19,6 +19,7 @@ namespace SmokeRescue.Brain
             public Vector2 rejectedFrom;   // where the robot stood when the agent rejected it
             public double rejectedAt, rejectedUntil = double.PositiveInfinity;   // a partner's rejection lapses after reject_share_s
             public bool peerRejected;
+            public double candidateSince = double.NaN;   // when it last became a candidate (agent_order_priority grace)
         }
         readonly struct AirSample
         { public readonly double t; public readonly float c; public AirSample(double time, float value) { t = time; c = value; } }
@@ -142,6 +143,7 @@ namespace SmokeRescue.Brain
             else if (retreating && airC < c.heat_recover_below_c && t - lastAir <= c.frame_max_age_s && budget >= c.heat_resume_fraction && !heatInside)
             {
                 ResetStuckRecovery(); retreating = false; ClearPath();
+                if (c.retreat_reduced_clearance) grid.FireClearance = retreatClearance = c.fire_clearance_m;
                 Emit(t, "goal", "Cool air and a recovered heat budget permit travel again.", "air_c", airC, "heat_budget", budget);
             }
             NoteBodyTrack();
@@ -177,10 +179,27 @@ namespace SmokeRescue.Brain
             }
             if (retreating)
             {
+                if (c.retreat_reduced_clearance) grid.FireClearance = float.IsNaN(retreatClearance) ? c.fire_clearance_m : retreatClearance;
                 if (NeedPlan(t))
                 {
                     bool blocked = path.Count > 0 && !planner.PathSafe(path, cursor);
+                    if (c.retreat_reduced_clearance) grid.FireClearance = retreatClearance = c.fire_clearance_m;
                     var escape = goal.HasValue && !blocked ? planner.Plan(motion.Pose.position, goal.Value) : RetreatPath();
+                    // retreat_reduced_clearance: no route at the full fire clearance, so retry at the emergency and then the
+                    // last-resort clearance (never through a burning cell), and keep that clearance while following the route.
+                    // Held-out run 2 (seed 913), robot A: "No safe cool route is known; hold position", then 70 s still in 381 C
+                    // air, its surroundings all inside the 1.2 m fire margin (issue list 23 Oct, item 5).
+                    if (escape.Count == 0 && c.retreat_reduced_clearance)
+                        foreach (float m in new[] { c.emergency_fire_clearance_m, c.last_resort_fire_clearance_m })
+                        {
+                            grid.FireClearance = m; escape = RetreatPath();
+                            if (escape.Count == 0) continue;
+                            retreatClearance = m;
+                            Emit(t, "retreat_reduced_clearance", "No cool route at the full fire clearance: retreat with a smaller margin from the flames.",
+                                "fire_clearance_m", m, "path_points", escape.Count);
+                            break;
+                        }
+                    if (c.retreat_reduced_clearance) grid.FireClearance = retreatClearance;
                     SetPath(escape); lastPlan = t;
                     Emit(t, "replan", escape.Count > 0 ? "Retreat along the coolest reachable known route." : "No safe cool route is known; hold position.", "path_points", path.Count);
                     if (goal.HasValue) EmitGoal(t, c.stay_inside ? "Coolest reachable floor inside the house." : "Coolest reachable known cell, with a preference for the start.");
@@ -326,6 +345,7 @@ namespace SmokeRescue.Brain
                 foreach (var track in tracks)
                 {
                     if (!track.candidate || track.confirmed || track.onWall || track.retryAfter > t || GoalBlacklisted(track.position, t) || t - track.lastSeen > FreshS(track)) continue;
+                    if (AgentOrderHolds(t, track)) continue;
                     // A warm shape outside the ceilinged floor is beyond a window or door: not a person inside.
                     if (!InSearchArea(track.position)) continue;
                     float range = Vector2.Distance(track.position, motion.Pose.position);
@@ -667,6 +687,7 @@ namespace SmokeRescue.Brain
                     // A partner's rejection counts the same way, from where the partner stood, for reject_share_s.
                     if (nearest.rejected && t < nearest.rejectedUntil && !NewView(nearest)) continue;
                     bool again = nearest.rejected; nearest.rejected = false;
+                    if (!nearest.candidate) nearest.candidateSince = t;
                     nearest.candidate = true;
                     // A thermal-only warm shape on a long mapped wall is almost always wall heated by the fire (15 runs: 150 of
                     // 151 such candidates); flagged for the agent and not approached by the robot on its own.
@@ -742,7 +763,7 @@ namespace SmokeRescue.Brain
             while (nearest.observations.Count > 0 && t - nearest.observations.Peek() > c.person_rgb_window_s) nearest.observations.Dequeue();
             if (!nearest.candidate && nearest.observations.Count >= c.person_rgb_sightings)
             {
-                nearest.candidate = true;
+                nearest.candidate = true; nearest.candidateSince = t;
                 Emit(t, "survivor_candidate", "OpenCV dnn person detector (YOLO11m) saw a person in the colour image in repeated scans.",
                     "x_m", position.x, "y_m", position.y, "confidence", confidence, "range_m", rangeM, "frames", nearest.observations.Count, "rgb", 1);
             }
@@ -1962,6 +1983,21 @@ namespace SmokeRescue.Brain
         /// it, and the kitchen, bathroom, laundry and closet beyond went unsearched by both robots. When no frontier is
         /// reachable but unsearched floor in the search area is (NearestBlocked), the core shrinks once to the body's own
         /// half-width so the robot can pass along the far side; the costed ring still keeps it as far away as the space allows.</summary>
+        /// <summary>agent_order_priority: while an agent order other than exploring holds this robot (a go_to, a turn to face, an
+        /// arrival hold), the reflex leaves a fresh candidate to the agent for agent_candidate_grace_s, and leaves one the agent
+        /// is walking to face for as long as that order lasts. Held-out runs 1 and 2: the reflex approach pre-empted 5 live agent
+        /// orders (a go_to, a turn, an arrival hold, two of them unrelated to the shape), issue list 23 Oct item 2. An explore
+        /// order (60 s) does not hold it, and after the grace the reflex still walks up: 7 agent go_to orders were refused and 8
+        /// of 21 closer looks dropped in those runs, when the reflex was the only approach. Without an agent nothing changes.</summary>
+        bool AgentOrderHolds(double t, Track track)
+        {
+            if (!c.agent_order_priority || !AgentConfirms) return false;
+            bool held = (AgentGoalActive(t) && !agentGoalIsFrontier) || t < agentHoldUntil || facing.HasValue;
+            if (!held) return false;
+            if (agentFace.HasValue && Vector2.Distance(agentFace.Value, track.position) <= c.survivor_merge_m) return true;
+            return double.IsNaN(track.candidateSince) || t - track.candidateSince < c.agent_candidate_grace_s;
+        }
+        float retreatClearance = float.NaN;   // retreat_reduced_clearance: the fire clearance the current retreat route needs
         bool SqueezePastPerson(double t)
         {
             if (!c.survivor_squeeze || squeezePast || survivors.Count == 0 || c.survivor_squeeze_core_m >= c.survivor_keepout_core_m) return false;
