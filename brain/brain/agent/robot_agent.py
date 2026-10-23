@@ -57,6 +57,13 @@ Facts about your robot and the context:
   right. Your partner's numbers are in its own frame, so its coordinates are not positions in yours. Once partners
   shows maps_linked, your robot matched LiDAR fingerprints with that partner: its position and the area it searched
   are converted into your frame, and your frontier list leaves its searched area out.
+- Heat, from your own air sensor 0.6 m above the floor: air_c is the air now (C), air_trend_c_per_min its trend over
+  the last seconds, heat_budget how much heat the robot can still take (1 full, 0 empty), and heat_seconds_left how
+  long the budget lasts at this air (absent below 50 C, where it does not drain). The budget drains by 0.002 per second
+  for every degree above 50 C: at 100 C it lasts about 10 s, at 380 C under 2 s. The air near the floor can jump from
+  40 C to over 300 C within seconds when the hot smoke layer comes down, so a fast rising trend is the warning, at any
+  temperature. nearest_fire is the closest floor your own thermal map measured burning, anywhere in your map, with
+  bearing, distance and burning area; absent when your map holds none.
 - looks_not_finished: warm candidates you set out to look at closer whose approach was dropped (dropped_because: a
   heat event, no path to it, or timed out), not yet confirmed or rejected by you or confirmed by the team.
 - frontiers: floor your robot can reach that no camera on the team has searched. Each has id, x, y, path_m (metres along
@@ -99,8 +106,8 @@ Facts about your robot and the context:
   fire the robot has not raised yet: one scan on a check-in, an arrival or a new candidate is worth its cost, and a warm
   person-sized region deserves inspect_candidate at once, even during a retreat (inspecting and confirming from where
   the robot stands is always allowed). assess_visibility is for the torch and track_fire_spread for a decision about
-  fire or water; the context already carries fire_near_robot, fire_blocks_frontier, fire_blocks_exit and spray_option
-  from the robot's own thermal map, so neither is needed every step.
+  fire or water; the context already carries nearest_fire, fire_near_robot, fire_blocks_frontier, fire_blocks_exit and
+  spray_option from the robot's own thermal map, so neither is needed every step.
 - send_team_message reaches your partner and the commander only within radio range and through at most one wall;
   what you do not radio, they do not know. Your partner is woken only by a proposal or an answer to its proposal, not
   by findings, so a message is not a way to get its attention; send findings when you have a new one, not every step.
@@ -110,7 +117,7 @@ Facts about your robot and the context:
   its recent reports; your_last_intent is what you set out to do at your previous step. propose_plan suggests a
   division of work. Until your maps are linked, a place in your partner's words is not a position in your frame.
 - spray_option, when present: the fire your own thermal map measures where it cuts your way out (or to unsearched
-  floor), or, with blocks "near", the nearest fire within the nozzle's reach while your own air is warm: bearing, distance, whether it is in the camera's view now (spray_water needs a scan_thermal hot spot within its
+  floor), or, with blocks "near", the nearest fire within the nozzle's reach, whatever your own air: bearing, distance, whether it is in the camera's view now (spray_water needs a scan_thermal hot spot within its
   aim tolerance) and within the nozzle's reach, its burning area and estimated heat release, the heat one stream removes,
   water left, and code's comparison of the two.
 
@@ -267,7 +274,7 @@ class RobotAgent:
         outcomes = _tools.order_outcomes(Path(req["robot_dir"]), last[0], last[1], ctx.t) if last else []
         ctx.last_orders = outcomes
         tools = ToolRegistry(Path(req["robot_dir"]), ctx, Path(req.get("debug_dir") or Path(self.trace_path).parent / "agent_debug"))
-        context = {k: req[k] for k in ("robot", "t", "pose", "torch", "mode", "state", "goal", "heat_budget", "air_c", "event",
+        context = {k: req[k] for k in ("robot", "t", "pose", "torch", "mode", "state", "goal", "heat_budget", "air_c", "air_trend_c_per_min", "heat_seconds_left", "nearest_fire", "fire_near_robot", "event",
                                        "inbox", "orders", "survivors", "frontiers", "lidar", "partners", "blocked_unsearched", "fire_blocks_frontier", "fire_blocks_exit", "mission_time_left_s",
                                        "water_l", "carrying_person", "rooms") if k in req}
         if _tools.RESCUE_ENABLED:

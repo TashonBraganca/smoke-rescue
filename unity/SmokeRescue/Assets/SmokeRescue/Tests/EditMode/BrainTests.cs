@@ -1092,8 +1092,9 @@ namespace SmokeRescue.Tests.EditMode
         public void AFireHeatingTheRobotIsReportedForSprayingEvenWhenItBlocksNoRoute()
         {
             // Seed 929, robot B: air 30 to 211 C beside a fire in its own room; the agent's spray option existed only for a
-            // fire blocking a way out or a frontier, so it never used its 12 L. Controls: cool air, or a fire beyond the
-            // nozzle's 5 m throw, report nothing.
+            // fire blocking a way out or a frontier, so it never used its 12 L. Since 23 Oct (issue list item 8) the robot's
+            // own air no longer gates it: a fire in reach is offered in cool air too. Control: a fire beyond the nozzle's 5 m
+            // throw reports nothing.
             BrainFireBlock? Near(float air, float fireY)
             {
                 var b = new RobotBrain(Calibration(), Settings(), "A", 0); Room(b, -3, 3, -3, 9); var g = Map(b);
@@ -1107,8 +1108,36 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(hot.Value.distanceM, Is.InRange(2.8f, 3.2f));
             Assert.That(Mathf.Abs(hot.Value.bearingDegRight), Is.LessThan(5f), "straight ahead");
             Assert.That(hot.Value.burningM2, Is.GreaterThan(0));
-            Assert.That(Near(20, 3).HasValue, Is.False, "control: cool air, nothing to report");
+            Assert.That(Near(20, 3).HasValue, Is.True, "cool air: a fire in reach is still offered");
             Assert.That(Near(60, 7).HasValue, Is.False, "control: beyond the nozzle's throw");
+        }
+
+        [Test]
+        public void TheAgentHearsTheAirItsHeatBudgetsTimeLeftAndTheNearestFireInItsOwnMap()
+        {
+            // Held-out run 2 (seed 913), robot A: the agent saw only heat_budget (1.0 at 122 s, 0 at 128 s) while the air at its
+            // sensor jumped from 44 to 375 C; it was never told the air or the nearest fire, which was gated on warm air within
+            // 5 m. Controls: below heat_drain_start_c no time limit is given; no burning floor in the map gives no fire.
+            RobotBrain Brain(float air, float? fireY)
+            {
+                var b = new RobotBrain(Calibration(), Settings(), "A", 0); Room(b, -3, 3, -3, 12); var g = Map(b);
+                if (fireY.HasValue) for (float x = -.3f; x <= .3f; x += .1f) g.ObserveHeat(g.Cell(new Vector2(x, fireY.Value)), 500, 0);
+                Motion(b, 0); b.OnRgbd(Image(0, true, 0)); b.OnAirTemperature(0, air); b.Step(0, .05f);
+                Motion(b, .1); b.OnRgbd(Image(.1, true, 0)); b.OnAirTemperature(.1, air); b.Step(.1, .1f);
+                return b;
+            }
+            var c = Settings();
+            var hot = Brain(c.heat_drain_start_c + 50, null).AirState(.1);
+            Assert.That(hot.HasValue, Is.True);
+            Assert.That(hot.Value.airC, Is.EqualTo(c.heat_drain_start_c + 50).Within(.01f));
+            Assert.That(hot.Value.heatSecondsLeft.HasValue, Is.True, "draining air gives a time limit");
+            Assert.That(hot.Value.heatSecondsLeft.Value, Is.EqualTo(hot.Value.heatBudget / (50 * c.heat_drain_per_degree_s)).Within(.01f));
+            Assert.That(Brain(20, null).AirState(.1).Value.heatSecondsLeft.HasValue, Is.False, "control: cool air does not drain");
+            Assert.That(Brain(20, null).AirState(5).HasValue, Is.False, "control: no recent reading, no air reported");
+            var far = Brain(20, 9).NearestFire();
+            Assert.That(far.HasValue, Is.True, "a fire 9 m away in cool air: beyond the old 5 m and warm-air gates");
+            Assert.That(far.Value.distanceM, Is.InRange(8.8f, 9.2f));
+            Assert.That(Brain(20, null).NearestFire().HasValue, Is.False, "control: no burning floor in the map");
         }
 
         [Test]

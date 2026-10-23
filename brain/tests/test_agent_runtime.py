@@ -764,3 +764,19 @@ def test_a_closer_look_at_a_flat_warm_surface_is_refused(tmp_path, monkeypatch):
     assert [o["type"] for o in approach(unknown)["orders"]] == ["go_to"], "control: too little depth to tell is approached"
     colour = {"depth": {"valid_fraction": .9, "nonplanar": False}, "plane": {"large_plane": True}, "rgb_dnn": {"hits": [{"confidence": .8}]}}
     assert [o["type"] for o in approach(colour)["orders"]] == ["go_to"], "control: a colour person is approached"
+
+
+def test_air_heat_time_and_nearest_fire_reach_the_model(tmp_path, monkeypatch):
+    # Held-out run 2 (seed 913), robot A: the model saw only heat_budget, which read 1.0 six seconds before it was empty,
+    # while the air jumped from 44 to 375 C; it radioed "no fire seen" at 378 C. Unity now sends the robot's own air,
+    # trend, heat time left and nearest measured fire; they must reach the model's context. Control: a field the
+    # whitelist does not name never does.
+    fake_vision(monkeypatch, "uncertain")
+    fire = {"bearing_deg": -20.0, "distance_m": 7.5, "burning_m2": 0.6}
+    req = request(tmp_path) | {"t": 3.0, "event": {"kind": "periodic"}, "air_c": 96.4, "air_trend_c_per_min": 140.0,
+                               "heat_seconds_left": 9.1, "nearest_fire": fire, "fire_near_robot": None, "not_a_field": 1}
+    RobotAgent(Scripted([[ToolCall("finish", {"summary": "ok"})]]), tmp_path / "t.jsonl").step(req)
+    ctx = [json.loads(l) for l in (tmp_path / "t.jsonl").read_text().splitlines() if '"step_start"' in l][-1]["context"]
+    assert ctx["air_c"] == 96.4 and ctx["air_trend_c_per_min"] == 140.0 and ctx["heat_seconds_left"] == 9.1
+    assert ctx["nearest_fire"] == fire and "fire_near_robot" in ctx
+    assert "not_a_field" not in ctx, "control: unnamed fields are not passed"
