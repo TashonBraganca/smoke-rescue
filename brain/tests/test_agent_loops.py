@@ -66,6 +66,15 @@ def test_a_proposal_or_an_answer_wakes_the_model(tmp_path, monkeypatch):
     assert model.calls == 1
 
 
+def test_a_radio_text_still_wakes_the_step_while_a_close_look_is_pending(tmp_path, monkeypatch):
+    _fresh(); fake_vision(monkeypatch)
+    T.ToolRegistry._pending["robot_A"] = {"x": 3.0, "y": 3.0, "t": 9.0, "evidence_id": "ev0"}
+    model = Scripted([])
+    inbox = [{"message_id": "robot_B-5", "from": "robot_B", "t": 9.0, "kind": "finding", "text": "nothing new"}]
+    RobotAgent(model, tmp_path / "trace.jsonl").step(request(tmp_path, event={"kind": "team_message"}, inbox=inbox))
+    assert model.calls == 1
+
+
 def test_the_commander_makes_no_call_without_reports(tmp_path):
     model = Scripted([])
     out = Commander(model, tmp_path / "trace.jsonl").step({"t": 30.0, "reports": [], "robots": ["robot_A", "robot_B"]})
