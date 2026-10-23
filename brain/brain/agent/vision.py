@@ -531,9 +531,10 @@ def inspect_candidate(frame: Frame, bearing_deg: float, range_m: float, *, outpu
     config = _perception()
     min_depth_fraction = config["inspection_min_depth_fraction"]
     depth = _depth(frame); c = frame.thermal.astype(float)/10-273.15
-    options = []
+    options = []; warm_bearings = []
     for mask,stats in _components((frame.thermal>0)&(c>=human_band_c[0])&(c<=human_band_c[1])&_above_floor(frame,depth),8):
         region = _region(frame,mask,stats,depth)
+        warm_bearings.append(region["bearing_deg"])
         da = abs(region["bearing_deg"]-bearing_deg)
         dr = abs(region["range_m"]-range_m) if region["range_m"] is not None else 0
         if da<=bearing_tolerance_deg and dr<=range_tolerance_m:
@@ -702,7 +703,11 @@ def inspect_candidate(frame: Frame, bearing_deg: float, range_m: float, *, outpu
                 result["reasons"] = result["reasons"] + ["The colour detector sees a whole person elsewhere in this view (other_people): "
                                                          "inspect there; this inspection says nothing about them."]
             elif not options and result["verdict"] == "uncertain" and _spot_in_view(frame, bearing_deg, range_m) and \
-                    not any(p["confidence"] >= 0.35 for p in people):
+                    not any(p["confidence"] >= 0.35 for p in people) and \
+                    not any(abs(b - bearing_deg) <= 2 * bearing_tolerance_deg for b in warm_bearings):
+                # Also nothing in the human band within twice the bearing tolerance at any range: a person at the edge of
+                # the asked area, or nearer or farther than asked, that the colour detector missed (opencv-bc's check of
+                # the 934 video, 2:06: the rule fired on wall patches with a real person partly in the frame).
                 # Nothing warm at a spot the camera fully sees, and no person anywhere in the colour image even at the
                 # detector's lowest confidence: there is nothing there to confirm. Held-out runs 1 and 2: 22 of 25
                 # uncertain verdicts were not on a person, and an uncertain verdict can never be rejected, so the robots
