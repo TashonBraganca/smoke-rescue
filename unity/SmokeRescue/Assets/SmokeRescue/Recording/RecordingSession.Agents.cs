@@ -48,8 +48,12 @@ namespace SmokeRescue.Recording
         const double AgentPeriodS = 20, AgentMinGapS = 4, CommanderPeriodS = 30, OrderHoldS = 15, ExploreHoldS = 60;
         const int FrontierOptions = 8;
 
+        /// <summary>Consecutive failed agent calls after which the reflex confirms people itself (Unity HTTP timeout 120 s, so
+        /// three in a row is minutes of a silent agent, never one slow reply).</summary>
+        const int AgentDownAfterFailures = 3;
         partial class RobotRig
         {
+            public int agentFailures;
             public RobotActions actions;
             public double lastAgent = double.NegativeInfinity;
             public double lastBrainStep = double.NaN;
@@ -255,7 +259,17 @@ namespace SmokeRescue.Recording
                 // The messages this step was shown leave the inbox only once the step answered; a failed call keeps them for
                 // the next one (they were cleared before the call; Codex design review, 22 Oct). The sim is paused during
                 // the call, so nothing arrived meanwhile and the first ones are exactly those shown.
-                if (reply == null) { w.errors++; continue; }
+                // Agent liveness: with the agent unreachable for agent_down_after_failures calls in a row, the reflex confirms
+                // people itself again, so a dead server cannot leave a found person unconfirmed (issue list 23 Oct, item 2).
+                if (reply == null)
+                {
+                    w.errors++;
+                    if (++rig.agentFailures >= AgentDownAfterFailures && rig.brain.AgentConfirms)
+                    { rig.brain.AgentConfirms = false; rig.brain.LogAgentAction(t, $"agent unreachable {rig.agentFailures} calls in a row: the robot confirms people itself"); }
+                    continue;
+                }
+                if (rig.agentFailures >= AgentDownAfterFailures) rig.brain.LogAgentAction(t, "agent reachable again: confirmations go back to the agent");
+                rig.agentFailures = 0; rig.brain.AgentConfirms = true;
                 rig.inbox.RemoveRange(0, Math.Min(((JArray)calls[i].req["inbox"]).Count, rig.inbox.Count));
                 rig.agentLog.Append(reply.ToString(Formatting.None)).Append('\n');
                 w.refusals += (reply["refusals"] as JArray)?.Count ?? 0;

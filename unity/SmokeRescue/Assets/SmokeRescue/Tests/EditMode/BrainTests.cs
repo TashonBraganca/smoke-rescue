@@ -1228,6 +1228,64 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void ARetreatWithNoRouteAtTheFullFireClearanceTakesASmallerMarginInsteadOfHolding()
+        {
+            // Held-out run 2 (seed 913), robot A: "No safe cool route is known; hold position", then 70 s still in 381 C air,
+            // everything around it inside the 1.2 m fire margin. Here fire lines at x = +-1.1 m leave a 2.2 m band whose every
+            // cell is inside the full margin; at the 0.5 m emergency clearance the band's middle is walkable. Control: without
+            // retreat_reduced_clearance the robot holds. No route point is ever on a burning cell.
+            (List<BrainEvent> events, List<Vector2> path) Run(bool reduced)
+            {
+                var c = Settings(); c.stay_inside = true; c.search_requires_ceiling = false; c.mission_time_limit_s = 1000;
+                c.retreat_reduced_clearance = reduced;
+                var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -4, 4, -3, 3); var g = Map(b);
+                foreach (float x in new[] { -1.1f, 1.1f }) for (float y = -3; y <= 3; y += .1f) g.ObserveHeat(g.Cell(new Vector2(x, y)), 500, 0);
+                var all = new List<BrainEvent>(); double last = 0;
+                for (int i = 0; i <= 30; i++)
+                {
+                    double t = i / 30.0; Motion(b, t); b.OnRgbd(Image(t, true, 0)); b.OnAirTemperature(t, 381); b.Step(t, (float)Math.Max(1e-3, t - last)); last = t;
+                    all.AddRange(b.DrainEvents());
+                }
+                return (all, b.Snapshot().path?.ToList() ?? new List<Vector2>());
+            }
+            var on = Run(true);
+            Assert.That(on.events.Any(e => e.kind == "retreat_reduced_clearance"), Is.True, "a smaller margin is taken");
+            Assert.That(on.path, Is.Not.Empty, "the robot has a retreat route");
+            foreach (var p in on.path) Assert.That(Mathf.Abs(p.x), Is.LessThan(1.0f), "never on or past a burning line");
+            var off = Run(false);
+            Assert.That(off.events.Any(e => e.reason.StartsWith("No safe cool route is known")), Is.True, "control: it holds");
+        }
+
+        [Test]
+        public void ALiveAgentOrderKeepsTheReflexOffAFreshCandidateForTheGraceOnly()
+        {
+            // Held-out runs 1 and 2: the reflex approach to a warm shape pre-empted 5 live agent orders (issue list 23 Oct,
+            // item 2). With agent_order_priority, a go_to holds the reflex off a fresh candidate for agent_candidate_grace_s,
+            // then the reflex still walks up (agent approaches were refused or dropped 15 times in those runs). Controls:
+            // without the switch it takes over at once; without an agent (AgentConfirms false) nothing changes.
+            double FirstTakeover(bool priority, bool agent)
+            {
+                var c = Settings(); c.agent_order_priority = priority; c.agent_candidate_grace_s = 8; c.mission_time_limit_s = 1000;
+                var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -3, 3, -3, 14); b.AgentConfirms = agent;
+                var command = new BrainCommand(); double last = 0;
+                for (int i = 0; i <= 150; i++)
+                {
+                    double t = i / 10.0;
+                    Motion(b, t, command.forwardMps, command.yawRateDeg * Mathf.Deg2Rad); b.OnRgbd(Image(t, true, 0)); b.OnAirTemperature(t, 20);
+                    if (i == 1) b.AgentGoTo(new Vector2(0, 12), t, 60, "search the far end");
+                    if (i >= 10) b.OnPersonSighting(t, 30f, 3f, .8f);
+                    command = b.Step(t, (float)Math.Max(1e-3, t - last)); last = t;
+                    if (b.DrainEvents().Any(e => e.reason.StartsWith("Inspect the nearest recent survivor candidate"))) return t;
+                }
+                return double.PositiveInfinity;
+            }
+            double held = FirstTakeover(true, true), free = FirstTakeover(false, true), solo = FirstTakeover(true, false);
+            Assert.That(free, Is.LessThan(5), "control: without the switch the reflex takes over at once");
+            Assert.That(solo, Is.EqualTo(free).Within(.15), "control: without an agent nothing changes");
+            Assert.That(held, Is.GreaterThanOrEqualTo(free + 7.5).And.LessThan(free + 10), "held for the grace, then the reflex still walks up");
+        }
+
+        [Test]
         public void StayingInsideWarmAirWithNothingLeftDoesNotPingPongRetreats()
         {
             // Seed 927, robot B: with nothing left to search and the air at 24 to 31 C, the "leave while the way out is open"
