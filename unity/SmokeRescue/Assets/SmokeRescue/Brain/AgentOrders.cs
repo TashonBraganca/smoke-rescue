@@ -77,7 +77,7 @@ namespace SmokeRescue.Brain
         public IReadOnlyList<BrainFrontier> FrontierOptions(double t, int max)
         {
             if (max <= 0) return Array.Empty<BrainFrontier>();
-            planner.Rooms.Update(t, motion.Pose.position, InSearchArea);
+            planner.Rooms.Update(t, motion.Pose.position, InSearchAreaOwn);
             // Keep the indoor boundary when clustering, so a nearby proven standpoint cannot hide an unproven
             // doorway in the same cluster. Wide slots compete across both sets before either set is truncated.
             int claimed = 0, blacklisted = 0, visited = 0, outside = 0;
@@ -101,7 +101,7 @@ namespace SmokeRescue.Brain
                 proven.Add(new GridPlanner.FrontierChoice { position = follow, claimCentre = follow, path = followRoute, cost = cost, score = cost, information = 0, towardPartner = true });
             }
             var unproven = planner.Frontiers(motion.Pose.position,
-                p => ClaimBlocks(p, t) || GoalBlacklisted(p, t) || VisitedGoal(p, t) || InSearchArea(p));
+                p => ClaimBlocks(p, t) || GoalBlacklisted(p, t) || VisitedGoal(p, t) || InSearchArea(p), false, false);
             // With proven indoor floor to search, an unproven frontier on ground this robot's own LiDAR saw as open, with no
             // mapped floor beyond it, is yard, not a way in: it is not offered (one-door seed 922, robot B: 6 of its 8
             // options were such yard frontiers, larger on paper than the 2 proven ones; its agent turned to check them for
@@ -159,7 +159,7 @@ namespace SmokeRescue.Brain
         /// A split or merge can change IDs; visit time stays attached to sensed pose cells.</summary>
         public IReadOnlyList<RoomLedger.Room> RoomOptions(double t)
         {
-            planner.Rooms.Update(t, motion.Pose.position, InSearchArea);
+            planner.Rooms.Update(t, motion.Pose.position, InSearchAreaOwn);
             return c.room_ledger ? planner.Rooms.Rooms : Array.Empty<RoomLedger.Room>();
         }
 

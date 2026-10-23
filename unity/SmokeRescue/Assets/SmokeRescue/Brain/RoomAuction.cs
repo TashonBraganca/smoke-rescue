@@ -9,7 +9,12 @@ namespace SmokeRescue.Brain
     /// room_auction_margin_s; within the margin the robot that took the room first keeps it, and on equal times the lower ID.
     /// Every robot applies the same rule to the same radioed claims, so they agree without an auctioneer. A claim lapses
     /// peer_claim_s after it was sent, so a robot that goes quiet loses its room. Corridors are never claimed: a claim on a
-    /// corridor would lock partners out of every room off it.</summary>
+    /// corridor would lock partners out of every room off it. With room_ledger_corridor_first a corridor is claimable: one robot
+    /// works the hall while partners take the rooms off it, as fire crews split at a hallway (Miami-Dade Fire Rescue, Searching
+    /// Techniques, 2024; Jones and Bartlett / NFPA skill drill 12-2, both in prior_art_23oct.txt). Rooms off the hall keep their
+    /// own claims, so nobody is locked out of them; a claimed hall only stops a partner choosing frontiers in the hall itself.
+    /// Headless seed 5001: with corridor first and unclaimable halls, both robots walked the hall and the living room was left
+    /// at 46 %.</summary>
     public sealed partial class RobotBrain
     {
         int claimedRoom = -1;
@@ -39,7 +44,7 @@ namespace SmokeRescue.Brain
         bool PeerWinsRoom(int room, float myBid, double mySince, double t)
         {
             var own = planner.Rooms.Get(room);
-            if (!AuctionOn || own == null || own.corridor) return false;
+            if (!AuctionOn || own == null || (own.corridor && !c.room_ledger_corridor_first)) return false;
             foreach (var pair in peers)
             {
                 var claim = pair.Value.room;
@@ -59,12 +64,12 @@ namespace SmokeRescue.Brain
         }
 
         /// <summary>The robot set off for a frontier: it holds that frontier's room, unless the room is a corridor.</summary>
-        void ClaimRoom(double t, Vector2 frontier, float pathCostM)
+        void ClaimRoom(double t, Vector2 frontier, float pathLengthM)
         {
             if (!AuctionOn) return;
             int room = planner.Rooms.RoomForFrontier(frontier); var r = planner.Rooms.Get(room);
-            if (r == null || r.corridor) { claimedRoom = -1; return; }
-            claimedBid = pathCostM / c.open_speed_mps;
+            if (r == null || (r.corridor && !c.room_ledger_corridor_first)) { claimedRoom = -1; return; }
+            claimedBid = pathLengthM / c.open_speed_mps;
             if (room == claimedRoom) return;
             claimedRoom = room; claimedSince = t;
             Emit(t, "room_claimed", "This robot holds the room of its frontier; partners hear its bid.", "room_id", room,
@@ -85,7 +90,7 @@ namespace SmokeRescue.Brain
         BrainRoomClaim RoomClaimToSend(double t, bool searching)
         {
             var r = claimedRoom >= 0 ? planner.Rooms.Get(claimedRoom) : null;
-            if (!AuctionOn || !searching || r == null || r.corridor) { claimedRoom = -1; return null; }
+            if (!AuctionOn || !searching || r == null || (r.corridor && !c.room_ledger_corridor_first)) { claimedRoom = -1; return null; }
             if (path.Count > 0) claimedBid = RemainingBid();
             return new BrainRoomClaim { anchor = r.anchor, radiusM = r.radiusM, bidS = claimedBid, since = claimedSince, expiresAt = t + c.peer_claim_s };
         }

@@ -72,3 +72,5 @@ docs/SIMULATION_SPEC.md
 handoff/shreya.md
 handoff/vishnu.md
 handoff/vishnu_aws.md
+tools/headless/bin/
+tools/headless/obj/

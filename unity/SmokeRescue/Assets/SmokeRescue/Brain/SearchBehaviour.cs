@@ -41,6 +41,13 @@ namespace SmokeRescue.Brain
             visited.Add(new Visited { position = at, radius = c.visited_radius_m, until = t + c.visited_hold_s });
             sweeps.RemoveAll(s => t - s.t > c.sweep_repeat_s);
             if (sweeps.Exists(s => Vector2.Distance(s.position, motion.Pose.position) < c.sweep_spacing_m)) return;
+            // sweep_once_per_room: one sweep on first entering a room of the ledger, none at later frontiers in it. Headless seed
+            // 5001: sweeps took 9 to 15 s of turning and 13 to 19 s of standing per robot in 240 s.
+            if (c.room_ledger && c.sweep_once_per_room)
+            {
+                int room = planner.Rooms.RoomAt(motion.Pose.position);
+                if (room < 0 || !sweptRooms.Add(room)) return;
+            }
             sweeps.Add((motion.Pose.position, t));
             sweeping = true; sweepIndex = 0; sweepCheckedIndex = -1; sweepBase = motion.Pose.yawRad; sweepHoldUntil = double.NaN; sweepStarted = t;
             Emit(t, "sweep_started", "New area: inspect the left, right and forward camera sectors that still contain unsearched floor.",
@@ -48,6 +55,7 @@ namespace SmokeRescue.Brain
         }
 
         double sweepStarted;
+        readonly HashSet<int> sweptRooms = new HashSet<int>();
         /// <summary>A look lasts long enough for the colour person detector to see the same place person_rgb_sightings times,
         /// whatever the phase of its scans. 0.6 s held the camera for less than one scan period (1 s) while a candidate needs two
         /// sightings, so a look could never make one (23 Oct memo, section 1.4; 6 of 30 people in 922 to 928 were seen but never

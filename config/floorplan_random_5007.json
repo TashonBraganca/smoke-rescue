@@ -1,0 +1,500 @@
+{
+  "version": 1,
+  "units": "m",
+  "origin": "south-west corner, Unity world (0,0,0)",
+  "footprint": [
+    0,
+    0,
+    18.918,
+    12.869
+  ],
+  "wall_height": 2.8,
+  "exterior_wall_thickness": 0.25,
+  "interior_wall_thickness": 0.15,
+  "door_height": 2.1,
+  "rooms": [
+    {
+      "id": "r01",
+      "name": "Bedroom",
+      "kind": "bedroom",
+      "rect": [
+        0,
+        7.61,
+        5.471,
+        12.869
+      ],
+      "floor": "wood_dark_walnut",
+      "walls": "wallpaper_deep_green",
+      "ceiling": "plaster_white"
+    },
+    {
+      "id": "r02",
+      "name": "Kitchen",
+      "kind": "kitchen",
+      "rect": [
+        4.603,
+        0,
+        9.105,
+        5.91
+      ],
+      "floor": "wood_herringbone",
+      "walls": "wallpaper_deep_green",
+      "ceiling": "plaster_white"
+    },
+    {
+      "id": "r03",
+      "name": "Bathroom",
+      "kind": "bathroom",
+      "rect": [
+        15.844,
+        7.61,
+        18.918,
+        10.239
+      ],
+      "floor": "ceramic_tiles_checker",
+      "walls": "ceramic_tiles_large_white",
+      "ceiling": "plaster_white"
+    },
+    {
+      "id": "r04",
+      "name": "Bedroom",
+      "kind": "bedroom",
+      "rect": [
+        14.027,
+        0,
+        18.918,
+        5.91
+      ],
+      "floor": "wood_oak_planks",
+      "walls": "wallpaper_deep_green",
+      "ceiling": "plaster_white"
+    },
+    {
+      "id": "r05",
+      "name": "Laundry",
+      "kind": "laundry",
+      "rect": [
+        15.844,
+        10.239,
+        18.918,
+        12.869
+      ],
+      "floor": "ceramic_tiles_checker",
+      "walls": "ceramic_tiles_large_white",
+      "ceiling": "plaster_white"
+    },
+    {
+      "id": "r06",
+      "name": "Study",
+      "kind": "study",
+      "rect": [
+        11.04,
+        7.61,
+        15.844,
+        12.869
+      ],
+      "floor": "wood_herringbone",
+      "walls": "wallpaper_deep_green",
+      "ceiling": "plaster_white"
+    },
+    {
+      "id": "r07",
+      "name": "Living",
+      "kind": "living",
+      "rect": [
+        0,
+        0,
+        4.603,
+        5.91
+      ],
+      "floor": "wood_dark_walnut",
+      "walls": "wallpaper_yellow_stripes",
+      "ceiling": "plaster_white"
+    },
+    {
+      "id": "r08",
+      "name": "Study",
+      "kind": "study",
+      "rect": [
+        9.105,
+        0,
+        14.027,
+        5.91
+      ],
+      "floor": "wood_dark_walnut",
+      "walls": "wallpaper_deep_green",
+      "ceiling": "plaster_white"
+    },
+    {
+      "id": "r09",
+      "name": "Corridor",
+      "kind": "corridor",
+      "rect": [
+        0,
+        5.91,
+        18.918,
+        7.61
+      ],
+      "floor": "wood_herringbone",
+      "walls": "wallpaper_blue_floral",
+      "ceiling": "plaster_white"
+    },
+    {
+      "id": "r10",
+      "name": "Bedroom",
+      "kind": "bedroom",
+      "rect": [
+        5.471,
+        7.61,
+        11.04,
+        12.869
+      ],
+      "floor": "wood_herringbone",
+      "walls": "wallpaper_blue_floral",
+      "ceiling": "plaster_white"
+    }
+  ],
+  "doors": [
+    {
+      "id": "d01",
+      "between": [
+        "r02",
+        "r09"
+      ],
+      "wall": "z",
+      "at": [
+        7.616,
+        5.91
+      ],
+      "width": 0.9,
+      "state": "removed"
+    },
+    {
+      "id": "d02",
+      "between": [
+        "r07",
+        "r09"
+      ],
+      "wall": "z",
+      "at": [
+        3.252,
+        5.91
+      ],
+      "width": 0.9,
+      "state": "removed"
+    },
+    {
+      "id": "d03",
+      "between": [
+        "r04",
+        "r09"
+      ],
+      "wall": "z",
+      "at": [
+        17.135,
+        5.91
+      ],
+      "width": 1.0,
+      "state": "removed"
+    },
+    {
+      "id": "d04",
+      "between": [
+        "r09",
+        "r10"
+      ],
+      "wall": "z",
+      "at": [
+        6.538,
+        7.61
+      ],
+      "width": 0.95,
+      "state": "removed"
+    },
+    {
+      "id": "d05",
+      "between": [
+        "r08",
+        "r09"
+      ],
+      "wall": "z",
+      "at": [
+        10.29,
+        5.91
+      ],
+      "width": 0.95,
+      "state": "removed"
+    },
+    {
+      "id": "d06",
+      "between": [
+        "r06",
+        "r09"
+      ],
+      "wall": "z",
+      "at": [
+        13.343,
+        7.61
+      ],
+      "width": 0.9,
+      "state": "removed"
+    },
+    {
+      "id": "d07",
+      "between": [
+        "r01",
+        "r09"
+      ],
+      "wall": "z",
+      "at": [
+        0.978,
+        7.61
+      ],
+      "width": 0.9,
+      "state": "removed"
+    },
+    {
+      "id": "d08",
+      "between": [
+        "r03",
+        "r09"
+      ],
+      "wall": "z",
+      "at": [
+        16.876,
+        7.61
+      ],
+      "width": 1.0,
+      "state": "removed"
+    },
+    {
+      "id": "d09",
+      "between": [
+        "r03",
+        "r05"
+      ],
+      "wall": "z",
+      "at": [
+        18.052,
+        10.239
+      ],
+      "width": 1.0,
+      "state": "removed"
+    },
+    {
+      "id": "d10",
+      "between": [
+        "outside",
+        "r09"
+      ],
+      "wall": "x",
+      "at": [
+        18.918,
+        6.636
+      ],
+      "width": 1.0,
+      "state": "removed"
+    }
+  ],
+  "landmarks": [
+    {
+      "room": "r01",
+      "kind": "tall_wardrobe",
+      "at": [
+        4.4928,
+        9.5695
+      ],
+      "yaw": 270
+    },
+    {
+      "room": "r02",
+      "kind": "stove_and_hood",
+      "at": [
+        5.373,
+        4.76
+      ],
+      "yaw": 90
+    },
+    {
+      "room": "r02",
+      "kind": "tall_steel_fridge",
+      "at": [
+        8.285,
+        1.1882
+      ],
+      "yaw": 270
+    },
+    {
+      "room": "r04",
+      "kind": "tall_wardrobe",
+      "at": [
+        17.5865,
+        0.9783
+      ],
+      "yaw": 0
+    },
+    {
+      "room": "r06",
+      "kind": "wooden_desk_with_lamp",
+      "at": [
+        12.544,
+        11.9754
+      ],
+      "yaw": 180
+    },
+    {
+      "room": "r06",
+      "kind": "antique_globe",
+      "at": [
+        15.099,
+        9.435
+      ],
+      "yaw": 270
+    },
+    {
+      "room": "r07",
+      "kind": "apartment_modern_sofa",
+      "at": [
+        3.05,
+        0.97
+      ],
+      "yaw": 0
+    },
+    {
+      "room": "r07",
+      "kind": "console_table_with_vase",
+      "at": [
+        0.7147,
+        3.2385
+      ],
+      "yaw": 90
+    },
+    {
+      "room": "r08",
+      "kind": "wooden_desk_with_lamp",
+      "at": [
+        10.805,
+        0.8936
+      ],
+      "yaw": 0
+    },
+    {
+      "room": "r08",
+      "kind": "antique_globe",
+      "at": [
+        9.85,
+        4.085
+      ],
+      "yaw": 90
+    },
+    {
+      "room": "r10",
+      "kind": "tall_wardrobe",
+      "at": [
+        9.4306,
+        8.5883
+      ],
+      "yaw": 0
+    }
+  ],
+  "fires": [
+    {
+      "id": "f01",
+      "room": "r02",
+      "at": [
+        5.373,
+        4.76
+      ],
+      "intensity": 1
+    }
+  ],
+  "emergency_lights": [
+    {
+      "at": [
+        2.7355,
+        10.2395
+      ],
+      "note": "r01"
+    },
+    {
+      "at": [
+        6.854,
+        2.955
+      ],
+      "note": "r02"
+    },
+    {
+      "at": [
+        17.381,
+        8.9245
+      ],
+      "note": "r03"
+    },
+    {
+      "at": [
+        16.4725,
+        2.955
+      ],
+      "note": "r04"
+    },
+    {
+      "at": [
+        17.381,
+        11.554
+      ],
+      "note": "r05"
+    },
+    {
+      "at": [
+        13.442,
+        10.2395
+      ],
+      "note": "r06"
+    },
+    {
+      "at": [
+        2.3015,
+        2.955
+      ],
+      "note": "r07"
+    },
+    {
+      "at": [
+        11.565999999999999,
+        2.955
+      ],
+      "note": "r08"
+    },
+    {
+      "at": [
+        9.459,
+        6.76
+      ],
+      "note": "r09"
+    },
+    {
+      "at": [
+        8.2555,
+        10.2395
+      ],
+      "note": "r10"
+    }
+  ],
+  "generator": {
+    "seed": 5007,
+    "attempt": 2,
+    "size_basis": {
+      "source": "https://www.iccsafe.org/wp-content/uploads/Session-41-and-67-2021-IRC-Plan-Review.pdf",
+      "habitable": "2021 IRC R304.1/R304.2: 6.5 m2 and 2.134 m minimum clear dimension; kitchen exception not used.",
+      "hall": "2021 IRC R311.6: 0.914 m minimum hallway width. Generated corridors are 1.65-2.0 m before wall deductions.",
+      "simulation": "SIMULATION_SPEC 3.4 and floorplan.json clear_path_rule: 0.9 m door-to-centre path, 1.2 m door keepout.",
+      "assumptions": "Bathroom/laundry/closet minimum clear dimension 1.5 m and area 3 m2 are generator choices, not code requirements. Door gaps 0.9-1.0 m, entrance 1.0 m, walls 0.25/0.15 m and height 2.8 m follow this simulation. This is not a building-code compliance check."
+    }
+  },
+  "clear_path_rule": "0.9 m clear door-to-centre paths; 1.2 m door keepout plus furniture radius.",
+  "generator_notes": [
+    "r03 (bathroom) has no furniture: none fits clear of its doors",
+    "r05 (laundry) has no furniture: none fits clear of its doors",
+    "r09 (corridor) has no furniture: none fits clear of its doors"
+  ]
+}

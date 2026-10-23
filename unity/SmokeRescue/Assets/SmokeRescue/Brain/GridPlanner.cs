@@ -13,6 +13,15 @@ namespace SmokeRescue.Brain
         public RoomLedger Rooms { get; }
         /// <summary>Room auction filter set by the brain: does a partner hold this room against this robot's bid in seconds?</summary>
         public Func<int, float, bool> RoomTaken;
+        /// <summary>Metres walked along a path starting at from.</summary>
+        public static float Length(List<Vector2> path, Vector2 from)
+        {
+            float m = 0; var at = from;
+            foreach (var p in path) { m += Vector2.Distance(at, p); at = p; }
+            return m;
+        }
+        /// <summary>The robot's heading (left-positive radians) for the turn cost; null leaves frontier costs as travel only.</summary>
+        public float? HeadingRad;
         public GridPlanner(OccupancyGrid map, BrainConfig config) { grid = map; c = config; Rooms = new RoomLedger(map, config); }
         public List<Vector2> Plan(Vector2 from, Vector2 to)
         {
@@ -138,7 +147,7 @@ namespace SmokeRescue.Brain
         }
         /// <summary>Every worthwhile reachable frontier cluster, best score first. partnerSearchedToo keeps frontier cells a
         /// partner's camera has searched (normally dropped), for following a partner through the one way on.</summary>
-        public List<FrontierChoice> Frontiers(Vector2 from, Func<Vector2, bool> excluded = null, bool partnerSearchedToo = false)
+        public List<FrontierChoice> Frontiers(Vector2 from, Func<Vector2, bool> excluded = null, bool partnerSearchedToo = false, bool roomClaims = true)
         {
             var choices = new List<FrontierChoice>();
             grid.PrepareNavigation();
@@ -194,6 +203,17 @@ namespace SmokeRescue.Brain
                 // Nearest worthwhile frontier first, so an area is finished before the robot walks on: the size bonus
                 // is capped, and slivers too small to hide a person (under furniture, wall seams) are ignored.
                 if (unknown.Count < c.frontier_min_information_cells) continue;
+                // A goal costs its walking time plus the time to turn to its first leg when that turn is taken in place (beyond
+                // turn_in_place_deg the controller turns first, then walks, so the times add; FUEL, arXiv 2010.11561, takes the
+                // larger of the two because a drone yaws while it flies). Headless seed 5001: turning in place toward a newly
+                // chosen goal took 25 to 27 s per robot in 240 s, the largest single share of turning.
+                if (c.frontier_turn_cost && HeadingRad.HasValue)
+                {
+                    var leg = Reconstruct(parent, start, target); Vector2 toward = grid.Centre(target);
+                    foreach (var p in leg) if (Vector2.Distance(p, from) >= c.goal_tolerance_m * 2) { toward = p; break; }
+                    float turnDeg = Mathf.Abs(BrainMath.Angle(HeadingRad.Value, BrainMath.Heading(toward - from)));
+                    if (turnDeg > c.turn_in_place_deg) targetCost += turnDeg / c.limits.max_yaw_rate_dps * c.open_speed_mps;
+                }
                 float score = targetCost - c.frontier_gain_weight * Math.Min(unknown.Count, c.frontier_gain_cap_cells);
                 choices.Add(new FrontierChoice { position = grid.Centre(target), path = Join(lead, Reconstruct(parent, start, target)),
                     cost = targetCost, score = score, information = unknown.Count, claimCentre = centre, claimRadius = radius });
@@ -203,12 +223,21 @@ namespace SmokeRescue.Brain
             order.Sort((x, y) => { int k = choices[x].score.CompareTo(choices[y].score); return k != 0 ? k : x.CompareTo(y); });
             var sorted = new List<FrontierChoice>(); foreach (int i in order) sorted.Add(choices[i]);
             Rooms.Rank(sorted, from);
-            if (RoomTaken != null && c.room_ledger && c.room_auction)
+            // A follow-through (partnerSearchedToo) only passes through a partner's floor toward unsearched floor beyond, so a
+            // partner's room claim does not filter it. Headless seed 5002, robot B: a person confirmed 2 m inside the
+            // only door and robot A's claimed first room left B nothing but follow-through goals, all filtered; B waited outside
+            // 42 s (wait_behind_partner_s) before entering.
+            // roomClaims false: callers that look for floor not yet proven indoors (threshold looks, facade relocation, the
+            // agent's unproven options) are not dividing search floor. Headless seed 5002: with them filtered, robot B outside
+            // found no threshold to look in from while robot A held the first room, and scanned on its pad for 42 s.
+            if (RoomTaken != null && c.room_ledger && c.room_auction && !partnerSearchedToo && roomClaims)
             {
-                // This robot's bid for a room is its travel time to that room's nearest offered frontier.
+                // This robot's bid for a room is its travel time to that room's nearest offered frontier: the walked length of
+                // the path, never the planner cost, which adds clearance and heat penalties (about 2.5 times the length along a
+                // corridor) and so would lose rooms to a partner that is really farther away.
                 var bid = new Dictionary<int, float>();
                 foreach (var f in sorted)
-                    if (f.roomId >= 0) bid[f.roomId] = Math.Min(bid.TryGetValue(f.roomId, out float b) ? b : float.PositiveInfinity, f.cost / c.open_speed_mps);
+                    if (f.roomId >= 0) bid[f.roomId] = Math.Min(bid.TryGetValue(f.roomId, out float b) ? b : float.PositiveInfinity, Length(f.path, from) / c.open_speed_mps);
                 sorted.RemoveAll(f => f.roomId >= 0 && RoomTaken(f.roomId, bid[f.roomId]));
             }
             return sorted;

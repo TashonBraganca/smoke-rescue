@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using SmokeRescue.Brain;
@@ -66,6 +67,185 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(two.Get(two.RoomAt(Vector2.zero)).corridor, Is.False, "control: two openings make a passage, not a hub");
             var (wide, _) = Build(1.8f, -4, 0, 4);
             Assert.That(wide.Get(wide.RoomAt(Vector2.zero)).corridor, Is.False, "control: 3.6 m is wider than any code corridor");
+        }
+
+        [Test]
+        public void StandingInACorridorItsFrontiersComeBeforePocketsInEnteredRoomsButAfterUnenteredRooms()
+        {
+            // Headless seed 5001: the corridor ranked last whenever a robot stood in it, so both robots went back to pockets in
+            // rooms they had entered and never walked far enough up the corridor to see the kitchen door.
+            var c = AuctionSettings(); c.room_auction = false; var g = new OccupancyGrid(c); CorridorWithRooms(g, .8f, -4, 0, 4);
+            var planner = new GridPlanner(g, c); double t = 0;
+            planner.Rooms.Update(t, new Vector2(-4, 2.7f));                       // walked into the west room only
+            planner.Rooms.Update(t += 1, new Vector2(-3.5f, 0));                  // and back out into the corridor
+            int hall = planner.Rooms.RoomAt(Vector2.zero), west = planner.Rooms.RoomAt(new Vector2(-4, 2.7f));
+            Assert.That(planner.Rooms.Get(hall).corridor, Is.True, "control: the layout's corridor is detected");
+            var first = planner.Frontiers(new Vector2(-3.5f, 0))[0];
+            Assert.That(first.roomId, Is.Not.EqualTo(hall).And.Not.EqualTo(west), "a room not yet entered comes first");
+            planner.Rooms.Update(t += 1, new Vector2(0, 2.7f)); planner.Rooms.Update(t += 1, new Vector2(4, 2.7f));
+            planner.Rooms.Update(t += 1, new Vector2(-3.5f, 0));                  // every room entered, standing in the corridor
+            var ranked = planner.Frontiers(new Vector2(-3.5f, 0));
+            Assert.That(ranked.Any(f => f.roomId == west), Is.True, "control: the entered west room still has unsearched floor");
+            Assert.That(ranked[0].roomId, Is.EqualTo(hall), "the corridor, which reveals doors, comes before pockets in entered rooms; " +
+                string.Join(", ", ranked.Take(6).Select(f => f.roomId + "/" + f.roomTier)));
+        }
+
+        [Test]
+        public void CorridorFirstWalksTheCorridorBeforeEnteringRoomsButStillFinishesTheRoomItIsIn()
+        {
+            // Headless seed 5001: the kitchen door 17 m down the corridor was never seen from its lower half. With corridor first,
+            // a robot in the corridor walks it before taking a room; inside a room it still finishes that room.
+            var c = AuctionSettings(); c.room_auction = false; c.room_ledger_corridor_first = true;
+            var g = new OccupancyGrid(c); CorridorWithRooms(g, .8f, -4, 0, 4);
+            var planner = new GridPlanner(g, c);
+            planner.Rooms.Update(0, new Vector2(-3.5f, 0));                       // standing in the corridor, no room entered
+            int hall = planner.Rooms.RoomAt(Vector2.zero);
+            Assert.That(planner.Frontiers(new Vector2(-3.5f, 0))[0].roomId, Is.EqualTo(hall), "corridor before rooms not yet entered");
+            c.room_ledger_corridor_first = false;
+            Assert.That(planner.Frontiers(new Vector2(-3.5f, 0))[0].roomId, Is.Not.EqualTo(hall), "control: off, a room not yet entered comes first");
+            c.room_ledger_corridor_first = true;
+            planner.Rooms.Update(1, new Vector2(4, 2.7f)); planner.Rooms.Update(2, new Vector2(4, 2.7f));   // now inside the east room
+            int east = planner.Rooms.RoomAt(new Vector2(4, 2.7f));
+            Assert.That(planner.Frontiers(new Vector2(4, 2.7f))[0].roomId, Is.EqualTo(east), "inside an unfinished room, it finishes that room first");
+        }
+
+        [Test]
+        public void WithTheTurnCostAFrontierAheadBeatsASlightlyNearerOneBehind()
+        {
+            // Headless seed 5001: turning in place toward newly chosen goals was 25 to 27 s per robot in 240 s.
+            var c = AuctionSettings(); c.room_ledger = false; c.frontier_gain_weight = 0; var g = new OccupancyGrid(c);
+            var searched = (bool[])typeof(OccupancyGrid).GetField("observed", Private).GetValue(g);
+            for (int i = 0; i < g.Count; i++)
+            {
+                var p = g.Centre(i);
+                if (Mathf.Abs(p.x) > 1.7f || p.y < -3.2f || p.y > 4.2f) continue;
+                // A walled room: unknown floor around it would itself be frontier beside the robot.
+                if (Mathf.Abs(p.x) > 1.5f || p.y < -3f || p.y > 4f) { g.ObserveOccupied(i); continue; }
+                g.ObserveFree(i);
+                // Searched floor everywhere except a patch 2.6 m ahead and a patch 2.0 m behind (robot at the origin facing +y).
+                searched[i] = !((p.y > 2.6f && p.y < 3.6f) || (p.y < -2.0f && p.y > -2.9f));
+            }
+            var planner = new GridPlanner(g, c) { HeadingRad = 0 };
+            c.frontier_turn_cost = false;
+            Assert.That(planner.Frontiers(Vector2.zero)[0].position.y, Is.LessThan(0), "control: travel alone picks the nearer patch behind");
+            c.frontier_turn_cost = true;
+            Assert.That(planner.Frontiers(Vector2.zero)[0].position.y, Is.GreaterThan(0), "with the turn cost the patch ahead wins");
+            planner.HeadingRad = Mathf.PI;
+            Assert.That(planner.Frontiers(Vector2.zero)[0].position.y, Is.LessThan(0), "facing the other way, the patch behind is now ahead");
+        }
+
+        [Test]
+        public void AnEnclosedRoomWithSomeProvenFloorBecomesSearchAreaButAnOpenYardNever()
+        {
+            // Headless seeds 5001 to 5004: the far side of a room stayed unproven, was never offered, and robots left after
+            // the near corner. Controls: an open-edged region (a yard) is never promoted, and the switch off promotes nothing.
+            (RoomLedger ledger, BrainConfig c) Build(bool walled, bool on)
+            {
+                var c = AuctionSettings(); c.room_indoor_promotion = on; var g = new OccupancyGrid(c);
+                for (int i = 0; i < g.Count; i++)
+                {
+                    var p = g.Centre(i);
+                    bool inside = Mathf.Abs(p.x) < 2.5f && p.y > 0 && p.y < 5;
+                    bool edge = Mathf.Abs(p.x) < 2.7f && p.y > -.2f && p.y < 5.2f && !inside;
+                    if (inside) g.ObserveFree(i); else if (edge && walled) g.ObserveOccupied(i);
+                }
+                var searched = (bool[])typeof(OccupancyGrid).GetField("observed", Private).GetValue(g);
+                System.Array.Clear(searched, 0, searched.Length);
+                var ledger = new RoomLedger(g, c);
+                ledger.Update(0, new Vector2(0, .5f), p => p.y < 1.5f);   // only a strip by the door is proven indoors
+                return (ledger, c);
+            }
+            var room = Build(true, true).ledger;
+            Assert.That(room.Promoted(new Vector2(0, 4.5f)), Is.True, "the far side of an enclosed, partly proven room is search area");
+            Assert.That(room.Get(room.RoomAt(new Vector2(0, 4.5f))).coveredShare, Is.LessThan(.1f), "coverage is counted on all its floor");
+            Assert.That(Build(false, true).ledger.Promoted(new Vector2(0, 4.5f)), Is.False, "an open-edged region (a yard) is never promoted");
+            Assert.That(Build(true, false).ledger.Promoted(new Vector2(0, 4.5f)), Is.False, "control: off promotes nothing");
+        }
+
+        [Test]
+        public void ARoomBidIsTheWalkedLengthOverOpenSpeedNotThePlannerCost()
+        {
+            // The planner cost adds clearance and heat penalties: on 223 frontiers of the headless houses (exp6, 23 Oct) it ran
+            // 1.42 times the walked length (median; 1.19 to 2.07 between the 10th and 90th percentiles, at most 3.56). Bidding it
+            // lost rooms to a partner that was really farther away.
+            // A 1.0 m corridor with the shipped clearance band (brain.json obstacle_cost_margin_m 0.6, weight 3; the code defaults,
+            // 0.15 m, leave every walkable cell outside the band): its whole length lies inside the band, as a narrow hall does.
+            var c = AuctionSettings(); c.obstacle_cost_margin_m = .6f; c.obstacle_cost_weight = 3f;
+            var g = new OccupancyGrid(c); CorridorWithRooms(g, .5f, -4, 0, 4);
+            var planner = new GridPlanner(g, c); planner.Rooms.Update(0, new Vector2(-5.5f, 0));
+            var bids = new Dictionary<int, float>();
+            planner.RoomTaken = (room, bid) => { bids[room] = bid; return false; };
+            var from = new Vector2(-5.5f, 0); var options = planner.Frontiers(from);
+            int east = planner.Rooms.RoomAt(new Vector2(4, 2.7f));
+            var nearest = options.Where(f => f.roomId == east).OrderBy(f => GridPlanner.Length(f.path, from)).First();
+            Assert.That(nearest.cost, Is.GreaterThan(GridPlanner.Length(nearest.path, from) * 1.1f), "control: the planner cost exceeds the walked length here");
+            Assert.That(bids[east], Is.EqualTo(options.Where(f => f.roomId == east).Min(f => GridPlanner.Length(f.path, from)) / c.open_speed_mps).Within(1e-3),
+                "the bid is the shortest walked length to the room over open_speed_mps");
+        }
+
+        [Test]
+        public void APersonLyingInACorridorNoLongerSealsItWhenFloorBeyondIsCutOff()
+        {
+            // Headless seed 5001: a confirmed person in the 1.7 m hallway sealed it (0.45 m core plus the walking clearance) and
+            // four rooms beyond went unsearched. Controls: the full core seals the corridor; the rule fires only when floor is cut
+            // off, and only once.
+            var c = AuctionSettings(); c.survivor_squeeze = true;
+            var b = new RobotBrain(Calibration(), c, "robot_A", 0); var g = Map(b);
+            for (int i = 0; i < g.Count; i++)
+            {
+                var p = g.Centre(i);
+                if (Mathf.Abs(p.y) > 6.1f || Mathf.Abs(p.x) > 1.1f) continue;
+                if (Mathf.Abs(p.x) > .9f || Mathf.Abs(p.y) > 6f) g.ObserveOccupied(i); else g.ObserveFree(i);   // a 1.8 m corridor
+            }
+            var searched = (bool[])typeof(OccupancyGrid).GetField("observed", Private).GetValue(g);
+            for (int i = 0; i < g.Count; i++) searched[i] = g.Centre(i).y < 1.5f;      // floor beyond the person is unsearched
+            var person = new Vector2(0, 2); var planner = Planner(b);
+            ((List<Vector2>)typeof(RobotBrain).GetField("survivors", Private).GetValue(b)).Add(person);
+            bool Reaches(float core)
+            {
+                g.SetKeepOut(new[] { person }, core, c.survivor_keepout_m + c.robot_radius_m);
+                var path = planner.Plan(new Vector2(0, -3), new Vector2(0, 5));
+                return path.Count > 0 && Vector2.Distance(path[path.Count - 1], new Vector2(0, 5)) < .2f;
+            }
+            Assert.That(Reaches(c.survivor_keepout_core_m), Is.False, "control: the full core seals a 1.8 m corridor");
+            Assert.That(Reaches(c.survivor_squeeze_core_m), Is.True, "at the body's half-width the robot can pass along the side");
+            g.SetKeepOut(new[] { person }, c.survivor_keepout_core_m, c.survivor_keepout_m + c.robot_radius_m);
+            typeof(RobotBrain).GetField("motion", Private).GetValue(b);
+            var squeeze = typeof(RobotBrain).GetMethod("SqueezePastPerson", Private);
+            Assert.That((bool)squeeze.Invoke(b, new object[] { 1.0 }), Is.True, "floor beyond the person is cut off: squeeze");
+            Assert.That((bool)squeeze.Invoke(b, new object[] { 2.0 }), Is.False, "once only");
+            c.survivor_squeeze = false; typeof(RobotBrain).GetField("squeezePast", Private).SetValue(b, false);
+            Assert.That((bool)squeeze.Invoke(b, new object[] { 3.0 }), Is.False, "control: switched off");
+        }
+
+        [Test]
+        public void WithCorridorFirstOneRobotHoldsTheHallAndAFollowThroughIgnoresRoomClaims()
+        {
+            // Fire crews split at a hallway: one works the hall, the others take the rooms (Miami-Dade 2024; NFPA skill drill
+            // 12-2). Headless seed 5001: with unclaimable halls both robots walked the hall and the living room was left at 46 %.
+            // Headless seed 5002: room claims filtered robot B's follow-through goals and it waited outside 42 s.
+            var c = AuctionSettings(); c.room_ledger_corridor_first = true;
+            var b = new RobotBrain(Calibration(), c, "robot_2", 0);
+            CorridorWithRooms(Map(b), .8f, -4, 0, 4);
+            var planner = Planner(b); planner.Rooms.Update(0, Vector2.zero);
+            int hall = planner.Rooms.RoomAt(Vector2.zero), west = planner.Rooms.RoomAt(new Vector2(-4, 2.7f));
+            long sequence = 0;
+            void Claim(Vector2 anchor, double sent)
+            {
+                var m = new RobotBrain(Calibration(), c, "robot_1", 0).BuildMessage(sent); m.Sequence = ++sequence;
+                m.RoomClaim = new BrainRoomClaim { anchor = anchor, radiusM = 2, bidS = 0, since = sent, expiresAt = sent + c.peer_claim_s };
+                b.OnPeerMessage(Wire(m), sent + .1);
+            }
+            Assert.That(planner.Frontiers(Vector2.zero).Any(f => f.roomId == hall), Is.True, "control: the hall is offered before any claim");
+            Claim(Vector2.zero, 0);
+            Assert.That(planner.Frontiers(Vector2.zero).Any(f => f.roomId == hall), Is.False, "with corridor first a partner can hold the hall");
+            Assert.That(planner.Frontiers(Vector2.zero).Any(f => f.roomId == west), Is.True, "rooms off the held hall stay open");
+            Claim(new Vector2(-4, 2.7f), .2);
+            Assert.That(planner.Frontiers(Vector2.zero).Any(f => f.roomId == west), Is.False, "control: the partner's room is not offered to the search");
+            Assert.That(planner.Frontiers(Vector2.zero, null, true).Any(f => f.roomId == west), Is.True, "a follow-through still sees it");
+            // Headless seed 5002: threshold looks for floor not yet proven indoors were filtered by the partner's room, and robot B
+            // scanned outside for 42 s.
+            Assert.That(planner.Frontiers(Vector2.zero, null, false, false).Any(f => f.roomId == west), Is.True, "a caller not dividing search floor still sees it");
         }
 
         [Test]
