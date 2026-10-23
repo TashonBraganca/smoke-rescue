@@ -817,3 +817,19 @@ def test_close_looks_count_per_shape_not_per_grid_square_and_a_twice_looked_shap
     look(10.0, 5.0)
     out = look(11.0, 5.0, then="reject")
     assert out["orders"] == [] and out["refusals"][0]["tool"] == "reject_candidate", "control: one look cannot drop it"
+
+
+def test_a_five_round_step_reaches_finish_and_a_cut_step_still_logs_its_decision(tmp_path, monkeypatch):
+    # Held-out runs 1 and 2: with 4 rounds, scan, inspect, act and a separate finish filled the limit; 41 of 84 steps
+    # lost their summary and 2 a decision. Control: the old 4-round limit cuts the same step before finish, and the
+    # orders it gave are still named in the summary.
+    fake_vision(monkeypatch, "uncertain")
+    T.ToolRegistry._looks.clear(); T.ToolRegistry._pending.clear()
+    turns = lambda: [[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": 5})], [ToolCall("approach_candidate", {"evidence_id": "ev1"})],
+                     [ToolCall("send_team_message", {"text": "warm shape ahead, looking closer"})],
+                     [ToolCall("send_team_message", {"text": "still looking"})], [ToolCall("finish", {"summary": "closer look ordered"})]]
+    out = RobotAgent(Scripted(turns()), tmp_path / "t.jsonl").step(request(tmp_path))
+    assert out["summary"] == "closer look ordered" and out["rounds"] == 5
+    T.ToolRegistry._looks.clear(); T.ToolRegistry._pending.clear()
+    cut = RobotAgent(Scripted(turns()), tmp_path / "t.jsonl", max_rounds=4).step(request(tmp_path) | {"t": 40.0})
+    assert cut["rounds"] == 4 and cut["summary"].startswith("(no summary") and "go_to" in cut["summary"], "control: 4 rounds"
