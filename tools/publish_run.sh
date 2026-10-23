@@ -19,6 +19,7 @@ for f in agent_trace.jsonl agent_summary.json command_post.jsonl radio.txt brain
   [ -f "$src/$f" ] && cp "$src/$f" "$dst/$f"
 done
 [ -d "$src/agent_debug" ] && rsync -a --delete "$src/agent_debug/" "$dst/agent_debug/"
+for v in "$src"/*.mp4; do [ -f "$v" ] && cp "$v" "$dst/"; done
 cp "$repo/config/$scenario" "$dst/$scenario"
 cd "$repo"
 git add "run_logs/$run"
