@@ -315,7 +315,7 @@ namespace SmokeRescue.Brain
             var routeLookCommand = RouteLookStep(t, dt);
             if (routeLookCommand.HasValue) return routeLookCommand.Value;
 
-            if (active != null && (active.confirmed || t - active.lastSeen > c.survivor_lost_s))
+            if (active != null && (active.confirmed || SurvivorLost(t)))
             {
                 Emit(t, "goal", "Survivor inspection ended or recent evidence was lost; resume exploration.");
                 active = null; dwell = 0; ClearPath();
@@ -334,7 +334,7 @@ namespace SmokeRescue.Brain
                 if (active != null)
                 {
                     // The no-frontier scan must be a continuous look around; an inspection interrupts it.
-                    ClearPath(); dwell = 0; inspecting = false; scanSince = double.NaN;
+                    ClearPath(); dwell = 0; inspecting = false; scanSince = double.NaN; activeSince = t; lostClockFrom = double.NaN;
                     Emit(t, "goal", "Inspect the nearest recent survivor candidate at a safe standoff.",
                         "person_x_m", active.position.x, "person_y_m", active.position.y, "standoff_m", c.survivor_standoff_m);
                 }
@@ -686,6 +686,27 @@ namespace SmokeRescue.Brain
         }
         /// <summary>Colour sightings arrive once per scan period, thermal blobs every frame, so freshness depends on the source.</summary>
         double FreshS(Track track) => track.rgb ? c.person_rgb_fresh_s : c.survivor_fresh_s;
+        double activeSince, lostClockFrom = double.NaN;
+        /// <summary>Is the active candidate lost? A collapsed person does not move, so evidence is lost only when the camera
+        /// looks at the spot (inside the horizontal view, past the blind floor for a body search_low_m high, within
+        /// person_rgb_max_range_m, a known-free line on this robot's own map) and sees nobody for survivor_lost_s. Walking around
+        /// furniture or through a doorway toward the viewing spot no longer ends the approach (survivor_lost_in_view). The walk
+        /// itself is capped at twice the detection range at near speed. Headless houses 5005-5010: 24 people seen, 13 confirmed;
+        /// house 5007 saw all five and confirmed one, its approaches ended "evidence was lost" while the spot was out of view.</summary>
+        bool SurvivorLost(double t)
+        {
+            if (!c.survivor_lost_in_view) return t - active.lastSeen > c.survivor_lost_s;
+            var cam = sensors.camera;
+            float half = Mathf.Atan(cam.width / 2f / cam.fx) * Mathf.Rad2Deg;
+            float lowest = cam.mount.pitch_down_deg + Mathf.Atan(cam.height / 2f / cam.fy) * Mathf.Rad2Deg;
+            float blind = (cam.mount.height_m - c.search_low_m) / Mathf.Tan(lowest * Mathf.Deg2Rad);
+            float range = Vector2.Distance(active.position, motion.Pose.position);
+            float off = Mathf.Abs(BrainMath.Angle(motion.Pose.yawRad, BrainMath.Heading(active.position - motion.Pose.position)));
+            bool inView = off <= half && range >= blind && range <= c.person_rgb_max_range_m && grid.OwnFreeLine(motion.Pose.position, active.position);
+            if (!inView) lostClockFrom = double.NaN; else if (double.IsNaN(lostClockFrom)) lostClockFrom = t;
+            bool lookedAndMissed = !double.IsNaN(lostClockFrom) && t - Math.Max(lostClockFrom, active.lastSeen) > c.survivor_lost_s;
+            return lookedAndMissed || t - activeSince > 2 * c.person_rgb_max_range_m / c.near_speed_mps;
+        }
 
         public static Vector2 PersonSightingPosition(BrainPose pose, float bearingDegRight, float rangeM)
         {

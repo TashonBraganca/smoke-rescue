@@ -21,6 +21,7 @@ namespace SmokeRescue.Brain
         public bool room_ledger_corridor_first = false;
         public bool sweep_once_per_room = false;
         public bool survivor_squeeze = false;
+        public bool survivor_lost_in_view = false;
         public float survivor_squeeze_core_m = .23f;
         public float room_auction_margin_s = 2;
         public float corridor_max_width_m = 2.44f;

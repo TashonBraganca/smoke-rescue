@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
@@ -246,6 +247,30 @@ namespace SmokeRescue.Tests.EditMode
             // Headless seed 5002: threshold looks for floor not yet proven indoors were filtered by the partner's room, and robot B
             // scanned outside for 42 s.
             Assert.That(planner.Frontiers(Vector2.zero, null, false, false).Any(f => f.roomId == west), Is.True, "a caller not dividing search floor still sees it");
+        }
+
+        [Test]
+        public void ACandidateOutOfViewDuringTheApproachIsNotLostButOneInViewAndUnseenIs()
+        {
+            // Headless house 5007: all five people seen, one confirmed; approaches ended "evidence was lost" while the person's
+            // spot was out of view behind furniture or a door frame. A collapsed person does not move.
+            var c = AuctionSettings(); c.survivor_lost_in_view = true;
+            var b = new RobotBrain(Calibration(), c, "robot_A", 0); Room(b, -6, 6, -6, 6);   // open mapped floor, robot at origin facing +y
+            var trackType = typeof(RobotBrain).GetNestedType("Track", Private);
+            object Track(Vector2 at) { var k = Activator.CreateInstance(trackType, true); trackType.GetField("position").SetValue(k, at);
+                trackType.GetField("lastSeen").SetValue(k, 0.0); trackType.GetField("candidate").SetValue(k, true); return k; }
+            var lost = typeof(RobotBrain).GetMethod("SurvivorLost", Private);
+            bool Lost(object track, double t) { typeof(RobotBrain).GetField("active", Private).SetValue(b, track); return (bool)lost.Invoke(b, new object[] { t }); }
+            void Reset() { typeof(RobotBrain).GetField("activeSince", Private).SetValue(b, 0.0); typeof(RobotBrain).GetField("lostClockFrom", Private).SetValue(b, double.NaN); }
+            Reset(); var behind = Track(new Vector2(0, -3));
+            Assert.That(Lost(behind, 1) || Lost(behind, 5), Is.False, "a spot behind the robot is not looked at, so it is not lost");
+            Reset(); var ahead = Track(new Vector2(0, 3));
+            Assert.That(Lost(ahead, 1), Is.False, "in view, unseen for 1 s: not yet lost");
+            Assert.That(Lost(ahead, 4.5), Is.True, "in view and unseen for more than survivor_lost_s: lost");
+            Reset();
+            Assert.That(Lost(behind, 100), Is.True, "the approach is capped (2 x detection range at near speed)");
+            c.survivor_lost_in_view = false; Reset();
+            Assert.That(Lost(behind, 5), Is.True, "control: off, an unseen spot is lost after survivor_lost_s wherever it is");
         }
 
         [Test]
