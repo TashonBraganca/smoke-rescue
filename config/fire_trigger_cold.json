@@ -523,6 +523,8 @@
     "_reason": "Flow is shared equally across visible cone cell centres, including cold fuel. Tick-interval overlap conserves litres for non-grid times. Exact room boundaries block water except within current door widths; no furniture occlusion. Flame heat is absorbed first; surplus cools toward ambient using gas.effective_heat_capacity_kj_m2_k times cell area, the existing effective heated-lining capacity. There is no separate solid-cell capacity in this model. Smoke and room gas use the remaining heat release. Wetting is a dry-out timer, not moisture transport or a validated suppression model. Sources accessed 2026-10-21."
   },
   "spread": {
+    "growth_alpha_kw_s2": 0.01172,
+    "growth_alpha_kw_s2_reason": "Medium design-fire coefficient per independent configured origin. NFPA 72, National Fire Alarm Code, 2002 edition, Annex B, pp.72-168 to 72-169, equations B.4/B.5 give Q=alpha*(t-tv)^2 and alpha=1055/tg^2; choosing tg=300 s gives 0.0117222, rounded here to the requested 0.01172 kW/s^2, or 1054.8 kW at 300 s. https://previewnorm.com/nfpa/NFPA%2072-2002%20PDF.pdf . One budget is shared by all cells descended from that origin, across rooms. Mass loss cannot exceed burning fuel capacity. Step energy integrates the quadratic exactly. Zero explicitly selects the legacy uncapped model for diagnostic configurations; older files without this field retain that behaviour. No growth clock ignites a new room. Accessed 2026-10-23.",
     "neighbour_heat_per_s": 0.028,
     "surface_cooling_per_s": 0.012,
     "gas_surface_heat_per_s": 0.05,
@@ -534,7 +536,19 @@
     "flame_max_c": 1100,
     "max_temperature_c": 1100,
     "fuel_variation_fraction": 0.08,
-    "heat_of_combustion_kj_kg": 18000
+    "heat_of_combustion_kj_kg": 18000,
+    "neighbour_heat_per_s_reason": "Existing value 0.028, retained without recalibration. This is an unvalidated model estimate; see sources.spread_estimates. Source: https://www.nist.gov/el/fcd/room-flashover-experiments-demonstrate-effectiveness-barrier-fabrics",
+    "surface_cooling_per_s_reason": "Existing value 0.012, retained without recalibration. This is an unvalidated model estimate; see sources.spread_estimates. Source: https://www.nist.gov/el/fcd/room-flashover-experiments-demonstrate-effectiveness-barrier-fabrics",
+    "gas_surface_heat_per_s_reason": "Existing value 0.05, retained without recalibration. This is an unvalidated model estimate; see sources.spread_estimates. Source: https://www.nist.gov/el/fcd/room-flashover-experiments-demonstrate-effectiveness-barrier-fabrics",
+    "flashover_surface_heat_c_s_reason": "Existing value 18, retained without recalibration. This is an unvalidated model estimate; see sources.spread_estimates. Source: https://www.nist.gov/el/fcd/room-flashover-experiments-demonstrate-effectiveness-barrier-fabrics",
+    "fuel_burn_kg_m2_s_reason": "Existing value 0.018, retained without recalibration. This is an unvalidated model estimate; see sources.spread_estimates. Source: https://www.nist.gov/el/fcd/room-flashover-experiments-demonstrate-effectiveness-barrier-fabrics",
+    "flame_ramp_s_reason": "Existing 8 s local combustion ramp, now stored separately from displayed flame intensity. Water and the origin heat budget cannot reduce this stored ramp by visually dimming a flame. This is a numerical estimate, not a measured material response. Source: baseline FireSim.Step; fuel and flame cooling mechanism: https://www.nist.gov/publications/fire-fighting-properties-nistir-6191",
+    "flame_relaxation_s_reason": "Existing 4 s surface-temperature response at full cell heat release. The response now scales with actual heat-release intensity, so growth-limited cells cannot supply full flame feedback. This temperature proxy is not a solved solid heat balance. Source: baseline FireSim.Step and the heat-transfer principle at https://www.nist.gov/el/fire-research-division-73300/firegov-fire-service/fire-dynamics",
+    "flame_min_c_reason": "Existing value 650, retained without recalibration. This is an unvalidated model estimate; see sources.spread_estimates. Source: https://www.nist.gov/el/fcd/room-flashover-experiments-demonstrate-effectiveness-barrier-fabrics",
+    "flame_max_c_reason": "Existing value 1100, retained without recalibration. This is an unvalidated model estimate; see sources.spread_estimates. Source: https://www.nist.gov/el/fcd/room-flashover-experiments-demonstrate-effectiveness-barrier-fabrics",
+    "max_temperature_c_reason": "Existing value 1100, retained without recalibration. This is an unvalidated model estimate; see sources.spread_estimates. Source: https://www.nist.gov/el/fcd/room-flashover-experiments-demonstrate-effectiveness-barrier-fabrics",
+    "fuel_variation_fraction_reason": "Existing value 0.08, retained without recalibration. This is an unvalidated model estimate; see sources.spread_estimates. Source: https://www.nist.gov/el/fcd/room-flashover-experiments-demonstrate-effectiveness-barrier-fabrics",
+    "heat_of_combustion_kj_kg_reason": "Existing value 18000, retained without recalibration. This is an unvalidated model estimate; see sources.spread_estimates. Source: https://www.nist.gov/el/fcd/room-flashover-experiments-demonstrate-effectiveness-barrier-fabrics"
   },
   "gas": {
     "effective_heat_capacity_kj_m2_k": 6.5,

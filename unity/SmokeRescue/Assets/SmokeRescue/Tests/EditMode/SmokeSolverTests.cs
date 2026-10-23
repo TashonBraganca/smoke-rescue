@@ -25,6 +25,9 @@ namespace SmokeRescue.Tests.EditMode
             fire["spread"]["neighbour_heat_per_s"] = 0;
             fire["spread"]["gas_surface_heat_per_s"] = 0;
             fire["spread"]["flashover_surface_heat_c_s"] = 0;
+            // These tests are about the smoke layer, so the source burns at its full fuel rate: under the medium t-squared
+            // cap it releases about 5 kW at 20 s, too little gas to fill a layer within the test.
+            fire["spread"]["growth_alpha_kw_s2"] = 0;
             firePath = Temporary(fire);
             smokePath = Path.Combine(FloorPlan.ConfigDir, "smoke.json");
         }
