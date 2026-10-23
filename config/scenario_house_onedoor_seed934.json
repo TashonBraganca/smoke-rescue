@@ -1,6 +1,6 @@
 {
   "id": "house_onedoor_seed934",
-  "description": "One-entrance fresh seed (23 Oct 2026), people placed with seed 934 by the fair placement (9f74c16), never run and never looked at before recording. No mission deadline; the recording stops at 480 s: the agent layer plus the C# retreat, room ranking and sweep fixes, and the room auction switched on; The fire has a 320 s head start (NFPA 1710 response time), so heat matters from entry. Nothing was tuned on it.",
+  "description": "One-entrance fresh seed (23 Oct 2026), people placed with seed 934 by the fair placement (9f74c16), never run and never looked at before recording. No mission deadline; the recording stops at 480 s. Brain config as of 93cc0be: the agent layer; room ledger with corridor-first ranking, the radio room auction, indoor promotion of enclosed rooms, turn cost on frontier choice, one sweep per room, passing a confirmed person in a narrow hallway, candidates lost only while in view, and the entrance lock as a passage (never a wall between rooms). The fire has a 320 s head start (NFPA 1710 response time), so heat matters from entry. Nothing was tuned on it.",
   "seed": 934,
   "duration_s": 480,
   "time_limit": false,
