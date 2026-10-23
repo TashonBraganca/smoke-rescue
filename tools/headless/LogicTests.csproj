@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems><NoWarn>CS0436;CS0618;CS0649;CS0169;CS0414</NoWarn>
+    <Src>$(MSBuildThisFileDirectory)../../unity/SmokeRescue/Assets/SmokeRescue</Src>
+    <UnityResources>/Applications/Unity/Hub/Editor/6000.6.6f1/Unity.app/Contents/Resources</UnityResources>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(Src)/Brain/*.cs" />
+    <Compile Include="$(Src)/Sensors/SensorConfig.cs;$(Src)/Sensors/ImuSensor.cs;$(Src)/Sensors/OdometrySensor.cs;$(Src)/Sensors/AirTemperatureSensor.cs;$(Src)/Sensors/SensorRandom.cs;$(Src)/Sensors/FrameConvert.cs" />
+    <Compile Include="$(Src)/World/FloorPlan.cs;$(Src)/World/Scenario.cs;$(Src)/World/FireSim.cs;$(Src)/World/FireSimHeat.cs" />
+    <Compile Include="$(Src)/Tests/EditMode/BrainTests.cs;$(Src)/Tests/EditMode/RoomAuctionTests.cs;$(Src)/Tests/EditMode/CameraLinkTests.cs;$(Src)/Tests/EditMode/TeamMapTests.cs" />
+    <Compile Include="Standalone.cs;LogicTests.cs" />
+    <Compile Include="$(Src)/Tests/EditMode/HeadlessMotionErrors.cs" />
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(UnityResources)/Scripting/Managed/UnityEngine/UnityEngine.CoreModule.dll</HintPath></Reference>
+    <Reference Include="Newtonsoft.Json"><HintPath>$(UnityResources)/Scripting/DotNetSdk/sdk/8.0.318/Newtonsoft.Json.dll</HintPath></Reference>
+    <Reference Include="nunit.framework"><HintPath>$(UnityResources)/PackageManager/BuiltInPackages/com.unity.ext.nunit/net472/unity-custom/nunit.framework.dll</HintPath></Reference>
+  </ItemGroup>
+</Project>

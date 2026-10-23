@@ -542,6 +542,9 @@ namespace SmokeRescue.Recording
             for (int i = 0; i < pixels.Length; i++) pixels[i] = s.occupancy[i] == 255 ? (byte)0 : s.occupancy[i] == 1 ? (byte)255 : (byte)128;
             string rel = $"brain_map/{Fmt(t)}.png", path = Path.Combine(rig.dir, rel); int size = s.gridSize;
             Directory.CreateDirectory(Path.Combine(rig.dir, "brain_map"));
+            var team = rig.brain.ExportTeamMap(t);
+            string teamPath = Path.Combine(rig.dir, $"brain_map/{Fmt(t)}.team.bin.gz");
+            pending.Enqueue(Task.Run(() => team.Write(teamPath)));
             pending.Enqueue(Task.Run(() => File.WriteAllBytes(path, ImageConversion.EncodeArrayToPNG(pixels,
                 UnityEngine.Experimental.Rendering.GraphicsFormat.R8_UNorm, (uint)size, (uint)size))));
             var searched = new byte[s.searched.Length];

@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.IO.Compression;
 using System.Text;
 using UnityEngine;
 
@@ -52,7 +53,7 @@ namespace SmokeRescue.Brain
     [Serializable] public struct SurvivorSnapshot
     { public Vector2 position; public double confirmedAt; public string source, sourceRobot; }
 
-    /// <summary>Version 7 binary radio state (version 1 plus LiDAR keyframes, people carried out, camera keyframes, rejected warm spots, air samples and a room claim), in the sender's own map frame. Masks are row-major,
+    /// <summary>Version 8 binary radio state, with pose uncertainty and per-source team-map evidence, in the sender's own map frame. Masks are row-major,
     /// least-significant bit first. Explored is cumulative since BaseSequence; Occupied is always full.
     /// ToBytes is the transport format. JSON/base64 and transport headers are outside EstimatedBytes.
     /// Sequence numbers last for one run; create new brains when restarting a sender.</summary>
@@ -79,6 +80,9 @@ namespace SmokeRescue.Brain
         public BrainRejected[] Rejected = Array.Empty<BrainRejected>();
         public BrainAirSample[] Air = Array.Empty<BrainAirSample>();
         public BrainRoomClaim RoomClaim;
+        public PoseUncertainty PoseUncertainty;
+        public BrainPose MapCorrection;
+        public TeamEvidenceCell[] TeamCells = Array.Empty<TeamEvidenceCell>();
         /// <summary>Version 3 adds CarriedOut after the keyframes (hidden-corner run: robot B went back for a person
         /// robot A had already carried out, because only confirmations travelled). Version 4 adds VisualKeyframes after
         /// CarriedOut, so maps can also be linked by places the cameras recognise (run 3 never linked by LiDAR alone). Version 5
@@ -87,7 +91,8 @@ namespace SmokeRescue.Brain
         /// held in 44 C air, remembering 20 C in the foyer from 100 s earlier, while robot B stood there in 54 C). Version 7 adds
         /// RoomClaim after Air, so code splits rooms between any number of robots (seed 932: the agents split the house in words,
         /// "west" and "north", and nobody searched the east).</summary>
-        public const byte Version = 7;
+        public const byte Version = 8;
+        public const int MaxTeamCells = 256;
         public const int MaxRejected = 16, MaxAir = 32;
         public const int MaxVisualPayloadBytes = 8192;
         public int EstimatedBytes => ToBytes().Length;
@@ -139,6 +144,20 @@ namespace SmokeRescue.Brain
                 foreach (var a in Air) { Write(w, a.position); w.Write(a.c); w.Write(a.at); }
                 w.Write(RoomClaim != null);
                 if (RoomClaim != null) { Write(w, RoomClaim.anchor); w.Write(RoomClaim.radiusM); w.Write(RoomClaim.bidS); w.Write(RoomClaim.since); w.Write(RoomClaim.expiresAt); }
+                if (!PoseUncertainty.Valid || TeamCells.Length > MaxTeamCells) throw new InvalidDataException("Invalid team-map state.");
+                w.Write(PoseUncertainty.positionStdM); w.Write(PoseUncertainty.yawStdRad);
+                Write(w, MapCorrection.position); w.Write(MapCorrection.yawRad); w.Write((ushort)TeamCells.Length);
+                using (var compressed = new MemoryStream())
+                {
+                    using (var zip = new DeflateStream(compressed, System.IO.Compression.CompressionLevel.Fastest, true))
+                    using (var cells = new BinaryWriter(zip))
+                    foreach (var cell in TeamCells)
+                    {
+                        cells.Write(cell.cell); cells.Write(cell.logOdds); cells.Write(cell.revision);
+                        cells.Write((float)cell.observedAt); cells.Write((float)cell.searchedAt);
+                    }
+                    var block = compressed.ToArray(); w.Write((ushort)block.Length); w.Write(block);
+                }
                 w.Flush();
                 if (stream.Length >= MaxBytes) throw new InvalidDataException("Brain state exceeds the 40000-byte radio limit; increase compression before using this scene.");
                 return stream.ToArray();
@@ -193,6 +212,32 @@ namespace SmokeRescue.Brain
                 }
                 if (r.ReadBoolean())
                     m.RoomClaim = new BrainRoomClaim { anchor = ReadPoint(r), radiusM = r.ReadSingle(), bidS = r.ReadSingle(), since = r.ReadDouble(), expiresAt = r.ReadDouble() };
+                m.PoseUncertainty = new PoseUncertainty { positionStdM = r.ReadSingle(), yawStdRad = r.ReadSingle() };
+                m.MapCorrection = new BrainPose { position = ReadPoint(r), yawRad = r.ReadSingle() };
+                int teamCount = r.ReadUInt16();
+                if (!m.PoseUncertainty.Valid || teamCount > MaxTeamCells || !BrainMath.Finite(m.MapCorrection.position.x) ||
+                    !BrainMath.Finite(m.MapCorrection.position.y) || !BrainMath.Finite(m.MapCorrection.yawRad)) throw new InvalidDataException("Invalid team-map pose.");
+                m.TeamCells = new TeamEvidenceCell[teamCount];
+                int blockLength = r.ReadUInt16();
+                if (blockLength > MaxTeamCells * 20 + 64) throw new InvalidDataException("Invalid compressed team-map length.");
+                var block = r.ReadBytes(blockLength);
+                if (block.Length != blockLength) throw new InvalidDataException("Truncated team-map block.");
+                using (var data = new MemoryStream(block, false))
+                using (var zip = new DeflateStream(data, CompressionMode.Decompress))
+                using (var cells = new BinaryReader(zip))
+                {
+                    for (int j = 0; j < teamCount; j++)
+                    {
+                        var cell = new TeamEvidenceCell { cell = cells.ReadInt32(), logOdds = cells.ReadSingle(), revision = cells.ReadUInt32() };
+                        cell.observedAt = cells.ReadSingle(); cell.searchedAt = cells.ReadSingle();
+                        if (cell.cell < 0 || cell.cell >= m.GridSize * m.GridSize || !BrainMath.Finite(cell.logOdds) ||
+                            Math.Abs(cell.logOdds) > 100 || cell.revision == 0 || !BrainMath.Finite((float)cell.observedAt) ||
+                            !BrainMath.Finite((float)cell.searchedAt) || cell.observedAt < 0 || cell.observedAt > m.SentAt + .01 ||
+                            cell.searchedAt < -1 || cell.searchedAt > m.SentAt + .01) throw new InvalidDataException("Invalid team-map cell.");
+                        m.TeamCells[j] = cell;
+                    }
+                    if (zip.ReadByte() != -1) throw new InvalidDataException("Trailing team-map cells.");
+                }
                 if (stream.Position != stream.Length) throw new InvalidDataException("Trailing brain packet bytes.");
                 return m;
             }

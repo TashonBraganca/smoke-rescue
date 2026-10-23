@@ -20,7 +20,7 @@ namespace SmokeRescue.Tests.EditMode
     public sealed class HeadlessSim
     {
         sealed class Prism { public Vector2[] poly; public float height; }
-        sealed class Body { public string id; public RobotBrain brain; public Vector2 p; public float yaw, v, w; public double start, nextLidar, nextSight; public float moved, air = 20, peakAir = 20, hotS, contactS; public AirTemperatureSensor sensor; }
+        sealed class Body { public string id; public RobotBrain brain; public Vector2 p; public float yaw, v, w; public double start, nextLidar, nextSight; public float moved, air = 20, peakAir = 20, hotS, contactS; public AirTemperatureSensor sensor; public HeadlessMotionErrors motionError; }
         FireSimHeat heat; Vector2 gateOrigin; float gateYaw;
         /// <summary>House (x, z) of a gate-frame point.</summary>
         Vector2 House(Vector2 g) { Vector2 f = new Vector2(Mathf.Sin(gateYaw), Mathf.Cos(gateYaw)), r = new Vector2(Mathf.Cos(gateYaw), -Mathf.Sin(gateYaw)); return gateOrigin + r * g.x + f * g.y; }
@@ -257,9 +257,10 @@ namespace SmokeRescue.Tests.EditMode
             foreach (var r in world["robots"])
             {
                 var pad = r["pad"].Select(v => (float)v).ToArray();
+                var error = new HeadlessMotionErrors((JObject)run["motion_error"], 3000 + i0);
                 robots.Add(new Body { id = (string)r["id"], p = new Vector2((float)r["at"][0], (float)r["at"][1]),
                     yaw = -(float)r["heading_deg"] * Mathf.Deg2Rad, start = i0 * ((double?)run["stagger_s"] ?? 0),
-                    brain = new RobotBrain(cal, cfg, (string)r["id"], 1000 + i0 * 10 + 6, new EntryPose(pad[0], pad[1], pad[2])),
+                    brain = new RobotBrain(cal, cfg, (string)r["id"], 1000 + i0 * 10 + 6, new EntryPose(pad[0], pad[1], pad[2] + error.InitialHeadingDeg)), motionError = error,
                     sensor = cal.air_temperature != null ? new AirTemperatureSensor(cal.air_temperature, 2000 + i0) : null });
                 i0++;
             }
@@ -275,7 +276,7 @@ namespace SmokeRescue.Tests.EditMode
                 {
                     if (t < r.start) continue;
                     r.brain.OnOdometry(new OdometrySample(t, r.v, 0, r.w));
-                    r.brain.OnImu(new ImuSample(t, Vector3.zero, new Vector3(0, -r.w, 0)));
+                    r.brain.OnImu(new ImuSample(t, Vector3.zero, new Vector3(0, -r.motionError.Gyro(r.w), 0)));
                     if (heat == null || r.sensor == null) r.brain.OnAirTemperature(t, 20);
                     else
                     {
@@ -302,6 +303,7 @@ namespace SmokeRescue.Tests.EditMode
                             log.WriteLine(new JObject { ["t"] = t, ["kind"] = "sighting", ["robot"] = r.id, ["person"] = pid, ["range_m"] = range, ["bearing_deg"] = bearing }.ToString(Newtonsoft.Json.Formatting.None));
                         }
                     }
+                    var stepPosition = r.p; float stepYaw = r.yaw;
                     brainClock.Start(); var cmd = r.brain.Step(t, (float)dt); brainClock.Stop();
                     float v = Mathf.Clamp(cmd.forwardMps, -cfg.limits.max_reverse_mps, cfg.limits.max_forward_mps);
                     float w = Mathf.Clamp(cmd.yawRateDeg, -cfg.limits.max_yaw_rate_dps, cfg.limits.max_yaw_rate_dps) * Mathf.Deg2Rad;
@@ -330,7 +332,8 @@ namespace SmokeRescue.Tests.EditMode
                     {
                         var s = r.brain.Snapshot();
                         log.WriteLine(new JObject { ["t"] = t, ["kind"] = "pose", ["robot"] = r.id, ["x"] = r.p.x, ["y"] = r.p.y, ["yaw_deg"] = -r.yaw * Mathf.Rad2Deg,
-                            ["bx"] = s.pose.position.x, ["by"] = s.pose.position.y, ["v"] = v, ["w_dps"] = w * Mathf.Rad2Deg, ["state"] = s.state, ["mode"] = s.mode,
+                            ["step_x"] = stepPosition.x, ["step_y"] = stepPosition.y, ["step_yaw_rad"] = stepYaw,
+                            ["bx"] = s.pose.position.x, ["by"] = s.pose.position.y, ["byaw_rad"] = s.pose.yawRad, ["pose_uncertainty"] = JObject.FromObject(r.brain.EstimatedPoseUncertainty), ["v"] = v, ["w_dps"] = w * Mathf.Rad2Deg, ["state"] = s.state, ["mode"] = s.mode,
                             ["gx"] = s.goal?.x, ["gy"] = s.goal?.y, ["air_c"] = r.air }.ToString(Newtonsoft.Json.Formatting.None));
                     }
                 }
@@ -360,6 +363,7 @@ namespace SmokeRescue.Tests.EditMode
             foreach (var r in robots)
             {
                 var s = r.brain.Snapshot();
+                r.brain.ExportTeamMap(duration).Write(Path.Combine(outDir, r.id + ".team.bin.gz"));
                 maps.Add(new JObject { ["robot"] = r.id, ["grid_size"] = s.gridSize, ["cell_m"] = s.cellM, ["origin"] = new JArray(s.gridOrigin.x, s.gridOrigin.y),
                     ["own_searched"] = Convert.ToBase64String(s.ownSearched), ["searched"] = Convert.ToBase64String(s.searched),
                     ["occupancy"] = Convert.ToBase64String(s.occupancy), ["walked_m"] = r.moved, ["final_state"] = s.state, ["peak_air_c"] = r.peakAir, ["air_over_60_s"] = r.hotS, ["robot_contact_s"] = r.contactS,

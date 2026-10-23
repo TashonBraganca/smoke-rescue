@@ -63,6 +63,7 @@ namespace SmokeRescue.Brain
             planner = new GridPlanner(grid, c) { Home = home }; planner.RoomTaken = RoomTaken; health = new CameraHealth(c); matcher = new ScanMatcher(grid, c);
             grid.MarkFootprint(home);
             observedSequence = new long[SharedSize * SharedSize];
+            InitializeTeamMap();
         }
         public void OnOdometry(OdometrySample sample) => motion.Add(sample);
         public void OnImu(ImuSample sample) => motion.Add(sample);
@@ -108,7 +109,7 @@ namespace SmokeRescue.Brain
             if (!double.IsNaN(lastStep) && Math.Abs(elapsed - dt) > Math.Max(1e-5, dt * .001))
                 throw new ArgumentException("dt must equal elapsed simulation time.");
             double previous = double.IsNaN(lastStep) ? t : lastStep; lastStep = t;
-            motion.Advance(t); grid.DecayTo(t); ConsumeLidar(t); ConsumeImages(t); UpdateHeatBudget(previous, t);
+            motion.Advance(t); UpdateTeamUncertainty(t); grid.DecayTo(t); ConsumeLidar(t); ConsumeImages(t); UpdateHeatBudget(previous, t);
             grid.ClearBody(motion.Pose.position, c.robot_radius_m - grid.CellM * .5f);
             InvalidatePeerGoal(t); CheckMapOverlap(t);
             grid.PrepareNavigation();
@@ -603,12 +604,12 @@ namespace SmokeRescue.Brain
                 var match = matcher.Match(scan, prior);
                 if (match.applied)
                 {
-                    // Heading follows the gyro and takes only scan_yaw_gain of each match's turn: the gyro alone stays within
-                    // 0.55 deg over 200 s and 3669 deg of turning (run 13, robot A, against truth), while full scan-matched turns
-                    // pulled the heading toward a map that had itself turned, up to 2.4 deg. Position takes the full match.
+                    // Keep a small own-map yaw gain. After fixing interval timing, gain 1 improved B in seed 934 but
+                    // worsened run 13 A's peak yaw error from 0.793 to 2.314 degrees in sensor replay. Position takes the full match.
                     var corrected = new BrainPose { position = match.pose.position,
                         yawRad = prior.yawRad + c.scan_yaw_gain * BrainMath.Angle(prior.yawRad, match.pose.yawRad) * Mathf.Deg2Rad };
-                    motion.ApplyCorrection(ScanMatcher.Delta(prior, corrected));
+                    var correction = ScanMatcher.Delta(prior, corrected);
+                    motion.ApplyCorrection(correction); teamMap.ApplyCorrection(correction);
                     matched++; fitSum += match.fit; correctionSum += new Vector3(match.dx, match.dy, match.dyawRad * Mathf.Rad2Deg);
                 }
                 else unmatched++;
