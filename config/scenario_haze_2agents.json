@@ -3,8 +3,17 @@
   "description": "Two autonomous robots enter the south and east sides of a connected 40 by 28 m house, apartment, office and workshop. Six survivors use seeded random placement. Routes remain as simulator test fallbacks; autonomous control ignores them when commands are attached.",
   "seed": 7,
   "duration_s": 300,
-  "search_area": [0, 0, 40, 28],
-  "door_states": {"d_apt_bed2_hall": "closed", "d_office_store_corridor": "closed", "d_workshop_tools_corridor": "half"},
+  "search_area": [
+    0,
+    0,
+    40,
+    28
+  ],
+  "door_states": {
+    "d_apt_bed2_hall": "closed",
+    "d_office_store_corridor": "closed",
+    "d_workshop_tools_corridor": "half"
+  },
   "door_states_reason": "Closed and half-open interior doors on rooms off the long corridors, so robots must open them with the arm or search elsewhere; every entrance stays open.",
   "sim_rate_hz": 15,
   "yaw_convention": "degrees about Unity +y. 0 faces +z (north), 90 faces +x (east).",
@@ -118,50 +127,50 @@
       "color": "#2FA3E6",
       "spawn": {
         "at": [
-          41.2,
-          7.5
+          10.0,
+          -1.2
         ],
-        "yaw": 270
+        "yaw": 0
       },
       "control": "autonomous",
       "cruise_speed": 0.5,
       "doorway_speed": 0.3,
       "route": [
         [
-          38,
-          7.5
+          10.0,
+          1.5
         ],
         [
-          38,
-          7
+          10.0,
+          3.5
         ],
         [
-          22,
-          7
+          11.0,
+          3.5
         ],
         [
-          22,
-          11
+          13.0,
+          3.5
         ],
         [
-          22,
-          16.2
+          14.5,
+          4.6
         ],
         [
-          27,
-          16.2
+          16.0,
+          5.0
         ],
         [
-          27,
-          20.5
+          16.0,
+          7.0
         ],
         [
-          18,
-          20.5
+          18.0,
+          7.0
         ],
         [
-          18,
-          16.5
+          18.0,
+          9.5
         ],
         [
           18.0,
@@ -174,30 +183,6 @@
         [
           18.0,
           7.0
-        ],
-        [
-          16.0,
-          7.0
-        ],
-        [
-          16.0,
-          5.0
-        ],
-        [
-          14.5,
-          4.6
-        ],
-        [
-          13.0,
-          3.5
-        ],
-        [
-          11.0,
-          3.5
-        ],
-        [
-          10.0,
-          4.6
         ],
         [
           10.0,
@@ -229,7 +214,8 @@
           10.6,
           11.0
         ]
-      ]
+      ],
+      "route_reason": "One building, one entrance (owner, 23 Oct 2026): robot B enters by the front door like robot A and takes the house's east loop (foyer, kitchen, laundry, hallway). Its former routes came in by the west door or through the apartment, office link and back door, which are now walled."
     }
   ],
   "look_around": {

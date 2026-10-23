@@ -27,9 +27,9 @@ namespace SmokeRescue.Tests.EditMode
         {
             // Seed 934: openings of 1.2 to 1.6 m (at or above the fixed 1.2 m door) merged foyer, living room and hallway into
             // one room; 126 of robot A's 133 rooms were under 1 m2.
-            int Rooms(bool relative, float opening, out int strip)
+            int Rooms(bool relative, float opening, out int strip, bool slivers = false)
             {
-                var c = AuctionSettings(); c.room_ledger_relative_doors = relative;
+                var c = AuctionSettings(); c.room_ledger_relative_doors = relative; c.room_ledger_drop_slivers = slivers;
                 var b = new RobotBrain(Calibration(), c, "robot_A", 0); TwoRoomsWithOpening(Map(b), opening);
                 var ledger = Planner(b).Rooms; ledger.Update(0, new Vector2(-2, 0), p => true);
                 strip = ledger.RoomAt(new Vector2(1.25f, 2.8f));
@@ -43,6 +43,8 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(Rooms(true, .9f, out _), Is.EqualTo(2), "and so is an ordinary 0.9 m door");
             Assert.That(strip, Is.LessThan(0), "a 0.3 m2 sliver is no room");
             Assert.That(Rooms(true, 3.8f, out _), Is.EqualTo(1), "an opening nearly as wide as the rooms joins them into one space");
+            Assert.That(Rooms(false, 1.6f, out int fixedStrip, slivers: true), Is.EqualTo(1), "drop_slivers alone keeps the fixed door rule");
+            Assert.That(fixedStrip, Is.LessThan(0), "but the sliver is no room");
         }
 
         [Test]

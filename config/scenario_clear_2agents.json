@@ -17,7 +17,12 @@
   "obstacles": [],
   "survivor_placement": "fixed",
   "duration_s": 160,
-  "search_area": [0, 0, 40, 28],
+  "search_area": [
+    0,
+    0,
+    40,
+    28
+  ],
   "robots": [
     {
       "id": "robot_A",
@@ -118,22 +123,50 @@
       "color": "#2FA3E6",
       "spawn": {
         "at": [
-          -1.2,
-          7.0
+          10.0,
+          -1.2
         ],
-        "yaw": 90
+        "yaw": 0
       },
       "control": "scripted",
       "cruise_speed": 0.5,
       "doorway_speed": 0.3,
       "route": [
         [
-          1.5,
-          7
+          10.0,
+          1.5
         ],
         [
-          18,
-          7
+          10.0,
+          3.5
+        ],
+        [
+          11.0,
+          3.5
+        ],
+        [
+          13.0,
+          3.5
+        ],
+        [
+          14.5,
+          4.6
+        ],
+        [
+          16.0,
+          5.0
+        ],
+        [
+          16.0,
+          7.0
+        ],
+        [
+          18.0,
+          7.0
+        ],
+        [
+          18.0,
+          9.5
         ],
         [
           18.0,
@@ -148,44 +181,8 @@
           7.0
         ],
         [
-          16.0,
-          7.0
-        ],
-        [
-          16.0,
-          5.0
-        ],
-        [
-          14.5,
-          4.6
-        ],
-        [
-          13.0,
-          3.5
-        ],
-        [
-          11.0,
-          3.5
-        ],
-        [
-          10.0,
-          4.6
-        ],
-        [
           10.0,
           7.0
-        ],
-        [
-          10.0,
-          9.5
-        ],
-        [
-          10.6,
-          11.0
-        ],
-        [
-          9.4,
-          10.4
         ]
       ],
       "look_around_at": [
@@ -201,7 +198,8 @@
           10.6,
           11.0
         ]
-      ]
+      ],
+      "route_reason": "One building, one entrance (owner, 23 Oct 2026): robot B enters by the front door like robot A and takes the house's east loop (foyer, kitchen, laundry, hallway). Its former routes came in by the west door or through the apartment, office link and back door, which are now walled."
     }
   ],
   "survivors": [
