@@ -1030,30 +1030,34 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
-        public void StayingInsideBuildingHeatStartsTheRetreatEarlyAndHoldsIt()
+        public void StayingInsideRisingHeatSteersTheSearchAwayWithoutStoppingIt()
         {
-            // Seed 927, robot B: air 28 C at 168 s, 59 C at 172 s, and the retreat started only above 70 C at 174 s (peak 169 C).
-            // Staying inside, a fast rise (the rate-of-rise detector) starts the retreat, and it holds while the air is still
-            // rising. Control: without stay_inside the same air below 70 C starts no retreat.
+            // Seed 932: the rate-of-rise rule held both robots in "retreat" at about 24 C; they spent 62 s and 66 s in air below
+            // 50 C barely moving. Now a rise sets aside the floor around the robot and the search goes on; no retreat below
+            // the hard limit. Control: without stay_inside the rule does not run at all.
             var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
-            (double startedAt, bool heldAt33) Run(bool stay)
+            (double steeredAt, bool retreated, bool areaSetAside) Run(bool stay)
             {
                 var c = Settings(); c.stay_inside = stay; c.mission_time_limit_s = 1000;
                 var b = new RobotBrain(Calibration(), c, "B", 0); Room(b, -3, 3, -3, 3);
-                double started = double.NaN, last = 0; bool held = false;
+                double steered = double.NaN, last = 0; bool retreated = false, setAside = false;
                 for (int i = 0; i <= 900; i++)
                 {
                     double t = i / 15.0; float air = (float)Math.Min(22 + Math.Max(0, t - 20) * .4, 33);   // 24 C per minute to 33 C
                     Motion(b, t); b.OnRgbd(Image(t, true, 0)); b.OnAirTemperature(t, air); b.Step(t, i == 0 ? .05f : (float)(t - last)); last = t;
-                    if (double.IsNaN(started) && b.DrainEvents().Any(e => e.kind == "retreat")) started = t;
-                    if (t >= 42 && t < 43) held |= (bool)typeof(RobotBrain).GetField("retreating", flags).GetValue(b);
+                    var ev = b.DrainEvents();
+                    if (double.IsNaN(steered) && ev.Any(e => e.kind == "avoid_fire" && e.reason.StartsWith("The air at this robot is rising fast"))) steered = t;
+                    retreated |= ev.Any(e => e.kind == "retreat");
+                    if (!double.IsNaN(steered) && t < steered + 1)
+                        setAside |= (bool)typeof(RobotBrain).GetMethod("GoalBlacklisted", flags).Invoke(b, new object[] { b.Snapshot().pose.position, t });
                 }
-                return (started, held);
+                return (steered, retreated, setAside);
             }
             var stay = Run(true);
-            Assert.That(stay.startedAt, Is.LessThan(46), "retreat starts while the air is still about 30 C, not at 70 C: " + stay.startedAt);
-            Assert.That(stay.heldAt33, Is.True, "the retreat holds while the air is still rising");
-            Assert.That(double.IsNaN(Run(false).startedAt), Is.True, "control: without stay_inside no retreat below 70 C");
+            Assert.That(stay.steeredAt, Is.LessThan(46), "the rise is acted on while the air is still about 30 C: " + stay.steeredAt);
+            Assert.That(stay.retreated, Is.False, "no retreat: the robot keeps searching below the hard limit");
+            Assert.That(stay.areaSetAside, Is.True, "the floor where the air is warming is set aside");
+            Assert.That(double.IsNaN(Run(false).steeredAt), Is.True, "control: without stay_inside the rule does not run");
         }
 
         [Test]
@@ -1168,12 +1172,12 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
-        public void StayingInsideNoisyAirAtTheRiseThresholdStartsOneRetreat()
+        public void StayingInsideNoisyAirAtTheRiseThresholdSteersOnce()
         {
-            // Seed 929, robot B at 42.5 to 44 s: the air rose about 5 C in 10 s near a fire, and the +5 C test flickered with
-            // a few tenths of a degree of sensor noise, so the retreat ended and restarted 4 times in 1.5 s at 24 C. A rise now
-            // counts for one more air_rise_window_s once seen. Control: with that window 0 the retreats repeat.
-            int Retreats(float windowS)
+            // Seed 929, robot B at 42.5 to 44 s: the +5 C rise test flickered with a few tenths of a degree of sensor noise. A
+            // rise counts for one more air_rise_window_s once seen, so one rise steers once. Control: with that window cleared
+            // every tick the noise steers again and again.
+            int Steers(bool hold)
             {
                 var c = Settings(); c.stay_inside = true; c.mission_time_limit_s = 1000; c.air_rise_window_s = 10;
                 var b = new RobotBrain(Calibration(), c, "B", 0); Room(b, -3, 3, -3, 3);
@@ -1182,18 +1186,16 @@ namespace SmokeRescue.Tests.EditMode
                 for (int i = 0; i <= 15 * 40; i++)
                 {
                     double t = i / 15.0;
-                    // 20 C, then 0.5 C/s to 24.6 C, then held there with +-0.4 C alternating noise.
                     float air = t < 20 ? 20 : (float)Math.Min(20 + (t - 20) * .5, 24.6) + (t >= 20 ? (i % 2 == 0 ? .4f : -.4f) : 0);
                     Motion(b, t); b.OnRgbd(Image(t, true, 0)); b.OnAirTemperature(t, air);
-                    if (windowS <= 0) typeof(RobotBrain).GetField("heatRisingUntil", flags).SetValue(b, double.NegativeInfinity);
+                    if (!hold) typeof(RobotBrain).GetField("heatRisingUntil", flags).SetValue(b, double.NegativeInfinity);
                     b.Step(t, i == 0 ? .05f : (float)(t - last)); last = t;
-                    n += b.DrainEvents().Count(e => e.kind == "retreat");
-                    if (windowS <= 0) typeof(RobotBrain).GetField("heatRisingUntil", flags).SetValue(b, double.NegativeInfinity);
+                    n += b.DrainEvents().Count(e => e.kind == "avoid_fire" && e.reason.StartsWith("The air at this robot is rising fast"));
                 }
                 return n;
             }
-            Assert.That(Retreats(10), Is.EqualTo(1), "one retreat for one rise");
-            Assert.That(Retreats(0), Is.GreaterThan(2), "control: without the hold the noise restarts it");
+            Assert.That(Steers(true), Is.EqualTo(1), "one steer for one rise");
+            Assert.That(Steers(false), Is.GreaterThan(2), "control: without the hold the noise steers again and again");
         }
 
         [Test]
