@@ -26,7 +26,27 @@ namespace SmokeRescue.Brain
         public bool agent_order_priority = false;
         public float agent_candidate_grace_s = 8f;
         public bool entrance_lock_passage = false;
+        public bool person_glance = false;
+        public bool room_ledger_relative_doors = false;
+        public bool reject_area_memory = false;
+        public bool room_sweep = false;
+        public bool health_close_surface = false;
+        public bool fire_cut_retry = false;
+        public float rendezvous_walk_max_s = 0f;
+        public float fire_cut_retry_s = 20f;
+        public float health_smoke_max_valid_depth = .65f;
+        public float room_sweep_s = 20f;
+        public float reject_area_m = 1.5f, reject_area_s = 120f;
+        public float room_ledger_min_core_m2 = .4f, room_ledger_min_room_m2 = 1.5f, room_ledger_split_min_m = .35f, room_ledger_split_max_m = 1.5f,
+            room_ledger_split_step_m = .1f;
+        public float person_rgb_strong_confidence = 1.01f, person_glance_min_confidence = .25f, person_glance_s = 2f, person_glance_repeat_s = 15f,
+            person_rgb_boost_period_s = .2f;
         public float entrance_lock_cost_weight = 20f;
+        public bool pinned_watchdog = false;
+        public bool pinned_yield = false;
+        public bool candidate_split = false;
+        public float pinned_yield_m = 1.2f, pinned_yield_back_s = 3f, pinned_yield_speed_mps = .15f;
+        public float pinned_window_s = 8f, pinned_move_m = .15f;
         public float survivor_squeeze_core_m = .23f;
         public float room_auction_margin_s = 2;
         public float corridor_max_width_m = 2.44f;
@@ -246,13 +266,14 @@ namespace SmokeRescue.Brain
                 route_watch_min_interval_s < 0 || route_watch_dwell_s < 0 || route_watch_max_s <= route_watch_dwell_s)
                 throw new ArgumentException("Invalid route watch configuration.");
             if (scan_yaw_gain < 0 || scan_yaw_gain > 1 || collision_margin_m < 0 || lead_max_m < cell_m || agent_avoid_min_radius_m < cell_m || agent_avoid_max_radius_m < agent_avoid_min_radius_m || frontier_cluster_max_m < cell_m * 2 || ceiling_min_height_m <= obstacle_max_height_m || ceiling_radius_m < 0 || ceiling_min_hits < 1 || ceiling_wall_margin_m < 0 ||
-                enclosure_rays < 8 || enclosure_range_m <= cell_m || enclosure_min_closed_share <= 0 || enclosure_min_closed_share > 1 || enclosure_max_open_share < 0 || enclosure_max_open_share >= 1 || lidar_open_span_deg <= 0 || fire_cut_blacklist_s < 0 || reenter_after_heat_s < 0 || candidate_wall_extent_m <= 0 || candidate_wall_disc_m <= 0 || candidate_wall_window_m < candidate_wall_disc_m || last_resort_fire_clearance_m <= 0 || last_resort_fire_clearance_m > emergency_fire_clearance_m || air_warm_c <= ambient_c || air_rise_c_per_min <= 0 || air_rise_window_s <= 0 || air_rise_min_delta_c < 0 || air_rise_baseline_s < air_rise_window_s || frontier_peek_m < 0 || search_low_m < 0 || frontier_beyond_m < 0 || reject_new_view_deg < 0 || reject_new_view_deg > 180 || reject_share_s < 0 || retreat_air_weight < 0 || fire_near_m <= 0 || survivor_keepout_core_m < 0 || survivor_keepout_core_m > survivor_keepout_m || keepout_cost_weight < 0 || entrance_lock_m < 0 || entrance_lock_cost_weight < 0 || agent_candidate_grace_s < 0 || heat_steer_radius_m <= 0 || heat_steer_s <= 0 || air_sample_radius_m <= 0 || air_sample_spacing_m <= 0 || frontier_wide_min_m2 < 0 || progress_min_travel_m < 0 || exterior_dwell_s < 0 || facade_band_m <= 0 || exit_open_share <= 0.5f || exit_open_share > 1 || exit_min_scans < 1 || exit_max_count < 0 || frontier_wide_options < 0 || see_over_clearance_m < 0 || carried_person_radius_m <= 0 || search_max_range_m <= 0 ||
+                enclosure_rays < 8 || enclosure_range_m <= cell_m || enclosure_min_closed_share <= 0 || enclosure_min_closed_share > 1 || enclosure_max_open_share < 0 || enclosure_max_open_share >= 1 || lidar_open_span_deg <= 0 || fire_cut_blacklist_s < 0 || reenter_after_heat_s < 0 || candidate_wall_extent_m <= 0 || candidate_wall_disc_m <= 0 || candidate_wall_window_m < candidate_wall_disc_m || last_resort_fire_clearance_m <= 0 || last_resort_fire_clearance_m > emergency_fire_clearance_m || air_warm_c <= ambient_c || air_rise_c_per_min <= 0 || air_rise_window_s <= 0 || air_rise_min_delta_c < 0 || air_rise_baseline_s < air_rise_window_s || frontier_peek_m < 0 || search_low_m < 0 || frontier_beyond_m < 0 || reject_new_view_deg < 0 || reject_new_view_deg > 180 || reject_share_s < 0 || retreat_air_weight < 0 || fire_near_m <= 0 || survivor_keepout_core_m < 0 || survivor_keepout_core_m > survivor_keepout_m || keepout_cost_weight < 0 || entrance_lock_m < 0 || entrance_lock_cost_weight < 0 || agent_candidate_grace_s < 0 || pinned_window_s <= 0 || pinned_move_m <= 0 || heat_steer_radius_m <= 0 || heat_steer_s <= 0 || air_sample_radius_m <= 0 || air_sample_spacing_m <= 0 || frontier_wide_min_m2 < 0 || progress_min_travel_m < 0 || exterior_dwell_s < 0 || facade_band_m <= 0 || exit_open_share <= 0.5f || exit_open_share > 1 || exit_min_scans < 1 || exit_max_count < 0 || frontier_wide_options < 0 || see_over_clearance_m < 0 || carried_person_radius_m <= 0 || search_max_range_m <= 0 ||
                 keyframe_spacing_m <= 0 || keyframe_turn_deg <= 0 || keyframe_beams < 36 || keyframe_max < 2 || keyframes_per_message < 1 || keyframes_per_message > 16 || visual_keyframe_max_payload_bytes < 1 || visual_keyframe_max_payload_bytes > BrainMessage.MaxVisualPayloadBytes || visual_lidar_keyframes_per_message < 1 || visual_lidar_keyframes_per_message > keyframes_per_message || visual_keyframe_max < 1 || visual_keyframes_per_message < 0 || visual_keyframes_per_message > 16 || visual_link_min_inliers < 3 || !(visual_keyframe_period_s > 0) ||
                 link_shortlist < 1 || link_max_candidates < 2 || link_turn_candidates < 1 || link_verifications_per_step < 1 || link_max_descriptor_distance <= 0 || link_window_m < 0 || link_step_m <= 0 ||
                 link_window_deg < 0 || link_step_deg <= 0 || link_min_fit <= 0 || link_min_fit > 1 || link_agree_m <= 0 || link_agree_deg <= 0 || link_min_separation_m < 0 ||
                 keyframe_min_return_share < 0 || keyframe_min_return_share > 1 || link_unique_shift_m <= 0 || link_unique_ratio <= 0 || link_unique_ratio >= 1 || link_coarse_min_fit <= 0 || link_coarse_min_fit > link_min_fit ||
                 person_rgb_min_confidence <= 0 || person_rgb_min_confidence >= 1 || person_rgb_max_range_m <= 0 || person_rgb_window_s <= 0 ||
-                person_rgb_fresh_s <= 0 || person_rgb_scan_period_s <= 0 || person_rgb_sightings < 1 ||
+                person_rgb_fresh_s <= 0 || person_rgb_scan_period_s <= 0 || person_rgb_sightings < 1 || person_rgb_strong_confidence <= 0 ||
+                person_glance_min_confidence <= 0 || person_glance_s <= 0 || person_glance_repeat_s < 0 || person_rgb_boost_period_s <= 0 ||
                 person_floor_clearance_m < 0 || person_top_max_m <= person_floor_clearance_m || scan_beam_stride < 1 || scan_min_beams < 3 || scan_match_range_m <= 0 ||
                 scan_sigma_m <= 0 || scan_window_m < 0 || scan_step_m <= 0 || scan_window_deg < 0 || scan_step_deg <= 0 ||
                 scan_min_fit < 0 || scan_min_fit > 1 || scan_softness <= 0 || localization_report_s <= 0 || collision_escape_s <= 0)

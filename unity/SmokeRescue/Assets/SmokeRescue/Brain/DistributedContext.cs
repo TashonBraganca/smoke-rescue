@@ -56,6 +56,7 @@ namespace SmokeRescue.Brain
             if (nearest == null) { nearest = new Track { position = p, lastSeen = double.NegativeInfinity }; tracks.Add(nearest); }
             if (nearest == active || nearest.candidate || (nearest.rejected && !nearest.peerRejected) ||
                 (nearest.peerRejected && nearest.rejectedAt >= rejected.at)) return;
+            NoteRejectedSpot(p, rejected.at);
             nearest.rejected = true; nearest.peerRejected = true; nearest.rejectedAt = rejected.at;
             nearest.rejectedUntil = rejected.at + c.reject_share_s;
             nearest.rejectedFrom = link.Transform(rejected.from.x, rejected.from.y);

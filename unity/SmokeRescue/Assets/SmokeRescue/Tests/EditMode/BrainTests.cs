@@ -990,9 +990,10 @@ namespace SmokeRescue.Tests.EditMode
         public void CameraSwitchRequiresContinuousHysteresisDurations()
         {
             var b = new RobotBrain(Calibration(), Settings(), "A", 0);
-            for (int i = 0; i <= 7; i++) { double t = i / 15.0; b.OnRgbd(Image(t, false)); b.Step(t, 1f / 15); }
+            // Smoke: no texture and no valid depth (a blank image with valid depth is a close wall; see health_close_surface).
+            for (int i = 0; i <= 7; i++) { double t = i / 15.0; b.OnRgbd(Image(t, false, 0)); b.Step(t, 1f / 15); }
             Assert.That(b.Snapshot().mode, Is.EqualTo("rgb"));
-            b.OnRgbd(Image(8 / 15.0, false)); b.Step(8 / 15.0, 1f / 15);
+            b.OnRgbd(Image(8 / 15.0, false, 0)); b.Step(8 / 15.0, 1f / 15);
             Assert.That(b.Snapshot().mode, Is.EqualTo("thermal"));
             for (int i = 9; i <= 38; i++) { double t = i / 15.0; b.OnRgbd(Image(t, true)); b.Step(t, 1f / 15); }
             Assert.That(b.Snapshot().mode, Is.EqualTo("thermal"));
@@ -1001,6 +1002,22 @@ namespace SmokeRescue.Tests.EditMode
             var switches = b.DrainEvents().Where(e => e.kind == "sensor_switch").ToArray();
             Assert.That(switches.Length, Is.EqualTo(2));
             Assert.That(switches[1].numbers["corners"], Is.GreaterThan(0));
+        }
+
+        [Test]
+        public void ABlankWallFillingTheViewIsNotSmokeButABlankViewWithNoDepthIs()
+        {
+            // Seed 934, robot A: 4 switches to thermal facing featureless walls with 80 to 99 % valid depth.
+            string Mode(bool closeSurface, ushort mm)
+            {
+                var c = Settings(); c.health_close_surface = closeSurface;
+                var b = new RobotBrain(Calibration(), c, "A", 0);
+                for (int i = 0; i <= 15; i++) { double t = i / 15.0; b.OnRgbd(Image(t, false, mm)); b.Step(t, 1f / 15); }
+                return b.Snapshot().mode;
+            }
+            Assert.That(Mode(false, 800), Is.EqualTo("thermal"), "control: without the rule a close blank wall reads as smoke");
+            Assert.That(Mode(true, 800), Is.EqualTo("rgb"), "with it, a blank wall 0.8 m away keeps colour mode");
+            Assert.That(Mode(true, 0), Is.EqualTo("thermal"), "a blank view with no valid depth is still smoke");
         }
 
         [Test]

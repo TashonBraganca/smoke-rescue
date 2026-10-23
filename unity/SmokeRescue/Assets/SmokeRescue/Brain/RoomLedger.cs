@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 namespace SmokeRescue.Brain
@@ -74,10 +75,15 @@ namespace SmokeRescue.Brain
                 Rebuild(indoors ?? (p => !config.search_requires_ceiling || grid.Indoors(p)));
                 LastSegmentationAt = t; nextSegmentation = t + config.room_ledger_period_s;
             }
-            if (cell >= 0 && grid.OwnOccupancy(cell) == 1 && byId.TryGetValue(labels[cell], out var current)) current.entered = true;
+            if (cell >= 0 && grid.OwnOccupancy(cell) == 1 && byId.TryGetValue(labels[cell], out var current))
+            {
+                current.entered = true;
+                if (!entryById.ContainsKey(current.id)) entryById[current.id] = at;   // where this robot first stood in the room
+            }
             lastCell = cell >= 0 && grid.OwnOccupancy(cell) == 1 ? cell : -1; lastT = t;
         }
 
+        readonly Dictionary<int, Vector2> entryById = new Dictionary<int, Vector2>();
         public Room Get(int id) => byId.TryGetValue(id, out var room) ? room : null;
         /// <summary>Is p on the floor of a promoted room (see Shape)?</summary>
         public bool Promoted(Vector2 p) { var r = Get(RoomAt(p)); return r != null && r.promoted; }
@@ -112,6 +118,8 @@ namespace SmokeRescue.Brain
                 next[i] = -1;
             }
             int count = 0; var queue = new Queue<int>();
+            if (config.room_ledger_relative_doors) count = RelativeCores(free, clearance, next);
+            else
             for (int i = 0; i < grid.Count; i++)
             {
                 if (!core[i] || next[i] >= 0) continue;
@@ -129,17 +137,23 @@ namespace SmokeRescue.Brain
                 int cell = queue.Dequeue();
                 Neighbours(cell, n => { if (free[n] && next[n] < 0) { next[n] = next[cell]; queue.Enqueue(n); } });
             }
-            // A sensed strip narrower than a door still needs a label, even if no room core exists there.
+            // A sensed strip narrower than a door still needs a label, even if no room core exists there. With relative doors a
+            // strip smaller than room_ledger_min_room_m2 is no room at all (seed 934: 126 of robot A's 133 rooms were under
+            // 1 m2, median one cell, each with a new id, ranked, claimed and shown to the agent).
+            var strip = new List<int>();
             for (int i = 0; i < grid.Count; i++)
             {
                 if (!free[i] || next[i] >= 0) continue;
-                int label = count++; next[i] = label; queue.Enqueue(i);
+                int label = count++; next[i] = label; queue.Enqueue(i); strip.Clear();
                 while (queue.Count > 0)
                 {
-                    int cell = queue.Dequeue();
+                    int cell = queue.Dequeue(); strip.Add(cell);
                     Neighbours(cell, n => { if (free[n] && next[n] < 0) { next[n] = label; queue.Enqueue(n); } });
                 }
+                if (config.room_ledger_relative_doors && strip.Count * grid.CellM * grid.CellM < config.room_ledger_min_room_m2)
+                { foreach (int cell in strip) next[cell] = -2; count--; }
             }
+            for (int i = 0; i < grid.Count; i++) if (next[i] == -2) next[i] = -1;
             var overlap = new Dictionary<(int label, int id), int>();
             for (int i = 0; i < grid.Count; i++)
             {
@@ -180,6 +194,56 @@ namespace SmokeRescue.Brain
             }
             labels = next;
             Shape(clearance, free, indoors);
+        }
+
+        /// <summary>Room cores by hierarchical erosion (distance-transform room segmentation; Bormann et al., ICRA 2016, "Room
+        /// segmentation: survey, implementation, and analysis"): free floor is cut at rising clearance thresholds, and a region
+        /// becomes two rooms only where it splits into two cores of at least room_ledger_min_core_m2. A doorway is then any
+        /// narrowing between two wider spaces, whatever its width; a corridor that thins away without splitting stays one room.
+        /// Seed 934: the foyer, living room and hallway openings were 1.2 to 1.6 m wide, at or above the fixed 1.2 m door, so the
+        /// three spaces were one room and neither robot took a side door.</summary>
+        int RelativeCores(bool[] free, float[] clearance, int[] next)
+        {
+            float step = Mathf.Max(grid.CellM, config.room_ledger_split_step_m);
+            int minCore = Mathf.Max(1, Mathf.CeilToInt(config.room_ledger_min_core_m2 / (grid.CellM * grid.CellM)));
+            var cores = new List<List<int>>();
+            var start = Components(free, clearance, config.room_ledger_split_min_m, null);
+            var work = new Stack<(List<int> cells, float level)>();
+            foreach (var comp in start) if (comp.Count >= minCore) work.Push((comp, config.room_ledger_split_min_m));
+            while (work.Count > 0)
+            {
+                var (cells, level) = work.Pop(); bool split = false;
+                for (float r = level + step; r <= config.room_ledger_split_max_m + 1e-4f; r += step)
+                {
+                    var parts = Components(free, clearance, r, cells).FindAll(part => part.Count >= minCore);
+                    if (parts.Count == 0) break;
+                    if (parts.Count >= 2) { foreach (var part in parts) work.Push((part, r)); split = true; break; }
+                }
+                if (!split) cores.Add(cells);
+            }
+            // Stable order (smallest first cell first), so labels and ids do not depend on stack order.
+            cores.Sort((a, b) => a.Min().CompareTo(b.Min()));
+            for (int k = 0; k < cores.Count; k++) foreach (int cell in cores[k]) next[cell] = k;
+            return cores.Count;
+        }
+        /// <summary>4-connected components of free cells whose clearance exceeds level, within subset when given.</summary>
+        List<List<int>> Components(bool[] free, float[] clearance, float level, List<int> subset)
+        {
+            var result = new List<List<int>>(); var seen = new HashSet<int>(); var queue = new Queue<int>();
+            HashSet<int> inside = subset == null ? null : new HashSet<int>(subset);
+            IEnumerable<int> cells = subset ?? Enumerable.Range(0, grid.Count);
+            foreach (int i in cells)
+            {
+                if (!free[i] || clearance[i] <= level || !seen.Add(i)) continue;
+                var comp = new List<int> { i }; queue.Enqueue(i);
+                while (queue.Count > 0)
+                {
+                    int cell = queue.Dequeue();
+                    Neighbours(cell, n => { if (free[n] && clearance[n] > level && (inside == null || inside.Contains(n)) && seen.Add(n)) { comp.Add(n); queue.Enqueue(n); } });
+                }
+                result.Add(comp);
+            }
+            return result;
         }
 
         /// <summary>Width, length, openings, corridor flag, anchor and radius of every room, from labels and clearance.</summary>
@@ -316,6 +380,14 @@ namespace SmokeRescue.Brain
                 f.roomTier = !known ? 5 : finishing && f.roomId == current ? 0 : room.corridor ? corridorTier : !room.entered ? unenteredTier :
                     room.coveredShare >= config.room_ledger_covered_share ? 4 : 3;
                 f.roomScore = f.cost / config.open_speed_mps + (known ? room.coveredShare * config.room_ledger_dwell_s : 0);
+                // room_sweep (owner, 23 Oct): finish a room from the left side across to the right, as seen from where the robot
+                // came in, then leave on the right. Frontiers in the room being finished cost extra the further right of the line
+                // from the entry point to the room centre they lie, up to room_sweep_s; travel time still counts within a band.
+                if (config.room_sweep && f.roomTier == 0 && entryById.TryGetValue(current, out var entry) && Vector2.Distance(here.centre, entry) > grid.CellM)
+                {
+                    float left = Vector2.SignedAngle(here.centre - entry, f.position - entry);   // positive to the left
+                    f.roomScore += (90 - Mathf.Clamp(left, -90, 90)) / 180f * config.room_sweep_s;
+                }
             }
             choices.Sort((a, b) =>
             {

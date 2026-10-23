@@ -354,6 +354,7 @@ namespace SmokeRescue.Brain
                 track.candidate = false; track.retryAfter = double.PositiveInfinity; MarkRejected(track, t); n++;
                 if (active == track) { active = null; dwell = 0; inspecting = false; ClearPath(); }
             }
+            NoteRejectedSpot(p, t);
             Emit(t, "candidate_rejected", "Agent rejected a warm region as not a person, OpenCV evidence " + evidence + ".",
                 "x_m", p.x, "y_m", p.y, "tracks", n);
         }

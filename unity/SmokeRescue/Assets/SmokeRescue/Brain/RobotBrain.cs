@@ -333,7 +333,17 @@ namespace SmokeRescue.Brain
             // A route look turns in place and keeps the path; a survivor candidate is taken up when it ends.
             var routeLookCommand = RouteLookStep(t, dt);
             if (routeLookCommand.HasValue) return routeLookCommand.Value;
+            var yieldCommand = YieldStep(t, dt);
+            if (yieldCommand.HasValue) return yieldCommand.Value;
+            var glanceCommand = GlanceStep(t, dt);
+            if (glanceCommand.HasValue) return glanceCommand.Value;
 
+            if (active != null && !inspecting && PartnerTakesCandidate(active.position, t))
+            {
+                Emit(t, "goal", "The partner is nearer to this candidate and heading for it: leave it to the partner and search on.",
+                    "person_x_m", active.position.x, "person_y_m", active.position.y);
+                active.retryAfter = t + c.survivor_lost_s * 2; active = null; dwell = 0; ClearPath();
+            }
             if (active != null && (active.confirmed || SurvivorLost(t)))
             {
                 Emit(t, "goal", "Survivor inspection ended or recent evidence was lost; resume exploration.");
@@ -345,6 +355,7 @@ namespace SmokeRescue.Brain
                 foreach (var track in tracks)
                 {
                     if (!track.candidate || track.confirmed || track.onWall || track.retryAfter > t || GoalBlacklisted(track.position, t) || t - track.lastSeen > FreshS(track)) continue;
+                    if (PartnerTakesCandidate(track.position, t)) continue;
                     if (AgentOrderHolds(t, track)) continue;
                     // A warm shape outside the ceilinged floor is beyond a window or door: not a person inside.
                     if (!InSearchArea(track.position)) continue;
@@ -454,13 +465,13 @@ namespace SmokeRescue.Brain
                 // test the next one chosen lay 1.0 m from the cut one), and every look-out for the same unsearched floor lies
                 // within frontier_peek_m of it, so frontier_peek_m plus the stall radius (or the claim, if larger) is excluded.
                 if (blocked && frontierGoal && goal.HasValue && FireCuts(path, cursor))
-                    BlacklistGoal(frontierCentre, t, 0, c.fire_cut_blacklist_s, "The fire margin cut the path to this frontier; leave it until the retry time.",
+                    BlacklistGoal(frontierCentre, t, 0, c.fire_cut_blacklist_s, FireCutReason,
                         Mathf.Max(frontierRadius, c.frontier_peek_m + c.stuck_repeat_radius_m));
                 // The same for a frontier reached through the partner's floor, which is driven without a claim. One-door seed
                 // 928, robot A at 140 to 148 s: that goal was chosen, its path discarded within 1 to 3 s as heat appeared
                 // nearby, and chosen again, 7 times, while the robot stood still.
                 else if (blocked && throughCentre.HasValue && goal.HasValue && FireCuts(path, cursor))
-                    BlacklistGoal(throughCentre.Value, t, 0, c.fire_cut_blacklist_s, "The fire margin cut the path to this frontier beyond the partner's floor; leave it until the retry time.",
+                    BlacklistGoal(throughCentre.Value, t, 0, c.fire_cut_blacklist_s, FireCutReasonThrough,
                         c.frontier_peek_m + c.stuck_repeat_radius_m);
                 if (goal.HasValue && !blocked)
                 {
@@ -562,6 +573,7 @@ namespace SmokeRescue.Brain
                         Emit(t, "goal", "A room is still under its coverage threshold: search its remaining floor again before holding.",
                             "x_m", retry.position.x, "y_m", retry.position.y, "room_id", retry.roomId, "path_cost", retry.cost);
                     }
+                    else if (RetryFireCuts(t)) { ClearPath(); }
                     else
                     {
                         ClearPath(); lastPlan = t; if (double.IsNaN(scanSince))
@@ -686,6 +698,7 @@ namespace SmokeRescue.Brain
                     // 38 C fridge in the same second, three times).
                     // A partner's rejection counts the same way, from where the partner stood, for reject_share_s.
                     if (nearest.rejected && t < nearest.rejectedUntil && !NewView(nearest)) continue;
+                    if (RejectedArea(nearest, t)) continue;
                     bool again = nearest.rejected; nearest.rejected = false;
                     if (!nearest.candidate) nearest.candidateSince = t;
                     nearest.candidate = true;
@@ -698,6 +711,22 @@ namespace SmokeRescue.Brain
                         "previously_rejected", again ? 1 : 0);
                 }
             }
+        }
+        readonly List<(Vector2 at, double t)> rejectedSpots = new List<(Vector2 at, double t)>();
+        /// <summary>Remember where a warm region was rejected, by this robot's agent or a partner's (reject_area_memory).</summary>
+        internal void NoteRejectedSpot(Vector2 at, double t) { if (c.reject_area_memory) rejectedSpots.Add((at, t)); }
+        /// <summary>A thermal-only warm shape within reject_area_m of a spot rejected in the last reject_area_s is not raised again,
+        /// from any side. Seed 934, robot A in the study: 12 rejections of warm patches beside a desk lamp and a globe, each a 10 to
+        /// 27 s agent step; the same patches came back from new sides or as new tracks when the blob centre shifted past
+        /// survivor_merge_m. A colour person sighting still raises a candidate there (track.rgb).</summary>
+        bool RejectedArea(Track track, double t)
+        {
+            if (!c.reject_area_memory || track.rgb) return false;
+            // Only a shape on a long mapped wall (heated wall, 150 of 151 such candidates over 15 runs): a person lying on the floor
+            // beside a rejected wall is still raised when smoke hides her from the colour camera.
+            if (grid.OccupiedExtent(track.position, c.candidate_wall_disc_m, c.candidate_wall_window_m) < c.candidate_wall_extent_m) return false;
+            rejectedSpots.RemoveAll(s => t - s.t > c.reject_area_s);
+            return rejectedSpots.Exists(s => Vector2.Distance(s.at, track.position) <= c.reject_area_m);
         }
         /// <summary>Seen from reject_new_view_deg round, or from half the distance, since the agent rejected it.</summary>
         bool NewView(Track track)
@@ -745,11 +774,20 @@ namespace SmokeRescue.Brain
         {
             BrainMath.Time(t);
             if (!BrainMath.Finite(bearingDegRight) || !BrainMath.Finite(rangeM) || !BrainMath.Finite(confidence)) throw new ArgumentException("Nonfinite person sighting.");
-            if (confidence < c.person_rgb_min_confidence || !(rangeM > 0) || rangeM > c.person_rgb_max_range_m) return;
+            if (!(rangeM > 0) || rangeM > c.person_rgb_max_range_m) return;
+            float floor = c.person_glance ? Mathf.Min(c.person_glance_min_confidence, c.person_rgb_min_confidence) : c.person_rgb_min_confidence;
+            if (confidence < floor) return;
             var pose = motion.Covers(t) ? motion.At(t) : motion.Pose;
             var position = PersonSightingPosition(pose, bearingDegRight, rangeM);
             foreach (var person in survivors) if (Vector2.Distance(person, position) <= c.survivor_merge_m) return;
             if (AtOwnSetDown(position)) return;
+            // Seed 934, robot B: a person on a bed was in the colour view for 1.2 s (21 frames, 0.54 to 0.86, 1.8 m) while the
+            // robot turned past her; the once-a-second scan caught one frame, the two-sightings rule dropped her, and she was
+            // found by chance 100 s later. Any sighting now stops the turn and holds the camera on her for person_glance_s,
+            // with the colour scan at person_rgb_boost_period_s meanwhile (WantsPeopleBoost); the repeat window keeps one weak
+            // false hit from stopping the robot again and again.
+            if (c.person_glance) Glance(t, position);
+            if (confidence < c.person_rgb_min_confidence) return;
             Track nearest = null; float best = c.survivor_merge_m;
             foreach (var track in tracks)
             {
@@ -761,7 +799,7 @@ namespace SmokeRescue.Brain
             // The colour detector is independent evidence: it lifts an earlier thermal rejection.
             nearest.rgb = true; nearest.onWall = false; nearest.rejected = false; nearest.position = position; nearest.lastSeen = t; nearest.observations.Enqueue(t);
             while (nearest.observations.Count > 0 && t - nearest.observations.Peek() > c.person_rgb_window_s) nearest.observations.Dequeue();
-            if (!nearest.candidate && nearest.observations.Count >= c.person_rgb_sightings)
+            if (!nearest.candidate && (nearest.observations.Count >= c.person_rgb_sightings || confidence >= c.person_rgb_strong_confidence))
             {
                 nearest.candidate = true; nearest.candidateSince = t;
                 Emit(t, "survivor_candidate", "OpenCV dnn person detector (YOLO11m) saw a person in the colour image in repeated scans.",
@@ -808,7 +846,7 @@ namespace SmokeRescue.Brain
         sealed class StuckPlace
         { public Vector2 position; public int repeats; public double lastAt; }
         sealed class BlockedGoal
-        { public Vector2 position; public double until; public float radius; }
+        { public Vector2 position; public double until; public float radius; public bool fireCut; }
         readonly List<StuckPlace> stuckPlaces = new List<StuckPlace>();
         readonly List<BlockedGoal> blockedGoals = new List<BlockedGoal>();
         double stalledFor, recoverySince;
@@ -905,9 +943,25 @@ namespace SmokeRescue.Brain
         void BlacklistGoal(Vector2 point, double t, int repeats, double forS = double.NaN, string why = null, float radius = 0)
         {
             double until = t + (double.IsNaN(forS) ? c.stuck_blacklist_s : forS);
-            blockedGoals.Add(new BlockedGoal { position = point, until = until, radius = radius });
+            blockedGoals.Add(new BlockedGoal { position = point, until = until, radius = radius, fireCut = why == FireCutReason || why == FireCutReasonThrough });
             Emit(t, "goal_blacklisted", why ?? "Repeated stalls near one location exclude this goal area until the retry time.",
                 "x_m", point.x, "y_m", point.y, "repeats", repeats, "until_s", until, "radius_m", radius > 0 ? radius : c.stuck_repeat_radius_m);
+        }
+        const string FireCutReason = "The fire margin cut the path to this frontier; leave it until the retry time.",
+            FireCutReasonThrough = "The fire margin cut the path to this frontier beyond the partner's floor; leave it until the retry time.";
+        double lastFireCutRetry = double.NegativeInfinity;
+        /// <summary>fire_cut_retry: before declaring nothing reachable, drop this robot's fire-cut exclusions and plan again, at most
+        /// once per fire_cut_retry_s. Seed 934, robot A: 21 frontiers set aside because the fire margin cut their routes while its
+        /// air never passed 44 C; at 209 s and 217 s it reported no reachable floor with six house rooms unsearched. Heat a fresh
+        /// cool look has cleared (OccupancyGrid.ProjectHeat) no longer cuts the route; a still-burning one cuts it again.</summary>
+        bool RetryFireCuts(double t)
+        {
+            if (!c.fire_cut_retry || t - lastFireCutRetry < c.fire_cut_retry_s) return false;
+            int n = blockedGoals.RemoveAll(g => g.fireCut);
+            if (n == 0) return false;
+            lastFireCutRetry = t; lastPlan = double.NegativeInfinity;
+            Emit(t, "fire_cut_retry", "Nothing reachable left except frontiers set aside for the fire margin: try them again on the current heat map.", "goals", n);
+            return true;
         }
         /// <summary>True when the rest of the path passes within the fire clearance of a dangerous cell (the fire margin,
         /// not a wall, is what made it unsafe).</summary>
@@ -1117,6 +1171,30 @@ namespace SmokeRescue.Brain
             Emit(t, "route_watch", "Most of the route home has had no thermal look recently; turn and look along it before searching on.",
                 "stale_share", stale / (float)counted, "x_m", nearest.x, "y_m", nearest.y, "route_m", routeM, "distance_m", nearestM);
         }
+        Vector2? glanceAt; double glanceUntil = double.NegativeInfinity, boostUntil = double.NegativeInfinity;
+        readonly List<(Vector2 at, double t)> glances = new List<(Vector2 at, double t)>();
+        void Glance(double t, Vector2 at)
+        {
+            boostUntil = t + c.person_glance_s;
+            if (glanceAt.HasValue && t < glanceUntil) { glanceAt = at; return; }   // already looking: follow the newest sighting
+            glances.RemoveAll(g => t - g.t > c.person_glance_repeat_s);
+            if (glances.Exists(g => Vector2.Distance(g.at, at) <= c.survivor_merge_m)) return;
+            glances.Add((at, t)); glanceAt = at; glanceUntil = t + c.person_glance_s;
+            Emit(t, "person_glance", "The colour detector saw a person: stop and hold the camera on her so repeated scans can confirm a candidate.",
+                "x_m", at.x, "y_m", at.y);
+        }
+        /// <summary>True while a recent person sighting wants the colour scan at person_rgb_boost_period_s.</summary>
+        public bool WantsPeopleBoost(double t) => c.person_glance && t < boostUntil;
+        /// <summary>Hold the camera on the latest person sighting (Glance): turn toward it and stand. Ends at its time limit, or as
+        /// soon as a candidate exists to inspect; the path is kept.</summary>
+        BrainCommand? GlanceStep(double t, float dt)
+        {
+            if (!glanceAt.HasValue) return null;
+            if (t >= glanceUntil || active != null || tracks.Exists(k => k.candidate && !k.confirmed && Vector2.Distance(k.position, glanceAt.Value) <= c.survivor_merge_m))
+            { glanceAt = null; return null; }
+            float error = BrainMath.Angle(motion.Pose.yawRad, BrainMath.Heading(glanceAt.Value - motion.Pose.position));
+            return Command(0, Mathf.Abs(error) <= c.survivor_face_tolerance_deg ? 0 : Mathf.Clamp(error * c.heading_gain, -c.sweep_yaw_dps, c.sweep_yaw_dps), dt, true);
+        }
         /// <summary>Turning in place toward the route look point, then holding still; null when no look is running. Kept
         /// apart from the agent's facing (FaceStep), so neither is ever taken for the other.</summary>
         BrainCommand? RouteLookStep(double t, float dt)
@@ -1298,7 +1376,7 @@ namespace SmokeRescue.Brain
         /// robots stood at their own blocked door for 106 to 124 s. Never open yard: the wall keeps the robot's LiDAR
         /// localisation anchored (held-out run 2: robot B lost its position searching an open yard).
         /// </summary>
-        Vector2? meetGoal; double meetSince = double.NaN, meetArrived = double.NaN, nextMeet;
+        Vector2? meetGoal; double meetSince = double.NaN, meetArrived = double.NaN, nextMeet, meetWalkFrom = double.NaN;
         /// <summary>Back into radio contact. The radio reaches 12 m through at most one wall, so in the house the robots were out
         /// of contact for 168 to 184 s of 200 (held-out seeds 919, 920) and each searched blind to the other's map. Out of
         /// contact for rendezvous_after_s, with at least rendezvous_min_unshared_cells of own map the partner has not
@@ -1316,6 +1394,13 @@ namespace SmokeRescue.Brain
                 if (lastPeerReceived > meetSince)
                 {
                     Emit(t, "rendezvous_done", "Radio contact with the partner again: maps exchanged; search on.", "out_of_contact_s", t - meetSince);
+                    meetGoal = null; ClearPath(); nextMeet = t + c.rendezvous_after_s; return null;
+                }
+                // rendezvous_walk_max_s: seed 934, robot B walked back 30 s (136 to 166 s) to where it last heard robot A, which by
+                // then was elsewhere, and searched nothing meanwhile. The walk back is capped; a meeting not reached in time is dropped.
+                if (c.rendezvous_walk_max_s > 0 && double.IsNaN(meetArrived) && t - meetWalkFrom > c.rendezvous_walk_max_s)
+                {
+                    Emit(t, "rendezvous_done", "The walk back to where the partner was last heard ran past its time limit; search on.", "walked_s", t - meetWalkFrom);
                     meetGoal = null; ClearPath(); nextMeet = t + c.rendezvous_after_s; return null;
                 }
                 if (Vector2.Distance(motion.Pose.position, meetGoal.Value) <= c.return_arrive_m || (path.Count == 0 && !double.IsNaN(meetArrived)))
@@ -1346,7 +1431,7 @@ namespace SmokeRescue.Brain
             float outM = Vector2.Distance(contactAt.Value, home);
             if (route.Count == 0 || t + (routeM + outM) / c.open_speed_mps * c.escape_time_factor + c.rendezvous_hold_s >= c.mission_time_limit_s)
             { nextMeet = t + c.escape_check_s; return null; }
-            meetGoal = contactAt; meetSince = lastPeerReceived; meetArrived = double.NaN; frontierGoal = false;
+            meetGoal = contactAt; meetSince = lastPeerReceived; meetArrived = double.NaN; meetWalkFrom = t; frontierGoal = false;
             SetPath(route); lastPlan = t;
             Emit(t, "rendezvous", "Out of radio contact with much of the map unshared: walk back to where the partner was last heard; it does the same.",
                 "x_m", contactAt.Value.x, "y_m", contactAt.Value.y, "out_of_contact_s", t - lastPeerReceived, "unshared_cells", unshared, "route_m", routeM);
@@ -1740,6 +1825,7 @@ namespace SmokeRescue.Brain
             Vector2 position = motion.Pose.position;
             while (cursor + 1 < path.Count && Vector2.Distance(position, path[cursor]) < c.goal_tolerance_m) cursor++;
             if (Vector2.Distance(position, goal.Value) < (arriveM ?? c.goal_tolerance_m)) return Command(0, 0, dt, true);
+            if (Pinned(t)) return Command(0, 0, dt, true);
             Vector2 target = path[cursor], previous = position; float remain = c.lookahead_m;
             for (int i = cursor; i < path.Count; i++)
             {
@@ -1836,7 +1922,115 @@ namespace SmokeRescue.Brain
             return Command(speed, yaw, dt, false);
         }
         double blockedSince = double.NaN, lastBlocked = double.NegativeInfinity, translationHeldSince = double.NaN;
+        Vector2 pinnedAnchor; double pinnedSince = double.NaN, lastPursuit = double.NegativeInfinity;
+        /// <summary>pinned_watchdog (opencv-e5, branch pinned): a robot that has followed a route for pinned_window_s without
+        /// its body moving pinned_move_m is pinned, whatever holds it. Its goal is set aside (stuck_blacklist_s) and it backs up,
+        /// turns and chooses again. The 3 s holds (SafeForward's swept-path brake, the safe-chord hold) restart whenever a single
+        /// step passes their check, and the progress watchdog ignores a robot that has not travelled. Headless house 5011 (23 Oct),
+        /// robot B: 25 s still in a closet doorway with its goal 0.5 m ahead. Only continuous pursuit counts: a gap over
+        /// stuck_window_s (inspecting, sweeping, scanning, recovering) restarts it.</summary>
+        bool Pinned(double t)
+        {
+            if (!c.pinned_watchdog) return false;
+            var at = motion.Pose.position;
+            if (t - lastPursuit > c.stuck_window_s || double.IsNaN(pinnedSince) || Vector2.Distance(at, pinnedAnchor) > c.pinned_move_m)
+            { pinnedSince = t; pinnedAnchor = at; }
+            lastPursuit = t;
+            if (t - pinnedSince < c.pinned_window_s || recoveryPhase != 0) return false;
+            // pinned_yield: two robots pinned against each other back up at the same moment, each into the other, forever.
+            // Headless house 5003 (23 Oct, solid bodies): both robots 0.33 m apart at the entrance, the watchdog firing 42 times,
+            // every back-up refused, 9 % of the house searched. Right of way breaks the symmetry: the robot with the lower id keeps
+            // its goal and restarts its clock; the other backs straight away from its partner (YieldStep), then steps aside.
+            if (c.pinned_yield && PartnerInContact(t, out var partner, out string partnerId))
+            {
+                // Right of way: stand still while the other robot backs away, rather than driving back into it (headless 5003: the
+                // robot with right of way kept pressing on, so every yield ended in contact again).
+                if (string.CompareOrdinal(id, partnerId) < 0) { pinnedSince = t; pinnedAnchor = at; rightOfWayHoldUntil = t + c.pinned_yield_back_s + 1; return true; }
+                // First back straight away from the partner with no turn: with the bodies touching, a turn in place swings into
+                // the partner and is refused, so every planned step aside starting with a turn failed (headless 5003, 26 yields,
+                // 217 s in contact). Then plan the step aside from the clear spot.
+                yieldFrom = partner; yieldUntil = t + c.pinned_yield_back_s; pinnedSince = double.NaN;
+                if (goal.HasValue && !returning && !retreating)
+                    BlacklistGoal(goal.Value, t, 1, double.NaN, "Pinned against the partner on the way to this goal: set it aside and step clear.");
+                Emit(t, "pinned_yield", "Pinned against the partner, which has right of way: back straight away from it, then step clear and choose again.",
+                    "partner_x_m", partner.x, "partner_y_m", partner.y);
+                return true;
+            }
+            pinnedSince = double.NaN;
+            if (goal.HasValue && !returning && !retreating)
+                BlacklistGoal(goal.Value, t, 1, double.NaN, "Pinned on the way to this goal: set it aside until the retry time and choose another.");
+            BeginRecovery(t, "pinned", "Following a route, the body moved less than pinned_move_m in pinned_window_s: back up, turn and choose another route.", goal, false);
+            return true;
+        }
 
+        Vector2? yieldFrom; double yieldUntil = double.NegativeInfinity;
+        /// <summary>The yielding robot backs (or drives) straight away from its partner, no turn, until pinned_yield_m apart or
+        /// pinned_yield_back_s has passed; then it plans a short path further away (StepAside) and searches on from there.</summary>
+        double rightOfWayHoldUntil = double.NegativeInfinity;
+        BrainCommand? YieldStep(double t, float dt)
+        {
+            if (t < rightOfWayHoldUntil) return Command(0, 0, dt, true);
+            if (!yieldFrom.HasValue) return null;
+            // A yield interrupted by a retreat or a return is stale when they end: drop it rather than step away from where the
+            // partner stood minutes ago.
+            if (t - yieldUntil > 1) { yieldFrom = null; return null; }
+            var at = motion.Pose.position; Vector2 away = at - yieldFrom.Value;
+            if (t >= yieldUntil || away.magnitude >= c.pinned_yield_m)
+            {
+                var aside = StepAside(at, yieldFrom.Value); yieldFrom = null;
+                if (aside.Count > 0) SetPath(aside);
+                return null;
+            }
+            // Forward along the body axis if the partner is behind, backwards if it is in front.
+            Vector2 forward = new Vector2(-Mathf.Sin(motion.Pose.yawRad), Mathf.Cos(motion.Pose.yawRad));
+            float sign = Vector2.Dot(forward, away) >= 0 ? 1 : -1;
+            return Command(sign * c.pinned_yield_speed_mps, 0, dt, false);
+        }
+        /// <summary>candidate_split: a linked partner nearer to this candidate and already heading for it (its radio goal within
+        /// survivor_stop_max_m + 1 m of it) or standing within the viewing band takes it; this robot searches on and hears the
+        /// confirmation by radio. Headless houses 5003 and 5004 (23 Oct): with one strong sighting enough, both robots raised the
+        /// same people from the entrance at 0 s, both walked up to them, and their bodies jammed in the doorway for over 200 s.</summary>
+        bool PartnerTakesCandidate(Vector2 person, double t)
+        {
+            if (!c.candidate_split) return false;
+            float mine = Vector2.Distance(motion.Pose.position, person);
+            foreach (var peer in peers.Values)
+            {
+                if (peer.message == null || !peer.poseKnown || t - peer.poseT > c.teammate_predict_max_s || !TryPartnerLink(peer.message.Sender, out _)) continue;
+                float theirs = Vector2.Distance(peer.pose.position, person);
+                if (theirs >= mine) continue;
+                bool heading = peer.goal.HasValue && Vector2.Distance(peer.goal.Value, person) <= c.survivor_stop_max_m + 1;
+                if (heading || theirs <= c.survivor_stop_max_m) return true;
+            }
+            return false;
+        }
+        /// <summary>A linked partner whose last radio pose (no older than teammate_predict_max_s) is within pinned_yield_m.</summary>
+        bool PartnerInContact(double t, out Vector2 at, out string partnerId)
+        {
+            at = default; partnerId = null; float best = c.pinned_yield_m;
+            foreach (var peer in peers.Values)
+            {
+                if (peer.message == null || !peer.poseKnown || t - peer.poseT > c.teammate_predict_max_s || !TryPartnerLink(peer.message.Sender, out _)) continue;
+                float d = Vector2.Distance(peer.pose.position, motion.Pose.position);
+                if (d <= best) { best = d; at = peer.pose.position; partnerId = peer.message.Sender; }
+            }
+            return partnerId != null;
+        }
+        /// <summary>A planned path about pinned_yield_m * 1.5 straight away from the partner, or turned up to 90 deg either way when
+        /// a wall is in the way; empty when none is reachable.</summary>
+        List<Vector2> StepAside(Vector2 from, Vector2 partner)
+        {
+            Vector2 away = from - partner; if (away.sqrMagnitude < 1e-6f) away = new Vector2(Mathf.Sin(motion.Pose.yawRad), -Mathf.Cos(motion.Pose.yawRad));   // straight back
+            float baseHeading = BrainMath.Heading(away.normalized);
+            foreach (float turn in new[] { 0f, 45f, -45f, 90f, -90f })
+            {
+                float h = baseHeading + turn * Mathf.Deg2Rad;
+                var target = from + new Vector2(-Mathf.Sin(h), Mathf.Cos(h)) * (c.pinned_yield_m * 1.5f);
+                var route = planner.Plan(from, target);
+                if (route.Count > 0) return route;
+            }
+            return new List<Vector2>();
+        }
         /// <summary>(23 Oct.) A step out of a cell closer to a mapped obstacle than the walking clearance: allowed when the
         /// cell ahead is mapped free and no nearer to an obstacle or to fire than the robot's own cell, the same rule GridPlanner.Lead
         /// uses to leave a fire margin. SegmentSafe judged the robot's own cell and refused every step from it in every direction:

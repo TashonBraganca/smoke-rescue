@@ -120,7 +120,7 @@ namespace SmokeRescue.Recording
             var scenario = Scenario.Load(scenarioFile);
             CheckSurvivorsMatchScene(scenario);
             var sensorCfg = SensorConfig.Load();
-            PeoplePeriodS = BrainConfig.Load().person_rgb_scan_period_s;
+            PeoplePeriodS = BrainConfig.Load().person_rgb_scan_period_s; PeopleBoostS = BrainConfig.Load().person_rgb_boost_period_s;
             PlaceHttpTimeoutS = JObject.Parse(File.ReadAllText(Path.Combine(SensorConfig.ConfigDir, "perception.json"))).Value<float>("place_http_timeout_s");
             string root = Path.GetFullPath(Path.Combine(FloorPlan.ConfigDir, "..", "data", "recordings", runId));
             if (Directory.Exists(root))

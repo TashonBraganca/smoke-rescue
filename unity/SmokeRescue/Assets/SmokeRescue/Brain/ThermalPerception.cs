@@ -187,7 +187,12 @@ namespace SmokeRescue.Brain
                 c.health_contrast_weight * Mathf.Clamp01(Contrast / c.contrast_target) + c.health_depth_weight * ValidDepth;
             double t = f.Timestamp;
             if (t - previous > c.health_max_gap_s) { poorSince = double.NaN; goodSince = double.NaN; }
-            previous = t; bool poor = Score < c.health_threshold;
+            previous = t;
+            // health_close_surface: a poor colour score with most depth valid is a close, featureless surface (a blank or heated
+            // wall filling the view), not smoke. Seed 934: robot A switched to thermal 4 times facing such walls (0 to 7 corners,
+            // contrast 0.054 to 0.065, valid depth 0.80 to 0.99); every earlier switch in smoke or haze (30 across 12 runs) had
+            // valid depth 0.50 or less.
+            bool poor = Score < c.health_threshold && !(c.health_close_surface && ValidDepth >= c.health_smoke_max_valid_depth);
             if (poor)
             {
                 goodSince = double.NaN; if (double.IsNaN(poorSince)) poorSince = t;

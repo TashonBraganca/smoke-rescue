@@ -421,36 +421,6 @@
       "note": "front entrance"
     },
     {
-      "id": "d_west",
-      "between": [
-        "outside",
-        "hallway"
-      ],
-      "wall": "x",
-      "at": [
-        0.0,
-        7.0
-      ],
-      "width": 0.9,
-      "state": "open",
-      "note": "west side entrance"
-    },
-    {
-      "id": "d_back",
-      "between": [
-        "laundry",
-        "office_link"
-      ],
-      "wall": "z",
-      "at": [
-        18.0,
-        14.0
-      ],
-      "width": 0.9,
-      "state": "open",
-      "note": "back entrance"
-    },
-    {
       "id": "d_living_foyer",
       "between": [
         "living",
@@ -612,21 +582,6 @@
       "width": 0.9,
       "state": "open",
       "note": "identical hallway door, look-alike on purpose"
-    },
-    {
-      "id": "d_house_apartment",
-      "between": [
-        "kitchen",
-        "apt_living"
-      ],
-      "wall": "x",
-      "at": [
-        20,
-        3.5
-      ],
-      "width": 1.8,
-      "state": "removed",
-      "note": "Wide cased opening between house and apartment."
     },
     {
       "id": "d_apartment_workshop",
@@ -1937,5 +1892,6 @@
     }
   ],
   "clear_path_rule": "Keep a 0.9 m wide clear path through every door and between every door and the room centre.",
-  "extension_note": "Original south-west house retained. The former back entrance now joins the office link. New east opening joins the apartment. North corridors connect the office and workshop over 40 m. Original 0.8 m doors and 2 m hallway remain unchanged."
+  "extension_note": "Original south-west house retained. The former back entrance now joins the office link. New east opening joins the apartment. North corridors connect the office and workshop over 40 m. Original 0.8 m doors and 2 m hallway remain unchanged.",
+  "one_building_note": "Owner's rule (23 Oct 2026): the robots search one building through one entrance and never leave it. d_west (west exterior door), d_back (laundry to office link) and d_house_apartment (1.8 m opening from the kitchen to the apartment) are walled, so the house (0..20 x 0..14 m) is reachable only through d_front. Seed 934: robot B walked through d_house_apartment at 94 s and spent 59 % of the run in the unscored apartment. The apartment, office and workshop remain as separate buildings with their own exterior doors."
 }
