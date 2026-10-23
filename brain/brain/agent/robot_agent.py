@@ -38,7 +38,8 @@ evidence changes where to go (a person, fire on the route, a proposal you accept
 Limits the tools enforce (an action that breaks one is refused, and the refusal is returned to you):
 - Every action except go_to, explore_frontier on proven floor, turn_to_face, send_team_message and finish cites the
   evidence_id of a perception result from this step, of the kind its description names.
-- confirm_survivor needs an inspect_candidate verdict of person; reject_candidate needs not_person. extract_survivor
+- confirm_survivor needs an inspect_candidate verdict of person taken within 5 m, or, up to 8 m, two person verdicts on
+  the same spot from standpoints at least 0.5 m apart that agree within 0.5 m; reject_candidate needs not_person. extract_survivor
   needs the person within the rescue reach and the grip cone (numbers in its description), cited either by the evidence
   that confirmed them (survivors_to_rescue) or by a person verdict taken within that reach. The robot never confirms a
   person by itself.
@@ -201,7 +202,7 @@ class RobotAgent:
             cls._run = run; cls._last_t = {robot: t}
             cls._recent.clear(); cls._ordered.clear(); ToolRegistry._looks.clear(); ToolRegistry._lifted.clear(); ToolRegistry._confirmed.clear()
             ToolRegistry._pending.clear(); ToolRegistry._unfinished.clear(); TeamState.reset()
-            ToolRegistry._inspection_histories.clear(); ToolRegistry._faces.clear(); ToolRegistry._wall_spots.clear(); ToolRegistry._confirm_walks.clear()
+            ToolRegistry._inspection_histories.clear(); ToolRegistry._faces.clear(); ToolRegistry._wall_spots.clear(); ToolRegistry._confirm_walks.clear(); ToolRegistry._person_views.clear()
             cls._last_orders.clear()
 
     _last_orders: dict = {}   # robot -> (t, orders) of its last step that moved the robot

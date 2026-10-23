@@ -13,7 +13,7 @@ def _fresh_team_conversation():
     # Unresolved sightings also survive agent steps in one recording. The test
     # helpers share a recording parent, so give each test an empty queue.
     ToolRegistry._unfinished.clear()
-    ToolRegistry._faces.clear(); ToolRegistry._wall_spots.clear(); ToolRegistry._pending.clear(); ToolRegistry._confirm_walks.clear()
+    ToolRegistry._faces.clear(); ToolRegistry._wall_spots.clear(); ToolRegistry._pending.clear(); ToolRegistry._confirm_walks.clear(); ToolRegistry._person_views.clear()
     from brain.agent.robot_agent import RobotAgent
     RobotAgent._last_orders.clear()
     yield

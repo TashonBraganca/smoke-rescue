@@ -33,6 +33,12 @@ RESCUE_APPROACH_M = float(_RESCUE["approach_m"])
 RESCUE_ENABLED = bool(_RESCUE.get("enabled", True))
 _PERCEPTION = json.loads((_Path(__file__).resolve().parents[3] / "config" / "perception.json").read_text())
 _CAMERA = json.loads((_Path(__file__).resolve().parents[3] / "config" / "sensors.json").read_text())["camera"]
+# Two agreeing person verdicts from different standpoints may confirm a person seen from beyond CONFIRM_MAX_RANGE_M
+# (perception.json two_view_*, each with its measurement).
+TWO_VIEW_MAX_RANGE_M = float(_PERCEPTION["two_view_max_range_m"])
+TWO_VIEW_AGREE_M = float(_PERCEPTION["two_view_agree_m"])
+TWO_VIEW_BASELINE_M = float(_PERCEPTION["two_view_baseline_m"])
+TWO_VIEW_MEMORY_S = float(_PERCEPTION["fusion_memory_s"])
 # Half the colour camera's horizontal view (atan of half the width over fx: 37.6 deg). A person further off the heading
 # than this is outside the picture, so an inspection there cannot see them (run 20: looks at 106 and 148 deg).
 CAMERA_HALF_HFOV_DEG = math.degrees(math.atan(_CAMERA["width"] / 2 / _CAMERA["fx"]))
@@ -245,6 +251,8 @@ class ToolRegistry:
     _unfinished: dict = {}
     # Walks toward a person verdict to confirm her from closer, per robot: {"x", "y", "t"}. Cleared by a confirmation there.
     _confirm_walks: dict = {}
+    # Person verdicts with a measured range, per robot: [(t, evidence_id, observer (x, y), position (x, y), range_m)].
+    _person_views: dict = {}
     # Thermal-only warm patches the brain found on a long mapped wall, per robot, until a colour sighting there clears them.
     # Over 15 runs 151 such candidates held 1 person (0.7 %, Wilson 95 % 0.1 to 3.7 %; colour candidates were people 13
     # times in 16), so walking or turning to them waits until the offered frontiers are searched (opus_search_design 2.2).
@@ -420,6 +428,11 @@ class ToolRegistry:
             history = self._inspection_histories.setdefault(key, vision.InspectionHistory())
             r = history.observe(r, position=(r["x"], r["y"]), observer=(self.ctx.x, self.ctx.y))
         self._remember_inspection(r)
+        cand = r.get("candidate") or {}
+        if r.get("verdict") == "person" and cand.get("range_m") is not None and r.get("x") is not None:
+            views = [v for v in self._person_views.get(self.ctx.robot, []) if self.ctx.t - v[0] <= TWO_VIEW_MEMORY_S]
+            self._person_views[self.ctx.robot] = views + [(self.ctx.t, r.get("id"), (self.ctx.x, self.ctx.y),
+                                                           (float(r["x"]), float(r["y"])), float(cand["range_m"]))]
         return r
 
     def _p_check_indoors(self, bearing_deg: float):
@@ -486,6 +499,21 @@ class ToolRegistry:
         if reach < rng * math.cos(math.radians(bearing)) - .5:
             return {"refused": True, "reason": f"depth along that bearing ends at {reach:.1f} m, before the spot: something nearer "
                     "blocks the view, so the spot was not seen"}
+        return None
+
+    def _second_view(self, ev: dict, looked: float) -> tuple[float, float] | None:
+        """The mean position of this person verdict and an earlier one by this robot that agrees with it within
+        TWO_VIEW_AGREE_M, taken from a standpoint at least TWO_VIEW_BASELINE_M away, both within TWO_VIEW_MAX_RANGE_M;
+        None when there is no such view. Two rays from different places that meet on the same spot fix the position the
+        range alone cannot."""
+        if looked > TWO_VIEW_MAX_RANGE_M or ev.get("x") is None:
+            return None
+        here, me = (self.ctx.x, self.ctx.y), (float(ev["x"]), float(ev["y"]))
+        for t, eid, observer, pos, rng in reversed(self._person_views.get(self.ctx.robot, [])):
+            if eid == ev.get("id") or self.ctx.t - t > TWO_VIEW_MEMORY_S or rng > TWO_VIEW_MAX_RANGE_M:
+                continue
+            if math.dist(pos, me) <= TWO_VIEW_AGREE_M and math.dist(observer, here) >= TWO_VIEW_BASELINE_M:
+                return round((pos[0] + me[0]) / 2, 2), round((pos[1] + me[1]) / 2, 2)
         return None
 
     def _confirmed_near(self, ev: dict) -> bool:
@@ -564,8 +592,15 @@ class ToolRegistry:
             if refusal is None:
                 looked = self._inspection_range(self.evidence[str(args["evidence_id"])])
                 if looked is not None and looked > CONFIRM_MAX_RANGE_M:
-                    refusal = {"refused": True, "reason": f"the inspection looked from {looked:.1f} m; confirm only within "
-                               f"{CONFIRM_MAX_RANGE_M:.1f} m: approach_candidate citing it, then inspect again"}
+                    second = self._second_view(self.evidence[str(args["evidence_id"])], looked)
+                    if second is not None:
+                        args = {**args, "x": second[0], "y": second[1], "two_view": True}
+                    else:
+                        refusal = {"refused": True, "reason": f"the inspection looked from {looked:.1f} m; confirm only within "
+                                   f"{CONFIRM_MAX_RANGE_M:.1f} m: approach_candidate citing it, then inspect again. Beyond "
+                                   f"that, up to {TWO_VIEW_MAX_RANGE_M:.0f} m, a second person verdict on the same spot from a "
+                                   f"standpoint at least {TWO_VIEW_BASELINE_M:.1f} m away that agrees within {TWO_VIEW_AGREE_M:.1f} m "
+                                   "also confirms her: inspect again after moving."}
             if refusal is None:
                 spot = self._set_down_near(float(args["x"]), float(args["y"]))
                 if spot is not None:
