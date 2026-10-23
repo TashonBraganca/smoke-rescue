@@ -1,0 +1,7 @@
+{
+  "head_start_s": 320.0,
+  "config_file": "fire.json",
+  "note": "times are on the robots' clock (fire time minus head start)",
+  "collapses": [],
+  "flashover": []
+}
