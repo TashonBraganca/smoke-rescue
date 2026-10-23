@@ -18,6 +18,7 @@ from brain.nav_io import (CELL_M, ORIGIN, interpolate_poses,
 from brain.nav_io import (load_scenario, start_pose, recording_frame, placed_states,
                           transform_xy, rotation, map_geometry, sample_grid, frame_peer)
 from brain.oracle import load_collisions, load_floorplan, load_house_points, load_survivors, load_trajectory
+from brain.team_map import latest_team_map
 
 
 def body_trajectory(recording: Path, robot: str) -> tuple[np.ndarray, np.ndarray]:
@@ -343,13 +344,19 @@ def draw_overlay(path: Path, shape: tuple, truth: np.ndarray, layers: list[dict]
 
 
 def frame_link_report(events, receiver, robots, scenario):
+    pads = {r['id'] for r in scenario.get('robots', []) if r.get('launch_pad') is not None}
+    if receiver in pads and any(r != receiver for r in pads):
+        return dict(status='shared_at_launch', t=0., sender=None,
+                    reported_transform=dict(dx_m=0., dy_m=0., dyaw_deg=0.),
+                    position_error_m=None, yaw_error_deg=None,
+                    note='Nominal gate frame shared from launch pads. Physical pad placement remains uncertain.')
     event = next((e for e in events if e['kind'] == 'frame_linked'), None)
     if event is None:
-        return dict(t=None, reported_transform=None, position_error_m=None, yaw_error_deg=None)
+        return dict(status='not_linked', t=None, reported_transform=None, position_error_m=None, yaw_error_deg=None)
     sender = frame_peer(event, receiver, robots)
     n = event['numbers']
     reported = dict(dx_m=n['dx_m'], dy_m=n['dy_m'], dyaw_deg=n['dyaw_deg'])
-    result = dict(t=event['t'], sender=sender, reported_transform=reported,
+    result = dict(status='linked_by_sensors', t=event['t'], sender=sender, reported_transform=reported,
                   position_error_m=None, yaw_error_deg=None)
     a, b = start_pose(scenario, receiver), start_pose(scenario, sender)
     if a is not None and b is not None:
@@ -359,6 +366,65 @@ def frame_link_report(events, receiver, robots, scenario):
                       position_error_m=float(np.linalg.norm(np.array([n['dx_m'], n['dy_m']]) - xy)),
                       yaw_error_deg=abs(float(np.degrees(wrap_angle(np.radians(n['dyaw_deg']) - yaw)))))
     return result
+
+
+def true_wall_segments(floorplan: dict) -> np.ndarray:
+    """Room wall lines with actual door openings removed, from evaluator-only geometry."""
+    segments = []
+    for room in floorplan.get('rooms', []):
+        x0, y0, x1, y1 = room['rect']
+        for axis, fixed, lo, hi in [('z', y0, x0, x1), ('z', y1, x0, x1), ('x', x0, y0, y1), ('x', x1, y0, y1)]:
+            intervals = [(lo, hi)]
+            for door in floorplan.get('doors', []):
+                moving, normal = (0, 1) if axis == 'z' else (1, 0)
+                if door['wall'] != axis or abs(door['at'][normal] - fixed) > 1e-4:
+                    continue
+                a, b = door['at'][moving] - door['width'] / 2, door['at'][moving] + door['width'] / 2
+                intervals = [(l, min(h, a)) for l, h in intervals if l < a] + [(max(l, b), h) for l, h in intervals if h > b]
+            for a, b in intervals:
+                if b <= a:
+                    continue
+                segments.append([[a, fixed], [b, fixed]] if axis == 'z' else [[fixed, a], [fixed, b]])
+    return np.array(segments, float).reshape(-1, 2, 2)
+
+
+def team_belief_metrics(grid, xy: np.ndarray, segments: np.ndarray, floor: np.ndarray) -> dict:
+    occupied = (grid.occupancy > .5) & (grid.source_mask != 0)
+    walls = xy[occupied]
+    if len(walls) and len(segments):
+        a, delta = segments[:, 0], segments[:, 1] - segments[:, 0]
+        length2 = np.sum(delta * delta, axis=1)
+        length2 = np.maximum(length2, 1e-12)
+        u = np.clip(np.sum((walls[:, None, :] - a) * delta, axis=2) / length2, 0, 1)
+        distances = np.linalg.norm(walls[:, None, :] - a - u[..., None] * delta, axis=2).min(axis=1)
+        wall_share = float(np.mean(distances <= .2 + 1e-7))
+    else:
+        wall_share = None
+    searched = (grid.searched_source_mask != 0) & floor
+    return dict(status='measured', t=grid.at, occupied_cells=int(occupied.sum()), wall_tolerance_m=.2,
+                occupied_probability_rule='p > 0.5 and source mask nonzero; furniture is not a wall',
+                occupied_within_0_2_m_wall_share=wall_share, floor_cells=int(floor.sum()),
+                searched_floor_m2=float(searched.sum() * grid.cell_m ** 2),
+                searched_floor_share=float(searched.sum() / max(1, floor.sum())),
+                confidence_weighted_searched_floor_m2=float((grid.searched_confidence * floor).sum() * grid.cell_m ** 2),
+                sources=list(grid.sources), note='One receiver belief; peers are limited to messages this robot received.')
+
+
+def team_map_accuracy(grid, transform, floorplan, scenario, points) -> dict:
+    yy, xx = np.indices((grid.size, grid.size))
+    own = grid.origin + (np.stack([xx, yy], axis=-1) + .5) * grid.cell_m
+    xy = transform_xy(own, transform)
+    local_points = points.copy()
+    local_points[:, [0, 2]] = (points[:, [0, 2]] - transform[:2]) @ rotation(transform[2])
+    occupied = truth_occupancy(local_points, (grid.size, grid.size), grid.origin, grid.cell_m)
+    floor = np.zeros((grid.size, grid.size), bool)
+    area = scenario.get('search_area')
+    for room in floorplan.get('rooms', []):
+        x0, y0, x1, y1 = room['rect']
+        if area and not (x0 >= area[0] and y0 >= area[1] and x1 <= area[2] and y1 <= area[3]):
+            continue
+        floor |= (xy[..., 0] >= x0) & (xy[..., 0] < x1) & (xy[..., 1] >= y0) & (xy[..., 1] < y1)
+    return team_belief_metrics(grid, xy, true_wall_segments(floorplan), floor & ~occupied)
 
 
 def indoor_report(indoor: np.ndarray, building: np.ndarray, searched: np.ndarray | None, cell: float, tolerance_m: float = .2) -> dict:
@@ -480,7 +546,9 @@ def evaluate(recording: Path | str, out: Path | str | None = None) -> dict:
                     map_report['indoor'] = indoor_report(indoor, building, searched, cell)
                 team_searched = covered if team_searched is None else team_searched | covered
                 team_floor = int(floor.sum())
-        report = dict(robot=robot, localization=localization, frame_check=convention, frame_link=link, lidar=lidar,
+        belief = latest_team_map(robot_dir)
+        team_report = dict(status='missing_export') if belief is None else team_map_accuracy(belief, frames[robot][0], floorplan, scenario, points)
+        report = dict(robot=robot, localization=localization, frame_check=convention, frame_link=link, lidar=lidar, team_map=team_report,
                       map=map_report, stalls=stalls, collision_seconds=None if collisions is None else collisions.get(robot),
                       collision_note='Writer supplies aggregate seconds only; contact locations and counts are unavailable.')
         reports[robot] = report
@@ -492,6 +560,7 @@ def evaluate(recording: Path | str, out: Path | str | None = None) -> dict:
         draw_overlay(output / 'overlay.png', shape, truth_occupancy(points, shape, origin, cell), [layer], floorplan, origin, cell)
     if team_searched is not None:
         team = dict(searched_floor_share=float(team_searched.sum() / max(1, team_floor)), floor_cells=team_floor)
+        team['belief_by_receiver'] = {robot: report['team_map'] for robot, report in reports.items()}
         (out / 'team.json').write_text(json.dumps(team, indent=2) + '\n')
         print(f"team searched floor share {team['searched_floor_share']:.3f} of {team_floor} floor cells")
     shape = common_shape or tuple(max((layer['grid'].shape[i] if layer['grid'] is not None else 440) for layer in layers) for i in (0, 1))
@@ -510,14 +579,18 @@ def print_table(reports: dict) -> None:
               f"{number(lidar.get('true_pose', {}).get('median_m'))}/{number(lidar.get('brain_pose', {}).get('median_m'))}   "
               f"{number(r['map'].get('precision'))}/{number(r['map'].get('recall'))}   {len(r['stalls'])} ({sum(not s['explained'] for s in r['stalls'])} unexplained)   {number(r['collision_seconds'])}")
         link = r['frame_link']
-        print(f"{robot} frame_link: not linked" if link['t'] is None else
+        print(f"{robot} frame_link: shared gate frame from launch pads; physical placement uncertain" if link.get('status') == 'shared_at_launch' else
+              f"{robot} frame_link: not linked" if link['t'] is None else
               f"{robot} frame_link: linked at {link['t']:.2f}s from {link['sender']} {link['reported_transform']}; error {number(link['position_error_m'])} m / {number(link['yaw_error_deg'])} deg")
+        belief = r.get('team_map', {})
+        if belief.get('status') == 'measured':
+            print(f"{robot} team map: occupied within 0.2 m of true wall {number(belief['occupied_within_0_2_m_wall_share'])}; camera searched floor {number(belief['searched_floor_m2'])} m2 / {number(belief['searched_floor_share'])} share")
         if lidar.get('true_pose', {}).get('median_m', 0) is not None and lidar.get('true_pose', {}).get('median_m', 0) > .05:
             print(f'LIDAR CONVENTION FAILURE for {robot}: true-pose median exceeds 0.05 m. Check sensor geometry and frame conventions before trusting navigation metrics.')
         elif not lidar['true_pose']['passed']:
             print(f"{robot} LiDAR gate NOT VERIFIED: {lidar.get('status')}, {lidar['true_pose'].get('status', '')}")
         if r['frame_check'].get('passed') is False:
-            print(f'{robot} FRAME CHECK FAILED: initial body pose does not match the scenario spawn; inspect frame_check in report.json.')
+            print(f'{robot} FRAME CHECK FAILED: initial truth pose or transformed brain estimate exceeds the start-pose tolerance; inspect frame_check in report.json.')
 
 
 def main(argv=None) -> int:

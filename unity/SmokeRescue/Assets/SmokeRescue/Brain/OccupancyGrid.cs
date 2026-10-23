@@ -37,6 +37,7 @@ namespace SmokeRescue.Brain
         float[] obstacleDistance, fireDistance;
         bool dirty = true;
         double time;
+        internal TeamMap TeamBelief { get; set; }
         public int Size { get; }
         public int Count => Size * Size;
         public float CellM => c.cell_m;
@@ -97,6 +98,8 @@ namespace SmokeRescue.Brain
         public byte Occupancy(int i)
         {
             if (i < 0 || i >= Count) return 0;
+            if (c.team_map_planner && (placed == null || !placed[i]) && TeamBelief != null && TeamBelief.TryOccupancy(Centre(i), time, out float belief))
+                return belief >= c.occupied_threshold ? (byte)255 : belief <= c.free_threshold ? (byte)1 : (byte)0;
             byte own = OwnOccupancy(i);
             return own != 0 ? own : peer[i];
         }
@@ -367,12 +370,16 @@ namespace SmokeRescue.Brain
             // could not have been found from here (hidden-corner runs: a glance through a doorway from 8 m counted a whole
             // room as searched and the robot never went in, while a confirmation needs an inspection within 4 m).
             Vector2 eye = Centre(start); float reach = c.search_max_range_m;
+            TeamBelief?.BeginObservation(frame.Timestamp);
             for (int i = 0; i < Count; i++)
-                if (hits[i]) ObserveOccupied(i);
+                if (hits[i]) { ObserveOccupied(i); TeamBelief?.Observe(Centre(i), true, false); }
                 else if (frees[i] && frame.Timestamp >= localTime[i])
                 {
-                    if (Vector2.Distance(Centre(i), eye) <= reach && (c.search_low_m <= 0 || lows[i])) ObserveFree(i); else MapFree(i);
+                    bool searchedFloor = Vector2.Distance(Centre(i), eye) <= reach && (c.search_low_m <= 0 || lows[i]);
+                    if (searchedFloor) ObserveFree(i); else MapFree(i);
+                    TeamBelief?.Observe(Centre(i), false, searchedFloor);
                 }
+            TeamBelief?.EndObservation();
             MarkCeilingSightLines(start);
             localObservationTime = time;
         }
@@ -400,11 +407,13 @@ namespace SmokeRescue.Brain
                 Ray(start, end, true);
             }
             // As for depth, a grazing beam through a wall cell cannot erase a hit from the same sweep.
+            TeamBelief?.BeginObservation(scan.Timestamp, 1);
             for (int i = 0; i < Count; i++)
             {
-                if (hits[i]) { lidarOdds[i] = Mathf.Min(c.log_odds_cap, Mathf.Max(0, lidarOdds[i]) + c.occupied_log_odds); dirty = roofDirty = true; }
-                else if (frees[i]) { lidarOdds[i] = Mathf.Max(-c.log_odds_cap, lidarOdds[i] + c.free_log_odds); dirty = roofDirty = true; }
+                if (hits[i]) { lidarOdds[i] = Mathf.Min(c.log_odds_cap, Mathf.Max(0, lidarOdds[i]) + c.occupied_log_odds); dirty = roofDirty = true; TeamBelief?.Observe(Centre(i), true, false); }
+                else if (frees[i]) { lidarOdds[i] = Mathf.Max(-c.log_odds_cap, lidarOdds[i] + c.free_log_odds); dirty = roofDirty = true; TeamBelief?.Observe(Centre(i), false, false); }
             }
+            TeamBelief?.EndObservation();
             MarkOpenGround(scan, origin, pose.yawRad);
             CountOpenBeams(scan, origin, pose.yawRad);
         }

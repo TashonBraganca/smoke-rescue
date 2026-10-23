@@ -28,6 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'brain'))
 from brain.nav_io import (load_scenario, recording_frame, transform_xy, transform_poses,
                           map_geometry, rotation, sample_grid, frame_peer)
 from brain.compare_runs import score_confirmations
+from brain.team_map import latest_team_map
 from make_walkthrough import frames, ironbow, narration, thermal_frames  # noqa: E402
 
 W, H = 1920, 1080
@@ -100,6 +101,30 @@ def jsonl(p: Path) -> list[dict]:
     return [json.loads(l) for l in p.read_text().splitlines() if l.strip()] if p.exists() else []
 
 
+def team_map_rgb(grid, at=None):
+    """Colour only the exported robot belief. Wall brightness follows occupancy confidence.
+    Free-floor colour follows camera search confidence; unseen floor stays dark."""
+    image = np.full((grid.size, grid.size, 3), PANEL, np.uint8)
+    tint = np.zeros_like(image, dtype=float)
+    contributors = np.zeros((grid.size, grid.size), int)
+    for i, source in enumerate(grid.sources):
+        mask = (grid.source_mask & (1 << i)) != 0
+        colour = ROBOT[1 if source.endswith('B') or source == 'B' else 0]
+        tint[mask] += colour
+        contributors[mask] += 1
+    known = contributors > 0
+    tint[known] /= contributors[known, None]
+    certainty = np.abs(grid.occupancy - .5) * 2
+    age = 0 if at is None else max(0, at - grid.at)
+    search = grid.searched_confidence * .5 ** (age / 60)
+    free = known & (grid.occupancy <= .5)
+    strength = np.maximum(certainty * .18, search * .75)
+    image[free] = (np.array(PANEL) + (tint[free] - PANEL) * strength[free, None]).astype(np.uint8)
+    wall = known & (grid.occupancy > .5)
+    image[wall] = (np.array(PANEL) + (np.array(TEXT) - PANEL) * certainty[wall, None]).astype(np.uint8)
+    return image
+
+
 class LiveMaps:
     """Place recorded grids and sensors on the plan using known starts for display."""
 
@@ -126,6 +151,7 @@ class LiveMaps:
         self.bounds = np.r_[extent.min(axis=0) - 1, extent.max(axis=0) + 1]
         self.maps, self.map_times, self.state_times, self.poses, self.lidar = {}, {}, {}, {}, {}
         self.decoded, self.base_key, self.base_image = {}, None, None
+        self.team_cache = {}
         for r in robots:
             rd = rec / r
             index = rd / 'brain_map.txt'
@@ -195,7 +221,8 @@ class LiveMaps:
 
     def base(self, t, size):
         indices = self.map_indices(t)
-        key = indices, size
+        receiver, belief = self.team_snapshot(t)
+        key = indices, size, receiver, None if belief is None else belief.at, int(t * 2)
         if key == self.base_key:
             return self.base_image
         x0, y0, x1, y1 = self.bounds
@@ -203,6 +230,16 @@ class LiveMaps:
         ys = y1 - (np.arange(size[1]) + .5) * (y1 - y0) / size[1]
         xx, yy = np.meshgrid(xs, ys)
         building = np.stack([xx, yy], axis=-1)
+        if belief is not None:
+            transform = self.frames[receiver][0]
+            own = (building - transform[:2]) @ rotation(transform[2])
+            cells = np.floor((own - belief.origin) / belief.cell_m).astype(int)
+            valid = (cells[..., 0] >= 0) & (cells[..., 0] < belief.size) & (cells[..., 1] >= 0) & (cells[..., 1] < belief.size)
+            image = np.full((size[1], size[0], 3), PANEL, np.uint8)
+            colours = team_map_rgb(belief, t)
+            image[valid] = colours[cells[..., 1][valid], cells[..., 0][valid]]
+            self.base_key, self.base_image = key, image
+            return image
         occupied = np.zeros((size[1], size[0]), bool)
         free = np.zeros_like(occupied)
         tint = np.zeros((*occupied.shape, 3), float)
@@ -231,6 +268,22 @@ class LiveMaps:
         image[occupied] = TEXT
         self.base_key, self.base_image = key, image
         return image
+
+    def team_snapshot(self, t):
+        # One receiver's actual team state, rather than an evaluator's union of all robots' grids.
+        # Refresh every half second so a watcher can pick up a file just finished by the recorder.
+        key = int(t * 2)
+        if key not in self.team_cache:
+            found = [(r, latest_team_map(self.rec / r, t)) for r in self.robots]
+            found = [(r, g) for r, g in found if g is not None]
+            self.team_cache = {key: max(found, key=lambda item: item[1].at) if found else (None, None)}
+        return self.team_cache[key]
+
+    def belief_caption(self, t):
+        receiver, grid = self.team_snapshot(t)
+        if grid is None:
+            return 'legacy binary grids; confidence was not recorded'
+        return f"{receiver}'s team belief at {grid.at:.1f}s; bright = confident"
 
     def render(self, t, available_size):
         x0, y0, x1, y1 = self.bounds
@@ -485,7 +538,7 @@ def main() -> None:
         if live_maps is not None:
             panel(d, mbox, "Live maps")
             d.text((mbox[0] + 16, mbox[1] + 38),
-                   "known start pose placement for display only", font=F['small'], fill=FAINT)
+                   live_maps.belief_caption(t), font=F['small'], fill=FAINT)
             m = live_maps.render(t, (mbox[2] - mbox[0] - 24, mbox[3] - mbox[1] - 112))
             im.paste(m, (mbox[0] + (mbox[2] - mbox[0] - m.width) // 2,
                          mbox[1] + 62 + (mbox[3] - mbox[1] - 112 - m.height) // 2))
@@ -503,7 +556,7 @@ def main() -> None:
             d.text((mbox[0] + 16, mbox[3] - 34), "placed on the plan with the known start pose for display;", font=F['tiny'], fill=DIM)
             d.text((mbox[0] + 16, mbox[3] - 18), FRAME_NOTE, font=F['tiny'], fill=DIM)
         cbox = (672, 568, 672 + 640, H - 16)
-        evaluator_plan_panel(d, cbox, 'Shared context')
+        evaluator_plan_panel(d, cbox, 'Evaluator truth overlay')
         c = context.render(t)[56:56 + context.mh + 4, 6:6 + context.mw + 8, ::-1]
         s = min((cbox[2] - cbox[0] - 24) / c.shape[1], (cbox[3] - cbox[1] - 164) / c.shape[0])
         c = cv2.resize(np.ascontiguousarray(c), (int(c.shape[1] * s), int(c.shape[0] * s)), interpolation=cv2.INTER_AREA)
