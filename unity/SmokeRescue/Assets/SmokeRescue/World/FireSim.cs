@@ -30,13 +30,15 @@ namespace SmokeRescue.World
             public double HeatReleaseKw { get; }
             public float BurntFraction { get; }
             public bool Collapsed { get; }
+            /// <summary>Simulation time until which water keeps this cell from igniting.</summary>
+            public double WetUntilS { get; }
             internal CellState(string room, Cell c)
             {
                 Room = room; InitialFuelKg = (float)c.initialFuel; FuelRemainingKg = (float)c.fuel;
                 SurfaceTemperatureC = (float)c.temperature; FlameIntensity = (float)c.flame;
                 HeatReleaseKw = c.heatReleaseKw;
                 BurntFraction = c.initialFuel > 0 ? (float)Clamp(1 - c.fuel / c.initialFuel, 0, 1) : 0;
-                Collapsed = c.collapsed;
+                Collapsed = c.collapsed; WetUntilS = c.wetUntil;
             }
         }
 
@@ -115,6 +117,10 @@ namespace SmokeRescue.World
         sealed class WaterConfig
         {
             public double latent_heat_kj_l, sensible_heat_kj_l, application_efficiency, wet_seconds_per_litre;
+            /// <summary>Share of an aimed stream that lands on the burning cells of its cone (the rest wets the whole cone).</summary>
+            public double burning_first_share;
+            /// <summary>A cell put out by water keeps its share of its origin's growth budget while it stays out.</summary>
+            public bool quench_keeps_growth_share;
         }
         sealed class CollapseConfig
         {
@@ -131,6 +137,8 @@ namespace SmokeRescue.World
             public int room = -1;
             public int origin = -1;
             public double initialFuel, fuel, temperature, flame, burnIntensity, wetUntil, heatReleaseKw, ignition = double.MaxValue;
+            public double wetBank, quenchedKw;   // dry-out seconds banked by this wetting; free-burn release water took away
+            public int quenchedOrigin = -1;
             public bool burning, collapsed, protectedApproach;
         }
         internal sealed class Gas
@@ -403,13 +411,23 @@ namespace SmokeRescue.World
                 if (spray.start >= Time + dt) break;
                 double overlap = Math.Max(0, Math.Min(Time + dt, spray.end) - Math.Max(Time, spray.start));
                 if (overlap <= 0 || spray.flow == 0 || spray.targets.Length == 0) continue;
-                double litres = spray.flow * overlap / spray.targets.Length;
+                // An aimed stream puts burning_first_share of its water on the burning cells of its cone and spreads the rest
+                // over the whole cone. Issue list 23 Oct, item 7: shared evenly over every visible cell, a 5 m cone's water
+                // mostly fell on floor that was not burning, and a fire the cone held never went out.
+                int burningTargets = 0; foreach (int i in spray.targets) if (cells[i].burning) burningTargets++;
+                double total = spray.flow * overlap, aimed = burningTargets > 0 ? total * config.water.burning_first_share : 0;
+                double spread = (total - aimed) / spray.targets.Length;
                 foreach (int i in spray.targets)
                 {
+                    double litres = spread + (cells[i].burning ? aimed / burningTargets : 0);
                     waterLitres[i] += litres;
-                    // Retained water buys an additive dry-out time after the last wetted part of a tick.
-                    cells[i].wetUntil = Math.Max(cells[i].wetUntil, Math.Min(Time + dt, spray.end)) +
-                        litres * config.water.wet_seconds_per_litre;
+                    // Retained water buys an additive dry-out time after the last wetted part of a tick, banked across ticks:
+                    // re-taking the max with the tick end each tick dropped every earlier tick's share, so a cone over more
+                    // than about 30 cells left about 0 s of protection (issue list 23 Oct, item 7).
+                    var c = cells[i];
+                    if (c.wetUntil <= Time) c.wetBank = 0;
+                    c.wetBank += litres * config.water.wet_seconds_per_litre;
+                    c.wetUntil = Math.Max(c.wetUntil, Math.Min(Time + dt, spray.end) + c.wetBank);
                 }
             }
         }
@@ -477,7 +495,15 @@ namespace SmokeRescue.World
                     nextBurnIntensity[i] = intensity;
                     potentialMass[i] = Math.Min(c.fuel, dt * s.fuel_burn_kg_m2_s * area * intensity);
                     originPotentialKw[nextOrigin[i]] += potentialMass[i] * s.heat_of_combustion_kj_kg / dt;
+                    c.quenchedKw = 0;
                 }
+                // quench_keeps_growth_share: a cell water put out still counts in its origin's growth potential, so the cap
+                // (budget over potential) does not hand its share to the cells still burning. Without it, a fire with the cap
+                // binding returned to exactly its alpha t^2 budget after water put out most of its cells (issue list 23 Oct,
+                // item 7). FDS reduces burning where water lands and moves no heat elsewhere (FDS Technical Reference Guide,
+                // reduction of pyrolysis rate due to water).
+                else if (config.water.quench_keeps_growth_share && c.quenchedKw > 0 && c.fuel > 0 && c.quenchedOrigin >= 0)
+                    originPotentialKw[c.quenchedOrigin] += c.quenchedKw;
             }
             for (int n = 0; n < originScale.Length; n++)
             {
@@ -531,7 +557,11 @@ namespace SmokeRescue.World
                 // Extinction is a state transition, not a visual fade. A subsequent ignition
                 // needs dry fuel and neighbour/room heating in the first pass above.
                 // Grimwood (2005), p.6; NISTIR 6191 (1998), chapter 2.
-                if (flameAbsorbed && temperature < c.ignition) { c.burning = false; nextFlame[i] = 0; }
+                if (flameAbsorbed && temperature < c.ignition)
+                {
+                    c.burning = false; nextFlame[i] = 0;
+                    c.quenchedKw = potentialMass[i] * s.heat_of_combustion_kj_kg / dt; c.quenchedOrigin = c.origin;
+                }
                 c.burnIntensity = c.burning ? nextBurnIntensity[i] : 0;
                 nextTemperature[i] = Clamp(temperature, config.ambient_c, s.max_temperature_c);
             }
@@ -937,6 +967,7 @@ namespace SmokeRescue.World
             Nonnegative(c.water.sensible_heat_kj_l, "water.sensible_heat_kj_l");
             Positive(c.water.wet_seconds_per_litre, "water.wet_seconds_per_litre");
             Fraction(c.water.application_efficiency, "water.application_efficiency");
+            Fraction(c.water.burning_first_share, "water.burning_first_share");
             Require(Finite(c.water.latent_heat_kj_l + c.water.sensible_heat_kj_l), "water energy overflow");
             var s = c.spread; var g = c.gas; var r = c.collapse; var q = c.query;
             Nonnegative(s.growth_alpha_kw_s2, "spread.growth_alpha_kw_s2");
