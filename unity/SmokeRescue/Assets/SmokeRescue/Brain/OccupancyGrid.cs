@@ -215,6 +215,10 @@ namespace SmokeRescue.Brain
         internal void MarkHeatLook(int i, double t) { if (i >= 0 && i < Count && t > heatLookTime[i]) heatLookTime[i] = t; }
         float ExternalHeatAt(int i, double t) => double.IsNegativeInfinity(externalTime[i]) ? c.ambient_c :
             Mathf.Max(c.ambient_c, externalHeat[i] - c.heat_decay_c_per_s * (float)(t - externalTime[i]));
+        /// <summary>An agent's keep-out (avoid_area) is written as heat and must last its full time: this robot's cool
+        /// readings never clear a held cell before until (a fire spreading toward cool floor is why it was ordered).</summary>
+        internal void HoldHeat(int i, double until) { if (i < 0 || i >= Count) return; heatHeldUntil ??= new double[Count]; heatHeldUntil[i] = Math.Max(heatHeldUntil[i], until); }
+        double[] heatHeldUntil;
         internal void ObservePeerHeat(int i, float temperatureC, double observedAt, double receivedAt)
         {
             if (i < 0 || i >= Count || observedAt < heatTime[i]) return;
@@ -230,15 +234,24 @@ namespace SmokeRescue.Brain
             if (i < 0 || i >= Count || !BrainMath.Finite(temperatureC) || t < heatTime[i]) return;
             float ownDecayed = double.IsNegativeInfinity(ownHeatTime[i]) ? c.ambient_c :
                 Mathf.Max(c.ambient_c, ownHeat[i] - c.heat_decay_c_per_s * (float)(t - ownHeatTime[i]));
-            if (t >= ownHeatTime[i] && temperatureC >= ownDecayed) { ownHeat[i] = temperatureC; ownHeatTime[i] = t; }
-            else if (t - ownHeatTime[i] >= c.heat_cool_after_s)
+            // Cooled: seen below its decayed own heat, or seen cool (heat_project_min_c) where the map holds heat that came
+            // only from a partner, with no hot reading of its own for heat_cool_after_s. Tested before the "warmer than
+            // remembered" update, which a cool look at a partner-reported cell would otherwise take (ambient own heat).
+            bool cooled = (temperatureC < ownDecayed || (temperatureC <= c.heat_project_min_c && heat[i] > c.heat_project_min_c))
+                          && t - ownHeatTime[i] >= c.heat_cool_after_s && !(heatHeldUntil != null && heatHeldUntil[i] > t);
+            if (!cooled && t >= ownHeatTime[i] && temperatureC >= ownDecayed) { ownHeat[i] = temperatureC; ownHeatTime[i] = t; }
+            else if (cooled)
             {
                 // Seen cooler, with no hot reading for heat_cool_after_s: the fire there is out (water, burnt out). Flames
                 // flicker, but a burning cell keeps refreshing its hot reading, so it stays hot. Without this a 500 C
                 // reading stayed "fire" for over 30 minutes (0.2 C/s decay) and sprayed water never opened a route.
                 bool before = Dangerous(i);
                 ownHeat[i] = temperatureC; ownHeatTime[i] = t;
-                heat[i] = Mathf.Max(temperatureC, ExternalHeatAt(i, t)); heatTime[i] = t; rise[i] = 0;
+                // This robot's own newer look beats a partner's older report: keeping max(cool, partner heat) held a
+                // partner's 500 C sample at 499 C against a fresh local 20 C (Codex HeatCheck, 23 Oct). A partner packet
+                // observed before t is already ignored by ObservePeerHeat's time check.
+                externalHeat[i] = temperatureC; externalTime[i] = t;
+                heat[i] = temperatureC; heatTime[i] = t; rise[i] = 0;
                 dirty |= before != Dangerous(i);
                 return;
             }

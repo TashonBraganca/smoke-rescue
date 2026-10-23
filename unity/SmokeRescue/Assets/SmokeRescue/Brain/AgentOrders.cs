@@ -401,7 +401,7 @@ namespace SmokeRescue.Brain
                     if (dx * dx + dy * dy > radiusM * radiusM) continue;
                     int i = grid.Cell(centre + new Vector2(dx, dy));
                     if (i < 0) continue;
-                    grid.ObservePeerHeat(i, temperature, t, t); cells++;
+                    grid.ObservePeerHeat(i, temperature, t, t); grid.HoldHeat(i, t + Math.Max(1.0, seconds)); cells++;
                 }
             lastPlan = double.NegativeInfinity;   // replan through the new margin at once
             Emit(t, "agent_order", "avoid_area around spreading fire, OpenCV evidence " + evidence + ".",

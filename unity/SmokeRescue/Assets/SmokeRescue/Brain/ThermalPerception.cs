@@ -125,9 +125,20 @@ namespace SmokeRescue.Brain
             {
                 if (!Match(x, y, rgb, s, out int u, out int v, out float z)) continue;
                 float right = (u - k.cx) / k.fx * z, ahead = k.mount.forward_offset_m + z * cosPitch - (v - k.cy) / k.fy * z * sinPitch;
-                grid.MarkHeatLook(grid.Cell(pose.position + new Vector2(cosYaw * right - sinYaw * ahead, sinYaw * right + cosYaw * ahead)), thermal.Timestamp);
-                float temperature = thermal.Celsius(x, y); if (temperature <= c.heat_project_min_c) continue;
-                var p = OccupancyGrid.BackProject(u, v, z, s); int cell = grid.Cell(pose.Transform(p.x, p.y));
+                int look = grid.Cell(pose.position + new Vector2(cosYaw * right - sinYaw * ahead, sinYaw * right + cosYaw * ahead));
+                grid.MarkHeatLook(look, thermal.Timestamp);
+                float temperature = thermal.Celsius(x, y);
+                int cell;
+                if (temperature <= c.heat_project_min_c)
+                {
+                    // A cool reading counts where the map still holds heat, so the "seen cool for heat_cool_after_s: the fire
+                    // is out" rule in ObserveHeat can run. Skipping every pixel at or below heat_project_min_c kept a cell
+                    // seen at 500 C and then at 20 C 3 s later "fire" at 499 C (Codex HeatCheck, 23 Oct); seed 934, robot A:
+                    // 21 routes cut by fire margins while its own air never passed 44 C.
+                    if (look < 0 || grid.Heat(look) <= c.heat_project_min_c) continue;
+                    cell = look;
+                }
+                else { var p = OccupancyGrid.BackProject(u, v, z, s); cell = grid.Cell(pose.Transform(p.x, p.y)); }
                 if (cell >= 0 && (!maximum.TryGetValue(cell, out float old) || temperature > old)) maximum[cell] = temperature;
             }
             // Sort keys so updates and any later extension to event logging have an explicit order.
