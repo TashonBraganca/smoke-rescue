@@ -48,6 +48,11 @@ namespace SmokeRescue.Brain
         }
 
         double sweepStarted;
+        /// <summary>A look lasts long enough for the colour person detector to see the same place person_rgb_sightings times,
+        /// whatever the phase of its scans. 0.6 s held the camera for less than one scan period (1 s) while a candidate needs two
+        /// sightings, so a look could never make one (23 Oct memo, section 1.4; 6 of 30 people in 922 to 928 were seen but never
+        /// became a candidate).</summary>
+        float LookHoldS => Mathf.Max(c.sweep_hold_s, c.person_rgb_sightings * c.person_rgb_scan_period_s);
 
         void SkipSweepLook(double t, string why)
         {
@@ -91,7 +96,7 @@ namespace SmokeRescue.Brain
                 return Command(0, Mathf.Clamp(error * c.heading_gain, -c.sweep_yaw_dps, c.sweep_yaw_dps), dt, true);
             if (double.IsNaN(sweepHoldUntil))
             {
-                sweepHoldUntil = t + c.sweep_hold_s;
+                sweepHoldUntil = t + LookHoldS;
                 Emit(t, "sweep_look", "Hold a camera sector that contains unsearched floor.",
                     "look_index", sweepIndex, "offset_deg", SweepOffsetsDeg[sweepIndex]);
             }
@@ -225,7 +230,7 @@ namespace SmokeRescue.Brain
             float error = BrainMath.Angle(motion.Pose.yawRad, BrainMath.Heading(doorwayProbeForward));
             if (Mathf.Abs(error) > c.sweep_tolerance_deg)
                 return Command(0, Mathf.Clamp(error * c.heading_gain, -c.sweep_yaw_dps, c.sweep_yaw_dps), dt, true);
-            if (double.IsNaN(doorwayProbeHoldUntil)) doorwayProbeHoldUntil = t + c.sweep_hold_s;
+            if (double.IsNaN(doorwayProbeHoldUntil)) doorwayProbeHoldUntil = t + LookHoldS;
             if (t >= doorwayProbeHoldUntil) EndDoorwayProbe(t, "One doorway look completed; only sensed ceiling evidence can admit the floor ahead.");
             return Command(0, 0, dt, true);
         }

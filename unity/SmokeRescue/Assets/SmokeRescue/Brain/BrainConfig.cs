@@ -101,7 +101,7 @@ namespace SmokeRescue.Brain
         public float frontier_gain_weight = 0.04f;
         public int frontier_gain_cap_cells = 150, frontier_min_information_cells = 10;
         public float visited_radius_m = 0.8f, visited_hold_s = 90f;
-        public float sweep_max_s = 12f;
+        public float sweep_max_s = 16f;
         public float collision_escape_s = 3f;
         public float collision_margin_m = 0.05f;
         public float lead_max_m = 1.0f;

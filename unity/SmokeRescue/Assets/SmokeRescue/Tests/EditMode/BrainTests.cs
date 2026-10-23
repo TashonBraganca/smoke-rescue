@@ -4191,13 +4191,15 @@ namespace SmokeRescue.Tests.EditMode
             var hall = Sweep(true);
             Assert.That(hall.turned, Is.LessThan(6), "searched walls do not justify either side turn");
             Assert.That(hall.looks, Is.EqualTo(1), "only the forward sector contains unsearched floor");
-            Assert.That(hall.seconds, Is.LessThan(1.5), "one short dwell replaces the corridor sweep");
+            var timing = Settings(); float twoScans = timing.person_rgb_sightings * timing.person_rgb_scan_period_s;
+            Assert.That(hall.seconds, Is.GreaterThanOrEqualTo(twoScans), "the look lasts long enough for two colour detector scans");
+            Assert.That(hall.seconds, Is.LessThan(twoScans + .9), "one dwell replaces the corridor sweep");
             TestContext.WriteLine($"corridor: {hall.looks} look, {hall.turned:0.0} degrees, {hall.seconds:0.00} s");
             var room = Sweep(false);
             TestContext.WriteLine($"open room: {room.looks} looks, {room.turned:0.0} degrees, {room.seconds:0.00} s");
             Assert.That(room.looks, Is.EqualTo(3), "all three camera sectors in an open unsearched room are kept");
             Assert.That(room.turned, Is.GreaterThan(200), "the room still receives the complete sweep");
-            Assert.That(room.seconds, Is.LessThan(12), "all three holds finish before the sweep time limit");
+            Assert.That(room.seconds, Is.LessThan(Settings().sweep_max_s), "all three holds finish before the sweep time limit");
             var door = Sweep(true, sideOpening: true);
             Assert.That(door.looks, Is.EqualTo(2), "an opening in the side wall keeps that side look as well as the forward look");
             Assert.That(Sweep(false, allSearched: true).looks, Is.Zero, "a searched room needs no look");
