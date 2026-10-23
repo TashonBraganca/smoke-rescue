@@ -1,0 +1,240 @@
+{
+ "run": "/Volumes/Tashon/opencv/smoke-rescue/data/runs/headless/exp6/5010_v0_default",
+ "settings": {},
+ "sim_s": 240.0,
+ "wall_s": 580,
+ "bad_trace_lines": 0,
+ "robots": {
+  "robot_A": {
+   "walked_m": 37.5,
+   "final_state": "explore",
+   "peak_air_c": 20,
+   "air_over_60_s": 0,
+   "outside_s": 4.0,
+   "turning_in_place_s": 60.0,
+   "turned_in_place_deg": 2962.1,
+   "still_s": 48.0,
+   "turned_in_place_turns": 8.2,
+   "states_s": {
+    "explore": 226,
+    "survivor": 12,
+    "recover": 3
+   },
+   "rooms_in_order": [
+    [
+     "r11:corridor",
+     4.0
+    ],
+    [
+     "r05:bathroom",
+     11.0
+    ],
+    [
+     "r11:corridor",
+     36.0
+    ],
+    [
+     "r06:study",
+     55.0
+    ],
+    [
+     "r11:corridor",
+     93.0
+    ],
+    [
+     "r03:bedroom",
+     116.5
+    ],
+    [
+     "r01:closet",
+     214.5
+    ]
+   ],
+   "stuck_events": {
+    "collision_hold": 1,
+    "no_progress": 1,
+    "collision_risk": 1
+   },
+   "room_claimed": 0,
+   "room_yielded": 0,
+   "events": {
+    "replan": 288,
+    "peer_message_received": 52,
+    "localization": 49,
+    "goal": 42,
+    "doorway_probe_done": 10,
+    "local_evidence_started": 9,
+    "sweep_look": 8,
+    "sweep_started": 4,
+    "sweep_look_skipped": 4,
+    "area_searched": 4,
+    "survivor_candidate": 2,
+    "map_shared": 1
+   }
+  },
+  "robot_B": {
+   "walked_m": 44.7,
+   "final_state": "explore",
+   "peak_air_c": 20,
+   "air_over_60_s": 0,
+   "outside_s": 11.5,
+   "turning_in_place_s": 55.0,
+   "turned_in_place_deg": 2662.6,
+   "still_s": 40.0,
+   "turned_in_place_turns": 7.4,
+   "states_s": {
+    "explore": 218,
+    "survivor": 12,
+    "recover": 9
+   },
+   "rooms_in_order": [
+    [
+     "r11:corridor",
+     11.5
+    ],
+    [
+     "r05:bathroom",
+     24.0
+    ],
+    [
+     "r11:corridor",
+     52.0
+    ],
+    [
+     "r07:living",
+     152.0
+    ]
+   ],
+   "stuck_events": {
+    "collision_hold": 3,
+    "no_progress": 2,
+    "goal_blacklisted": 1,
+    "collision_risk": 18
+   },
+   "room_claimed": 0,
+   "room_yielded": 0,
+   "events": {
+    "replan": 314,
+    "peer_message_received": 52,
+    "localization": 49,
+    "goal": 49,
+    "collision_risk": 18,
+    "doorway_probe_done": 7,
+    "sweep_look_skipped": 7,
+    "local_evidence_started": 6,
+    "sweep_look": 5,
+    "sweep_started": 4,
+    "area_searched": 4,
+    "collision_hold": 3
+   }
+  }
+ },
+ "rooms": {
+  "r01:closet": {
+   "searched_pct": 68,
+   "by_robot_pct": [
+    68,
+    3
+   ]
+  },
+  "r02:bedroom": {
+   "searched_pct": 48,
+   "by_robot_pct": [
+    2,
+    48
+   ]
+  },
+  "r03:bedroom": {
+   "searched_pct": 86,
+   "by_robot_pct": [
+    86,
+    8
+   ]
+  },
+  "r04:bedroom": {
+   "searched_pct": 8,
+   "by_robot_pct": [
+    1,
+    8
+   ]
+  },
+  "r05:bathroom": {
+   "searched_pct": 89,
+   "by_robot_pct": [
+    67,
+    83
+   ]
+  },
+  "r06:study": {
+   "searched_pct": 84,
+   "by_robot_pct": [
+    84,
+    3
+   ]
+  },
+  "r07:living": {
+   "searched_pct": 96,
+   "by_robot_pct": [
+    1,
+    96
+   ]
+  },
+  "r08:kitchen": {
+   "searched_pct": 17,
+   "by_robot_pct": [
+    14,
+    11
+   ]
+  },
+  "r09:study": {
+   "searched_pct": 66,
+   "by_robot_pct": [
+    5,
+    66
+   ]
+  },
+  "r10:laundry": {
+   "searched_pct": 42,
+   "by_robot_pct": [
+    35,
+    11
+   ]
+  },
+  "r11:corridor": {
+   "searched_pct": 100,
+   "by_robot_pct": [
+    54,
+    99
+   ]
+  }
+ },
+ "people": {
+  "s1:study": {
+   "first_sighting_s": 103.0,
+   "confirmed_s": null
+  },
+  "s2:bedroom": {
+   "first_sighting_s": 129.0,
+   "confirmed_s": null
+  },
+  "s3:kitchen": {
+   "first_sighting_s": null,
+   "confirmed_s": null
+  },
+  "s4:bedroom": {
+   "first_sighting_s": 61.0,
+   "confirmed_s": 66.1
+  },
+  "s5:living": {
+   "first_sighting_s": 150.0,
+   "confirmed_s": 208.0
+  }
+ },
+ "house_searched_pct_mean_over_rooms": 64,
+ "false_confirmations": 0,
+ "radio": {
+  "sent": 240,
+  "delivered": 104,
+  "with_room_claim": 0
+ }
+}

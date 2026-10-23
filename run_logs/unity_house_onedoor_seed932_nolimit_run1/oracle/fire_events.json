@@ -1,0 +1,33 @@
+{
+  "head_start_s": 0.0,
+  "config_file": "fire.json",
+  "note": "times are on the robots' clock (fire time minus head start)",
+  "collapses": [
+    {
+      "t": 229.8,
+      "Room": "living",
+      "rect": [
+        0.25,
+        0.0,
+        0.5,
+        0.25
+      ]
+    },
+    {
+      "t": 237.8,
+      "Room": "living",
+      "rect": [
+        2.5,
+        5.75,
+        2.75,
+        6.0
+      ]
+    }
+  ],
+  "flashover": [
+    {
+      "Room": "living",
+      "t": 181.8
+    }
+  ]
+}

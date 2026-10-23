@@ -1,0 +1,247 @@
+{
+ "run": "/Volumes/Tashon/opencv/smoke-rescue/data/runs/headless/unseen93/5017_passage",
+ "settings": {},
+ "sim_s": 240.0,
+ "wall_s": 433,
+ "bad_trace_lines": 0,
+ "robots": {
+  "robot_A": {
+   "walked_m": 58.2,
+   "final_state": "explore",
+   "peak_air_c": 20,
+   "air_over_60_s": 0,
+   "outside_s": 4.0,
+   "turning_in_place_s": 42.0,
+   "turned_in_place_deg": 2200.0,
+   "still_s": 26.0,
+   "turned_in_place_turns": 6.1,
+   "states_s": {
+    "explore": 200,
+    "survivor": 40
+   },
+   "rooms_in_order": [
+    [
+     "r08:corridor",
+     4.0
+    ],
+    [
+     "r06:study",
+     17.0
+    ],
+    [
+     "r08:corridor",
+     76.5
+    ],
+    [
+     "r02:living",
+     181.0
+    ],
+    [
+     "r08:corridor",
+     228.0
+    ],
+    [
+     "r01:bedroom",
+     239.5
+    ]
+   ],
+   "stuck_events": {
+    "no_progress": 1,
+    "collision_risk": 6
+   },
+   "room_claimed": 11,
+   "room_yielded": 0,
+   "events": {
+    "replan": 342,
+    "room_searched": 195,
+    "goal": 55,
+    "localization": 49,
+    "peer_message_received": 29,
+    "room_claimed": 11,
+    "collision_risk": 6,
+    "sweep_look_skipped": 5,
+    "sweep_started": 4,
+    "sweep_look": 4,
+    "survivor_candidate": 4,
+    "survivor_confirmed": 4
+   }
+  },
+  "robot_B": {
+   "walked_m": 71.1,
+   "final_state": "explore",
+   "peak_air_c": 20,
+   "air_over_60_s": 0,
+   "outside_s": 11.0,
+   "turning_in_place_s": 28.5,
+   "turned_in_place_deg": 1471.1,
+   "still_s": 15.5,
+   "turned_in_place_turns": 4.1,
+   "states_s": {
+    "explore": 234,
+    "survivor": 6
+   },
+   "rooms_in_order": [
+    [
+     "r08:corridor",
+     11.0
+    ],
+    [
+     "r07:bathroom",
+     15.0
+    ],
+    [
+     "r08:corridor",
+     51.5
+    ],
+    [
+     "r04:study",
+     82.5
+    ],
+    [
+     "r08:corridor",
+     147.5
+    ],
+    [
+     "r06:study",
+     163.5
+    ],
+    [
+     "r08:corridor",
+     185.5
+    ],
+    [
+     "r07:bathroom",
+     191.5
+    ],
+    [
+     "r08:corridor",
+     207.5
+    ],
+    [
+     "r09:kitchen",
+     237.5
+    ]
+   ],
+   "stuck_events": {
+    "no_progress": 1
+   },
+   "room_claimed": 12,
+   "room_yielded": 1,
+   "events": {
+    "replan": 421,
+    "localization": 49,
+    "room_searched": 41,
+    "goal": 39,
+    "peer_message_received": 29,
+    "room_claimed": 12,
+    "sweep_look_skipped": 7,
+    "sweep_look": 5,
+    "sweep_started": 4,
+    "area_searched": 4,
+    "survivor_from_peer": 4,
+    "goal_yielded": 2
+   }
+  }
+ },
+ "rooms": {
+  "r01:bedroom": {
+   "searched_pct": 44,
+   "by_robot_pct": [
+    43,
+    1
+   ]
+  },
+  "r02:living": {
+   "searched_pct": 97,
+   "by_robot_pct": [
+    97,
+    1
+   ]
+  },
+  "r03:closet": {
+   "searched_pct": 25,
+   "by_robot_pct": [
+    0,
+    25
+   ]
+  },
+  "r04:study": {
+   "searched_pct": 83,
+   "by_robot_pct": [
+    5,
+    83
+   ]
+  },
+  "r05:laundry": {
+   "searched_pct": 90,
+   "by_robot_pct": [
+    0,
+    90
+   ]
+  },
+  "r06:study": {
+   "searched_pct": 100,
+   "by_robot_pct": [
+    91,
+    66
+   ]
+  },
+  "r07:bathroom": {
+   "searched_pct": 100,
+   "by_robot_pct": [
+    52,
+    100
+   ]
+  },
+  "r08:corridor": {
+   "searched_pct": 100,
+   "by_robot_pct": [
+    100,
+    76
+   ]
+  },
+  "r09:kitchen": {
+   "searched_pct": 74,
+   "by_robot_pct": [
+    58,
+    61
+   ]
+  },
+  "r10:bedroom": {
+   "searched_pct": 44,
+   "by_robot_pct": [
+    43,
+    9
+   ]
+  }
+ },
+ "people": {
+  "s1:study": {
+   "first_sighting_s": 75.0,
+   "confirmed_s": 81.0
+  },
+  "s2:bedroom": {
+   "first_sighting_s": 223.0,
+   "confirmed_s": 232.2
+  },
+  "s3:kitchen": {
+   "first_sighting_s": 107.0,
+   "confirmed_s": 113.0
+  },
+  "s4:living": {
+   "first_sighting_s": 178.0,
+   "confirmed_s": 194.1
+  },
+  "s5:bedroom": {
+   "first_sighting_s": 127.0,
+   "confirmed_s": 138.0
+  }
+ },
+ "house_searched_pct_mean_over_rooms": 76,
+ "false_confirmations": 0,
+ "radio": {
+  "sent": 240,
+  "delivered": 58,
+  "with_room_claim": 184
+ }
+}

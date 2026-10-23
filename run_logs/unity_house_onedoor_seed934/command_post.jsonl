@@ -1,0 +1,55 @@
+{"t":6.0,"from":"robot_A","kind":"link","distance_m":4.26,"walls":0,"reason":"ok"}
+{"t":6.0,"from":"robot_A","kind":"heard","text":"Person detector/thermal candidate at map position (-0.51, 7.31); I am approaching for close confirmation. [robot state: this robot has confirmed nobody]"}
+{"t":20.0,"from":"robot_A","kind":"link","distance_m":9.89,"walls":0,"reason":"ok"}
+{"t":20.0,"from":"robot_A","kind":"heard","text":"Survivor confirmed at map position (-0.46, 12.18), approximately 4.8 m ahead; thermal/depth body signature. Crews notified. [robot state: confirmed by this robot so far, own map: (-0.5, 12.2)]"}
+{"t":56.0,"from":"robot_B","kind":"link","distance_m":10.79,"walls":1,"reason":"ok"}
+{"t":56.0,"from":"robot_B","kind":"heard","text":"Unresolved thermal-only wall patch near (9.04, 2.96) was not substantiated on current inspection; continuing reachable indoor frontier search. [robot state: this robot has confirmed nobody]"}
+{"t":130.0,"from":"robot_A","kind":"link","distance_m":13.41,"walls":1,"reason":"distance"}
+{"t":132.0,"from":"robot_A","kind":"link","distance_m":13.41,"walls":1,"reason":"distance"}
+{"t":134.0,"from":"robot_A","kind":"link","distance_m":12.82,"walls":0,"reason":"distance"}
+{"t":136.0,"from":"robot_A","kind":"link","distance_m":12.65,"walls":0,"reason":"distance"}
+{"t":138.0,"from":"robot_A","kind":"link","distance_m":12.78,"walls":0,"reason":"distance"}
+{"t":140.0,"from":"robot_A","kind":"link","distance_m":13.72,"walls":1,"reason":"distance"}
+{"t":142.0,"from":"robot_A","kind":"link","distance_m":14.65,"walls":1,"reason":"distance"}
+{"t":144.0,"from":"robot_A","kind":"link","distance_m":15.17,"walls":1,"reason":"distance"}
+{"t":146.0,"from":"robot_A","kind":"link","distance_m":15.41,"walls":0,"reason":"distance"}
+{"t":148.0,"from":"robot_A","kind":"link","distance_m":15.43,"walls":0,"reason":"distance"}
+{"t":150.0,"from":"robot_A","kind":"link","distance_m":15.47,"walls":1,"reason":"distance"}
+{"t":152.0,"from":"robot_A","kind":"link","distance_m":15.48,"walls":1,"reason":"distance"}
+{"t":154.0,"from":"robot_A","kind":"link","distance_m":15.49,"walls":0,"reason":"distance"}
+{"t":154.0,"from":"robot_B","kind":"link","distance_m":12.33,"walls":1,"reason":"distance"}
+{"t":156.0,"from":"robot_A","kind":"link","distance_m":15.41,"walls":0,"reason":"distance"}
+{"t":156.0,"from":"robot_B","kind":"link","distance_m":11.99,"walls":1,"reason":"ok"}
+{"t":156.0,"from":"robot_B","kind":"heard","text":"Survivor confirmed at map position (7.34, 5.74), RGB/depth person detection at 2.79 m; crews should dispatch to this location. [robot state: confirmed by this robot so far, own map: (7.3, 5.7)]"}
+{"t":158.0,"from":"robot_A","kind":"link","distance_m":15.01,"walls":1,"reason":"distance"}
+{"t":158.0,"from":"robot_B","kind":"link","distance_m":11.99,"walls":1,"reason":"ok"}
+{"t":158.0,"from":"robot_B","kind":"heard","text":"New survivor confirmed at map position (7.23, 5.74), RGB/depth person detection at 2.14 m; crews please dispatch. Existing record at (7.34,5.74) may be the same person but this confirmation localizes it at (7.23,5.74). [robot state: confirmed by this robot so far, own map: (7.3, "}
+{"t":160.0,"from":"robot_A","kind":"link","distance_m":14.03,"walls":1,"reason":"distance"}
+{"t":162.0,"from":"robot_A","kind":"link","distance_m":14.01,"walls":1,"reason":"distance"}
+{"t":164.0,"from":"robot_A","kind":"link","distance_m":14.42,"walls":1,"reason":"distance"}
+{"t":166.0,"from":"robot_A","kind":"link","distance_m":14.99,"walls":1,"reason":"distance"}
+{"t":168.0,"from":"robot_A","kind":"link","distance_m":15.34,"walls":0,"reason":"distance"}
+{"t":170.0,"from":"robot_A","kind":"link","distance_m":15.4,"walls":0,"reason":"distance"}
+{"t":172.0,"from":"robot_A","kind":"link","distance_m":15.4,"walls":0,"reason":"distance"}
+{"t":174.0,"from":"robot_A","kind":"link","distance_m":15.4,"walls":0,"reason":"distance"}
+{"t":176.0,"from":"robot_A","kind":"link","distance_m":15.17,"walls":0,"reason":"distance"}
+{"t":178.0,"from":"robot_A","kind":"link","distance_m":14.1,"walls":1,"reason":"distance"}
+{"t":180.0,"from":"robot_A","kind":"link","distance_m":13.9,"walls":1,"reason":"distance"}
+{"t":182.0,"from":"robot_A","kind":"link","distance_m":14.05,"walls":1,"reason":"distance"}
+{"t":184.0,"from":"robot_A","kind":"link","distance_m":14.65,"walls":1,"reason":"distance"}
+{"t":186.0,"from":"robot_A","kind":"link","distance_m":15.23,"walls":1,"reason":"distance"}
+{"t":188.0,"from":"robot_A","kind":"link","distance_m":15.62,"walls":2,"reason":"distance"}
+{"t":190.0,"from":"robot_A","kind":"link","distance_m":15.69,"walls":2,"reason":"distance"}
+{"t":192.0,"from":"robot_A","kind":"link","distance_m":15.69,"walls":2,"reason":"distance"}
+{"t":194.0,"from":"robot_A","kind":"link","distance_m":15.69,"walls":2,"reason":"distance"}
+{"t":196.0,"from":"robot_A","kind":"link","distance_m":15.19,"walls":1,"reason":"distance"}
+{"t":198.0,"from":"robot_A","kind":"link","distance_m":14.06,"walls":1,"reason":"distance"}
+{"t":200.0,"from":"robot_A","kind":"link","distance_m":13.04,"walls":0,"reason":"distance"}
+{"t":202.0,"from":"robot_A","kind":"link","distance_m":12.02,"walls":0,"reason":"distance"}
+{"t":204.0,"from":"robot_A","kind":"link","distance_m":11.43,"walls":0,"reason":"ok"}
+{"t":204.0,"from":"robot_A","kind":"heard","text":"Rejected a large nearby warm return at (1.68,12.79) as non-person; confirmed survivor at (-0.46,12.18) remains reported. [robot state: confirmed by this robot so far, own map: (-0.5, 12.2)]"}
+{"t":204.0,"from":"robot_A","kind":"heard","text":"Confirmed an additional survivor at map position (-0.41, 12.64), RGB/depth verified at 2.06 m; crews please dispatch. [robot state: confirmed by this robot so far, own map: (-0.5, 12.2), (-0.4, 12.6)]"}
+{"t":206.0,"from":"robot_A","kind":"link","distance_m":10.49,"walls":0,"reason":"ok"}
+{"t":206.0,"from":"robot_A","kind":"heard","text":"Robot A: rising-air heat retreat underway; thermal hotspot at (-2.40, 3.21), about 0.48 m², 253 C mean. No people in current thermal/RGB view. [robot state: confirmed by this robot so far, own map: (-0.5, 12.2), (-0.4, 12.6)]"}
+{"t":210.0,"from":"robot_A","kind":"link","distance_m":10.11,"walls":0,"reason":"ok"}
+{"t":210.0,"from":"robot_A","kind":"heard","text":"Thermal scan now measures active fire at (-3.23, 1.91), about 266 C mean over 1.61 m²; no people detected. Air trend remains sharply rising, so I am avoiding the fire rather than using ineffective single-robot water. [robot state: confirmed by this robot so far, own map: (-0.5, 1"}

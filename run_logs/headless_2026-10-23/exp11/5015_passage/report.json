@@ -1,0 +1,233 @@
+{
+ "run": "/Volumes/Tashon/opencv/smoke-rescue/data/runs/headless/exp11/5015_passage",
+ "settings": {},
+ "sim_s": 240.0,
+ "wall_s": 158,
+ "bad_trace_lines": 0,
+ "robots": {
+  "robot_A": {
+   "walked_m": 73.8,
+   "final_state": "explore",
+   "peak_air_c": 20,
+   "air_over_60_s": 0,
+   "outside_s": 4.0,
+   "turning_in_place_s": 34.0,
+   "turned_in_place_deg": 1846.4,
+   "still_s": 15.5,
+   "turned_in_place_turns": 5.1,
+   "states_s": {
+    "explore": 206,
+    "survivor": 34
+   },
+   "rooms_in_order": [
+    [
+     "r05:corridor",
+     4.0
+    ],
+    [
+     "r06:living",
+     13.5
+    ],
+    [
+     "r05:corridor",
+     42.0
+    ],
+    [
+     "r02:kitchen",
+     73.5
+    ],
+    [
+     "r05:corridor",
+     129.0
+    ],
+    [
+     "r04:bedroom",
+     144.5
+    ],
+    [
+     "r05:corridor",
+     192.0
+    ],
+    [
+     "r04:bedroom",
+     202.0
+    ],
+    [
+     "r03:laundry",
+     224.0
+    ]
+   ],
+   "stuck_events": {
+    "no_progress": 1
+   },
+   "room_claimed": 10,
+   "room_yielded": 1,
+   "events": {
+    "replan": 330,
+    "goal": 61,
+    "localization": 49,
+    "peer_message_received": 34,
+    "room_searched": 25,
+    "room_claimed": 10,
+    "sweep_look_skipped": 10,
+    "sweep_started": 4,
+    "area_searched": 4,
+    "survivor_candidate": 3,
+    "survivor_confirmed": 3,
+    "survivor_from_peer": 2
+   }
+  },
+  "robot_B": {
+   "walked_m": 60.0,
+   "final_state": "explore",
+   "peak_air_c": 20,
+   "air_over_60_s": 0,
+   "outside_s": 8.5,
+   "turning_in_place_s": 46.0,
+   "turned_in_place_deg": 2451.3,
+   "still_s": 24.5,
+   "turned_in_place_turns": 6.8,
+   "states_s": {
+    "explore": 202,
+    "survivor": 38
+   },
+   "rooms_in_order": [
+    [
+     "r05:corridor",
+     8.5
+    ],
+    [
+     "r06:living",
+     16.5
+    ],
+    [
+     "r05:corridor",
+     66.5
+    ],
+    [
+     "r09:study",
+     127.5
+    ],
+    [
+     "r05:corridor",
+     151.5
+    ],
+    [
+     "r08:bedroom",
+     215.5
+    ]
+   ],
+   "stuck_events": {},
+   "room_claimed": 15,
+   "room_yielded": 0,
+   "events": {
+    "replan": 320,
+    "room_searched": 67,
+    "goal": 62,
+    "localization": 49,
+    "peer_message_received": 34,
+    "room_claimed": 15,
+    "sweep_look_skipped": 5,
+    "sweep_look": 4,
+    "survivor_candidate": 3,
+    "survivor_from_peer": 3,
+    "sweep_started": 3,
+    "area_searched": 3
+   }
+  }
+ },
+ "rooms": {
+  "r01:closet": {
+   "searched_pct": 24,
+   "by_robot_pct": [
+    24,
+    0
+   ]
+  },
+  "r02:kitchen": {
+   "searched_pct": 93,
+   "by_robot_pct": [
+    93,
+    5
+   ]
+  },
+  "r03:laundry": {
+   "searched_pct": 93,
+   "by_robot_pct": [
+    93,
+    4
+   ]
+  },
+  "r04:bedroom": {
+   "searched_pct": 79,
+   "by_robot_pct": [
+    79,
+    17
+   ]
+  },
+  "r05:corridor": {
+   "searched_pct": 100,
+   "by_robot_pct": [
+    72,
+    100
+   ]
+  },
+  "r06:living": {
+   "searched_pct": 95,
+   "by_robot_pct": [
+    92,
+    95
+   ]
+  },
+  "r07:bathroom": {
+   "searched_pct": 98,
+   "by_robot_pct": [
+    3,
+    94
+   ]
+  },
+  "r08:bedroom": {
+   "searched_pct": 91,
+   "by_robot_pct": [
+    0,
+    91
+   ]
+  },
+  "r09:study": {
+   "searched_pct": 91,
+   "by_robot_pct": [
+    2,
+    91
+   ]
+  }
+ },
+ "people": {
+  "s1:bedroom": {
+   "first_sighting_s": 74.0,
+   "confirmed_s": 80.0
+  },
+  "s2:living": {
+   "first_sighting_s": 10.0,
+   "confirmed_s": 32.0
+  },
+  "s3:bedroom": {
+   "first_sighting_s": 187.0,
+   "confirmed_s": 201.1
+  },
+  "s4:bedroom": {
+   "first_sighting_s": 148.0,
+   "confirmed_s": 155.2
+  },
+  "s5:kitchen": {
+   "first_sighting_s": 66.0,
+   "confirmed_s": 73.0
+  }
+ },
+ "house_searched_pct_mean_over_rooms": 85,
+ "false_confirmations": 0,
+ "radio": {
+  "sent": 240,
+  "delivered": 68,
+  "with_room_claim": 162
+ }
+}

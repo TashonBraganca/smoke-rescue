@@ -1,0 +1,14 @@
+Headless simulator runs, 23 Oct 2026. The real RobotBrain stepped at 60 Hz against compiled worlds (worlds/), 240 s unless the
+request says otherwise. Per run: result.json.gz (maps, rooms, frontiers), trace.jsonl.gz (every brain event and pose),
+report.json (scored against the world's ground truth by tools/headless_report.py). Compare folders with
+tools/headless_compare.py after gunzip. Houses 5001-5004 tuning, 5005-5010 confirmation, 5011-5016 fresh (seen since 17:30),
+5017-5022 unseen check. Requests used are in requests/.
+
+5001_base, 5001_default, 5001_rooms, dbg*, parity   first room-ledger runs and simulator parity checks (morning)
+exp1 .. exp8                                         room ledger, corridor-first, promotion, turn cost, squeeze, sweeps, lost-in-view
+final                                                frozen config b57f9b1 vs default on fresh houses 5011-5016 (5015 collapsed)
+exp10                                                entrance lock off vs passage on (93cc0be), 5001-5004 + 5015
+exp11                                                passage refactor 326f0c3, with and without solid robot bodies
+exp12                                                room-bid fix f409501, solid bodies, 5001-5004 (nobidfix runs: code at 326f0c3)
+unseen93                                             unseen houses 5017-5022, passage off vs on at 93cc0be, solid bodies
+coll1, entry1, h932                                  runs from the parallel session (collision check, room entry, seed 932 world)

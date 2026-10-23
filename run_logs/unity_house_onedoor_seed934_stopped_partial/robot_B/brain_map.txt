@@ -1,0 +1,4 @@
+# brain occupancy snapshots, 8-bit PNG, 0 occupied, 128 unknown, 255 free; row 0 is the grid's south edge
+# t x y yaw_rad file
+0.000000 0.000000 -1.200000 0.000000 brain_map/0.000000.png
+5.000000 -0.076438 -0.311244 0.121095 brain_map/5.000000.png
