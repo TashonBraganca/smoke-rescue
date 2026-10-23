@@ -183,3 +183,12 @@ def test_partner_findings_carry_their_age():
     team.ingest([{"message_id": "robot_B-9", "from": "robot_B", "t": 40.0, "kind": "finding", "text": "fire in the hall"}], 41.0)
     ctx = team.context(70.0)
     assert ctx["partner_findings"][0]["age_s"] == 30.0 and ctx["partner_last_heard_s"] == 30.0
+
+
+def test_a_pending_look_does_not_wake_radio_steps_during_a_retreat(tmp_path, monkeypatch):
+    _fresh(); fake_vision(monkeypatch)
+    T.ToolRegistry._pending["robot_A"] = {"x": 3.0, "y": 3.0, "t": 9.0, "evidence_id": "ev0"}
+    model = Scripted([])
+    inbox = [{"message_id": "robot_B-6", "from": "robot_B", "t": 9.0, "kind": "finding", "text": "nothing new"}]
+    RobotAgent(model, tmp_path / "trace.jsonl").step({**request(tmp_path, event={"kind": "team_message"}, inbox=inbox), "state": "retreat"})
+    assert model.calls == 0
