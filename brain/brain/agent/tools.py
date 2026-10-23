@@ -36,6 +36,12 @@ _CAMERA = json.loads((_Path(__file__).resolve().parents[3] / "config" / "sensors
 # Half the colour camera's horizontal view (atan of half the width over fx: 37.6 deg). A person further off the heading
 # than this is outside the picture, so an inspection there cannot see them (run 20: looks at 106 and 148 deg).
 CAMERA_HALF_HFOV_DEG = math.degrees(math.atan(_CAMERA["width"] / 2 / _CAMERA["fx"]))
+# Half the thermal camera's horizontal view (25.0 deg), the narrower of the two. A target inside it is already in view of
+# both cameras, so turning to it shows nothing new: of 89 turn_to_face orders in one-door runs 926 to 929 and 932, 24 had
+# their target inside it already (12 within 10 deg of centre). 16 more aimed at points under 1 m away.
+_THERMAL = json.loads((_Path(__file__).resolve().parents[3] / "config" / "sensors.json").read_text())["thermal"]
+THERMAL_HALF_HFOV_DEG = math.degrees(math.atan(_THERMAL["width"] / 2 / _THERMAL["fx"]))
+BODY_HALF_LENGTH_M = float(_CONFIG["body_half_length_m"])
 # What this robot's water can do against a fire, from its own engineering assumptions (config, each with a reason).
 BURNING_KW_PER_M2 = float(_PERCEPTION["burning_kw_per_m2"])
 ONE_ROBOT_COOLS_KW = float(_NOZZLE["flow_lps"]) * float(_NOZZLE["cooling_kj_per_l"]) * float(_NOZZLE["application_efficiency"])
@@ -203,6 +209,7 @@ class AgentContext:
     carrying_person: bool = False                             # a person is already on the sled
     survivors: list = field(default_factory=list)             # people confirmed so far, [x, y] in this robot's frame
     maps_linked: bool = False                                 # this robot's frame is linked with its partner's
+    event: dict = field(default_factory=dict)                 # the brain event that woke the agent, with its numbers
 
 
 class ToolRegistry:
@@ -223,6 +230,10 @@ class ToolRegistry:
     # including sightings for which no approach was ordered. These are reminders,
     # not evidence for actions in another step. New recordings clear the queue.
     _unfinished: dict = {}
+    # Thermal-only warm patches the brain found on a long mapped wall, per robot, until a colour sighting there clears them.
+    # Over 15 runs 151 such candidates held 1 person (0.7 %, Wilson 95 % 0.1 to 3.7 %; colour candidates were people 13
+    # times in 16), so walking or turning to them waits until the offered frontiers are searched (opus_search_design 2.2).
+    _wall_spots: dict = {}
     # Events that mean the approach failed: the robot could not get there, or must leave for heat.
     APPROACH_FAILED = ("goal_blacklisted", "no_progress", "collision_hold", "stuck", "avoid_fire", "retreat", "escape_closing")
     MAX_LOOKS, LOOK_CELL_M, LOOK_MEMORY_S = 2, 1.5, 90.0
@@ -236,6 +247,33 @@ class ToolRegistry:
         self.refusals: list[dict] = []
         self.finished: str | None = None
         self._cache: dict = {}
+        self._note_wall_candidate()
+
+    def _note_wall_candidate(self):
+        ev = self.ctx.event or {}
+        n = ev.get("numbers") or {}
+        if ev.get("kind") != "survivor_candidate" or n.get("x_m") is None or n.get("y_m") is None:
+            return
+        x, y = float(n["x_m"]), float(n["y_m"])
+        spots = [s for s in self._wall_spots.get(self.ctx.robot, []) if math.hypot(s[0] - x, s[1] - y) > SURVIVOR_MERGE_M]
+        if float(n.get("on_wall") or 0) >= 1 and not float(n.get("rgb") or 0):
+            spots.append((x, y))
+        self._wall_spots[self.ctx.robot] = spots
+
+    def _deferred_wall(self, x: float, y: float, ev: dict | None = None) -> dict | None:
+        """Refuse a walk or turn to a thermal-only warm patch on a wall while the robot's own map still offers frontiers,
+        unless an inspection of it saw a colour person or measured a shape standing off a plane. Inspecting it from where
+        the robot stands stays allowed."""
+        if not self.ctx.frontiers or not any(math.hypot(s[0] - x, s[1] - y) <= SURVIVOR_MERGE_M
+                                             for s in self._wall_spots.get(self.ctx.robot, [])):
+            return None
+        if ev is not None:
+            cues = ev.get("cues") or {}
+            if ev.get("verdict") == "person" or (cues.get("rgb_dnn") or {}).get("hits") or (cues.get("depth") or {}).get("nonplanar") is True:
+                return None
+        return {"refused": True, "reason": "a thermal-only warm patch on a long wall: over 15 runs 1 in 151 of these was a person. "
+                "Search the offered frontiers first (explore_frontier); it is open again when no frontier is left, or when an "
+                "inspection from here shows a colour person or a shape standing off the wall"}
 
     def unfinished(self) -> list[dict]:
         """Unresolved inspected sightings, with current distance and bearing.
@@ -590,6 +628,9 @@ class ToolRegistry:
         elif name == "approach_candidate":
             refusal = self._need(args, ("inspect_candidate",), lambda ev: ev.get("x") is not None,
                                  "the cited inspection has no position")
+            if refusal is None:
+                ev = self.evidence[str(args["evidence_id"])]
+                refusal = self._deferred_wall(float(ev["x"]), float(ev["y"]), ev)
             if refusal is None and _flat_warm_surface(self.evidence[str(args["evidence_id"])]):
                 # A body protrudes from what it lies on; a heated wall or panel does not. Seed 932: in the 96 s before the
                 # fire took the house, robot A spent about 37 s and robot B about 17 s turning to and walking up to warm
@@ -646,8 +687,19 @@ class ToolRegistry:
                                                  "evidence_id": str(args["evidence_id"])}
         elif name == "turn_to_face":
             # A go_to where the robot stands, with a point to face: the brain arrives at once, turns, then reports.
+            dx, dy = float(args["x"]) - self.ctx.x, float(args["y"]) - self.ctx.y
+            bearing = (math.degrees(math.atan2(dx, dy)) - self.ctx.heading_deg + 180) % 360 - 180
             if self.ctx.event_kind in ("avoid_fire", "retreat"):
                 refusal = {"refused": True, "reason": "no turning toward a target during a heat event; let the reflex layer back away"}
+            elif math.hypot(dx, dy) < BODY_HALF_LENGTH_M:
+                refusal = {"refused": True, "reason": f"that point is {math.hypot(dx, dy):.1f} m away, under this robot's own body; "
+                           "turning cannot bring it into view"}
+            elif self._deferred_wall(float(args["x"]), float(args["y"])) is not None:
+                refusal = self._deferred_wall(float(args["x"]), float(args["y"]))
+            elif abs(bearing) <= THERMAL_HALF_HFOV_DEG:
+                refusal = {"refused": True, "reason": f"the point is already in view of both cameras (bearing {bearing:.0f} deg, "
+                           f"thermal half view {THERMAL_HALF_HFOV_DEG:.0f} deg); turning shows nothing new. inspect_candidate at "
+                           "that bearing, or approach_candidate for a closer look"}
             else:
                 args = {"x": round(self.ctx.x, 2), "y": round(self.ctx.y, 2), "face_x": float(args["x"]), "face_y": float(args["y"]),
                         "reason": str(args.get("reason") or "turn to face")}
