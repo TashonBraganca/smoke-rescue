@@ -918,3 +918,27 @@ def test_an_explore_order_for_the_goal_the_robot_already_has_sends_no_order(tmp_
     assert same["orders"] == [] and same["refusals"] == [], "already heading there: nothing sent, nothing refused"
     other = explore(1, 20.0, "agent_goal_reached")   # a new event, so the step is not skipped as a repeat
     assert [o["type"] for o in other["orders"]] == ["explore_frontier"], "control: a different frontier is ordered"
+
+
+def test_an_approach_to_a_deferred_wall_patch_does_not_hold_exploring_back(tmp_path, monkeypatch):
+    # Seed 934 (24 Oct), robot A at 145 to 167 s: approach_candidate was refused for a thermal-only patch on a long wall
+    # ("search the offered frontiers first") and explore_frontier for the approach already under way to it ("finish that
+    # first"), six steps running. The approach to a deferred wall patch is dropped, kept among the unfinished sightings,
+    # and exploring is allowed. Control: an approach to a patch that is not on a wall still holds exploring back.
+    fake_vision(monkeypatch, "uncertain")
+    T.ToolRegistry._pending.clear(); T.ToolRegistry._looks.clear(); T.ToolRegistry._wall_spots.clear(); T.ToolRegistry._unfinished.clear()
+    frontier = [{"id": 1, "x": 9.0, "y": 1.0, "path_m": 6.0, "unsearched_m2": 6.0, "proven_indoors": True}]
+    def step(t, numbers, calls):
+        RobotAgent._recent.clear()
+        req = request(tmp_path) | {"t": t, "event": {"kind": "survivor_candidate", "numbers": numbers}, "frontiers": frontier}
+        return RobotAgent(Scripted(calls), tmp_path / f"{t}.jsonl").step(req)
+    approach = [[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": 5})], [ToolCall("approach_candidate", {"evidence_id": "ev1"})]]
+    explore = [[ToolCall("explore_frontier", {"frontier_id": 1, "reason": "search on"})]]
+    patch = {"x_m": 5.0, "y_m": 10.0, "on_wall": 0.0, "rgb": 0.0}
+    assert [o["type"] for o in step(40.0, patch, approach)["orders"]] == ["go_to"]
+    held = step(41.0, patch | {"x_m": 5.1}, explore)
+    assert held["orders"] == [] and "finish that first" in held["refusals"][0]["reason"], "control: not on a wall"
+    freed = step(42.0, patch | {"on_wall": 1.0}, explore)
+    assert [o["type"] for o in freed["orders"]] == ["explore_frontier"] and freed["refusals"] == [], freed
+    assert T.ToolRegistry._pending.get("robot_A") is None
+    assert any("long wall" in u["dropped_because"] for u in T.ToolRegistry._unfinished["robot_A"])
