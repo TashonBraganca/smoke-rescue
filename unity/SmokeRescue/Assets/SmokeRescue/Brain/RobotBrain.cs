@@ -1900,6 +1900,7 @@ namespace SmokeRescue.Brain
             var midPose = motion.Pose; midPose.yawRad += nextYaw * Mathf.Deg2Rad * dt / 2;
             // Check the speed after acceleration limiting, including motion while braking.
             if (nextSpeed > 0 && !planner.SegmentSafe(position, position + midPose.Forward * nextSpeed * dt) &&
+                !StepClear(position + midPose.Forward * nextSpeed * dt) &&
                 !LeavingTightSpot(position, position + midPose.Forward * Mathf.Max(nextSpeed * dt, grid.CellM)))
             {
                 // (23 Oct, motion branch.) The chord to the target is safe but a step along the current heading is not (the
@@ -2044,6 +2045,20 @@ namespace SmokeRescue.Brain
             }
             return new List<Vector2>();
         }
+        /// <summary>step_exact_clearance: the end of one tick's step is safe when its point, not its cell, keeps robot_radius_m from
+        /// every obstacle cell's square, in known free floor outside the fire margin. A step of 5 mm (0.3 m/s at 60 Hz) judged by
+        /// its cell stopped the robot on a cell boundary where the next cell's centre lay a few mm inside the planning margin,
+        /// while the chord to its target, sampled every 2.5 cm, skipped that cell and passed: the robot faced a safe chord and
+        /// could not move. Headless unseen houses (23 Oct final): all 47 such holds had the body 0.32 to 0.41 m from every wall
+        /// and furniture edge; house 5021, robot B lost 57 s at a 0.95 m bedroom door in 8 hold, back-up and retry cycles.</summary>
+        bool StepClear(Vector2 to)
+        {
+            if (!c.step_exact_clearance) return false;
+            int cell = grid.Cell(to);
+            return cell >= 0 && grid.Occupancy(cell) == 1 && grid.FireDistance(cell) > grid.FireClearance + grid.CellM * .707107f &&
+                   grid.PointClearance(to, c.robot_radius_m + grid.CellM) > c.robot_radius_m;
+        }
+
         /// <summary>(23 Oct.) A step out of a cell closer to a mapped obstacle than the walking clearance: allowed when the
         /// cell ahead is mapped free and no nearer to an obstacle or to fire than the robot's own cell, the same rule GridPlanner.Lead
         /// uses to leave a fire margin. SegmentSafe judged the robot's own cell and refused every step from it in every direction:

@@ -658,8 +658,27 @@ namespace SmokeRescue.Brain
         {
             if (!dirty) return;
             if (obstacleDistance == null) { obstacleDistance = new float[Count]; fireDistance = new float[Count]; }
-            Distances(i => Occupancy(i) == 255 || (keepOut != null && keepOut[i]) || (entranceHard != null && entranceHard[i]), obstacleDistance);
+            Distances(ObstacleCell, obstacleDistance);
             Distances(Dangerous, fireDistance); dirty = false;
+        }
+        /// <summary>A cell routes keep their clearance from: occupied, inside a confirmed person's keep-out, or on the hard part
+        /// of the entrance lock.</summary>
+        bool ObstacleCell(int i) => Occupancy(i) == 255 || (keepOut != null && keepOut[i]) || (entranceHard != null && entranceHard[i]);
+        /// <summary>Distance from the point p to the nearest obstacle cell (ObstacleCell), measured to the cell's square, out to
+        /// maxM (returned when nothing is nearer). ObstacleDistance is a cell centre's distance to obstacle cell centres, so a point
+        /// near the edge of a cell can be farther from every obstacle than its cell's value says.</summary>
+        internal float PointClearance(Vector2 p, float maxM)
+        {
+            int cell = Cell(p); if (cell < 0) return 0;
+            int n = Mathf.CeilToInt(maxM / CellM) + 1, col = cell % Size, row = cell / Size; float h = CellM * .5f, best = maxM;
+            for (int dy = -n; dy <= n; dy++) for (int dx = -n; dx <= n; dx++)
+            {
+                if (!Inside(col + dx, row + dy) || !ObstacleCell((row + dy) * Size + col + dx)) continue;
+                var q = Centre((row + dy) * Size + col + dx);
+                float ex = Mathf.Max(Mathf.Abs(p.x - q.x) - h, 0), ey = Mathf.Max(Mathf.Abs(p.y - q.y) - h, 0);
+                best = Mathf.Min(best, Mathf.Sqrt(ex * ex + ey * ey));
+            }
+            return best;
         }
         /// <summary>Distance planned routes keep from fire: fire_clearance_m, lowered to emergency_fire_clearance_m only for an
         /// emergency exit (RobotBrain.CheckEmergencyExit).</summary>
