@@ -1186,6 +1186,8 @@ namespace SmokeRescue.Brain
         }
         /// <summary>True while a recent person sighting wants the colour scan at person_rgb_boost_period_s.</summary>
         public bool WantsPeopleBoost(double t) => c.person_glance && t < boostUntil;
+        /// <summary>The colour confidence at which one sighting makes a candidate (person_rgb_strong_confidence).</summary>
+        public float StrongSightingConfidence => c.person_rgb_strong_confidence;
         /// <summary>Hold the camera on the latest person sighting (Glance): turn toward it and stand. Ends at its time limit, or as
         /// soon as a candidate exists to inspect; the path is kept.</summary>
         BrainCommand? GlanceStep(double t, float dt)
