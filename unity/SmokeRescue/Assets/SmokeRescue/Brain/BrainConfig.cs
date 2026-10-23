@@ -10,6 +10,11 @@ namespace SmokeRescue.Brain
     [Serializable]
     public sealed class BrainConfig
     {
+        public bool room_ledger = false;
+        public float room_ledger_period_s = 3;
+        public float room_ledger_door_width_m = 1.2f;
+        public float room_ledger_covered_share = .9f;
+        public float room_ledger_dwell_s = 40;
         public float full_snapshot_s = 10;
         public float peer_claim_s = 15;
         public float peer_claim_radius_m = 1;
@@ -207,6 +212,9 @@ namespace SmokeRescue.Brain
                     if (float.IsNaN(value) || float.IsInfinity(value)) throw new ArgumentException("Nonfinite brain parameter " + field.Name);
                 }
             }
+            if (room_ledger_period_s <= 0 || room_ledger_door_width_m < cell_m * 2 ||
+                room_ledger_covered_share <= 0 || room_ledger_covered_share > 1 || room_ledger_dwell_s <= 0)
+                throw new ArgumentException("Invalid room ledger configuration.");
             if (obstacle_cost_margin_m <= 0 || obstacle_cost_weight < 0)
                 throw new ArgumentException("Invalid obstacle clearance cost configuration.");
             if (stuck_command_mps <= 0 || stuck_measured_mps < 0 || stuck_measured_mps >= stuck_command_mps ||

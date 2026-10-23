@@ -94,3 +94,20 @@ def test_recorded_colour_fallback_is_not_counted_as_a_wall_false_positive(seed,t
     rows=F.E.label_frame(frame,pose,F.load_survivors(rec),F.load_floorplan(rec),rec.name,'robot_A',t,tmp_path)
     assert not any(not r['label'] and r['inspect'] for r in rows)
     assert any(not r['label'] and r.get('returned_person') and r.get('selected_person') for r in rows)
+
+
+def test_a_failed_inspection_does_not_read_sensors_or_invent_a_verdict(tmp_path, monkeypatch):
+    # Run 932 A at 93.783 s sent an extra evidence_id. The live tool
+    # refused it before reading a frame; replay must keep the same boundary.
+    def unexpected(*args, **kwargs):
+        raise AssertionError('a refused inspection did not reach the camera')
+    monkeypatch.setattr(F.V, 'load_frame', unexpected)
+    trace = [
+        {'kind':'step_start','step':'A@1','robot':'A','t':1.,'context':{'pose':{'x':0.,'y':0.,'heading_deg':0.}}},
+        {'kind':'tool','step':'A@1','name':'inspect_candidate',
+         'arguments':{'bearing_deg':0.,'range_m':3.,'evidence_id':'extra'},
+         'result_id':None,'error':'bad arguments for inspect_candidate'},
+    ]
+    rows, confirms = F.replay_inspections(tmp_path, tmp_path, [], {}, {'A':np.zeros(3)}, {}, trace)
+    assert rows == [] and confirms == []
+    assert F.inspection_errors(trace) == [trace[1]]

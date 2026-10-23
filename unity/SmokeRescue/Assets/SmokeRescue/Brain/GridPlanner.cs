@@ -10,7 +10,8 @@ namespace SmokeRescue.Brain
         readonly OccupancyGrid grid;
         readonly BrainConfig c;
         public Vector2 Home { get; set; }
-        public GridPlanner(OccupancyGrid map, BrainConfig config) { grid = map; c = config; }
+        public RoomLedger Rooms { get; }
+        public GridPlanner(OccupancyGrid map, BrainConfig config) { grid = map; c = config; Rooms = new RoomLedger(map, config); }
         public List<Vector2> Plan(Vector2 from, Vector2 to)
         {
             grid.PrepareNavigation();
@@ -74,8 +75,8 @@ namespace SmokeRescue.Brain
         {
             var result = Frontier(from, excluded); return result?.position;
         }
-        internal sealed class FrontierChoice
-        { public Vector2 position, claimCentre; public List<Vector2> path; public float cost, score, claimRadius; public int information; public bool towardPartner; }
+        public sealed class FrontierChoice
+        { public Vector2 position, claimCentre; public List<Vector2> path; public float cost, score, claimRadius; public int information; public bool towardPartner; public int roomId = -1, roomTier; public float roomScore; }
         internal FrontierChoice Frontier(Vector2 from, Func<Vector2, bool> excluded = null, bool partnerSearchedToo = false)
         {
             var all = Frontiers(from, excluded, partnerSearchedToo); return all.Count > 0 ? all[0] : null;
@@ -135,7 +136,7 @@ namespace SmokeRescue.Brain
         }
         /// <summary>Every worthwhile reachable frontier cluster, best score first. partnerSearchedToo keeps frontier cells a
         /// partner's camera has searched (normally dropped), for following a partner through the one way on.</summary>
-        internal List<FrontierChoice> Frontiers(Vector2 from, Func<Vector2, bool> excluded = null, bool partnerSearchedToo = false)
+        public List<FrontierChoice> Frontiers(Vector2 from, Func<Vector2, bool> excluded = null, bool partnerSearchedToo = false)
         {
             var choices = new List<FrontierChoice>();
             grid.PrepareNavigation();
@@ -199,6 +200,7 @@ namespace SmokeRescue.Brain
             var order = new List<int>(); for (int i = 0; i < choices.Count; i++) order.Add(i);
             order.Sort((x, y) => { int k = choices[x].score.CompareTo(choices[y].score); return k != 0 ? k : x.CompareTo(y); });
             var sorted = new List<FrontierChoice>(); foreach (int i in order) sorted.Add(choices[i]);
+            Rooms.Rank(sorted, from);
             return sorted;
         }
         /// <summary>

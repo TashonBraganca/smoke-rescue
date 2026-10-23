@@ -206,11 +206,10 @@ class ToolRegistry:
     # confirmed or rejected, or the approach fails, explore_frontier is refused (hidden-corner run 3: both agents ordered
     # an approach and dropped it on the next area_searched event, and nobody was confirmed).
     _pending: dict = {}
-    # Approaches dropped before the candidate was resolved (heat, no path, timeout): robot -> [{"x", "y", "t", "evidence_id",
-    # "dropped_because"}]. One-door seed 924, robot A at 37.6 s: a "person" verdict from 4.6 m, an approach ordered, then
-    # the reflex backed away from a fire 2 m from her; the next step had no trace of her and she was never found.
+    # Ranged inspections not resolved by an accepted confirmation or rejection,
+    # including sightings for which no approach was ordered. These are reminders,
+    # not evidence for actions in another step. New recordings clear the queue.
     _unfinished: dict = {}
-    UNFINISHED_KEPT = 4
     # Events that mean the approach failed: the robot could not get there, or must leave for heat.
     APPROACH_FAILED = ("goal_blacklisted", "no_progress", "collision_hold", "stuck", "avoid_fire", "retreat", "escape_closing")
     MAX_LOOKS, LOOK_CELL_M, LOOK_MEMORY_S = 2, 1.5, 90.0
@@ -226,8 +225,11 @@ class ToolRegistry:
         self._cache: dict = {}
 
     def unfinished(self) -> list[dict]:
-        """Candidates this robot set out to look at closer and never resolved, newest last, with distance and bearing from
-        here; one the team has since confirmed (the brain's survivor list) is left out."""
+        """Unresolved inspected sightings, with current distance and bearing.
+
+        Confirmations in the robot's received team state are left out. A failed
+        approach or the passage of time does not erase an unresolved sighting.
+        """
         out = []
         for u in self._unfinished.get(self.ctx.robot, []):
             if any(math.hypot(u["x"] - s[0], u["y"] - s[1]) <= SURVIVOR_MERGE_M for s in self.ctx.survivors):
@@ -237,6 +239,22 @@ class ToolRegistry:
                         "bearing_deg": round((math.degrees(math.atan2(dx, dy)) - self.ctx.heading_deg + 180) % 360 - 180, 1),
                         "since_s": round(self.ctx.t - u["t"], 1), "dropped_because": u["dropped_because"]})
         return out
+
+    def _remember_inspection(self, result):
+        candidate = result.get("candidate") or {}
+        if result.get("verdict") not in ("uncertain", "person") or candidate.get("range_m") is None:
+            return
+        if self._confirmed_near(result) or any(
+                math.hypot(result["x"] - p[0], result["y"] - p[1]) <= SURVIVOR_MERGE_M for p in self.ctx.survivors):
+            return
+        queue = self._unfinished.setdefault(self.ctx.robot, [])
+        near = [u for u in queue if math.hypot(u["x"] - result["x"], u["y"] - result["y"]) <= SURVIVOR_MERGE_M]
+        if near:
+            previous = min(near, key=lambda u: math.hypot(u["x"] - result["x"], u["y"] - result["y"]))
+            previous["evidence_id"] = result["id"]
+        else:
+            queue.append({"x": result["x"], "y": result["y"], "t": self.ctx.t,
+                          "evidence_id": result["id"], "dropped_because": "inspection not resolved"})
 
     def pending(self) -> dict | None:
         """This robot's unresolved approach, with distance and bearing from where it stands now; None when there is
@@ -248,8 +266,8 @@ class ToolRegistry:
         if self.ctx.event_kind in self.APPROACH_FAILED or timed_out or self._brain_dropped_order(p["t"]):
             self._pending.pop(self.ctx.robot, None)
             why = self.ctx.event_kind if self.ctx.event_kind in self.APPROACH_FAILED else "timed out" if timed_out else "no path to it"
-            kept = [u for u in self._unfinished.get(self.ctx.robot, []) if math.hypot(u["x"] - p["x"], u["y"] - p["y"]) > self.LOOK_CELL_M]
-            self._unfinished[self.ctx.robot] = (kept + [{**p, "dropped_because": why}])[-self.UNFINISHED_KEPT:]
+            kept = [u for u in self._unfinished.get(self.ctx.robot, []) if math.hypot(u["x"] - p["x"], u["y"] - p["y"]) > SURVIVOR_MERGE_M]
+            self._unfinished[self.ctx.robot] = kept + [{**p, "dropped_because": why}]
             return None
         dx, dy = p["x"] - self.ctx.x, p["y"] - self.ctx.y
         bearing = (math.degrees(math.atan2(dx, dy)) - self.ctx.heading_deg + 180) % 360 - 180
@@ -331,6 +349,7 @@ class ToolRegistry:
             key = (str(self.robot_dir.resolve()), self.ctx.robot)
             history = self._inspection_histories.setdefault(key, vision.InspectionHistory())
             r = history.observe(r, position=(r["x"], r["y"]), observer=(self.ctx.x, self.ctx.y))
+        self._remember_inspection(r)
         return r
 
     def _p_check_indoors(self, bearing_deg: float):
@@ -663,7 +682,7 @@ class ToolRegistry:
             if p is not None and math.hypot(p["x"] - float(args["x"]), p["y"] - float(args["y"])) <= self.LOOK_CELL_M:
                 self._pending.pop(self.ctx.robot, None)
             self._unfinished[self.ctx.robot] = [u for u in self._unfinished.get(self.ctx.robot, [])
-                                                if math.hypot(u["x"] - float(args["x"]), u["y"] - float(args["y"])) > self.LOOK_CELL_M]
+                                                if math.hypot(u["x"] - float(args["x"]), u["y"] - float(args["y"])) > SURVIVOR_MERGE_M]
         if name == "withdraw_survivor":
             self._confirmed[self.ctx.robot] = [c for c in self._confirmed.get(self.ctx.robot, [])
                                                if math.hypot(c["x"] - float(args["x"]), c["y"] - float(args["y"])) > SURVIVOR_MERGE_M]

@@ -184,12 +184,12 @@ def test_recorded_visible_survivor_with_sparse_registered_depth(tmp_path):
     result = v.inspect_candidate(frame, -2.896164, 7.717141, output_dir=tmp_path)
     assert match_component(result['candidate'], visibility)
     assert result['cues']['depth']['registered_fraction'] == pytest.approx(.242857, abs=.000001)
-    assert result['cues']['depth']['valid_fraction'] == 1.
-    assert result['cues']['range_source'] == 'lidar'
-    assert result['cues']['lidar']['filled_pixels'] == 477
-    assert result['cues']['lidar']['t'] == pytest.approx(59.001667)
-    # s3 is a real person. The recess check used to reject her as an opening; with no sill beneath her she is no longer
-    # one, and with LiDAR-only range the verdict stays uncertain, so the agent must approach before confirming.
+    assert result['cues']['depth']['valid_fraction'] == result['cues']['depth']['registered_fraction']
+    assert result['cues']['range_source'] == 'depth'
+    assert result['cues']['depth']['camera_support']['sufficient']
+    assert 'lidar' not in result['cues']
+    # Distributed camera rays constrain the shape without LiDAR filling. Temperature
+    # structure and nonplanar depth are still absent, so this remains uncertain.
     # This recording predates severe frame-wide smoke dropout; it tests real sparse registration.
     assert result['verdict'] == 'uncertain'
     assert not result['cues']['window']['opening'] and result['cues']['window']['grounded']

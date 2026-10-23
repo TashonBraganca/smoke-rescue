@@ -11,6 +11,217 @@ namespace SmokeRescue.Tests.EditMode
 {
     public sealed partial class BrainTests
     {
+        // Fixtures represent only sensed floor. Clearing the camera mask leaves LiDAR-mapped
+        // free floor, which is a frontier even though geometry is already known.
+        public static (BrainConfig config, OccupancyGrid grid) RoomLedgerFixture(float openingM = .9f, bool senseRight = true)
+        {
+            var c = Settings(); c.grid_size_m = 14; c.room_ledger = true;
+            c.frontier_gain_weight = .01f; c.frontier_peek_m = 0; c.search_requires_ceiling = false;
+            var g = new OccupancyGrid(c);
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var searched = (bool[])typeof(OccupancyGrid).GetField("observed", flags).GetValue(g);
+            for (int i = 0; i < g.Count; i++)
+            {
+                var p = g.Centre(i);
+                bool floor = p.x > -5 && p.x < 5 && Mathf.Abs(p.y) < 2.5f;
+                if (!floor || (!senseRight && p.x > -.15f)) continue;
+                if (Mathf.Abs(p.x) < .15f && Mathf.Abs(p.y) >= openingM / 2) g.ObserveOccupied(i);
+                else
+                {
+                    g.ObserveFree(i);
+                    searched[i] = p.x < -.15f && !(p.x < -3.5f && p.y > 1.5f);
+                }
+            }
+            return (c, g);
+        }
+
+        [Test]
+        public void RoomLedgerSplitsANarrowDoorButKeepsAWideOpeningConnected()
+        {
+            foreach (float opening in new[] { .9f, 2f })
+            {
+                var fixture = RoomLedgerFixture(opening);
+                var ledger = new RoomLedger(fixture.grid, fixture.config);
+                ledger.Update(0, new Vector2(-2, 0));
+                int left = ledger.RoomAt(new Vector2(-2, 0)), right = ledger.RoomAt(new Vector2(2, 0));
+                Assert.That(left, Is.GreaterThanOrEqualTo(0)); Assert.That(right, Is.GreaterThanOrEqualTo(0));
+                Assert.That(left == right, Is.EqualTo(opening == 2f), "0.9 m is a constriction; a 2 m opening retains a connected core");
+                Assert.That(ledger.Rooms.Count, Is.EqualTo(opening == 2f ? 1 : 2));
+            }
+        }
+
+        [Test]
+        public void RoomLedgerMovesOnAfterCoverageOrDwellWhilePlainRankingLingers()
+        {
+            var fixture = RoomLedgerFixture(); var c = fixture.config; var g = fixture.grid;
+            var planner = new GridPlanner(g, c); var at = new Vector2(-3.5f, 0);
+            c.room_ledger = false;
+            var plain = planner.Frontiers(at);
+            Assert.That(plain.Count, Is.GreaterThan(1), "both rooms have reachable search targets");
+            Assert.That(plain[0].position.x, Is.LessThan(0), "nearest unfinished pocket keeps plain ranking in the current room");
+            c.room_ledger = true; planner.Rooms.Update(0, at);
+            var firstRoom = planner.Rooms.Rooms.Single(r => r.id == planner.Rooms.RoomAt(at));
+            Assert.That(firstRoom.coveredShare, Is.GreaterThan(c.room_ledger_covered_share));
+            Assert.That(planner.Frontiers(at)[0].position.x, Is.GreaterThan(0), "coverage releases the room before the time cap");
+            c.room_ledger_covered_share = 1;
+            Assert.That(planner.Frontiers(at)[0].position.x, Is.LessThan(0), "finish the current room while it has time");
+            planner.Rooms.Update(c.room_ledger_dwell_s + 1, at);
+            Assert.That(planner.Frontiers(at)[0].position.x, Is.GreaterThan(0), "the cap releases unresolved pockets");
+            c.room_ledger = false;
+            Assert.That(planner.Frontiers(at)[0].position, Is.EqualTo(plain[0].position), "disabled ranking retains the original choice");
+            CollectionAssert.AreEqual(plain.Select(f => f.position).ToArray(), planner.Frontiers(at).Select(f => f.position).ToArray(),
+                "disabled ranking retains every original option in order");
+        }
+
+        [Test]
+        public void RoomLedgerUsesOnlySensedGeometryAndNeverWritesIndoorOrSearchEvidence()
+        {
+            var fixture = RoomLedgerFixture(.9f, false); var g = fixture.grid; var c = fixture.config;
+            var ledger = new RoomLedger(g, c);
+            var occupancy = g.CopyOccupancy(); var searched = g.CopySearched(); var indoor = g.CopyIndoors();
+            ledger.Update(0, new Vector2(-2, 0));
+            Assert.That(ledger.RoomAt(new Vector2(2, 0)), Is.EqualTo(-1), "no unseen room can be inferred across the doorway");
+            Assert.That(ledger.Rooms.Count, Is.EqualTo(1));
+            CollectionAssert.AreEqual(occupancy, g.CopyOccupancy());
+            CollectionAssert.AreEqual(searched, g.CopySearched());
+            CollectionAssert.AreEqual(indoor, g.CopyIndoors());
+            c.search_requires_ceiling = true;
+            // No ceiling or enclosure evidence is admitted by this predicate.
+            ledger.Update(c.room_ledger_period_s, new Vector2(-2, 0), p => false);
+            Assert.That(ledger.Rooms.Sum(r => r.indoorFloorM2), Is.Zero);
+            Assert.That(ledger.Rooms.Sum(r => r.coveredShare), Is.Zero, "unproven free floor is not counted as searched indoor floor");
+        }
+
+        [Test]
+        public void RoomLedgerPreservesVisitTimeAcrossGrowthAndRecomputesOnItsPeriod()
+        {
+            var fixture = RoomLedgerFixture(.9f, false); var c = fixture.config; var g = fixture.grid;
+            var ledger = new RoomLedger(g, c); var at = new Vector2(-2, 0);
+            ledger.Update(0, at); int id = ledger.RoomAt(at);
+            ledger.Update(1, at);
+            Assert.That(ledger.Rooms.Single().dwellS, Is.EqualTo(1).Within(.001));
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var odds = (float[])typeof(OccupancyGrid).GetField("lidarOdds", flags).GetValue(g);
+            for (int i = 0; i < g.Count; i++)
+            { var p = g.Centre(i); if (p.x >= .15f && p.x < 5 && Mathf.Abs(p.y) < 2.5f) odds[i] = -c.log_odds_cap; }
+            ledger.Update(2, at);
+            Assert.That(ledger.RoomAt(new Vector2(2, 0)), Is.EqualTo(-1), "map segmentation stays cached between periods");
+            ledger.Update(c.room_ledger_period_s, at);
+            Assert.That(ledger.Rooms.Count, Is.EqualTo(2));
+            Assert.That(ledger.RoomAt(at), Is.EqualTo(id), "overlap retains the existing room id");
+            Assert.That(ledger.Rooms.Single(r => r.id == id).dwellS, Is.EqualTo(c.room_ledger_period_s).Within(.001));
+            var right = ledger.Rooms.Single(r => r.id != id);
+            Assert.That(right.entered, Is.False, "seeing new floor does not enter it");
+            Assert.That(right.dwellS, Is.Zero);
+            ledger.Update(c.room_ledger_period_s + 1, new Vector2(2, 0));
+            Assert.That(ledger.Rooms.Single(r => r.id == right.id).entered, Is.True);
+            ledger.Update(2 * c.room_ledger_period_s, at);
+            var previousRoom = ledger.Rooms.Single(r => r.id == right.id);
+            Assert.That(previousRoom.entered, Is.True, "a rebuild keeps the visit after the robot leaves");
+            Assert.That(previousRoom.dwellS, Is.EqualTo(c.room_ledger_period_s - 1).Within(.001));
+        }
+
+        [Test]
+        public void RoomLedgerCountsPartnerSearchButNeverPartnerOnlyGeometry()
+        {
+            var fixture = RoomLedgerFixture(); var c = fixture.config; var g = fixture.grid;
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var peer = (byte[])typeof(OccupancyGrid).GetField("peer", flags).GetValue(g);
+            for (int i = 0; i < g.Count; i++)
+            { var p = g.Centre(i); if (p.x > 0) peer[i] = 1; }
+            var ledger = new RoomLedger(g, c); ledger.Update(0, new Vector2(-2, 0));
+            var right = ledger.Rooms.Single(r => r.id == ledger.RoomAt(new Vector2(2, 0)));
+            Assert.That(right.coveredShare, Is.EqualTo(1).Within(.001), "aligned partner camera coverage counts");
+            Assert.That(right.indoorFloorM2, Is.LessThan(25), "the right sensed floor fits inside the fixture's 5 m by 5 m half");
+            Assert.That(right.entered, Is.False, "partner coverage does not claim this robot entered");
+            Assert.That(ledger.RoomAt(new Vector2(6, 0)), Is.EqualTo(-1), "peer free cells cannot invent own sensed room geometry");
+        }
+
+        [Test]
+        public void RoomLedgerRankingStillExcludesClaimsAndChargesTravel()
+        {
+            var fixture = RoomLedgerFixture(); var g = fixture.grid; var c = fixture.config;
+            var planner = new GridPlanner(g, c); var at = new Vector2(-3.5f, 0);
+            planner.Rooms.Update(0, at);
+            var candidates = planner.Frontiers(at, p => p.x > 0);
+            Assert.That(candidates.All(f => f.position.x < 0), Is.True, "ledger cannot restore a filtered frontier");
+            var room = planner.Rooms.RoomAt(new Vector2(2, 0));
+            var near = new GridPlanner.FrontierChoice { position = new Vector2(2, 0), cost = 5, score = 5 };
+            var far = new GridPlanner.FrontierChoice { position = new Vector2(3, 0), cost = 8, score = 8 };
+            var choices = new List<GridPlanner.FrontierChoice> { far, near };
+            planner.Rooms.Rank(choices, at);
+            Assert.That(choices[0], Is.EqualTo(near), "equal coverage pays path cost in travel seconds");
+            Assert.That(planner.Rooms.RoomAt(choices[0].position), Is.EqualTo(room));
+        }
+
+        [Test]
+        public void RoomLedgerDoorwayFrontierCreditsOnlyFloorOnASensedSightline()
+        {
+            var fixture = RoomLedgerFixture(); var c = fixture.config; var g = fixture.grid;
+            c.frontier_peek_m = 1.2f;
+            var ledger = new RoomLedger(g, c); var at = new Vector2(-.55f, 0);
+            ledger.Update(0, new Vector2(-2, 0));
+            int left = ledger.RoomAt(at), right = ledger.RoomAt(new Vector2(2, 0));
+            Assert.That(left, Is.GreaterThanOrEqualTo(0));
+            Assert.That(right, Is.GreaterThanOrEqualTo(0));
+            Assert.That(left, Is.Not.EqualTo(right), "the fixture must identify two known rooms before testing attribution");
+            Assert.That(ledger.RoomForFrontier(at), Is.EqualTo(right), "a standpoint before the door serves unsearched floor beyond it");
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var odds = (float[])typeof(OccupancyGrid).GetField("odds", flags).GetValue(g);
+            // Forget the doorway strip. The visible far room remains mapped, but no sensed sightline reaches it.
+            for (int i = 0; i < g.Count; i++) if (Mathf.Abs(g.Centre(i).x) < .15f) odds[i] = 0;
+            Assert.That(ledger.RoomForFrontier(at), Is.EqualTo(left), "unknown cells cannot attribute a frontier to the far room");
+        }
+
+        [Test]
+        public void RoomLedgerMergeAndSplitKeepVisitsOnTheCellsActuallyEntered()
+        {
+            var fixture = RoomLedgerFixture(); var c = fixture.config; var g = fixture.grid;
+            var ledger = new RoomLedger(g, c); var at = new Vector2(-2, 0);
+            ledger.Update(0, at);
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var odds = (float[])typeof(OccupancyGrid).GetField("odds", flags).GetValue(g);
+            for (int i = 0; i < g.Count; i++)
+                if (Mathf.Abs(g.Centre(i).x) < .15f && Mathf.Abs(g.Centre(i).y) < 1)
+                { odds[i] = 0; g.ObserveFree(i); }
+            ledger.Update(c.room_ledger_period_s, at);
+            Assert.That(ledger.Rooms.Count, Is.EqualTo(1), "new free evidence joins the cores");
+            for (int i = 0; i < g.Count; i++)
+                if (Mathf.Abs(g.Centre(i).x) < .15f && Mathf.Abs(g.Centre(i).y) >= .45f && Mathf.Abs(g.Centre(i).y) < 1)
+                    g.ObserveOccupied(i);
+            ledger.Update(2 * c.room_ledger_period_s, at);
+            Assert.That(ledger.Rooms.Count, Is.EqualTo(2));
+            var left = ledger.Rooms.Single(r => r.id == ledger.RoomAt(at));
+            var right = ledger.Rooms.Single(r => r.id == ledger.RoomAt(new Vector2(2, 0)));
+            Assert.That(left.dwellS, Is.EqualTo(2 * c.room_ledger_period_s).Within(.001));
+            Assert.That(right.entered, Is.False, "a temporary merge does not enter the unseen child");
+            Assert.That(right.dwellS, Is.Zero, "a split does not copy the parent's dwell into both children");
+        }
+
+        [Test]
+        public void RoomLedgerPreferredFrontierSurvivesTheAgentOptionLimit()
+        {
+            var fixture = RoomLedgerFixture(); var c = fixture.config;
+            var b = new RobotBrain(Calibration(), c, "A", 0, new EntryPose(-3.5f, 0, 0));
+            var g = Map(b);
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var searched = (bool[])typeof(OccupancyGrid).GetField("observed", flags).GetValue(g);
+            for (int i = 0; i < g.Count; i++)
+            {
+                byte occupancy = fixture.grid.OwnOccupancy(i); var p = g.Centre(i);
+                if (occupancy == 255) g.ObserveOccupied(i);
+                if (occupancy != 1) continue;
+                g.ObserveFree(i);
+                searched[i] = p.x > 0 && !(p.x > 3.5f && p.y > 1.5f);
+            }
+            b.RoomOptions(0); b.RoomOptions(c.room_ledger_dwell_s + 1);
+            var options = b.FrontierOptions(c.room_ledger_dwell_s + 1, 1);
+            Assert.That(options.Count, Is.EqualTo(1));
+            Assert.That(options[0].position.x, Is.GreaterThan(0), "the small unentered room survives reservation of large-area options");
+            var room = b.RoomOptions(c.room_ledger_dwell_s + 1).Single(r => r.id == options[0].roomId);
+            Assert.That(room.entered, Is.False);
+        }
+
         [Test]
         public void WalkingAnOpenQuarterTurnSpendsLessTimeStationaryAndAWallKeepsThePivot()
         {

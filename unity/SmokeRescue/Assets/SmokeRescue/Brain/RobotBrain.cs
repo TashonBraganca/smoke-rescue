@@ -111,6 +111,7 @@ namespace SmokeRescue.Brain
             grid.ClearBody(motion.Pose.position, c.robot_radius_m - grid.CellM * .5f);
             InvalidatePeerGoal(t); CheckMapOverlap(t);
             grid.PrepareNavigation();
+            planner.Rooms.Update(t, motion.Pose.position, InSearchArea);
             int cell = grid.Cell(motion.Pose.position);
             bool fireNow = grid.FireDistance(cell) < c.heat_cost_radius_m;
             if (fireNow && !nearFire)
@@ -508,8 +509,13 @@ namespace SmokeRescue.Brain
                     {
                         SetPath(frontier.path, true); frontierCentre = frontier.claimCentre; frontierRadius = frontier.claimRadius;
                         scanSince = double.NaN; noFrontierAt = double.NaN;
-                        Emit(t, "goal", "Reachable frontier minimizes travel and heat cost minus nearby unknown-cell gain.",
-                            "x_m", frontier.position.x, "y_m", frontier.position.y, "path_cost", frontier.cost, "information_cells", frontier.information, "score", frontier.score);
+                        if (c.room_ledger)
+                            Emit(t, "goal", "Room ledger ranks admitted frontiers by room completion, entry history, coverage and travel time.",
+                                "x_m", frontier.position.x, "y_m", frontier.position.y, "path_cost", frontier.cost, "information_cells", frontier.information, "score", frontier.score,
+                                "room_id", frontier.roomId, "room_tier", frontier.roomTier, "room_score_s", frontier.roomScore);
+                        else
+                            Emit(t, "goal", "Reachable frontier minimizes travel and heat cost minus nearby unknown-cell gain.",
+                                "x_m", frontier.position.x, "y_m", frontier.position.y, "path_cost", frontier.cost, "information_cells", frontier.information, "score", frontier.score);
                         Emit(t, "replan", "Build a path to the selected frontier.", "path_points", path.Count);
                     }
                     else if (ThresholdLook(t, out var lookRoute, out var beyond))

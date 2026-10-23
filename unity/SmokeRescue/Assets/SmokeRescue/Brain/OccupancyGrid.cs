@@ -995,6 +995,16 @@ namespace SmokeRescue.Brain
         // Scratch buffers reused across calls: the map changes 25 times a second per robot, and fresh arrays each time
         // (about 3 MB) kept the garbage collector busy enough to slow the whole recording.
         float[] dtTemp, dtF, dtD, dtCuts; int[] dtSites;
+        /// <summary>Distance from sensed free-cell centres to the boundary of known free floor. Unknown floor is a
+        /// boundary too. Subtract half a cell because the transform measures between cell centres.</summary>
+        public float[] KnownFreeClearance()
+        {
+            var result = new float[Count];
+            Distances(i => OwnOccupancy(i) != 1 || i % Size == 0 || i % Size == Size - 1 || i / Size == 0 || i / Size == Size - 1, result);
+            for (int i = 0; i < Count; i++) result[i] = Mathf.Max(0, result[i] - CellM / 2);
+            return result;
+        }
+
         void Distances(Func<int, bool> source, float[] output)
         {
             if (dtTemp == null) { dtTemp = new float[Count]; dtF = new float[Size]; dtD = new float[Size]; dtSites = new int[Size]; dtCuts = new float[Size + 1]; }

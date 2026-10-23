@@ -117,6 +117,11 @@ def check_confirmation(rec, out, row, arguments=None):
     return reg.call('confirm_survivor',args)
 
 
+def inspection_errors(trace):
+    """Keep failed calls visible without inventing a camera observation for them."""
+    return [r for r in trace if r.get('kind') == 'tool' and r.get('name') == 'inspect_candidate' and r.get('error')]
+
+
 def replay_inspections(rec, out, survivors, plan, transforms, trajectories, trace):
     starts = {r['step']: r for r in trace if r['kind'] == 'step_start'}
     histories = {r: V.InspectionHistory() for r in transforms}
@@ -124,6 +129,8 @@ def replay_inspections(rec, out, survivors, plan, transforms, trajectories, trac
     rows, evidence = [], {}
     for call in trace:
         if call.get('kind') != 'tool' or call.get('name') != 'inspect_candidate':
+            continue
+        if call.get('error'):
             continue
         start = starts[call['step']]
         robot, t = start['robot'], start['t']
@@ -329,6 +336,7 @@ def evaluate_run(rec, out, stride, sample_inspections=True):
     negatives = nonperson_time(trace, inspections, decisions, states, transforms, survivors)
     return {'run': rec.name, 'stride': stride, 'people': list(people.values()), 'inspections': inspections,
             'confirmations': confirms, 'eval_rows': eval_rows, 'nonperson_time': negatives,
+            'failed_inspection_calls': inspection_errors(trace),
             'eval_scores': E.summarize(eval_rows, n_boot=0) if eval_rows else {}}
 
 
@@ -349,6 +357,7 @@ def replay_cached_run(cached, rec, out):
         p['inspections'] = [r for r in inspections if r['label_person']==p['id']]
         p['confirm_attempts'] = [r for r in confirmations if r['person']==p['id']]
     cached.update(inspections=inspections,confirmations=confirmations,
+                  failed_inspection_calls=inspection_errors(trace),
                   nonperson_time=nonperson_time(trace,inspections,decisions,states,transforms,survivors))
     return cached
 
