@@ -192,3 +192,17 @@ def test_a_pending_look_does_not_wake_radio_steps_during_a_retreat(tmp_path, mon
     inbox = [{"message_id": "robot_B-6", "from": "robot_B", "t": 9.0, "kind": "finding", "text": "nothing new"}]
     RobotAgent(model, tmp_path / "trace.jsonl").step({**request(tmp_path, event={"kind": "team_message"}, inbox=inbox), "state": "retreat"})
     assert model.calls == 0
+
+
+def test_the_room_list_reaches_the_model(tmp_path, monkeypatch):
+    _fresh(); fake_vision(monkeypatch)
+    seen = []
+
+    class Capture(Scripted):
+        def chat(self, messages, tools):
+            seen.append(json.loads(messages[1]["content"].split("Context:\n", 1)[1]))
+            return super().chat(messages, tools)
+
+    rooms = [{"id": 2, "x": 4.0, "y": 6.0, "covered_share": 0.15, "entered": False, "dwell_s": 0.0, "indoor_floor_m2": 11.5}]
+    RobotAgent(Capture([]), tmp_path / "trace.jsonl").step({**request(tmp_path), "rooms": rooms})
+    assert seen and seen[0]["rooms"] == rooms

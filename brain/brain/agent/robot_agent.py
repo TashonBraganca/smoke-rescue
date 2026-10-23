@@ -87,6 +87,10 @@ Facts about your robot and the context:
 - mission_time_left_s: seconds until the robot's operating limit, when it must be out of the building.
 - frontiers lists up to 8 options in the code's ranked order, option 0 first; some are the frontiers opening onto the
   largest unsearched areas the map shows, so not every option is close by. Take option 0 unless your evidence says otherwise.
+- rooms, when present: the rooms your own map shows, segmented by code at door-width openings (ids are local to your
+  robot and can change when a room splits or merges): id, centre x and y, covered_share (share of its sensed indoor floor
+  any camera on the team has searched), entered (your robot has stood in it), dwell_s, indoor_floor_m2. A frontier's
+  room_id says which room it serves. A room with entered false or covered_share well under 1 is not searched yet.
 - last_orders_outcome: what the brain did with the movement orders of your previous step (reached, refused with its
   reason, no path, expired before arrival, overridden by a heat event, under way). An order refused for a reason that
   still holds is not worth repeating.
@@ -259,7 +263,7 @@ class RobotAgent:
         tools = ToolRegistry(Path(req["robot_dir"]), ctx, Path(req.get("debug_dir") or Path(self.trace_path).parent / "agent_debug"))
         context = {k: req[k] for k in ("robot", "t", "pose", "torch", "mode", "state", "goal", "heat_budget", "air_c", "event",
                                        "inbox", "orders", "survivors", "frontiers", "lidar", "partners", "blocked_unsearched", "fire_blocks_frontier", "fire_blocks_exit", "mission_time_left_s",
-                                       "water_l", "carrying_person") if k in req}
+                                       "water_l", "carrying_person", "rooms") if k in req}
         if _tools.RESCUE_ENABLED:
             context["survivors_to_rescue"] = survivors_to_rescue(req["robot"], pose, req.get("survivors") or [])
         context["team"] = team.context(ctx.t)
