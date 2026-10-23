@@ -1,3 +1,4 @@
+import math
 """Agent runtime guardrails with a scripted model: actions without matching OpenCV evidence are refused in code."""
 
 import json
@@ -337,6 +338,26 @@ def test_turn_to_face_is_a_go_to_where_the_robot_stands_with_a_face_point(tmp_pa
     assert heat["orders"] == [] and heat["refusals"][0]["tool"] == "turn_to_face"
 
 
+def test_turn_to_face_is_refused_for_a_point_already_in_view_or_under_the_robot(tmp_path, monkeypatch):
+    # One-door runs 926 to 929 and 932: of 89 turn_to_face orders, 24 aimed at a point already inside the thermal view
+    # (seed 932 robot A: the same patch faced twice in one step at 62.7 s) and 16 at points under 1 m away.
+    fake_vision(monkeypatch)
+    def face(x, y, t):
+        RobotAgent._recent.clear()
+        return RobotAgent(Scripted([[ToolCall("turn_to_face", {"x": x, "y": y, "reason": "r"})]]), tmp_path / f"{t}.jsonl").step(
+            request(tmp_path) | {"t": t})
+    ahead = face(5.0, 8.0, 30.0)                                   # robot at (5, 5) facing +y: dead ahead
+    assert ahead["orders"] == [] and "already in view" in ahead["refusals"][0]["reason"]
+    edge = face(5.0 + 3 * math.tan(math.radians(T.THERMAL_HALF_HFOV_DEG - 1)), 8.0, 31.0)
+    assert edge["orders"] == [], "inside the thermal half view by 1 deg"
+    under = face(5.2, 4.9, 32.0)
+    assert under["orders"] == [] and "under this robot" in under["refusals"][0]["reason"]
+    side = face(8.0, 5.0, 33.0)                                    # control: 90 deg to the right is out of view
+    assert [o["type"] for o in side["orders"]] == ["go_to"] and side["refusals"] == []
+    beyond = face(5.0 + 3 * math.tan(math.radians(T.THERMAL_HALF_HFOV_DEG + 2)), 8.0, 34.0)
+    assert [o["type"] for o in beyond["orders"]] == ["go_to"], "control: just outside the thermal view the turn is allowed"
+
+
 def test_approach_candidate_faces_the_inspected_spot_on_arrival(tmp_path, monkeypatch):
     fake_vision(monkeypatch, "uncertain")
     T.ToolRegistry._looks.clear()
@@ -344,6 +365,30 @@ def test_approach_candidate_faces_the_inspected_spot_on_arrival(tmp_path, monkey
                             [ToolCall("approach_candidate", {"evidence_id": "ev1"})]])
     (o,) = out["orders"]
     assert (o["face_x"], o["face_y"]) == pytest.approx((5.0, 10.0))
+
+
+def test_a_thermal_only_warm_patch_on_a_wall_waits_until_the_frontiers_are_searched(tmp_path, monkeypatch):
+    # Over 15 runs 151 thermal-only candidates on a long wall held 1 person; seed 932 robot A spent four orders on one
+    # wall patch. Controls: no frontiers left, a patch not on a wall, and a colour sighting at the spot all allow it.
+    fake_vision(monkeypatch, "uncertain")
+    def step(t, numbers, frontiers, calls):
+        RobotAgent._recent.clear(); T.ToolRegistry._looks.clear(); T.ToolRegistry._pending.clear()
+        req = request(tmp_path) | {"t": t, "event": {"kind": "survivor_candidate", "numbers": numbers}, "frontiers": frontiers}
+        return RobotAgent(Scripted(calls), tmp_path / f"{t}.jsonl").step(req)
+    T.ToolRegistry._wall_spots.clear()
+    wall = {"x_m": 5.0, "y_m": 10.0, "on_wall": 1.0, "rgb": 0.0}
+    frontier = [{"id": "f1", "x": 9.0, "y": 1.0}]
+    approach = [[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": 5})], [ToolCall("approach_candidate", {"evidence_id": "ev1"})]]
+    out = step(40.0, wall, frontier, approach)
+    assert out["orders"] == [] and "1 in 151" in out["refusals"][0]["reason"], out
+    face = step(41.0, wall, frontier, [[ToolCall("turn_to_face", {"x": 5.3, "y": 10.0, "reason": "r"})]])
+    assert face["orders"] == [] and "1 in 151" in face["refusals"][0]["reason"]
+    assert [o["type"] for o in step(42.0, wall, [], approach)["orders"]] == ["go_to"], "control: no frontier left"
+    T.ToolRegistry._wall_spots.clear()
+    assert [o["type"] for o in step(43.0, wall | {"on_wall": 0.0}, frontier, approach)["orders"]] == ["go_to"], "control: not on a wall"
+    step(44.0, wall, frontier, [[ToolCall("finish", {"summary": "s"})]])
+    step(45.0, wall | {"on_wall": 0.0, "rgb": 1.0}, frontier, [[ToolCall("finish", {"summary": "s"})]])
+    assert [o["type"] for o in step(46.0, {"x_m": 0.0, "y_m": 0.0}, frontier, approach)["orders"]] == ["go_to"], "a colour sighting clears the spot"
 
 
 def test_people_to_rescue_say_whether_they_are_in_the_camera_view():

@@ -65,7 +65,9 @@ Facts about your robot and the context:
   A person lying within the arm's reach is below the camera's view, so an inspection there may say uncertain.
 - lidar gives the nearest obstacle in eight directions. The robot's body radius is 0.25 m.
 - A warm candidate with on_wall 1 is a thermal-only warm patch on a long mapped wall (the structure around it runs on
-  for 2 m or more). Fire heats walls; people can also lie against them.
+  for 2 m or more). Fire heats walls: in 15 recorded runs 1 of 151 such patches was a person. Inspect it from where you
+  stand if you like; turning or walking to it is refused while frontiers are offered, unless an inspection shows a colour
+  person or a shape standing off the wall. Colour candidates were people 13 times in 16: always look at those.
 - previously_rejected 1 on a warm candidate: you rejected a warm region at that spot before, and the robot now sees it
   from a new viewpoint (at least 45 degrees round or half the distance) or the colour detector saw a person there.
 - survivors_to_rescue: people already confirmed whom nobody has lifted, with bearing, distance, in_view and the
@@ -202,6 +204,7 @@ class RobotAgent:
                            water_l=float(req.get("water_l") or 0.0), carrying_person=bool(req.get("carrying_person")),
                            event_kind=(req.get("event") or {}).get("kind", ""), torch=req.get("torch", "wide"))
         ctx.frontiers = list(req.get("frontiers") or [])
+        ctx.event = dict(req.get("event") or {})
         ctx.survivors = [list(p) for p in req.get("survivors") or []]
         ctx.maps_linked = any(p.get("maps_linked") for p in req.get("partners") or [])
         tools = ToolRegistry(Path(req["robot_dir"]), ctx, Path(req.get("debug_dir") or Path(self.trace_path).parent / "agent_debug"))
