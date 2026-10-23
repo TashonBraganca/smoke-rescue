@@ -107,6 +107,9 @@ Facts about your robot and the context:
 - last_orders_outcome: what the brain did with the movement orders of your previous step (reached, refused with its
   reason, no path, expired before arrival, overridden by a heat event, under way). An order refused for a reason that
   still holds is not worth repeating.
+- confirmed_people: every person the team has already confirmed, with bearing, distance and in_view. A warm shape or a
+  person verdict within 1 m of one of them is that same person: do not confirm or report her again, and do not radio a
+  "new survivor"; search elsewhere.
 - context.scan_thermal is this step's thermal scan, already run by code on the newest frame: use its hot spots and
   person-sized regions and cite its id as evidence; do not spend a round calling scan_thermal again.
 - Each perception tool returns the same result if called again in this step. scan_thermal is how you find people and
@@ -295,6 +298,12 @@ class RobotAgent:
                                        "water_l", "carrying_person", "rooms") if k in req}
         if _tools.RESCUE_ENABLED:
             context["survivors_to_rescue"] = survivors_to_rescue(req["robot"], pose, req.get("survivors") or [])
+        # Every person the team has confirmed, marked for the model with bearing, distance and whether the camera sees the
+        # spot now. Seed 934: both robots confirmed one person twice and radioed "new survivor"; the raw survivors list of
+        # coordinates was in the context and the model did not tie it to the person in front of it.
+        if req.get("survivors"):
+            context["confirmed_people"] = [{k: v for k, v in s.items() if k not in ("approach", "confirmed_by")}
+                                           for s in survivors_to_rescue(req["robot"], pose, req.get("survivors") or [])]
         context["team"] = team.context(ctx.t)
         spray = _tools.spray_option(req)
         if spray is not None:
