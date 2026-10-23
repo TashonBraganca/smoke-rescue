@@ -243,6 +243,8 @@ class ToolRegistry:
     # including sightings for which no approach was ordered. These are reminders,
     # not evidence for actions in another step. New recordings clear the queue.
     _unfinished: dict = {}
+    # Walks toward a person verdict to confirm her from closer, per robot: {"x", "y", "t"}. Cleared by a confirmation there.
+    _confirm_walks: dict = {}
     # Thermal-only warm patches the brain found on a long mapped wall, per robot, until a colour sighting there clears them.
     # Over 15 runs 151 such candidates held 1 person (0.7 %, Wilson 95 % 0.1 to 3.7 %; colour candidates were people 13
     # times in 16), so walking or turning to them waits until the offered frontiers are searched (opus_search_design 2.2).
@@ -360,7 +362,8 @@ class ToolRegistry:
                 e = json.loads(line)
             except ValueError:
                 continue
-            if float(e.get("t", -1)) >= since_t - 1e-6 and str(e.get("reason", "")).startswith(self._DROPPED):
+            # Up to now only: a replay of a finished recording must not read what the brain logged later.
+            if since_t - 1e-6 <= float(e.get("t", -1)) <= self.ctx.t + 1e-6 and str(e.get("reason", "")).startswith(self._DROPPED):
                 return True
         return False
 
@@ -702,6 +705,11 @@ class ToolRegistry:
                         "reason": (f"reach the person seen at ({ev['x']}, {ev['y']}) to lift them" if RESCUE_ENABLED
                                    else f"closer look to confirm the person seen at ({ev['x']}, {ev['y']})")}
                 name = "go_to"
+                if not RESCUE_ENABLED and not self._confirmed_near(ev):
+                    # Without the arm this walk exists only to confirm her: the next wake-up of any kind must be able to
+                    # finish it (exploring stays allowed meanwhile). Seed 932, robot A: person verdict from 5.6 m
+                    # at 45.0 s, walked closer, and confirmed s4 on the radio-woken step at 49.0 s from 3.7 m.
+                    self._confirm_walks[self.ctx.robot] = {"x": float(ev["x"]), "y": float(ev["y"]), "t": self.ctx.t}
             elif refusal is None:
                 ev = self.evidence[args["evidence_id"]]
                 key = (self.ctx.robot, round(ev["x"] / self.LOOK_CELL_M), round(ev["y"] / self.LOOK_CELL_M))
@@ -802,6 +810,10 @@ class ToolRegistry:
                 self._pending.pop(self.ctx.robot, None)
             self._unfinished[self.ctx.robot] = [u for u in self._unfinished.get(self.ctx.robot, [])
                                                 if math.hypot(u["x"] - float(args["x"]), u["y"] - float(args["y"])) > SURVIVOR_MERGE_M]
+        if name == "confirm_survivor":
+            w = self._confirm_walks.get(self.ctx.robot)
+            if w is not None and math.hypot(w["x"] - float(args["x"]), w["y"] - float(args["y"])) <= self.LOOK_CELL_M:
+                self._confirm_walks.pop(self.ctx.robot, None)
         if name == "withdraw_survivor":
             self._confirmed[self.ctx.robot] = [c for c in self._confirmed.get(self.ctx.robot, [])
                                                if math.hypot(c["x"] - float(args["x"]), c["y"] - float(args["y"])) > SURVIVOR_MERGE_M]
