@@ -3019,7 +3019,9 @@ namespace SmokeRescue.Tests.EditMode
         {
             // A 500 C reading stayed "fire" for over 30 minutes (0.2 C/s decay), so water could never open a route in the
             // robot's own map. Seen cool with no hot reading for heat_cool_after_s, a cell takes the cool value. Controls:
-            // a flickering flame (hot every 0.3 s) stays fire; heat from a partner or a keep-out order stays.
+            // a flickering flame (hot every 0.3 s) stays fire; an agent's keep-out order stays for its time. Since 23 Oct a
+            // partner's sensor heat older than this robot's cool look is cleared (Codex HeatCheck: it held 499 C against a
+            // fresh local 20 C), so the partner case now expects "out".
             var c = Settings(); c.grid_size_m = 6;
             var g = OpenGrid(c); int i = g.Cell(new Vector2(1, 1));
             g.ObserveHeat(i, 500, 0);
@@ -3034,7 +3036,14 @@ namespace SmokeRescue.Tests.EditMode
             typeof(OccupancyGrid).GetMethod("ObservePeerHeat", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
                 .Invoke(p, new object[] { q, 500f, 0.0, 0.0 });
             for (double t = .1; t <= 3; t += .1) p.ObserveHeat(q, 30, t);
-            Assert.That(p.Dangerous(q), Is.True, "a partner's or an agent's fire is not erased by this robot's cool readings");
+            Assert.That(p.Dangerous(q), Is.False, "a partner's older sensor heat yields to this robot's newer cool readings");
+            var o = OpenGrid(c); int r = o.Cell(new Vector2(1, 1));
+            typeof(OccupancyGrid).GetMethod("ObservePeerHeat", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                .Invoke(o, new object[] { r, 500f, 0.0, 0.0 });
+            typeof(OccupancyGrid).GetMethod("HoldHeat", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                .Invoke(o, new object[] { r, 30.0 });
+            for (double t = .1; t <= 3; t += .1) o.ObserveHeat(r, 30, t);
+            Assert.That(o.Dangerous(r), Is.True, "an agent's keep-out is not erased by this robot's cool readings before it expires");
         }
 
         [Test]
