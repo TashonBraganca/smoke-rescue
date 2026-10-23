@@ -20,7 +20,7 @@ namespace SmokeRescue.Tests.EditMode
     public sealed class HeadlessSim
     {
         sealed class Prism { public Vector2[] poly; public float height; }
-        sealed class Body { public string id; public RobotBrain brain; public Vector2 p; public float yaw, v, w; public double start, nextLidar, nextSight; public float moved, air = 20, peakAir = 20, hotS; public AirTemperatureSensor sensor; }
+        sealed class Body { public string id; public RobotBrain brain; public Vector2 p; public float yaw, v, w; public double start, nextLidar, nextSight; public float moved, air = 20, peakAir = 20, hotS, contactS; public AirTemperatureSensor sensor; }
         FireSimHeat heat; Vector2 gateOrigin; float gateYaw;
         /// <summary>House (x, z) of a gate-frame point.</summary>
         Vector2 House(Vector2 g) { Vector2 f = new Vector2(Mathf.Sin(gateYaw), Mathf.Cos(gateYaw)), r = new Vector2(Mathf.Cos(gateYaw), -Mathf.Sin(gateYaw)); return gateOrigin + r * g.x + f * g.y; }
@@ -87,10 +87,36 @@ namespace SmokeRescue.Tests.EditMode
                 foreach (var o in bodies)
                 {
                     if (o == self || o.brain == null) continue;
-                    Vector2 m = o.p - p; float b = Vector2.Dot(m, d), c2 = m.sqrMagnitude - cfg.body_radius_m * cfg.body_radius_m, disc = b * b - c2;
-                    if (disc >= 0 && b - Mathf.Sqrt(disc) > 0) best = Mathf.Min(best, b - Mathf.Sqrt(disc));
+                    foreach (var centre in Circles(o))
+                    {
+                        Vector2 m = centre - p; float b = Vector2.Dot(m, d), c2 = m.sqrMagnitude - cfg.body_radius_m * cfg.body_radius_m, disc = b * b - c2;
+                        if (disc >= 0 && b - Mathf.Sqrt(disc) > 0) best = Mathf.Min(best, b - Mathf.Sqrt(disc));
+                    }
                 }
             return best;
+        }
+        /// <summary>robot_collision (request option): robots are solid. Each body is three circles of body_radius_m along its
+        /// axis, at the centre and body_half_length_m - body_radius_m fore and aft (a 0.75 m by 0.36 m outline), for the LiDAR
+        /// and for contact. Without it a body is one circle the LiDAR sees and the other robot walks through. Headless house
+        /// 5015 (23 Oct): both robots ended on the same point, which two real bodies cannot do.</summary>
+        bool solidBodies;
+        Vector2[] Circles(Body o) => Circles(o.p, o.yaw);
+        Vector2[] Circles(Vector2 p, float yaw)
+        {
+            if (!solidBodies) return new[] { p };
+            var f = Fwd(yaw) * Mathf.Max(0, cfg.body_half_length_m - cfg.body_radius_m);
+            return new[] { p - f, p, p + f };
+        }
+        /// <summary>Smallest clearance between this pose's body and any other robot's body (negative: overlapping).</summary>
+        float BodyGap(Body self, Vector2 p, float yaw, List<Body> bodies)
+        {
+            float gap = float.PositiveInfinity;
+            foreach (var o in bodies)
+            {
+                if (o == self || o.brain == null) continue;
+                foreach (var a in Circles(p, yaw)) foreach (var b in Circles(o)) gap = Mathf.Min(gap, Vector2.Distance(a, b) - 2 * cfg.body_radius_m);
+            }
+            return gap;
         }
 
         LidarScan Lidar(double t, Body r, List<Body> bodies)
@@ -203,6 +229,7 @@ namespace SmokeRescue.Tests.EditMode
                 poly = q["poly"].Select(c => new Vector2((float)c[0], (float)c[1])).ToArray() }).ToList();
             roofs = world["rooms"].Select(q => q["poly"].Select(c => new Vector2((float)c[0], (float)c[1])).ToArray()).ToList();
             people = world["people"].Select(q => ((string)q["id"], new Vector2((float)q["at"][0], (float)q["at"][1]))).ToList();
+            solidBodies = (bool?)run["robot_collision"] ?? false;
             if (run["probes"] != null) Probes = run["probes"].Select(q => new Vector2((float)q[0], (float)q[1])).ToList();
             cal = SensorConfig.Load(); cfg = BrainConfig.Load(); cfg.frames_shared_at_start = true;
             // As the recorder does for a scenario with time_limit false (RecordingSession: mission_time_limit_s = 86400).
@@ -280,6 +307,18 @@ namespace SmokeRescue.Tests.EditMode
                     float w = Mathf.Clamp(cmd.yawRateDeg, -cfg.limits.max_yaw_rate_dps, cfg.limits.max_yaw_rate_dps) * Mathf.Deg2Rad;
                     float yaw = r.yaw + w * (float)dt; Vector2 next = r.p + Fwd(yaw) * v * (float)dt;
                     if (Collides(next) && !Collides(r.p)) { next = r.p; v = 0; }
+                    // A step that would press into another robot is refused (turn and move apart are tried in that order);
+                    // moving out of an overlap is always allowed.
+                    if (solidBodies)
+                    {
+                        float now = BodyGap(r, r.p, r.yaw, robots);
+                        if (BodyGap(r, next, yaw, robots) < 0 && BodyGap(r, next, yaw, robots) < now)
+                        {
+                            r.contactS += (float)dt;
+                            if (BodyGap(r, r.p, yaw, robots) >= Mathf.Min(0, now)) { next = r.p; v = 0; }
+                            else { next = r.p; yaw = r.yaw; v = 0; w = 0; }
+                        }
+                    }
                     r.moved += Vector2.Distance(r.p, next); r.p = next; r.yaw = yaw; r.v = v; r.w = w;
                     foreach (var e in r.brain.DrainEvents())
                     {
@@ -323,7 +362,7 @@ namespace SmokeRescue.Tests.EditMode
                 var s = r.brain.Snapshot();
                 maps.Add(new JObject { ["robot"] = r.id, ["grid_size"] = s.gridSize, ["cell_m"] = s.cellM, ["origin"] = new JArray(s.gridOrigin.x, s.gridOrigin.y),
                     ["own_searched"] = Convert.ToBase64String(s.ownSearched), ["searched"] = Convert.ToBase64String(s.searched),
-                    ["occupancy"] = Convert.ToBase64String(s.occupancy), ["walked_m"] = r.moved, ["final_state"] = s.state, ["peak_air_c"] = r.peakAir, ["air_over_60_s"] = r.hotS,
+                    ["occupancy"] = Convert.ToBase64String(s.occupancy), ["walked_m"] = r.moved, ["final_state"] = s.state, ["peak_air_c"] = r.peakAir, ["air_over_60_s"] = r.hotS, ["robot_contact_s"] = r.contactS,
                     ["indoor"] = Convert.ToBase64String(r.brain.IndoorMask()),
                     ["frontiers"] = FrontierDump(r.brain, duration),
                     ["rooms"] = new JArray(((GridPlanner)typeof(RobotBrain).GetField("planner", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(r.brain)).Rooms.Rooms
