@@ -82,13 +82,15 @@ namespace SmokeRescue.Brain
         /// <summary>Left-compose a building-frame rigid delta, with left-positive radians in yawRad.
         /// Corrects current and retained capture poses; discards the current path.
         /// The operator's entry door remains the return anchor in building coordinates.
-        /// Existing grid cells and survivor coordinates stay put until a later map correction system exists.</summary>
+        /// The confidence map's source transform moves its shared history with the corrected pose.
+        /// Legacy planner cells and survivor coordinates keep their current behaviour.</summary>
         public void ApplyCorrection(BrainPose delta)
         {
             if (!Finite(delta.position) || !BrainMath.Finite(delta.yawRad)) throw new ArgumentException("Nonfinite pose correction.");
             if (delta.position == Vector2.zero && delta.yawRad == 0) return;
             ResetStuckRecovery();
             motion.ApplyCorrection(delta);
+            teamMap.ApplyCorrection(delta);
             ClearPath();
         }
 
@@ -137,6 +139,8 @@ namespace SmokeRescue.Brain
             var acknowledgements = new List<BrainAck>();
             foreach (var p in peers) acknowledgements.Add(new BrainAck { sender = p.Key, sequence = p.Value.completeMapSequence });
             m.Acknowledgements = acknowledgements.ToArray();
+            if (teamMap.HasOwnEvidence || m.Hotspots.Length > 0) m.SentAt = t;
+            teamMap.FillMessage(m);
             // Ignore send time when comparing idle states. Hot cells always refresh and need the
             // real send time here because dense heat encodes sample ages relative to it.
             if (m.Hotspots.Length > 0) m.SentAt = t;
@@ -205,6 +209,7 @@ namespace SmokeRescue.Brain
             var m = peer.message;
             if (!TryPartnerLink(sender, out var link)) { peer.claim = null; peer.room = null; peer.goal = null; return; }
             grid.ReplacePeerLayer(sender, m, peer.explored, link, OwnBodyWasAt);
+            teamMap.Receive(m, link);
             var before = peer.poseKnown ? peer.pose.position : (Vector2?)null; double beforeT = peer.poseT;
             peer.pose = new BrainPose { position = link.Transform(m.Pose.position.x, m.Pose.position.y), yawRad = m.Pose.yawRad + link.yawRad };
             peer.poseKnown = true; peer.poseT = m.SentAt;

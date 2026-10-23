@@ -109,9 +109,62 @@ def report(run_dir: Path) -> dict:
     out["false_confirmations"] = sum(1 for c in confirmed if all(math.dist((c[2], c[3]), p["at"]) > 1.05 for p in world["people"]))
     radio = [r for r in rows if r["kind"] == "radio"]
     out["radio"] = {"sent": len(radio), "delivered": sum(r["ok"] for r in radio),
-                    "with_room_claim": sum(1 for r in radio if r.get("room_claim"))}
+                    "with_room_claim": sum(1 for r in radio if r.get("room_claim")),
+                    "mean_packet_bytes": sum(r.get('bytes', 0) for r in radio) / max(1, len(radio))}
+    out['team_map_by_receiver'] = headless_team_maps(run_dir, result, world)
     draw(run_dir, world, rows, masks)
     return out
+
+
+def polygon_mask(xy, poly):
+    import numpy as np
+    x, y = xy[..., 0], xy[..., 1]
+    hit = np.zeros(x.shape, bool)
+    for i, p in enumerate(poly):
+        q = poly[i - 1]
+        if p[1] == q[1]:
+            continue
+        hit ^= ((p[1] > y) != (q[1] > y)) & (x < (q[0] - p[0]) * (y - p[1]) / (q[1] - p[1]) + p[0])
+    return hit
+
+
+def headless_team_maps(run_dir, result, world):
+    """Evaluate each received team belief against simulator geometry, outside RobotBrain."""
+    import numpy as np
+    sys.path.insert(0, str(ROOT / 'brain'))
+    from brain.team_map import TeamGrid, load_team_map
+    from brain.nav_eval import team_belief_metrics
+    reports = {}
+    segments = np.array([s[:4] for s in world['segments'] if s[4] <= .2 and s[5] >= 1.5], float).reshape(-1, 2, 2)
+    for snapshot in result['maps']:
+        path = run_dir / (snapshot['robot'] + '.team.bin.gz')
+        if path.exists():
+            grid = load_team_map(path)
+            representation = 'confidence_export'
+        else:
+            n = snapshot['grid_size']
+            occupancy = np.frombuffer(base64.b64decode(snapshot['occupancy']), np.uint8).reshape(n, n)
+            searched = np.frombuffer(base64.b64decode(snapshot['searched']), np.uint8).reshape(n, n) > 0
+            known = occupancy != 0
+            grid = TeamGrid(n, snapshot['cell_m'], np.array(snapshot['origin']), result['duration_s'],
+                            (snapshot['robot'] + ':legacy_fused',), np.where(occupancy == 255, 1., np.where(occupancy == 1, 0., .5)),
+                            searched.astype(float), known.astype(np.uint32), searched.astype(np.uint32),
+                            np.where(known, 0., -1.), np.where(searched, 0., -1.))
+            representation = 'legacy_binary_no_confidence_or_age'
+        yy, xx = np.indices((grid.size, grid.size))
+        xy = grid.origin + (np.stack([xx, yy], axis=-1) + .5) * grid.cell_m
+        floor = np.zeros((grid.size, grid.size), bool)
+        for room in world['rooms']:
+            floor |= polygon_mask(xy, room['poly'])
+        for prism in world['prisms']:
+            if prism['height_m'] >= .15:
+                floor &= ~polygon_mask(xy, prism['poly'])
+        for a, b in segments:
+            d = b - a
+            u = np.clip(((xy - a) * d).sum(axis=2) / max(1e-12, (d * d).sum()), 0, 1)
+            floor &= np.linalg.norm(xy - a - u[..., None] * d, axis=2) > grid.cell_m * .5
+        reports[snapshot['robot']] = team_belief_metrics(grid, xy, segments, floor) | dict(representation=representation, cell_m=grid.cell_m)
+    return reports
 
 
 def draw(run_dir, world, rows, masks):
