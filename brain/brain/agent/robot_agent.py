@@ -19,7 +19,11 @@ from brain.agent import tools as _tools
 from brain.agent.tools import ALL_TOOLS, AgentContext, ToolRegistry, survivors_to_rescue
 from brain.agent.team import TeamState
 
-MAX_ROUNDS = 4
+# Model rounds per step. Scan, inspect, act and finish took exactly 4 rounds with one tool call per reply, so a 4-round
+# limit cut the step before finish: in held-out runs 1 and 2, 60 of 84 steps hit it, 41 lost their summary and 2 lost a
+# decision (issue list 23 Oct, item 10). 6 leaves two rounds of slack; each round costs about 3 s of wall time (the
+# simulation clock waits), and STEP_DEADLINE_S still bounds the step.
+MAX_ROUNDS = 6
 STEP_DEADLINE_S = 75.0     # past this the step ends with what it has; the reflex layer keeps the robot safe meanwhile
 REPEAT_WINDOW_S = 12.0     # the reflex brain re-raises the same candidate every few seconds; one decision covers it
 
@@ -123,7 +127,8 @@ Facts about your robot and the context:
   aim tolerance) and within the nozzle's reach, its burning area and estimated heat release, the heat one stream removes,
   water left, and code's comparison of the two.
 
-Finish every step with one sentence saying what you decided and why."""
+Finish every step with one sentence saying what you decided and why: call finish in the same reply as your last action
+(one reply may hold several tool calls), not in a round of its own."""
 
 
 _RESCUE_TEXT = [
@@ -327,6 +332,10 @@ class RobotAgent:
                                  "candidate": result.get("candidate")} if call.name == "inspect_candidate" else {}),
                              "refused": result.get("refused", False), "reason": result.get("reason"), "error": result.get("error")})
                 messages.append({"role": "tool", "name": call.name, "content": json.dumps(_compact(result), default=str)})
+        if tools.finished is None and (tools.orders or tools.refusals):
+            # Out of rounds or time before finish: the orders already stand, so record what was decided rather than nothing.
+            tools.finished = "(no summary: the step ended before finish) " + "; ".join(
+                [o.get("type", "order") for o in tools.orders] + [f"refused {r['tool']}" for r in tools.refusals])
         team.note_intent(ctx.t, tools.finished, tools.orders)
         if tools.orders: self._ordered[req["robot"]] = ctx.t
         if any(o.get("type") in ("go_to", "explore_frontier") for o in tools.orders):
