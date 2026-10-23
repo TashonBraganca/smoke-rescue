@@ -28,6 +28,7 @@ namespace SmokeRescue.Brain
         public bool entrance_lock_passage = false;
         public bool person_glance = false;
         public bool room_ledger_relative_doors = false;
+        public bool room_ledger_drop_slivers = false;
         public bool reject_area_memory = false;
         public bool room_sweep = false;
         public bool health_close_surface = false;

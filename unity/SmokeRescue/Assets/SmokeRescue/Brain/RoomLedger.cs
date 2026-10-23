@@ -150,7 +150,7 @@ namespace SmokeRescue.Brain
                     int cell = queue.Dequeue(); strip.Add(cell);
                     Neighbours(cell, n => { if (free[n] && next[n] < 0) { next[n] = label; queue.Enqueue(n); } });
                 }
-                if (config.room_ledger_relative_doors && strip.Count * grid.CellM * grid.CellM < config.room_ledger_min_room_m2)
+                if ((config.room_ledger_relative_doors || config.room_ledger_drop_slivers) && strip.Count * grid.CellM * grid.CellM < config.room_ledger_min_room_m2)
                 { foreach (int cell in strip) next[cell] = -2; count--; }
             }
             for (int i = 0; i < grid.Count; i++) if (next[i] == -2) next[i] = -1;
