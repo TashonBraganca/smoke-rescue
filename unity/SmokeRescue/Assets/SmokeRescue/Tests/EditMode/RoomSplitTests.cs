@@ -69,5 +69,46 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(Order(false), Is.EqualTo(new List<int> { 1, 0 }), "control: without the sweep, equal frontiers keep their order");
             Assert.That(Order(true), Is.EqualTo(new List<int> { 0, 1 }), "with it, the left side comes first");
         }
+
+        [Test]
+        public void ALowBedIsNoWallForAWarmShapeButATallWallIs()
+        {
+            // Seed 934: the kitchen person curled on a bed was flagged on-wall, since the 2 m bed made a long occupied structure.
+            var c = AuctionSettings(); c.candidate_wall_tall_only = true;
+            var b = new RobotBrain(Calibration(), c, "robot_A", 0); Room(b, -6, 6, -6, 6); var g = Map(b);
+            var top = new ushort[g.Count];
+            for (int i = 0; i < g.Count; i++)
+            {
+                var p = g.Centre(i);
+                if (p.x >= -1.1f && p.x <= 1.1f && p.y >= 2 && p.y <= 2.4f) { g.ObserveOccupied(i); top[i] = 50; }   // a bed 2.2 m long, 0.5 m high
+                if (p.x >= -1.1f && p.x <= 1.1f && p.y >= -2.4f && p.y <= -2) { g.ObserveOccupied(i); top[i] = 270; } // a wall, 2.7 m high
+            }
+            g.SetTopHeights(top); g.SeeOverMaxM = 1.0f;
+            float Extent(Vector2 p, bool tall) => g.OccupiedExtent(p, c.candidate_wall_disc_m, c.candidate_wall_window_m, tall);
+            Assert.That(Extent(new Vector2(0, 2.5f), false), Is.GreaterThanOrEqualTo(c.candidate_wall_extent_m), "control: counting every occupied cell, the bed reads as a wall");
+            Assert.That(Extent(new Vector2(0, 2.5f), true), Is.LessThan(c.candidate_wall_extent_m), "low furniture the camera sees over is no wall");
+            Assert.That(Extent(new Vector2(0, -1.9f), true), Is.GreaterThanOrEqualTo(c.candidate_wall_extent_m), "a tall wall still is");
+        }
+
+        [Test]
+        public void ARoomSearchedFromItsDoorwayIsStillWalkedIntoOnce()
+        {
+            // Headless (23 Oct): 17 of 55 rooms were never entered; floor seen from the door counted as searched.
+            var c = AuctionSettings(); c.room_walk_in = true; c.room_walk_in_max_m = 12;
+            var b = new RobotBrain(Calibration(), c, "robot_A", 0); var g = Map(b);
+            CorridorWithRooms(g, .8f, -4, 4);
+            var searched = (bool[])typeof(OccupancyGrid).GetField("observed", Private).GetValue(g);
+            for (int i = 0; i < g.Count; i++) { var p = g.Centre(i); if (p.y > .9f) searched[i] = true; }   // both rooms searched from the corridor
+            var ledger = Planner(b).Rooms; ledger.Update(0, Vector2.zero, p => true);
+            var walk = typeof(RobotBrain).GetMethod("WalkIntoRoom", Private);
+            var args = new object[] { 1.0, null, -1 };
+            Assert.That((bool)walk.Invoke(b, args), Is.True, "a searched room it never stood in is walked into");
+            var route = (List<Vector2>)args[1];
+            Assert.That(ledger.RoomAt(route[route.Count - 1]), Is.EqualTo((int)args[2]), "the walk ends inside that room");
+            int first = (int)args[2];
+            var again = new object[] { 2.0, null, -1 };
+            bool second = (bool)walk.Invoke(b, again);
+            Assert.That(!second || (int)again[2] != first, Is.True, "never the same room twice");
+        }
     }
 }

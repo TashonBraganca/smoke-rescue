@@ -628,5 +628,13 @@
   "candidate_split": true,
   "candidate_split_reason": "A linked partner nearer to a candidate and already heading for it (radio goal within survivor_stop_max_m + 1 m) or standing within the viewing band takes it; this robot leaves it and searches on, and drops one it is already walking to. Headless houses 5003 and 5004 (23 Oct, solid bodies): with one strong sighting enough, both robots raised the same people from the entrance at 0 s, walked up to them together and jammed in the doorway for over 200 s; with the split, contact fell to 1-2 s. On since 24 Oct 01:55.",
   "room_ledger_drop_slivers": true,
-  "room_ledger_drop_slivers_reason": "Free strips without a room core smaller than room_ledger_min_room_m2 are no room, with the fixed door rule kept. Seed 934: 126 of robot A's 133 ledger rooms were under 1 m2 (median one cell), each with a new id, ranked, claimed and shown to the agent. Separate from room_ledger_relative_doors, which cost house 5001 26 to 34 points of coverage in every headless run. On since 24 Oct 01:55."
+  "room_ledger_drop_slivers_reason": "Free strips without a room core smaller than room_ledger_min_room_m2 are no room, with the fixed door rule kept. Seed 934: 126 of robot A's 133 ledger rooms were under 1 m2 (median one cell), each with a new id, ranked, claimed and shown to the agent. Separate from room_ledger_relative_doors, which cost house 5001 26 to 34 points of coverage in every headless run. On since 24 Oct 01:55.",
+  "candidate_wall_tall_only": true,
+  "candidate_wall_tall_only_reason": "The on-wall test for thermal-only candidates counts only occupied cells the camera cannot see over (live 3D map heights), so a bed or sofa is no wall. Seed 934 (23 Oct 20:45), robot B: the kitchen person curled on a bed was flagged 'person-sized depth blob on a long mapped wall' at 14.5, 45.7, 69.9 and 150.4 s, never approached, and confirmed only at 153.5 s by the colour detector. Acts only where the robot has heights (Unity's /map3d layers); headless has none. On since 24 Oct 03:35.",
+  "room_walk_in": true,
+  "room_walk_in_reason": "A real room (room_walk_in_min_m2 or more, not a corridor) searched from its doorway but never entered gets one walk to its own centre cell within room_walk_in_max_m, once per room and once per spot (thrash guard: ledger ids can change). Owner: walk into every room. Headless unseen houses: 17 of 55 rooms never entered. Measured 24 Oct 03:20 (houses 5001-5004 and sealed 934, final config): 0 to 2 walk-ins per run, coverage 73.3 -> 75.8 % mean, confirmed 22 -> 21 of 25. On since 24 Oct 03:35.",
+  "room_walk_in_min_m2": 2.0,
+  "room_walk_in_min_m2_reason": "Smaller spaces are alcoves or furniture gaps, not rooms to walk into.",
+  "room_walk_in_max_m": 8.0,
+  "room_walk_in_max_m_reason": "About 13 s at open speed: a detour, not a cross-house trip."
 }
