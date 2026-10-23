@@ -12,6 +12,9 @@ from brain.agent import vision as v
 
 ROOT = Path(__file__).resolve().parents[2]
 RECORDING = ROOT / 'data/recordings/unity_house_hidden_run1'
+# The hidden-corner recording was deleted on 23 Oct to free disk space (owner's choice); these checks skip until they are
+# ported to a kept recording.
+needs_recording = pytest.mark.skipif(not RECORDING.exists(), reason='hidden-corner recording deleted 23 Oct')
 
 
 def room_frame(kind='room', ceiling=3., t=0., back_m=7., side_m=2.):
@@ -105,6 +108,7 @@ def test_verdict_thresholds_come_from_config(tmp_path):
             assert config[key + '_reason']
 
 
+@needs_recording
 @pytest.mark.parametrize('robot', ['A', 'B'])
 @pytest.mark.parametrize('bearing', [-35., -30., 0., 30., 35.])
 def test_recorded_outside_doorway_and_facade(robot, bearing, tmp_path):
@@ -122,6 +126,7 @@ def test_recorded_outside_doorway_and_facade(robot, bearing, tmp_path):
         assert r['walls'][1]['hit_fraction'] > .5
 
 
+@needs_recording
 @pytest.mark.parametrize('robot', ['A', 'B'])
 @pytest.mark.parametrize('t', [60., 70., 80., 90., 100., 110., 120.])
 def test_recorded_interval_labels_and_verdicts(robot, t, tmp_path):

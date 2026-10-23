@@ -18,6 +18,9 @@ from scipy.spatial.transform import Rotation
 
 ROOT = Path(__file__).resolve().parents[2]
 RECORDING = ROOT / 'data/recordings/unity_house_hidden_run1'
+# The hidden-corner recording was deleted on 23 Oct to free disk space (owner's choice); these checks skip until they are
+# ported to a kept recording.
+needs_recording = pytest.mark.skipif(not RECORDING.exists(), reason='hidden-corner recording deleted 23 Oct')
 SENSORS = json.loads((ROOT / 'config/sensors.json').read_text())
 
 
@@ -206,6 +209,7 @@ def test_native_worker_death_returns_error_and_can_restart(scene):
         assert m.layers(.1, [-4., -1.], 80)[0].any()
 
 
+@needs_recording
 def test_recorded_sequence_accuracy_and_budget(tmp_path):
     report = recorded_report(tmp_path / 'direct_report.json')
     assert report['frames'] == 15 and report['points'] > 1000
@@ -215,6 +219,7 @@ def test_recorded_sequence_accuracy_and_budget(tmp_path):
     print(json.dumps(report, sort_keys=True))
 
 
+@needs_recording
 def test_recorded_sequence_native_subprocess(tmp_path):
     result = subprocess.run([sys.executable, __file__, str(tmp_path / 'report.json')],
                             capture_output=True, text=True, timeout=config()['worker_timeout_s'] * 2)

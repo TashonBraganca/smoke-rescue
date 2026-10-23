@@ -694,3 +694,28 @@ def test_without_the_rescue_arm_walking_to_a_confirmed_person_is_refused(tmp_pat
     assert [o["type"] for o in allowed["orders"]] == ["go_to"], "control: an unconfirmed person can be approached"
     assert "closer look to confirm" in allowed["orders"][0]["reason"]
     assert [o["type"] for o in approach(True, True)["orders"]] == ["go_to"], "control: with the arm on, walk to lift"
+
+
+def test_a_closer_look_at_a_flat_warm_surface_is_refused(tmp_path, monkeypatch):
+    # Seed 932: in the 96 s before the fire took the house, robot A spent about 37 s and robot B about 17 s walking up to
+    # warm shapes on walls. An inspection that measured the warm region flat (enough depth, a large plane, no protrusion,
+    # no colour person) refuses approach_candidate. Controls: a protruding shape, and too little depth to tell, are allowed.
+    def approach(cues):
+        RobotAgent._new_run(request(tmp_path) | {"t": 49.0})
+        T.ToolRegistry._looks.clear(); T.ToolRegistry._pending.clear(); T.ToolRegistry._confirmed.clear()
+        fake_vision(monkeypatch, "uncertain")
+        real = T.vision.inspect_candidate
+        def with_cues(*a, **k):
+            r = real(*a, **k); r["cues"] = cues; return r
+        monkeypatch.setattr(T.vision, "inspect_candidate", with_cues)
+        return RobotAgent(Scripted([[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": 3})],
+                                    [ToolCall("approach_candidate", {"evidence_id": "ev1"})]]), tmp_path / "t.jsonl").step(request(tmp_path) | {"t": 50.0})
+    flat = {"depth": {"valid_fraction": .9, "nonplanar": False}, "plane": {"large_plane": True}, "rgb_dnn": {"hits": []}}
+    out = approach(flat)
+    assert out["orders"] == [] and "flat surface" in out["refusals"][0]["reason"]
+    body = {"depth": {"valid_fraction": .9, "nonplanar": True}, "plane": {"large_plane": False}, "rgb_dnn": {"hits": []}}
+    assert [o["type"] for o in approach(body)["orders"]] == ["go_to"], "control: a protruding shape is approached"
+    unknown = {"depth": {"valid_fraction": .3, "nonplanar": False}, "plane": {"large_plane": False}, "rgb_dnn": {"hits": []}}
+    assert [o["type"] for o in approach(unknown)["orders"]] == ["go_to"], "control: too little depth to tell is approached"
+    colour = {"depth": {"valid_fraction": .9, "nonplanar": False}, "plane": {"large_plane": True}, "rgb_dnn": {"hits": [{"confidence": .8}]}}
+    assert [o["type"] for o in approach(colour)["orders"]] == ["go_to"], "control: a colour person is approached"

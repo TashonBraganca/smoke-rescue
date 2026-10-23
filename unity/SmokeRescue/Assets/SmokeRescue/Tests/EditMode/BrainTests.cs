@@ -1247,6 +1247,49 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void TheShippedConfigLocksTheWayInForRobotsThatStayInside()
+        {
+            // The lock is off in code (tests that walk away from their start are not about it) and on in the shipped config.
+            var c = BrainConfig.Load();
+            Assert.That(c.stay_inside, Is.True);
+            Assert.That(c.entrance_lock_m, Is.EqualTo(2.5f).Within(1e-4f), "owner's choice: 2.5 m");
+        }
+
+        [Test]
+        public void StayingInsideARobotNeverGoesBackNearTheWayItCameIn()
+        {
+            // Seed 932: robot B's retreat ended 1 m inside the front door, its camera looking out at the yard. Owner's rule:
+            // once in, never back to or near the way in. The robot's first point on proven-indoor floor is its way in; once
+            // it is 2.5 m beyond it, floor within 2.5 m of it is locked for every route, retreat included. Control: no lock.
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            (List<Vector2> toDoor, List<Vector2> retreat, bool logged) Run(float lockM)
+            {
+                var c = Settings(); c.stay_inside = true; c.mission_time_limit_s = 1000; c.entrance_lock_m = lockM;
+                var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -3, 3, -3, 8);
+                double last = 0; bool logged = false;
+                for (int i = 0; i <= 15 * 8; i++)
+                {
+                    double t = i / 15.0; float air = t < 2 ? 20 : 45;   // cool near the way in, hot farther in
+                    Motion(b, t, .5f); b.OnRgbd(Image(t, true, 0)); b.OnAirTemperature(t, air);
+                    b.Step(t, i == 0 ? .05f : (float)(t - last)); last = t;
+                    logged |= b.DrainEvents().Any(e => e.kind == "entrance_locked");
+                }
+                var planner = (GridPlanner)typeof(RobotBrain).GetField("planner", flags).GetValue(b);
+                var toDoor = planner.Plan(b.Snapshot().pose.position, new Vector2(0, .5f));
+                var retreat = (List<Vector2>)typeof(RobotBrain).GetMethod("RetreatPath", flags).Invoke(b, null);
+                return (toDoor, retreat, logged);
+            }
+            var locked = Run(2.5f);
+            Assert.That(locked.logged, Is.True, "the lock is set once the robot is in");
+            Assert.That(locked.toDoor, Is.Empty, "no route back to the way in");
+            Assert.That(locked.retreat, Is.Not.Empty, "a retreat still exists");
+            Assert.That(locked.retreat.All(p => Vector2.Distance(p, Vector2.zero) > 2.5f), Is.True, "the retreat keeps away from the way in, though the air there was coolest");
+            var open = Run(0);
+            Assert.That(open.toDoor, Is.Not.Empty, "control: without the lock the way in is reachable");
+            Assert.That(open.retreat.Last().y, Is.LessThan(2.5f), "control: without the lock the retreat goes to the cool air by the way in");
+        }
+
+        [Test]
         public void APersonConfirmedJustInsideTheOnlyDoorDoesNotCloseIt()
         {
             // One-door seed 931: a person confirmed 2.4 m inside the one door; the whole 1.05 m keep-out disc was an obstacle,
