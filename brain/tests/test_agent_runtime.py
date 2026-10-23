@@ -901,3 +901,20 @@ def test_confirmed_people_are_marked_for_the_model_with_bearing_and_distance(tmp
     RobotAgent(Scripted([[ToolCall("finish", {"summary": "ok"})]]), tmp_path / "u.jsonl").step(request(tmp_path) | {"t": 30.0})
     ctx = [json.loads(l) for l in (tmp_path / "u.jsonl").read_text().splitlines() if '"step_start"' in l][-1]["context"]
     assert "confirmed_people" not in ctx, "control: nobody confirmed"
+
+
+def test_an_explore_order_for_the_goal_the_robot_already_has_sends_no_order(tmp_path, monkeypatch):
+    # Seed 934, robot B: 11 of 15 explore orders named the brain's own first frontier; each made a fresh goal and a turn.
+    # An explore order within 1 m of the robot's current goal now sends nothing. Control: a frontier 4 m from the goal
+    # is ordered as before.
+    fake_vision(monkeypatch, "uncertain")
+    T.ToolRegistry._pending.clear(); T.ToolRegistry._looks.clear()
+    frontiers = [{"id": 0, "x": 5.0, "y": 9.0, "path_m": 4.0, "unsearched_m2": 6.0, "proven_indoors": True},
+                 {"id": 1, "x": 9.0, "y": 9.0, "path_m": 5.0, "unsearched_m2": 6.0, "proven_indoors": True}]
+    def explore(fid, t, kind):
+        req = request(tmp_path) | {"t": t, "event": {"kind": kind}, "frontiers": frontiers, "goal": [5.2, 9.1]}
+        return RobotAgent(Scripted([[ToolCall("explore_frontier", {"frontier_id": fid, "reason": "search on"})]]), tmp_path / "t.jsonl").step(req)
+    same = explore(0, 10.0, "area_searched")
+    assert same["orders"] == [] and same["refusals"] == [], "already heading there: nothing sent, nothing refused"
+    other = explore(1, 20.0, "agent_goal_reached")   # a new event, so the step is not skipped as a repeat
+    assert [o["type"] for o in other["orders"]] == ["explore_frontier"], "control: a different frontier is ordered"

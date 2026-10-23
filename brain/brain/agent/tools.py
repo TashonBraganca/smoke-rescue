@@ -72,6 +72,10 @@ def knock_down_s(area_m2: float, distance_m: float, robots: int = 1) -> float | 
     return area_m2 * FUEL_KJ_PER_M2_K * (BURNING_SURFACE_C - KNOCKDOWN_C) / net_kw
 
 
+# An explore order within this distance of the brain's current goal names the goal it already has.
+SAME_GOAL_M = 1.0
+
+
 def _flat_warm_surface(ev: dict) -> bool:
     """An inspection that measured its warm region as flat: enough registered depth, a large plane or no non-planar
     shape, and no colour person detection. Unknown shape (too little depth) is not flat."""
@@ -256,6 +260,7 @@ class AgentContext:
     maps_linked: bool = False                                 # this robot's frame is linked with its partner's
     event: dict = field(default_factory=dict)                 # the brain event that woke the agent, with its numbers
     last_orders: list = field(default_factory=list)           # order_outcomes of the previous step's movement orders
+    goal: list | None = None                                  # where the brain is driving now, [x, y], if anywhere
 
 
 class ToolRegistry:
@@ -761,6 +766,13 @@ class ToolRegistry:
                         args = {**args, "unproven": True}
                 if refusal is None:
                     args = {**args, "x": float(frontier["x"]), "y": float(frontier["y"])}
+                    # Already driving there: no new goal, so no new turn. Seed 934, robot B: 11 of its 15 explore orders named
+                    # the brain's own first frontier; each became a fresh agent goal and a turn to face its point on arrival,
+                    # and a new goal more than 35 deg off the heading is exactly when the robot turns in place.
+                    g = self.ctx.goal
+                    if refusal is None and g is not None and math.hypot(float(g[0]) - args["x"], float(g[1]) - args["y"]) <= SAME_GOAL_M:
+                        return {"ok": True, "noop": True, "reason": f"the robot is already driving to this frontier (goal "
+                                f"{float(g[0]):.1f}, {float(g[1]):.1f}); no order sent, so it keeps its heading and pace"}
         elif name == "go_to":
             # No outline exists (no prior knowledge); the brain refuses targets not known to be indoors.
             if self.ctx.event_kind in ("avoid_fire", "retreat"):

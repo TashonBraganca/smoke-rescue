@@ -285,6 +285,7 @@ class RobotAgent:
                            water_l=float(req.get("water_l") or 0.0), carrying_person=bool(req.get("carrying_person")),
                            event_kind=(req.get("event") or {}).get("kind", ""), torch=req.get("torch", "wide"))
         ctx.frontiers = list(req.get("frontiers") or [])
+        ctx.goal = list(req["goal"]) if req.get("goal") else None
         ctx.event = dict(req.get("event") or {})
         ctx.survivors = [list(p) for p in req.get("survivors") or []]
         ctx.maps_linked = any(p.get("maps_linked") for p in req.get("partners") or [])
