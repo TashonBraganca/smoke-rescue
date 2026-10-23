@@ -1,0 +1,12 @@
+AWS operating rules from the project owner (22 Oct 2026), to apply when the account exists:
+1. Deploy on 24 or 25 Oct, verify, record the video, keep it up through judging (to 9 Nov), then teardown.sh.
+2. Fargate desired count 1, never autoscaling.
+3. Scale the service to 0 when not demoing (ALB floor about 16 USD/month while the stack exists).
+4. Bedrock only after checking per-token price for the chosen model; otherwise keep Azure with the key in Secrets Manager.
+5. Do not run the Batch pipeline on AWS unless needed for COOL.
+6. Keep S3 small: upload only the one or two runs for the results site; lifecycle rule or delete in teardown.
+7. Dedicated IAM user/role, credentials in AWS CLI config, never in the repo.
+8. Hard stop: calendar reminder 10 Nov to run teardown.
+9. Cost Explorer on from day one; check the morning after the first deploy.
+10. Document budget alarm, log retention, no-NAT VPC, WAF and teardown in the report (cloud criterion: responsible operation).
+Expected: about 25 to 40 USD compute + ALB through judging, plus LLM calls.
