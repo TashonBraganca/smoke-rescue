@@ -22,3 +22,10 @@ Not done, said plainly:
   - The Unity transport patch is unapplied and untested in Unity.
   - Transport bandwidth on a real recording is unmeasured (each recording is 5 to 7 GB locally).
   - Before using Bedrock, check the per-token price of the chosen model; the runs so far used Azure (gpt-5.6-terra).
+
+Added 23 Oct 12:00, from the competition pages (codex_briefs/research_23oct/competition_rules_23oct.txt, workstation):
+  - Devpost's timer says the deadline is 26 Oct 11:45 pm PDT (prose elsewhere says 11:59). Use 11:45.
+  - Judging runs 27 Oct to 9 Nov; winners 10 Nov. The rules ask for "a working web endpoint or an arranged live
+    screen-share demonstration" and say nothing about uptime. Scaling to 0 between demos risks a judge finding it down:
+    keep one warm task until 10 Nov, or arrange a screen-share.
+  - AWS must be "a meaningful project component"; no service list or definition is given.
