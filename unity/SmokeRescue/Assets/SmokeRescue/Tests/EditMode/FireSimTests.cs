@@ -537,16 +537,18 @@ namespace SmokeRescue.Tests.EditMode
         public void ExtinguishedCellRelightsFromHotNeighboursOnlyAfterItsWaterDries()
         {
             string path = WaterFire(true);
+            // Drying, not aiming, is under test: share the water evenly as when this test was written.
+            var aimed = JObject.Parse(File.ReadAllText(path)); aimed["water"]["burning_first_share"] = 0; File.WriteAllText(path, aimed.ToString());
             var sim = FireSim.Load(TwoRooms("closed"), path, 7);
             sim.AdvanceTo(20); TargetWater(sim, 2, 20, 1); sim.AdvanceTo(21);
             Assert.AreEqual(0, sim.GetCell(8, 8).FlameIntensity);
             Assert.Less(sim.GetCell(8, 8).SurfaceTemperatureC, 330, "The spray must cool the fuel, not just absorb its flame.");
             float fuel = sim.GetCell(8, 8).FuelRemainingKg;
             double coefficient = (double)JObject.Parse(File.ReadAllText(path))["water"]["wet_seconds_per_litre"];
-            // ApplyWater accumulates dry-out credit after the first wetted tick, with elapsed
-            // time using that credit during the spray. The helper divides two litres
-            // between two cells, so the target dries at 20.1 + 1 * 30 s.
-            double dryAt = 20 + sim.StepSeconds + coefficient;
+            // ApplyWater banks dry-out credit over the whole spray and counts it from the spray's end: a cell under a running
+            // spray is wet. The helper divides two litres between two cells, so the target dries at 21 + 1 * 30 s (before
+            // 23 Oct the spray's own seconds used up the credit, 20.1 + 30 s, which left wide cones about 0 s).
+            double dryAt = 21 + coefficient;
             sim.AdvanceTo(dryAt - sim.StepSeconds);
             Assert.Greater(sim.GetCell(9, 8).FlameIntensity, 0, "The adjacent fire must stay lit.");
             Assert.Greater(sim.GetCell(8, 8).SurfaceTemperatureC, 330, "Neighbour heating must reheat the wet fuel.");
@@ -690,6 +692,44 @@ namespace SmokeRescue.Tests.EditMode
                 open.AdvanceTo(10);
                 Assert.AreEqual(0, open.GetCell(east ? 16 : 8, east ? 8 : 16).FlameIntensity);
             }
+        }
+
+        [Test]
+        public void FirePutOutByWaterKeepsItsGrowthShareSoTheRestDoNotBurnHarder()
+        {
+            // Issue list 23 Oct, item 7: with the growth cap binding, water that put out part of a fire handed that part's
+            // budget to the cells still burning, and the fire's release returned to exactly alpha t^2. A quenched cell now
+            // keeps its share while it stays out. Control: with quench_keeps_growth_share off the release returns to budget.
+            double After(bool keep)
+            {
+                string path = Config(j => { j["ignitions"] = JArray.Parse("[{\"room\":\"living\",\"at\":[2,2],\"time_s\":0,\"radius_m\":100}]");
+                                            j["water"]["quench_keeps_growth_share"] = keep; });
+                var sim = FireSim.Load(TwoRooms("closed"), path, 7);
+                sim.AdvanceTo(200);
+                Assert.That(Release(sim, "living"), Is.EqualTo(MediumStep(200)).Within(1e-6), "the cap binds before the spray");
+                sim.ScheduleWater(200, new Vector2(.125f, 2f), (float)(Math.PI / 2), 2.5f, 40, 30, 6);
+                sim.AdvanceTo(210);
+                return Release(sim, "living") / MediumStep(210);
+            }
+            Assert.That(After(true), Is.LessThan(.85), "the cells water put out keep their share: the fire releases less");
+            Assert.That(After(false), Is.EqualTo(1).Within(.01), "control: without it the rest make up the budget");
+        }
+
+        [Test]
+        public void WetTimeBanksOverTheWholeSprayInAWideCone()
+        {
+            // Issue list 23 Oct, item 7: re-taking the max with each tick's end dropped every earlier tick's share of the
+            // dry-out time, so a 5 m cone (about 80 cells) left about 0 s of protection. Each cell now banks litres x
+            // wet_seconds_per_litre over the spray: 6 L spread over N cells gives 6 x 30 / N seconds after the spray ends.
+            string path = WaterFire();
+            var json = JObject.Parse(File.ReadAllText(path)); json["ignitions"][0]["time_s"] = 1000; File.WriteAllText(path, json.ToString());
+            var sim = FireSim.Load(TwoRooms("closed"), path, 7);
+            sim.ScheduleWater(0, new Vector2(.125f, 2f), (float)(Math.PI / 2), 3.5f, 40, 1, 6);
+            sim.AdvanceTo(6.05);
+            var wetted = Cells(sim).Where(c => c.WetUntilS > 6.05).ToList();
+            Assert.That(wetted.Count, Is.GreaterThan(30), "a wide cone");
+            double expected = 6 * 30.0 / wetted.Count;
+            foreach (var c in wetted) Assert.That(c.WetUntilS - 6, Is.EqualTo(expected).Within(expected * .1 + .11));
         }
 
         [Test]
