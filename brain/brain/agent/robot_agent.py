@@ -90,10 +90,12 @@ Facts about your robot and the context:
 - last_orders_outcome: what the brain did with the movement orders of your previous step (reached, refused with its
   reason, no path, expired before arrival, overridden by a heat event, under way). An order refused for a reason that
   still holds is not worth repeating.
-- Each perception tool returns the same result if called again in this step. Each tool call costs a model round while
-  the robot waits: call scan_thermal, assess_visibility and track_fire_spread only when you intend an action that needs
-  their evidence (spray, avoid_area, torch, approach). The context already carries fire_near_robot, fire_blocks_frontier,
-  fire_blocks_exit and spray_option from the robot's own thermal map.
+- Each perception tool returns the same result if called again in this step. scan_thermal is how you find people and
+  fire the robot has not raised yet: one scan on a check-in, an arrival or a new candidate is worth its cost, and a warm
+  person-sized region deserves inspect_candidate at once, even during a retreat (inspecting and confirming from where
+  the robot stands is always allowed). assess_visibility is for the torch and track_fire_spread for a decision about
+  fire or water; the context already carries fire_near_robot, fire_blocks_frontier, fire_blocks_exit and spray_option
+  from the robot's own thermal map, so neither is needed every step.
 - send_team_message reaches your partner and the commander only within radio range and through at most one wall;
   what you do not radio, they do not know. Your partner is woken only by a proposal or an answer to its proposal, not
   by findings, so a message is not a way to get its attention; send findings when you have a new one, not every step.
@@ -208,6 +210,10 @@ class RobotAgent:
         simulation 12.6 s (median) to say nothing new."""
         t = float(req["t"])
         if any(p["status"] == "pending" and t <= p["expires_t"] for p in team.received.values()):
+            return True
+        # A close look under way is finished on any wake-up: seed 932, robot A ordered an approach at 45.0 s and confirmed
+        # the person on the radio-woken step at 49.0 s, before the arrival event.
+        if ToolRegistry._pending.get(req["robot"]) is not None:
             return True
         new = set(new_messages)
         for m in req.get("inbox") or []:
