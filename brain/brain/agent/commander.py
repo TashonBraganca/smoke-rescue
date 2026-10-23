@@ -19,7 +19,9 @@ You stand outside at the command post and hear their radio reports, which may ar
 no map, no floor plan and no building outline: everything you know comes from those reports. Your job is to relay
 what one robot learned that changes the other's plan (a survivor found, fire spreading, a route blocked, an area
 already searched), and to set priorities in words. You never assign coordinates or areas; each robot decides where
-to search from its own map. Be brief: broadcast only when it helps, then finish with one sentence."""
+to search from its own map. Broadcast only a fact that changes a robot's plan (a person found where a robot is heading,
+fire blocking a route, an area already searched); repeating an agreed split or telling robots to hold is not such a
+fact, and your broadcasts do not wake the robots' agents. Be brief, then finish with one sentence."""
 
 # What the robots can do for a person they found, so priorities stay within it. One-door seed 924: with carrying
 # switched off, the commander told robot A at 48 s to "protect and maintain access to the confirmed survivor", and A
@@ -67,10 +69,16 @@ class Commander:
 
     def step(self, req: dict) -> dict:
         start = time.perf_counter()
+        step_id = f"commander@{float(req['t']):.3f}"
+        if not req.get("reports"):
+            # Nothing reached the post since the last step: there is nothing to relay, and a broadcast would only wake both
+            # robots (seed 932: 9 commander steps, 8 broadcasts, most repeating the agreed split).
+            out = {"step": step_id, "orders": [], "refusals": [], "summary": None, "latency_s": 0.0, "no_reports": True}
+            self._trace({"kind": "step_skipped", **out, "robot": "commander", "why": "no reports reached the post"})
+            return out
         messages = [{"role": "system", "content": system_prompt()},
                     {"role": "user", "content": "Situation:\n" + json.dumps({"t": req["t"],
                      "reports": req.get("reports", []), "robots": req.get("robots", {})}, default=str)}]
-        step_id = f"commander@{float(req['t']):.3f}"
         # What reached the post, so an audit can tell "nothing arrived" from "arrived and ignored".
         self._trace({"kind": "step_start", "step": step_id, "t": req["t"], "robot": "commander",
                      "reports": req.get("reports", [])})

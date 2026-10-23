@@ -42,6 +42,8 @@ CAMERA_HALF_HFOV_DEG = math.degrees(math.atan(_CAMERA["width"] / 2 / _CAMERA["fx
 _THERMAL = json.loads((_Path(__file__).resolve().parents[3] / "config" / "sensors.json").read_text())["thermal"]
 THERMAL_HALF_HFOV_DEG = math.degrees(math.atan(_THERMAL["width"] / 2 / _THERMAL["fx"]))
 BODY_HALF_LENGTH_M = float(_CONFIG["body_half_length_m"])
+FACE_TURNS_PER_SPOT = int(_PERCEPTION["face_turns_per_spot"]) if "face_turns_per_spot" in _PERCEPTION else 2
+FACE_MEMORY_S = float(_PERCEPTION["face_memory_s"]) if "face_memory_s" in _PERCEPTION else 90.0
 # What this robot's water can do against a fire, from its own engineering assumptions (config, each with a reason).
 BURNING_KW_PER_M2 = float(_PERCEPTION["burning_kw_per_m2"])
 ONE_ROBOT_COOLS_KW = float(_NOZZLE["flow_lps"]) * float(_NOZZLE["cooling_kj_per_l"]) * float(_NOZZLE["application_efficiency"])
@@ -210,6 +212,7 @@ class AgentContext:
     survivors: list = field(default_factory=list)             # people confirmed so far, [x, y] in this robot's frame
     maps_linked: bool = False                                 # this robot's frame is linked with its partner's
     event: dict = field(default_factory=dict)                 # the brain event that woke the agent, with its numbers
+    last_orders: list = field(default_factory=list)           # order_outcomes of the previous step's movement orders
 
 
 class ToolRegistry:
@@ -234,6 +237,9 @@ class ToolRegistry:
     # Over 15 runs 151 such candidates held 1 person (0.7 %, Wilson 95 % 0.1 to 3.7 %; colour candidates were people 13
     # times in 16), so walking or turning to them waits until the offered frontiers are searched (opus_search_design 2.2).
     _wall_spots: dict = {}
+    # Turns in place ordered per spot, kept across steps like _looks: (robot, cell) -> times. Seed 932, robot A at 58.7 to
+    # 62.8 s: face, approach, face, face at one wall patch, four steps and no movement.
+    _faces: dict = {}
     # Events that mean the approach failed: the robot could not get there, or must leave for heat.
     APPROACH_FAILED = ("goal_blacklisted", "no_progress", "collision_hold", "stuck", "avoid_fire", "retreat", "escape_closing")
     MAX_LOOKS, LOOK_CELL_M, LOOK_MEMORY_S = 2, 1.5, 90.0
@@ -509,8 +515,29 @@ class ToolRegistry:
                 return float(n["person_x_m"]), float(n["person_y_m"]), float(event["t"])
         return None
 
+    # Events that justify replacing a movement order still under way: something new to look at, or a safety change.
+    PREEMPTS = ("survivor_candidate", "survivor_view_ready", "agent_goal_reached", "avoid_fire", "retreat", "escape_closing",
+                "no_frontier", "goal_blacklisted", "collision_hold", "stuck", "no_progress", "area_searched")
+
+    def _commit_window(self, name: str) -> dict | None:
+        """A movement order the brain is still driving is not replaced on a radio text or a periodic check. Over the nine
+        one-door runs 121 of 420 movement orders were superseded by the agent's own next order before the robot arrived
+        (42 percent were reached at all)."""
+        if name not in ("explore_frontier", "go_to") or self.ctx.event_kind in self.PREEMPTS:
+            return None
+        live = [o for o in self.ctx.last_orders if str(o.get("outcome", "")).startswith("under way")]
+        if not live:
+            return None
+        o = live[0]
+        return {"refused": True, "reason": f"your {o['type']} to ({o['x']}, {o['y']}) is still being driven (last_orders_outcome: "
+                "under way); it is replaced only on arrival, a failure, a new candidate or a heat event. Finish this step without "
+                "a new movement order."}
+
     def _action(self, name: str, args: dict) -> dict:
-        refusal = None
+        refusal = self._commit_window(name)
+        if refusal:
+            self.refusals.append({"tool": name, "args": args, **refusal})
+            return refusal
         if name == "confirm_survivor":
             refusal = self._need(args, ("inspect_candidate",), lambda ev: ev.get("verdict") == "person" and self._near(ev, args),
                                  "the cited inspection is not a person verdict at that position")
@@ -701,9 +728,18 @@ class ToolRegistry:
                            f"thermal half view {THERMAL_HALF_HFOV_DEG:.0f} deg); turning shows nothing new. inspect_candidate at "
                            "that bearing, or approach_candidate for a closer look"}
             else:
-                args = {"x": round(self.ctx.x, 2), "y": round(self.ctx.y, 2), "face_x": float(args["x"]), "face_y": float(args["y"]),
-                        "reason": str(args.get("reason") or "turn to face")}
-                name = "go_to"
+                fx, fy = float(args["x"]), float(args["y"])
+                key = (self.ctx.robot, round(fx / self.LOOK_CELL_M), round(fy / self.LOOK_CELL_M))
+                faces = [s for s in self._faces.get(key, []) if self.ctx.t - s < FACE_MEMORY_S]
+                if len(faces) >= FACE_TURNS_PER_SPOT:
+                    refusal = {"refused": True, "reason": f"already turned to face this spot {len(faces)} times in the last "
+                               f"{FACE_MEMORY_S:.0f} s; a third turn from the same place adds no view. Approach it, reject it, "
+                               "or search on."}
+                else:
+                    self._faces[key] = faces + [self.ctx.t]
+                    args = {"x": round(self.ctx.x, 2), "y": round(self.ctx.y, 2), "face_x": fx, "face_y": fy,
+                            "reason": str(args.get("reason") or "turn to face")}
+                    name = "go_to"
         elif name == "send_team_message":
             # The radio carries the robot's own state next to the model's words, written by code from what the tools
             # accepted, so a listener can tell a claim from a fact (held-out seed 917, robot B: confirm_survivor was
@@ -775,6 +811,55 @@ class ToolRegistry:
                 hint = f"beyond the arm's {reach:.1f} m reach: approach_candidate citing {args['evidence_id']}, then extract on arrival"
             return {"ok": True, "queued": name, "next": hint}
         return {"ok": True, "queued": name}
+
+
+_ORDER_KINDS = {"agent_order", "replan", "goal", "agent_goal_reached", "agent_order_expired", "retreat", "avoid_fire",
+                "stay_overridden", "escape_closing"}
+
+
+def order_outcomes(robot_dir: Path, since_t: float, orders: list[dict], until_t: float = float("inf")) -> list[dict]:
+    """What the brain did with the movement orders of the previous step, from its own decision log (written before every
+    agent call): reached, refused with the brain's reason, no path, expired, overridden by heat, or still under way. Over
+    nine one-door runs 42 percent of 420 movement orders were reached; the model learned the fate of the rest only from
+    silence. A refusal still holding is not worth repeating."""
+    moves = [o for o in orders or [] if o.get("type") in ("go_to", "explore_frontier")]
+    if not moves:
+        return []
+    path = Path(robot_dir) / "decisions.jsonl"
+    events = []
+    if path.exists():
+        with path.open("rb") as f:
+            f.seek(0, 2); size = f.tell(); start = max(0, size - 262144); f.seek(start)
+            tail = f.read().decode("utf-8", "ignore").splitlines()[1 if start > 0 else 0:]
+        for line in tail:
+            try:
+                e = json.loads(line)
+            except ValueError:
+                continue
+            if e.get("kind") in _ORDER_KINDS and since_t - 1e-6 <= float(e.get("t", -1)) <= until_t + 1e-6:
+                events.append(e)   # until_t: a replay of a finished recording must not read the future
+    out = []
+    for o in moves:
+        x, y = float(o.get("x", 0)), float(o.get("y", 0))
+        outcome = "under way (no arrival yet)"
+        for e in events:
+            n = e.get("numbers") or {}
+            r = str(e.get("reason", ""))
+            at = ("x_m" in n and "y_m" in n and math.hypot(float(n["x_m"]) - x, float(n["y_m"]) - y) <= SURVIVOR_MERGE_M)
+            if e["kind"] == "agent_order" and r.startswith("Refused") and at:
+                outcome = "refused by the brain: " + r.split(":", 1)[-1].strip()[:140]; break
+            if e["kind"] == "replan" and r.startswith("Agent goal has no known free path") and at:
+                outcome = "dropped: no known free path to it"; break
+            if e["kind"] == "agent_order_expired" and at:
+                outcome = f"expired before arrival, {float(n.get('remaining_m', 0)):.1f} m short"; break
+            if e["kind"] in ("agent_goal_reached",) and at:
+                outcome = "reached"; break
+            if e["kind"] == "goal" and r.startswith("Reached the agent's goal") and at:
+                outcome = "reached"; break
+            if e["kind"] in ("retreat", "avoid_fire", "stay_overridden", "escape_closing"):
+                outcome = f"overridden by a heat event ({e['kind']})"; break
+        out.append({"type": o.get("type"), "x": round(x, 2), "y": round(y, 2), "outcome": outcome})
+    return out
 
 
 def survivors_to_rescue(robot: str, pose: dict, survivors: list, standoff_m: float = RESCUE_APPROACH_M,

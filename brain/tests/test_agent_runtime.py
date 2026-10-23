@@ -660,7 +660,7 @@ def test_the_commander_is_told_what_robots_can_do_for_a_found_person(tmp_path, m
     for enabled, said in ((False, "cannot lift, carry, shield or guard anyone"), (True, "carry them out")):
         monkeypatch.setattr(C, "RESCUE_ENABLED", enabled)
         model = Seen([])
-        C.Commander(model, tmp_path / "trace.jsonl").step({"t": 48.0, "reports": [], "robots": ["robot_A", "robot_B"]})
+        C.Commander(model, tmp_path / "trace.jsonl").step({"t": 48.0, "reports": [{"from": "robot_A", "text": "Survivor confirmed by the door."}], "robots": ["robot_A", "robot_B"]})
         assert said in model.system
 
 
