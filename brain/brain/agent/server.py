@@ -136,9 +136,19 @@ async def upload_recording(run_id: str, robot: str, request: Request):
             raise HTTPException(400, str(exc)) from exc
 
 
+def _remote(job_or_req, resolved):
+    """Mark a step whose frames come through the recording transport (an uploaded run:// recording or pull-v1): the agent
+    then skips its code-run pre-scan, which would fetch frames the transport protocol did not ask for."""
+    resolved["remote_frames"] = True
+    return resolved
+
+
 def _robot_step(robot, req):
+    remote = str(req.get("robot_dir", "")).startswith("run:")
     with recording_store().request(req, history=True, robot=robot) as resolved:
         resolved["robot"] = robot
+        if remote:
+            _remote(req, resolved)
         return RobotAgent(backend(), Path(resolved.get("trace_path") or TRACE)).step(resolved)
 
 
@@ -147,7 +157,7 @@ async def robot_step(robot: str, request: Request):
     req = await request.json()
     req["robot"] = robot
     if req.get('transport') == 'pull-v1':
-        return _submit_pull(robot, req, lambda job: RobotAgent(backend(), Path(job.resolved['trace_path'])).step(job.resolved))
+        return _submit_pull(robot, req, lambda job: RobotAgent(backend(), Path(job.resolved['trace_path'])).step(_remote(job, job.resolved)))
     # In a worker thread: the recorder sends both robots' steps at once, and a blocking call here would serialise them.
     return await run_in_threadpool(_robot_step, robot, req)
 
