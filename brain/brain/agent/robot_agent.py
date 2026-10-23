@@ -213,7 +213,9 @@ class RobotAgent:
             return True
         # A close look under way is finished on any wake-up: seed 932, robot A ordered an approach at 45.0 s and confirmed
         # the person on the radio-woken step at 49.0 s, before the arrival event.
-        if ToolRegistry._pending.get(req["robot"]) is not None:
+        # Not while the brain is retreating or returning: the look cannot be driven then, and the radio-woken steps only
+        # said "I remain in retreat" (seed 932 replay, robot B, eight steps between 108 and 144 s).
+        if ToolRegistry._pending.get(req["robot"]) is not None and req.get("state") not in ("retreat", "return"):
             return True
         new = set(new_messages)
         for m in req.get("inbox") or []:
