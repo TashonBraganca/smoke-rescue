@@ -389,15 +389,18 @@ class ToolRegistry:
             return None
         timed_out = self.ctx.t - p["t"] > float(_PERCEPTION["pending_candidate_s"])
         if self.ctx.event_kind in self.APPROACH_FAILED or timed_out or self._brain_dropped_order(p["t"]):
-            self._pending.pop(self.ctx.robot, None)
-            why = self.ctx.event_kind if self.ctx.event_kind in self.APPROACH_FAILED else "timed out" if timed_out else "no path to it"
-            kept = [u for u in self._unfinished.get(self.ctx.robot, []) if math.hypot(u["x"] - p["x"], u["y"] - p["y"]) > SURVIVOR_MERGE_M]
-            self._unfinished[self.ctx.robot] = kept + [{**p, "dropped_because": why}]
+            self._drop_pending(p, self.ctx.event_kind if self.ctx.event_kind in self.APPROACH_FAILED else "timed out" if timed_out else "no path to it")
             return None
         dx, dy = p["x"] - self.ctx.x, p["y"] - self.ctx.y
         bearing = (math.degrees(math.atan2(dx, dy)) - self.ctx.heading_deg + 180) % 360 - 180
         return {"x": p["x"], "y": p["y"], "distance_m": round(math.hypot(dx, dy), 2), "bearing_deg": round(bearing, 1),
                 "since_s": round(self.ctx.t - p["t"], 1), "evidence_id": p["evidence_id"]}
+
+    def _drop_pending(self, p: dict, why: str):
+        """End this robot's approach to p; the sighting stays among the unfinished ones, with why it was dropped."""
+        self._pending.pop(self.ctx.robot, None)
+        kept = [u for u in self._unfinished.get(self.ctx.robot, []) if math.hypot(u["x"] - p["x"], u["y"] - p["y"]) > SURVIVOR_MERGE_M]
+        self._unfinished[self.ctx.robot] = kept + [{**p, "dropped_because": why}]
 
     # What the brain does with an agent's walk order, from its own decision log (written before every agent call). The
     # agent's memory of an approach in progress was kept until a failure event or the 60 s timeout, even when the brain
@@ -743,6 +746,12 @@ class ToolRegistry:
         elif name == "explore_frontier":
             match = [f for f in self.ctx.frontiers if f.get("id") == args.get("frontier_id")]
             pending = self.pending()
+            # An approach to a thermal-only patch on a long wall is deferred until the frontiers are searched
+            # (_deferred_wall), so it cannot also hold exploring back. Seed 934 (24 Oct), robot A at 145 to 167 s: six steps
+            # in which approach_candidate was refused for the wall patch and explore_frontier for the approach to it.
+            if pending is not None and self._deferred_wall(pending["x"], pending["y"]) is not None:
+                self._drop_pending(self._pending[self.ctx.robot], "a thermal-only warm patch on a long wall, deferred while frontiers remain")
+                pending = None
             if pending is not None:
                 refusal = {"refused": True, "reason": f"you are walking to look closer at an unresolved warm candidate "
                            f"{pending['distance_m']:.1f} m away at bearing {pending['bearing_deg']:.0f} deg; finish that first: "
