@@ -107,6 +107,8 @@ Facts about your robot and the context:
 - last_orders_outcome: what the brain did with the movement orders of your previous step (reached, refused with its
   reason, no path, expired before arrival, overridden by a heat event, under way). An order refused for a reason that
   still holds is not worth repeating.
+- context.scan_thermal is this step's thermal scan, already run by code on the newest frame: use its hot spots and
+  person-sized regions and cite its id as evidence; do not spend a round calling scan_thermal again.
 - Each perception tool returns the same result if called again in this step. scan_thermal is how you find people and
   fire the robot has not raised yet: one scan on a check-in, an arrival or a new candidate is worth its cost, and a warm
   person-sized region deserves inspect_candidate at once, even during a retreat (inspecting and confirming from where
@@ -305,6 +307,15 @@ class RobotAgent:
             context["looks_not_finished"] = unfinished
         if outcomes:
             context["last_orders_outcome"] = outcomes
+        # The step's thermal scan runs in code before the first round, so the model can inspect or act in round 1. Seed
+        # 934: 62 of 72 steps spent a whole round (about 3 s) on scan_thermal first, steps averaged 15 s and reached 28 s
+        # at 6 rounds. It is this step's evidence like any other scan; calling scan_thermal again returns the same result.
+        try:
+            scan = tools.call("scan_thermal", {})
+        except Exception as e:                      # no usable frame: the model can still scan, or act without it
+            scan = {"error": repr(e)}
+        if scan.get("id") and not scan.get("error"):
+            context["scan_thermal"] = _compact(scan)
         messages = [{"role": "system", "content": system_prompt()},
                     {"role": "user", "content": "Decision needed. Context:\n" + json.dumps(context, default=str)}]
         step_id = f"{req['robot']}@{float(req['t']):.3f}"
