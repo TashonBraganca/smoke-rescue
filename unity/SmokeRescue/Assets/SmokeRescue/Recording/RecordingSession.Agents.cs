@@ -33,6 +33,7 @@ namespace SmokeRescue.Recording
         /// the language model, so it runs with or without agents. Null skips it (logged at the start of a run).</summary>
         public static string PeopleUrl;
         public static float PeoplePeriodS = 1f, PeopleBoostS = .2f;
+        const float SideMarginPx = 1f;   // config/perception.json rgb_side_margin_px
         /// <summary>How often the brain takes the live 3D map's height layer, and how often the map is saved as a point
         /// cloud in the recording (for the replay and the video).</summary>
         const double Map3dLayersPeriodS = 5, Map3dExportPeriodS = 30;
@@ -481,7 +482,18 @@ namespace SmokeRescue.Recording
                 foreach (JObject p in (reply["people"] as JArray) ?? new JArray())
                 {
                     if (p["range_m"] == null || p["range_m"].Type == JTokenType.Null) continue;
-                    rig.brain.OnPersonSighting(Math.Min(seen, t), p.Value<float>("bearing_deg"), p.Value<float>("range_m"), p.Value<float>("confidence"));
+                    float confidence = p.Value<float>("confidence");
+                    // A box cut by the left or right image side shows only part of whatever it is (the agent's inspection
+                    // refuses it for that reason: held-out seed 914, a 22 px sliver confirmed a person 2.6 m from anyone).
+                    // Replayed over seeds 932 and 934, both strong boxes within range that matched no person were such
+                    // slivers. It still counts as a sighting and earns a glance, but never makes a candidate on its own.
+                    if (p["bbox_rgb"] is JArray box && box.Count == 4)
+                    {
+                        float x = box[0].Value<float>(), w = box[2].Value<float>();
+                        if (x <= SideMarginPx || x + w >= cfg.camera.width - SideMarginPx)
+                            confidence = Math.Min(confidence, rig.brain.StrongSightingConfidence - .01f);
+                    }
+                    rig.brain.OnPersonSighting(Math.Min(seen, t), p.Value<float>("bearing_deg"), p.Value<float>("range_m"), confidence);
                 }
                 Map3d(rig, t);
             }
