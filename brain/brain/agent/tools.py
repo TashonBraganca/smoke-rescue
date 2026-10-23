@@ -234,7 +234,10 @@ class AgentContext:
 
 class ToolRegistry:
     _inspection_histories: dict = {}
-    # Close looks per spot, kept across steps (the server builds a new registry per step): (robot, cell) -> times.
+    # Close looks per shape, kept across steps (the server builds a new registry per step): robot -> [(t, shape x, shape y,
+    # robot x, robot y)]. A look belongs to a shape when it lies within LOOK_SAME_SHAPE_M of it, not when it falls in the
+    # same grid square: held-out run 2, robot A looked closer 5 times at one blob from 80 to 108 s because its measured
+    # position wandered over three 1.5 m squares.
     _looks: dict = {}
     # Where each robot has lifted someone, from its own extract orders, so a lifted person is not offered again.
     _lifted: dict = {}
@@ -264,6 +267,9 @@ class ToolRegistry:
     # Events that mean the approach failed: the robot could not get there, or must leave for heat.
     APPROACH_FAILED = ("goal_blacklisted", "no_progress", "collision_hold", "stuck", "avoid_fire", "retreat", "escape_closing")
     MAX_LOOKS, LOOK_CELL_M, LOOK_MEMORY_S = 2, 1.5, 90.0
+    # The brain's own radii: one person per survivor_merge_m, and a rejected shape raised again only from
+    # reject_new_view_deg round (brain.json), so a third look from a clearly different side is still allowed.
+    LOOK_SAME_SHAPE_M, LOOK_NEW_VIEW_DEG = float(_CONFIG["survivor_merge_m"]), float(_CONFIG["reject_new_view_deg"])
 
     def __init__(self, robot_dir: Path, ctx: AgentContext, debug_dir: Path | None = None):
         self.robot_dir = Path(robot_dir)
@@ -333,6 +339,16 @@ class ToolRegistry:
         else:
             queue.append({"x": result["x"], "y": result["y"], "t": self.ctx.t,
                           "evidence_id": result["id"], "dropped_because": "inspection not resolved"})
+
+    def _shape_looks(self, looks, x, y):
+        """This robot's recent close looks at the shape at (x, y): those within LOOK_SAME_SHAPE_M of it."""
+        return [l for l in looks if math.hypot(l[1] - float(x), l[2] - float(y)) <= self.LOOK_SAME_SHAPE_M]
+
+    def _new_view(self, looks, x, y):
+        """The robot now stands at least LOOK_NEW_VIEW_DEG round the shape from every earlier close look."""
+        here = math.atan2(self.ctx.x - float(x), self.ctx.y - float(y))
+        return all(abs((math.degrees(here - math.atan2(l[3] - float(x), l[4] - float(y))) + 180) % 360 - 180) >= self.LOOK_NEW_VIEW_DEG
+                   for l in looks)
 
     def pending(self) -> dict | None:
         """This robot's unresolved approach, with distance and bearing from where it stands now; None when there is
@@ -612,8 +628,15 @@ class ToolRegistry:
                                f"{spot[1]:.1f}) at {spot[2]:.0f} s; that is the person already rescued, not a new survivor. "
                                "Search the building for others."}
         elif name == "reject_candidate":
-            refusal = self._need(args, ("inspect_candidate",), lambda ev: ev.get("verdict") == "not_person" and self._near(ev, args),
-                                 "the cited inspection is not a not_person verdict at that position")
+            # An uncertain shape looked at closely MAX_LOOKS times from one side may be dropped too: only not_person could
+            # reject before, inspections rarely give it, and the brain kept raising the same shape (held-out run 2, robot A,
+            # 5 looks in 28 s). The brain raises a rejected shape again from reject_new_view_deg round or on a colour person.
+            refusal = self._need(args, ("inspect_candidate",), lambda ev: self._near(ev, args) and (ev.get("verdict") == "not_person" or (
+                                     ev.get("verdict") == "uncertain" and ev.get("x") is not None and len(self._shape_looks(
+                                         [l for l in self._looks.get(self.ctx.robot, []) if self.ctx.t - l[0] < self.LOOK_MEMORY_S],
+                                         ev["x"], ev["y"])) >= self.MAX_LOOKS)),
+                                 f"the cited inspection is not a not_person verdict at that position, nor an uncertain one at a shape "
+                                 f"looked at closely {self.MAX_LOOKS} times")
         elif name == "withdraw_survivor":
             refusal = self._withdraw_refusal(args)
         elif name == "avoid_area":
@@ -751,15 +774,17 @@ class ToolRegistry:
                     self._confirm_walks[self.ctx.robot] = {"x": float(ev["x"]), "y": float(ev["y"]), "t": self.ctx.t}
             elif refusal is None:
                 ev = self.evidence[args["evidence_id"]]
-                key = (self.ctx.robot, round(ev["x"] / self.LOOK_CELL_M), round(ev["y"] / self.LOOK_CELL_M))
-                looks = [s for s in self._looks.get(key, []) if self.ctx.t - s < self.LOOK_MEMORY_S]
-                if len(looks) >= self.MAX_LOOKS:
+                kept = [l for l in self._looks.get(self.ctx.robot, []) if self.ctx.t - l[0] < self.LOOK_MEMORY_S]
+                looks = self._shape_looks(kept, ev["x"], ev["y"])
+                if len(looks) >= self.MAX_LOOKS and not self._new_view(looks, ev["x"], ev["y"]):
                     self._pending.pop(self.ctx.robot, None)
-                    refusal = {"refused": True, "reason": f"already looked closer {len(looks)} times at this spot; leave it, "
-                               "tell your partner it is unconfirmed, and continue exploring"}
+                    refusal = {"refused": True, "reason": f"already looked closer {len(looks)} times at this shape from this side; "
+                               "drop it with reject_candidate citing this inspection (the robot raises it again if it is seen from "
+                               f"{self.LOOK_NEW_VIEW_DEG:.0f} deg round or a colour person appears there), tell your partner it is "
+                               "unconfirmed, and continue exploring"}
                     self.refusals.append({"tool": name, "args": args, **refusal})
                     return refusal
-                self._looks[key] = looks + [self.ctx.t]
+                self._looks[self.ctx.robot] = kept + [(self.ctx.t, float(ev["x"]), float(ev["y"]), self.ctx.x, self.ctx.y)]
                 dx, dy = ev["x"] - self.ctx.x, ev["y"] - self.ctx.y
                 dist = max(1e-6, (dx * dx + dy * dy) ** 0.5)
                 k = (dist - APPROACH_STANDOFF_M) / dist            # signed: closer than the standoff, step back to it
