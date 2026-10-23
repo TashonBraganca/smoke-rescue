@@ -220,3 +220,55 @@ def test_a_walk_to_confirm_a_person_keeps_radio_steps_awake(tmp_path, monkeypatc
     inbox = [{"message_id": "robot_B-7", "from": "robot_B", "t": 46.0, "kind": "finding", "text": "found someone"}]
     RobotAgent(later, tmp_path / "trace.jsonl").step(request(tmp_path, t=49.0, event={"kind": "team_message"}, inbox=inbox))
     assert later.calls == 1
+
+
+# ----- two agreeing views beyond the confirmation range ------------------------------------------------------------------
+
+def _person_at(monkeypatch, bearing, rng):
+    monkeypatch.setattr(T.vision, "load_frame", lambda d, t: object())
+    monkeypatch.setattr(T.vision, "inspect_candidate", lambda f, b, r, output_dir: {
+        "id": f"ev{b:.0f}{r:.1f}", "tool": "inspect_candidate", "verdict": "person", "t": None,
+        "candidate": {"bearing_deg": bearing, "range_m": rng}, "cues": {}})
+
+
+def _look(tmp_path, monkeypatch, x, y, bearing, rng, t, confirm_at):
+    _person_at(monkeypatch, bearing, rng)
+    eid = f"ev{bearing:.0f}{rng:.1f}"
+    turns = [[ToolCall("inspect_candidate", {"bearing_deg": bearing, "range_m": rng})],
+             [ToolCall("confirm_survivor", {"x": confirm_at[0], "y": confirm_at[1], "evidence_id": eid})]]
+    req = {"robot": "robot_A", "robot_dir": str(tmp_path), "t": t, "pose": {"x": x, "y": y, "heading_deg": 0.0},
+           "event": {"kind": "survivor_candidate", "numbers": {"x_m": confirm_at[0], "y_m": confirm_at[1]}}}
+    return RobotAgent(Scripted(turns), tmp_path / "trace.jsonl").step(req)
+
+
+def test_two_agreeing_views_from_apart_confirm_a_person_beyond_five_metres(tmp_path, monkeypatch):
+    _fresh(); T.ToolRegistry._person_views.clear()
+    # A person at (0, 7): seen from (0, 0) at 7.0 m, then from (0.8, 0.5), 0.8 m to the side, at the same spot.
+    first = _look(tmp_path, monkeypatch, 0.0, 0.0, 0.0, 7.0, 10.0, (0.0, 7.0))
+    assert first["orders"] == [] and "second person verdict" in first["refusals"][0]["reason"]
+    b = math.degrees(math.atan2(-0.8, 6.5)); r = math.hypot(0.8, 6.5)
+    second = _look(tmp_path, monkeypatch, 0.8, 0.5, b, r, 30.0, (0.0, 7.0))
+    (o,) = [o for o in second["orders"] if o["type"] == "confirm_survivor"]
+    assert math.hypot(o["x"] - 0.0, o["y"] - 7.0) < 0.05 and o.get("two_view")
+
+
+def test_two_views_from_one_standpoint_do_not_confirm(tmp_path, monkeypatch):
+    _fresh(); T.ToolRegistry._person_views.clear()
+    _look(tmp_path, monkeypatch, 0.0, 0.0, 0.0, 7.0, 10.0, (0.0, 7.0))
+    out = _look(tmp_path, monkeypatch, 0.1, 0.0, math.degrees(math.atan2(-0.1, 7.0)), math.hypot(0.1, 7.0), 30.0, (0.0, 7.0))
+    assert not any(o["type"] == "confirm_survivor" for o in out["orders"])
+
+
+def test_two_views_that_disagree_do_not_confirm(tmp_path, monkeypatch):
+    _fresh(); T.ToolRegistry._person_views.clear()
+    _look(tmp_path, monkeypatch, 0.0, 0.0, 0.0, 7.0, 10.0, (0.0, 7.0))
+    # The second view puts the body 1.0 m further on: like 928 B's 1.53 m outlier, no agreement, no confirmation.
+    out = _look(tmp_path, monkeypatch, 0.8, 0.5, math.degrees(math.atan2(-0.8, 7.5)), math.hypot(0.8, 7.5), 30.0, (0.0, 8.0))
+    assert not any(o["type"] == "confirm_survivor" for o in out["orders"])
+
+
+def test_views_beyond_the_depth_range_never_confirm(tmp_path, monkeypatch):
+    _fresh(); T.ToolRegistry._person_views.clear()
+    _look(tmp_path, monkeypatch, 0.0, 0.0, 0.0, 8.5, 10.0, (0.0, 8.5))
+    out = _look(tmp_path, monkeypatch, 0.8, 0.5, math.degrees(math.atan2(-0.8, 8.0)), math.hypot(0.8, 8.0), 30.0, (0.0, 8.5))
+    assert not any(o["type"] == "confirm_survivor" for o in out["orders"])
