@@ -125,7 +125,9 @@ Facts about your robot and the context:
 - spray_option, when present: the fire your own thermal map measures where it cuts your way out (or to unsearched
   floor), or, with blocks "near", the nearest fire within the nozzle's reach, whatever your own air: bearing, distance, whether it is in the camera's view now (spray_water needs a scan_thermal hot spot within its
   aim tolerance) and within the nozzle's reach, its burning area and estimated heat release, the heat one stream removes,
-  water left, and code's comparison of the two.
+  water left, knock_down_s_one_robot (seconds of this robot's spray that cool the burning floor below about 300 C, null
+  when one stream cannot outpace the fire) and code's assessment. The stream spreads over a wider patch the further it
+  travels, so closer spraying puts more of it on the flames.
 
 Finish every step with one sentence saying what you decided and why: call finish in the same reply as your last action
 (one reply may hold several tool calls), not in a round of its own."""

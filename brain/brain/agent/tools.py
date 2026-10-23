@@ -53,6 +53,23 @@ FACE_MEMORY_S = float(_PERCEPTION["face_memory_s"]) if "face_memory_s" in _PERCE
 # What this robot's water can do against a fire, from its own engineering assumptions (config, each with a reason).
 BURNING_KW_PER_M2 = float(_PERCEPTION["burning_kw_per_m2"])
 ONE_ROBOT_COOLS_KW = float(_NOZZLE["flow_lps"]) * float(_NOZZLE["cooling_kj_per_l"]) * float(_NOZZLE["application_efficiency"])
+BURNING_SURFACE_C, KNOCKDOWN_C = float(_PERCEPTION["burning_surface_c"]), float(_PERCEPTION["knockdown_c"])
+FUEL_KJ_PER_M2_K = float(_PERCEPTION["fuel_surface_kj_per_m2_k"])
+
+
+def knock_down_s(area_m2: float, distance_m: float, robots: int = 1) -> float | None:
+    """Seconds of spray that knock down area_m2 of burning floor distance_m away, by the robot's own assumptions (config,
+    never the simulator). The stream spreads over the nozzle's sector at that distance, so only the burning share of its
+    footprint lands on fire; that share must first take up the fire's own heat release, and what is left cools the burning
+    surface from burning_surface_c to knockdown_c. None when the streams cannot outpace the fire. Issue list 23 Oct, item
+    6: the old advice compared stream power with fire power alone and called any fire up to 4 m2 one robot's job."""
+    if area_m2 <= 0:
+        return 0.0
+    footprint = max(area_m2, math.radians(float(_NOZZLE["half_angle_deg"])) * max(float(distance_m), 1.0) ** 2)
+    net_kw = robots * ONE_ROBOT_COOLS_KW * min(1.0, area_m2 / footprint) - area_m2 * BURNING_KW_PER_M2
+    if net_kw <= 0:
+        return None
+    return area_m2 * FUEL_KJ_PER_M2_K * (BURNING_SURFACE_C - KNOCKDOWN_C) / net_kw
 
 
 def _flat_warm_surface(ev: dict) -> bool:
@@ -90,17 +107,26 @@ def spray_option(req: dict) -> dict | None:
         assessment = "no floor measured burning near the block: the margin there is heat or a forecast, not flames"
     elif water_s <= 0:
         assessment = "no water left"
-    elif kw <= ONE_ROBOT_COOLS_KW:
-        assessment = "this robot's stream removes more heat than the fire releases"
-    elif kw <= 2 * ONE_ROBOT_COOLS_KW:
-        assessment = "more than one stream removes; two robots spraying together remove more than it releases"
     else:
-        assessment = "more than two robots' streams remove"
+        distance = float(block.get("distance_m") or float(_NOZZLE["range_m"]))
+        one, two = knock_down_s(area, distance, 1), knock_down_s(area, distance, 2)
+        if one is not None and one <= water_s:
+            assessment = f"this robot alone can knock it down with about {one:.0f} s of its {water_s:.0f} s of water"
+        elif two is not None and two <= water_s:
+            assessment = (f"two robots spraying together can knock it down in about {two:.0f} s each; on its own this robot "
+                          + ("cannot outpace it" if one is None else f"would need {one:.0f} s and has {water_s:.0f} s"))
+        else:
+            assessment = "more than two robots' water: go around it, or spray only to hold a way open"
+        if one is None or one > water_s:
+            assessment += f" (from closer the stream spreads less: at {distance:.1f} m it covers about "
+            assessment += f"{math.radians(float(_NOZZLE['half_angle_deg'])) * max(distance, 1.0) ** 2:.1f} m2)"
     bearing = float(block.get("bearing_deg", 0.0))
     return {"blocks": which, "bearing_deg": round(bearing, 1), "distance_m": block.get("distance_m"),
             "in_camera_view": abs(bearing) <= CAMERA_HALF_HFOV_DEG, "within_nozzle_reach": float(block.get("distance_m") or 99) <= float(_NOZZLE["range_m"]),
             "burning_m2": round(area, 2), "est_heat_release_kw": round(kw), "one_robot_stream_removes_kw": round(ONE_ROBOT_COOLS_KW),
-            "water_s_left": round(water_s, 1), "assessment": assessment}
+            "water_s_left": round(water_s, 1), "assessment": assessment,
+            "knock_down_s_one_robot": None if area <= 0 or knock_down_s(area, float(block.get("distance_m") or _NOZZLE["range_m"])) is None
+            else round(knock_down_s(area, float(block.get("distance_m") or _NOZZLE["range_m"])), 1)}
 from pathlib import Path
 
 from brain.agent import vision

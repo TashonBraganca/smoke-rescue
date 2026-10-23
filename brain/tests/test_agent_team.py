@@ -105,16 +105,19 @@ def test_the_last_intent_is_the_orders_the_tools_accepted_not_the_words(tmp_path
 
 def test_the_spray_option_compares_the_blocking_fire_with_the_water(tmp_path):
     # Held-out seed 921: robot A, cut off by a burning wood pile, had 12 L and no measure of whether it could open the
-    # way. One stream removes flow x cooling x efficiency; the fire releases burning area x burning_kw_per_m2.
-    one = T.ONE_ROBOT_COOLS_KW
-    small = 0.5 * one / T.BURNING_KW_PER_M2; mid = 1.5 * one / T.BURNING_KW_PER_M2; big = 3 * one / T.BURNING_KW_PER_M2
-    def opt(area, water=12.0, bearing=-90.7):
-        return T.spray_option({"fire_blocks_exit": {"bearing_deg": bearing, "distance_m": 1.66, "burning_m2": area}, "water_l": water})
-    assert "this robot's stream" in opt(small)["assessment"]
-    assert "two robots" in opt(mid)["assessment"]
-    assert "more than two" in opt(big)["assessment"]
-    assert opt(small)["in_camera_view"] is False and opt(small, bearing=10)["in_camera_view"] is True
-    assert "no water" in opt(small, water=0)["assessment"]
+    # way. Issue list 23 Oct item 6: the first advice compared stream power with fire power and called any fire up to
+    # 4 m2 one robot's job. Now only the burning share of the stream's footprint counts, it must outpace the fire's own
+    # release, and the rest must cool the burning surface to knockdown_c within the water left.
+    def opt(area, water=12.0, bearing=-90.7, distance=1.66):
+        return T.spray_option({"fire_blocks_exit": {"bearing_deg": bearing, "distance_m": distance, "burning_m2": area}, "water_l": water})
+    assert "this robot alone" in opt(0.3)["assessment"]
+    assert "two robots" in opt(3.0)["assessment"]
+    assert "more than two" in opt(8.0)["assessment"]
+    assert "this robot alone" not in opt(4.0)["assessment"], "the old advice's one-robot 4 m2 fire"
+    assert "this robot alone" not in opt(0.3, distance=5.0)["assessment"], "from 5 m the stream spreads over about 5 m2"
+    assert opt(0.3)["knock_down_s_one_robot"] < opt(1.5)["knock_down_s_one_robot"] < 12
+    assert opt(small := 0.3)["in_camera_view"] is False and opt(small, bearing=10)["in_camera_view"] is True
+    assert "no water" in opt(0.3, water=0)["assessment"]
     assert "no floor measured burning" in opt(0.0)["assessment"]
     assert T.spray_option({"water_l": 12}) is None, "control: nothing blocks, no option"
 
