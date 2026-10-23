@@ -201,7 +201,7 @@ class RobotAgent:
             cls._run = run; cls._last_t = {robot: t}
             cls._recent.clear(); cls._ordered.clear(); ToolRegistry._looks.clear(); ToolRegistry._lifted.clear(); ToolRegistry._confirmed.clear()
             ToolRegistry._pending.clear(); ToolRegistry._unfinished.clear(); TeamState.reset()
-            ToolRegistry._inspection_histories.clear(); ToolRegistry._faces.clear(); ToolRegistry._wall_spots.clear()
+            ToolRegistry._inspection_histories.clear(); ToolRegistry._faces.clear(); ToolRegistry._wall_spots.clear(); ToolRegistry._confirm_walks.clear()
             cls._last_orders.clear()
 
     _last_orders: dict = {}   # robot -> (t, orders) of its last step that moved the robot
@@ -219,8 +219,13 @@ class RobotAgent:
         # the person on the radio-woken step at 49.0 s, before the arrival event.
         # Not while the brain is retreating or returning: the look cannot be driven then, and the radio-woken steps only
         # said "I remain in retreat" (seed 932 replay, robot B, eight steps between 108 and 144 s).
-        if ToolRegistry._pending.get(req["robot"]) is not None and req.get("state") not in ("retreat", "return"):
-            return True
+        if req.get("state") not in ("retreat", "return"):
+            if ToolRegistry._pending.get(req["robot"]) is not None:
+                return True
+            # A walk to confirm a person seen from too far: seed 932, robot A confirmed s4 on such a radio-woken step.
+            walk = ToolRegistry._confirm_walks.get(req["robot"])
+            if walk is not None and t - walk["t"] <= float(_tools._PERCEPTION["pending_candidate_s"]):
+                return True
         new = set(new_messages)
         for m in req.get("inbox") or []:
             mid = str(m.get("message_id") or f"{m.get('from')}@{m.get('t')}:{str(m.get('text'))[:40]}")

@@ -42,7 +42,7 @@ def trace(tmp_path):
 
 
 def _fresh():
-    T.ToolRegistry._faces.clear(); T.ToolRegistry._wall_spots.clear(); T.ToolRegistry._looks.clear(); T.ToolRegistry._pending.clear()
+    T.ToolRegistry._faces.clear(); T.ToolRegistry._wall_spots.clear(); T.ToolRegistry._looks.clear(); T.ToolRegistry._pending.clear(); T.ToolRegistry._confirm_walks.clear()
     RobotAgent._last_orders.clear(); RobotAgent._recent.clear()
 
 
@@ -206,3 +206,17 @@ def test_the_room_list_reaches_the_model(tmp_path, monkeypatch):
     rooms = [{"id": 2, "x": 4.0, "y": 6.0, "covered_share": 0.15, "entered": False, "dwell_s": 0.0, "indoor_floor_m2": 11.5}]
     RobotAgent(Capture([]), tmp_path / "trace.jsonl").step({**request(tmp_path), "rooms": rooms})
     assert seen and seen[0]["rooms"] == rooms
+
+
+def test_a_walk_to_confirm_a_person_keeps_radio_steps_awake(tmp_path, monkeypatch):
+    # Seed 932, robot A: a person verdict from 5.6 m at 45 s, a walk closer, and the confirmation came on a radio-woken step.
+    _fresh(); fake_vision(monkeypatch, "person")
+    monkeypatch.setattr(T, "RESCUE_ENABLED", False)
+    first = Scripted([[ToolCall("inspect_candidate", {"bearing_deg": 0, "range_m": 5.6})],
+                      [ToolCall("approach_candidate", {"evidence_id": "ev1"})]])
+    out = RobotAgent(first, tmp_path / "trace.jsonl").step(request(tmp_path, t=45.0, event={"kind": "survivor_candidate"}))
+    assert [o["type"] for o in out["orders"]] == ["go_to"] and T.ToolRegistry._confirm_walks.get("robot_A")
+    later = Scripted([])
+    inbox = [{"message_id": "robot_B-7", "from": "robot_B", "t": 46.0, "kind": "finding", "text": "found someone"}]
+    RobotAgent(later, tmp_path / "trace.jsonl").step(request(tmp_path, t=49.0, event={"kind": "team_message"}, inbox=inbox))
+    assert later.calls == 1
