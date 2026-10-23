@@ -515,8 +515,16 @@ namespace SmokeRescue.Brain
                     }
                     else { Emit(t, "replan", "Agent goal has no known free path; back to exploring.", "x_m", agentGoal.Value.x, "y_m", agentGoal.Value.y); agentGoal = null; }
                 }
-                if (path.Count == 0 || blocked)
+                if ((path.Count == 0 || blocked) && c.room_walk_in && WalkIntoRoom(t, out var walkIn, out int walkRoom))
                 {
+                    // room_walk_in: a room searched from its doorway is still entered. Headless (23 Oct): 17 of 55 rooms were never
+                    // entered, because floor seen from the door counts as searched and leaves no frontier inside.
+                    SetPath(walkIn, false); lastPlan = t;
+                    Emit(t, "goal", "This room was searched from outside but never entered: walk into it, then search on.",
+                        "room_id", walkRoom, "x_m", walkIn[walkIn.Count - 1].x, "y_m", walkIn[walkIn.Count - 1].y);
+                }
+                else if (path.Count == 0 || blocked)
+{
                     System.Func<Vector2, bool> excluded = p => ClaimBlocks(p, t) || GoalBlacklisted(p, t) || VisitedGoal(p, t) || !InSearchArea(p);
                     var frontier = planner.Frontier(motion.Pose.position, excluded);
                     lastPlan = t;
@@ -705,7 +713,9 @@ namespace SmokeRescue.Brain
                     nearest.candidate = true;
                     // A thermal-only warm shape on a long mapped wall is almost always wall heated by the fire (15 runs: 150 of
                     // 151 such candidates); flagged for the agent and not approached by the robot on its own.
-                    nearest.onWall = !nearest.rgb && grid.OccupiedExtent(nearest.position, c.candidate_wall_disc_m, c.candidate_wall_window_m) >= c.candidate_wall_extent_m;
+                    // candidate_wall_tall_only: low furniture the camera sees over (a bed, a sofa) is not a wall. Seed 934: the kitchen
+                    // person curled on a bed was flagged on-wall, since the 2 m bed made a long occupied structure.
+                    nearest.onWall = !nearest.rgb && grid.OccupiedExtent(nearest.position, c.candidate_wall_disc_m, c.candidate_wall_window_m, c.candidate_wall_tall_only) >= c.candidate_wall_extent_m;
                     Emit(t, "survivor_candidate", nearest.onWall ? "A human-temperature, person-sized depth blob on a long mapped wall persisted across independent frames (thermal only)."
                         : "A human-temperature, person-sized depth blob persisted across independent frames.",
                         "x_m", nearest.position.x, "y_m", nearest.position.y, "area_m2", detection.areaM2, "frames", nearest.observations.Count, "on_wall", nearest.onWall ? 1 : 0,
@@ -725,7 +735,7 @@ namespace SmokeRescue.Brain
             if (!c.reject_area_memory || track.rgb) return false;
             // Only a shape on a long mapped wall (heated wall, 150 of 151 such candidates over 15 runs): a person lying on the floor
             // beside a rejected wall is still raised when smoke hides her from the colour camera.
-            if (grid.OccupiedExtent(track.position, c.candidate_wall_disc_m, c.candidate_wall_window_m) < c.candidate_wall_extent_m) return false;
+            if (grid.OccupiedExtent(track.position, c.candidate_wall_disc_m, c.candidate_wall_window_m, c.candidate_wall_tall_only) < c.candidate_wall_extent_m) return false;
             rejectedSpots.RemoveAll(s => t - s.t > c.reject_area_s);
             return rejectedSpots.Exists(s => Vector2.Distance(s.at, track.position) <= c.reject_area_m);
         }
@@ -2221,6 +2231,30 @@ namespace SmokeRescue.Brain
         }
         /// <summary>At most two retries per room: floor that stays unseen after two passes (under a bed, behind a closed
         /// wardrobe) must not hold the robot in a loop.</summary>
+        readonly HashSet<int> walkInRooms = new HashSet<int>(); readonly List<Vector2> walkInSpots = new List<Vector2>();
+        /// <summary>The nearest real room (room_walk_in_min_m2 or more, not a corridor, indoor) that is searched past the ledger's
+        /// threshold but that this robot never stood in, reachable within room_walk_in_max_m: a path to the room's own centre cell.
+        /// Once per room.</summary>
+        bool WalkIntoRoom(double t, out List<Vector2> route, out int roomId)
+        {
+            route = null; roomId = -1; float best = c.room_walk_in_max_m;
+            if (!c.room_ledger || active != null) return false;
+            foreach (var room in planner.Rooms.Rooms)
+            {
+                if (room.entered || room.corridor || walkInRooms.Contains(room.id) || room.indoorFloorM2 < c.room_walk_in_min_m2 ||
+                    room.coveredShare < c.room_ledger_covered_share || !InSearchArea(room.anchor) || GoalBlacklisted(room.anchor, t) || ClaimBlocks(room.anchor, t)) continue;
+                if (Vector2.Distance(room.anchor, motion.Pose.position) > best) continue;
+                // Thrash guard: room ids can change when the ledger re-segments, so a spot walked to once is not a goal again
+                // (opencv-e5's room-entry goal re-picked one goal 1,097 to 5,924 times per run).
+                if (walkInSpots.Exists(w => Vector2.Distance(w, room.anchor) <= c.stuck_repeat_radius_m)) continue;
+                var p = planner.Plan(motion.Pose.position, room.anchor);
+                if (p.Count == 0) continue;
+                float m = PathLength(p); if (m > best) continue;
+                best = m; route = p; roomId = room.id;
+            }
+            if (route == null) return false;
+            walkInRooms.Add(roomId); walkInSpots.Add(route[route.Count - 1]); return true;
+        }
         bool UnfinishedRoomRetry(double t, out GridPlanner.FrontierChoice retry)
         {
             retry = null;

@@ -711,7 +711,7 @@ namespace SmokeRescue.Brain
         /// <summary>Longest extent (bounding-box diagonal, metres) of the occupied structure touching a discM disc around p,
         /// followed through 8-connected occupied cells within a windowM half-width box. A wall runs on; a body lying on the
         /// floor is a compact blob (see candidate_wall_extent_m).</summary>
-        public float OccupiedExtent(Vector2 p, float discM, float windowM)
+        public float OccupiedExtent(Vector2 p, float discM, float windowM, bool tallOnly = false)
         {
             int centre = Cell(p); if (centre < 0) return 0;
             int cx = centre % Size, cy = centre / Size, w = Mathf.CeilToInt(windowM / CellM), r = Mathf.CeilToInt(discM / CellM);
@@ -719,7 +719,7 @@ namespace SmokeRescue.Brain
             for (int dy = -r; dy <= r; dy++) for (int dx = -r; dx <= r; dx++)
             {
                 int x = cx + dx, y = cy + dy; if (!Inside(x, y) || dx * dx + dy * dy > r * r) continue;
-                int i = y * Size + x; if (OwnOccupancy(i) != 255 || seen.Contains(i)) continue;
+                int i = y * Size + x; if (OwnOccupancy(i) != 255 || (tallOnly && SeeOver(i)) || seen.Contains(i)) continue;
                 // One component at a time: its bounding box is its extent.
                 int minX = x, maxX = x, minY = y, maxY = y; seen.Add(i); queue.Enqueue(i);
                 while (queue.Count > 0)
@@ -729,7 +729,7 @@ namespace SmokeRescue.Brain
                     for (int ny = ky - 1; ny <= ky + 1; ny++) for (int nx = kx - 1; nx <= kx + 1; nx++)
                     {
                         if (!Inside(nx, ny) || Math.Abs(nx - cx) > w || Math.Abs(ny - cy) > w) continue;
-                        int n = ny * Size + nx; if (seen.Contains(n) || OwnOccupancy(n) != 255) continue;
+                        int n = ny * Size + nx; if (seen.Contains(n) || OwnOccupancy(n) != 255 || (tallOnly && SeeOver(n))) continue;
                         seen.Add(n); queue.Enqueue(n);
                     }
                 }
