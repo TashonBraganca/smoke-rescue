@@ -30,8 +30,10 @@ only thing that can reach them. Nobody has given you a map, a floor plan or a li
 sensed yourself or heard on the radio. How you search, in what order, and what you tell others is your judgement.
 
 What executes your decisions: a reflex controller plans paths on the robot's own LiDAR and camera map, keeps clear of
-walls, brakes for obstacles and backs away from heat on its own. If you give no movement order, it picks the nearest
-worthwhile frontier itself. It leaves the building when its own heat rules say so, whatever you ordered.
+walls, brakes for obstacles and backs away from heat on its own. If you give no movement order, it continues its own
+ranked search (frontiers are ranked by code: travel time, rooms not yet entered, corridor openings not yet looked
+through), enters each room and sweeps it. You need not re-order the search every step: order a move only when your own
+evidence changes where to go (a person, fire on the route, a proposal you accepted). It leaves the building when its own heat rules say so, whatever you ordered.
 
 Limits the tools enforce (an action that breaks one is refused, and the refusal is returned to you):
 - Every action except go_to, explore_frontier on proven floor, turn_to_face, send_team_message and finish cites the
@@ -43,6 +45,8 @@ Limits the tools enforce (an action that breaks one is refused, and the refusal 
 - explore_frontier on a frontier with proven_indoors false needs a check_indoors result saying indoors within its
   bearing tolerance of that frontier. go_to is refused where no ceiling has been seen.
 - No exploring or go_to during a heat event (avoid_fire, retreat).
+- turn_to_face is refused when the point is already inside the thermal camera's view or under the robot, and after
+  two turns toward the same spot within 90 s.
 
 Operator rule (no tool enforces it; the incident commander requires it): request_human_approval before entering a room
 where fire is spreading toward you.
@@ -54,8 +58,8 @@ Facts about your robot and the context:
   are converted into your frame, and your frontier list leaves its searched area out.
 - looks_not_finished: warm candidates you set out to look at closer whose approach was dropped (dropped_because: a
   heat event, no path to it, or timed out), not yet confirmed or rejected by you or confirmed by the team.
-- frontiers: floor your robot can reach that no camera on the team has searched. Each has id, x, y, path_m (planned
-  distance, with heat and wall costs), unsearched_m2 (unsearched floor right beside the frontier), mapped_unsearched_m2
+- frontiers: floor your robot can reach that no camera on the team has searched. Each has id, x, y, path_m (metres along
+  the planned route; path_s, when present, the estimated seconds of walking), unsearched_m2 (unsearched floor right beside the frontier), mapped_unsearched_m2
   (indoor floor your own sensors have mapped beyond it, up to the LiDAR's range, that no camera has searched; floor
   never mapped at all is not counted), proven_indoors (your own ceiling or wall evidence says it is inside) and its
   distance from your partner's claimed area.
@@ -81,11 +85,18 @@ Facts about your robot and the context:
   water_l is the water left for spray_water.
 - go_to, approach_candidate and turn_to_face end with an agent_goal_reached event when done.
 - mission_time_left_s: seconds until the robot's operating limit, when it must be out of the building.
-- frontiers lists up to 8 options, nearest first; some are the frontiers opening onto the largest unsearched areas the map
-  shows, so not every option is close by.
-- Each perception tool returns the same result if called again in this step.
+- frontiers lists up to 8 options in the code's ranked order, option 0 first; some are the frontiers opening onto the
+  largest unsearched areas the map shows, so not every option is close by. Take option 0 unless your evidence says otherwise.
+- last_orders_outcome: what the brain did with the movement orders of your previous step (reached, refused with its
+  reason, no path, expired before arrival, overridden by a heat event, under way). An order refused for a reason that
+  still holds is not worth repeating.
+- Each perception tool returns the same result if called again in this step. Each tool call costs a model round while
+  the robot waits: call scan_thermal, assess_visibility and track_fire_spread only when you intend an action that needs
+  their evidence (spray, avoid_area, torch, approach). The context already carries fire_near_robot, fire_blocks_frontier,
+  fire_blocks_exit and spray_option from the robot's own thermal map.
 - send_team_message reaches your partner and the commander only within radio range and through at most one wall;
-  what you do not radio, they do not know.
+  what you do not radio, they do not know. Your partner is woken only by a proposal or an answer to its proposal, not
+  by findings, so a message is not a way to get its attention; send findings when you have a new one, not every step.
 - team: your radio conversation with your partner, kept by code across your steps. awaiting_your_answer lists plans
   the partner proposed that need answer_proposal before they expire; your_proposals shows the status of plans you
   proposed; agreements_in_force are plans both robots accepted, with your part and the partner's; partner_findings are
@@ -113,8 +124,9 @@ _RESCUE_TEXT = [
 
 
 _LEAVES = "It leaves the building when its own heat rules say so, whatever you ordered."
-_STAYS = ("It never leaves the building once inside: when heat builds it retreats to the coolest floor inside, whatever "
-          "you ordered, and waits for the air to cool; spraying its water on the fire is your decision.")
+_STAYS = ("It never leaves the building once inside: when heat builds it moves to the coolest floor it has measured and "
+          "searches on from there while its air allows, whatever you ordered; holding still is its own decision at its "
+          "hard heat limits and needs no order from you. Spraying its water on the fire is your decision.")
 
 
 def system_prompt() -> str:
@@ -183,7 +195,26 @@ class RobotAgent:
             cls._run = run; cls._last_t = {robot: t}
             cls._recent.clear(); cls._ordered.clear(); ToolRegistry._looks.clear(); ToolRegistry._lifted.clear(); ToolRegistry._confirmed.clear()
             ToolRegistry._pending.clear(); ToolRegistry._unfinished.clear(); TeamState.reset()
-            ToolRegistry._inspection_histories.clear()
+            ToolRegistry._inspection_histories.clear(); ToolRegistry._faces.clear(); ToolRegistry._wall_spots.clear()
+            cls._last_orders.clear()
+
+    _last_orders: dict = {}   # robot -> (t, orders) of its last step that moved the robot
+
+    @staticmethod
+    def _radio_needs_decision(team: TeamState, req: dict, new_messages: list[str]) -> bool:
+        """A radio text alone is not a decision. Only a proposal still open for this robot's answer, or a new answer to
+        a plan it proposed, needs the model now; findings wait in partner_findings for the next real step. Seed 932: 80 of
+        116 robot steps were woken by radio texts, 78 of them by findings and commander broadcasts, and each paused the
+        simulation 12.6 s (median) to say nothing new."""
+        t = float(req["t"])
+        if any(p["status"] == "pending" and t <= p["expires_t"] for p in team.received.values()):
+            return True
+        new = set(new_messages)
+        for m in req.get("inbox") or []:
+            mid = str(m.get("message_id") or f"{m.get('from')}@{m.get('t')}:{str(m.get('text'))[:40]}")
+            if mid in new and m.get("kind") in ("proposal", "accept", "reject"):
+                return True
+        return False
 
     def step(self, req: dict) -> dict:
         start = time.perf_counter()
@@ -192,6 +223,12 @@ class RobotAgent:
         # A radio message not seen before is always decided on, even when the event looks like a repeat: a partner's
         # proposal or report arriving within REPEAT_WINDOW_S of the last step was dropped (Codex design review, 22 Oct).
         new_messages = team.ingest(req.get("inbox") or [], float(req["t"]))
+        if (req.get("event") or {}).get("kind") == "team_message" and not self._radio_needs_decision(team, req, new_messages):
+            out = {"step": f"{req['robot']}@{float(req['t']):.3f}", "orders": [], "refusals": [], "rounds": 0,
+                   "summary": None, "evidence_ids": [], "latency_s": 0.0, "radio_text_only": True}
+            self._trace({"kind": "step_skipped", **out, "event": req.get("event"),
+                         "why": "radio text only: no proposal to answer and no answer to this robot's proposal"})
+            return out
         if self._repeat(req) and not new_messages:
             out = {"step": f"{req['robot']}@{float(req['t']):.3f}", "orders": [], "refusals": [], "rounds": 0,
                    "summary": None, "evidence_ids": [], "latency_s": 0.0, "repeat_of_recent_event": True}
@@ -207,6 +244,10 @@ class RobotAgent:
         ctx.event = dict(req.get("event") or {})
         ctx.survivors = [list(p) for p in req.get("survivors") or []]
         ctx.maps_linked = any(p.get("maps_linked") for p in req.get("partners") or [])
+        ev_now, ev_numbers = req.get("event") or {}, (req.get("event") or {}).get("numbers") or {}
+        last = self._last_orders.get(req["robot"])
+        outcomes = _tools.order_outcomes(Path(req["robot_dir"]), last[0], last[1], ctx.t) if last else []
+        ctx.last_orders = outcomes
         tools = ToolRegistry(Path(req["robot_dir"]), ctx, Path(req.get("debug_dir") or Path(self.trace_path).parent / "agent_debug"))
         context = {k: req[k] for k in ("robot", "t", "pose", "torch", "mode", "state", "goal", "heat_budget", "air_c", "event",
                                        "inbox", "orders", "survivors", "frontiers", "lidar", "partners", "blocked_unsearched", "fire_blocks_frontier", "fire_blocks_exit", "mission_time_left_s",
@@ -223,6 +264,8 @@ class RobotAgent:
         unfinished = tools.unfinished()
         if unfinished:
             context["looks_not_finished"] = unfinished
+        if outcomes:
+            context["last_orders_outcome"] = outcomes
         messages = [{"role": "system", "content": system_prompt()},
                     {"role": "user", "content": "Decision needed. Context:\n" + json.dumps(context, default=str)}]
         step_id = f"{req['robot']}@{float(req['t']):.3f}"
@@ -259,6 +302,12 @@ class RobotAgent:
                 messages.append({"role": "tool", "name": call.name, "content": json.dumps(_compact(result), default=str)})
         team.note_intent(ctx.t, tools.finished, tools.orders)
         if tools.orders: self._ordered[req["robot"]] = ctx.t
+        if any(o.get("type") in ("go_to", "explore_frontier") for o in tools.orders):
+            self._last_orders[req["robot"]] = (ctx.t, list(tools.orders))
+        elif last and all(o["outcome"].startswith("under way") for o in outcomes):
+            pass   # the earlier order is still being driven: keep watching it
+        else:
+            self._last_orders.pop(req["robot"], None)
         out = {"step": step_id, "orders": tools.orders, "refusals": tools.refusals, "summary": tools.finished,
                "rounds": rounds, "evidence_ids": list(tools.evidence), "latency_s": round(time.perf_counter() - start, 3)}
         self._trace({"kind": "step_end", **out})

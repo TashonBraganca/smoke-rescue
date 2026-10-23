@@ -187,6 +187,37 @@ def _openai_messages(messages: list[dict]) -> list[dict]:
     return out
 
 
+class OpenRouterBackend:
+    """OpenRouter's OpenAI-compatible chat completions with tools, for comparing models on recorded decision steps.
+    The key comes from OPENROUTER_API_KEY or ~/.config/smoke-rescue/openrouter.env; it is never logged. Spend is capped
+    by the caller (the owner allowed about 500 INR for one comparison)."""
+
+    def __init__(self, model: str, reasoning_effort: str | None = None, timeout: float = 45.0):
+        env = {**_load_env_file(Path.home() / ".config" / "smoke-rescue" / "openrouter.env"), **os.environ}
+        self.key = env["OPENROUTER_API_KEY"]
+        self.model = model
+        self.effort = reasoning_effort or env.get("OPENROUTER_REASONING_EFFORT")
+        self.client = httpx.Client(timeout=timeout)
+        self.usage: list[dict] = []
+
+    def chat(self, messages: list[dict], tools: list[dict]) -> Reply:
+        body = {"model": self.model, "messages": _openai_messages(messages), "tools": tools, "tool_choice": "auto",
+                "max_tokens": 2000, "usage": {"include": True}}
+        if self.effort:
+            body["reasoning"] = {"effort": self.effort}
+        start = time.perf_counter()
+        r = self.client.post("https://openrouter.ai/api/v1/chat/completions", json=body,
+                             headers={"Authorization": f"Bearer {self.key}", "HTTP-Referer": "https://smoke-rescue.local",
+                                      "X-Title": "Smoke Rescue agent comparison"})
+        r.raise_for_status()
+        data = r.json()
+        msg = data["choices"][0]["message"]
+        calls = [ToolCall(c["function"]["name"], _loads_or_empty(c["function"].get("arguments") or "{}"))
+                 for c in msg.get("tool_calls") or []]
+        self.usage.append(data.get("usage") or {})
+        return Reply(msg.get("content") or "", calls, time.perf_counter() - start, self.model, {"usage": data.get("usage")})
+
+
 class ReplayBackend:
     """Replays model replies from a trace written by an earlier run, keyed by the exact request."""
 
@@ -215,6 +246,8 @@ def make_backend(kind: str | None = None, model: str | None = None, trace: str |
         return BedrockBackend(model or os.environ["AGENT_MODEL"])
     if kind == "replay":
         return ReplayBackend(Path(trace or os.environ["AGENT_REPLAY_TRACE"]))
+    if kind == "openrouter":
+        return OpenRouterBackend(model or os.environ["AGENT_MODEL"], os.environ.get("OPENROUTER_REASONING_EFFORT"))
     raise ValueError(f"unknown agent backend {kind!r}")
 
 
