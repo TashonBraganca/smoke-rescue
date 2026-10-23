@@ -17,6 +17,7 @@ namespace SmokeRescue.Brain
             public bool overlapLogged;
             // In this robot's frame; null or unset until the frames are linked.
             public BrainClaim claim;
+            public BrainRoomClaim room;
             public BrainPose pose; public bool poseKnown;
             public double poseT; public Vector2 velocity;   // when the pose was sent, and the motion between the last two
             public Vector2? goal;
@@ -119,8 +120,10 @@ namespace SmokeRescue.Brain
                 Origin = grid.Origin, Pose = motion.Pose, Goal = goal,
                 Explored = new byte[bytes], Occupied = new byte[bytes], Survivors = confirmed.ToArray(), Keyframes = KeyframesToSend(visual.Length > 0 ? c.visual_lidar_keyframes_per_message : c.keyframes_per_message, visual), CarriedOut = carriedOut.ToArray(), VisualKeyframes = visual, Rejected = RejectedToSend(t),
                 Air = airTrack.Skip(Math.Max(0, airTrack.Count - BrainMessage.MaxAir)).Select(a => new BrainAirSample { position = a.position, c = a.c, at = a.t }).ToArray() };
-            if (frontierGoal && frontierRadius > 0 && goal.HasValue && !completed && !returning && !retreating && active == null)
+            bool searching = frontierGoal && frontierRadius > 0 && goal.HasValue && !completed && !returning && !retreating && active == null;
+            if (searching)
                 m.Claim = new BrainClaim { centre = frontierCentre, radiusM = frontierRadius, expiresAt = t + c.peer_claim_s };
+            m.RoomClaim = RoomClaimToSend(t, searching);
             for (int i = 0; i < grid.Count; i++)
             {
                 int shared = m.Cell(grid.Centre(i));
@@ -138,7 +141,7 @@ namespace SmokeRescue.Brain
             // real send time here because dense heat encodes sample ages relative to it.
             if (m.Hotspots.Length > 0) m.SentAt = t;
             byte[] state = m.ToBytes();
-            if (!full && m.Claim == null && m.Hotspots.Length == 0 && m.Keyframes.Length == 0 && m.VisualKeyframes.Length == 0 && Equal(lastState, state)) return null;
+            if (!full && m.Claim == null && m.RoomClaim == null && m.Hotspots.Length == 0 && m.Keyframes.Length == 0 && m.VisualKeyframes.Length == 0 && Equal(lastState, state)) return null;
             m.Sequence = sequence + 1; m.SentAt = t; m.FullSnapshot = full;
             m.ToBytes(); // Check the complete packet before advancing sender state.
             sequence = m.Sequence; lastState = state; if (full) lastFull = t;
@@ -200,7 +203,7 @@ namespace SmokeRescue.Brain
         void ApplyPeerContent(string sender, PeerState peer, double t)
         {
             var m = peer.message;
-            if (!TryPartnerLink(sender, out var link)) { peer.claim = null; peer.goal = null; return; }
+            if (!TryPartnerLink(sender, out var link)) { peer.claim = null; peer.room = null; peer.goal = null; return; }
             grid.ReplacePeerLayer(sender, m, peer.explored, link, OwnBodyWasAt);
             var before = peer.poseKnown ? peer.pose.position : (Vector2?)null; double beforeT = peer.poseT;
             peer.pose = new BrainPose { position = link.Transform(m.Pose.position.x, m.Pose.position.y), yawRad = m.Pose.yawRad + link.yawRad };
@@ -215,6 +218,8 @@ namespace SmokeRescue.Brain
                 grid.MarkTeammateFree(before.Value, peer.pose.position, c.body_radius_m);
             peer.goal = m.Goal.HasValue ? link.Transform(m.Goal.Value.x, m.Goal.Value.y) : (Vector2?)null;
             peer.claim = m.Claim == null ? null : new BrainClaim { centre = link.Transform(m.Claim.centre.x, m.Claim.centre.y), radiusM = m.Claim.radiusM, expiresAt = m.Claim.expiresAt };
+            peer.room = m.RoomClaim == null ? null : new BrainRoomClaim { anchor = link.Transform(m.RoomClaim.anchor.x, m.RoomClaim.anchor.y),
+                radiusM = m.RoomClaim.radiusM, bidS = m.RoomClaim.bidS, since = m.RoomClaim.since, expiresAt = m.RoomClaim.expiresAt };
             foreach (var hot in m.Hotspots)
             {
                 // Fill every local cell under the shared 20 cm cell, preserving its full hazard extent.
@@ -247,7 +252,7 @@ namespace SmokeRescue.Brain
                 bool gone = false; foreach (var k in carriedOut) if (Vector2.Distance(k.position, s.position) <= c.survivor_merge_m) gone = true;
                 if (!gone) ReceiveSurvivor(s, sender, t);
             }
-            InvalidatePeerGoal(t); CheckMapOverlap(t);
+            InvalidatePeerGoal(t); YieldLostRoom(t); CheckMapOverlap(t);
         }
 
         BrainHotspot[] LocalHotspots(BrainMessage m, double t)
@@ -374,9 +379,10 @@ namespace SmokeRescue.Brain
             var result = new List<PeerSnapshot>();
             foreach (var p in peers)
             {
-                var m = p.Value.message; var claim = p.Value.claim; bool linked = TryPartnerLink(p.Key, out _);
+                var m = p.Value.message; var claim = p.Value.claim; var room = p.Value.room; bool linked = TryPartnerLink(p.Key, out _);
                 result.Add(new PeerSnapshot { robot = p.Key, sequence = m.Sequence, sentAt = m.SentAt, pose = p.Value.pose, goal = p.Value.goal, linked = linked,
-                    claim = claim == null || claim.expiresAt <= t ? null : new BrainClaim { centre = claim.centre, radiusM = claim.radiusM, expiresAt = claim.expiresAt } });
+                    claim = claim == null || claim.expiresAt <= t ? null : new BrainClaim { centre = claim.centre, radiusM = claim.radiusM, expiresAt = claim.expiresAt },
+                    room = room == null || room.expiresAt <= t ? null : new BrainRoomClaim { anchor = room.anchor, radiusM = room.radiusM, bidS = room.bidS, since = room.since, expiresAt = room.expiresAt } });
             }
             return result.ToArray();
         }
@@ -395,6 +401,9 @@ namespace SmokeRescue.Brain
                 (m.Goal.HasValue && !Finite(m.Goal.Value))) throw new InvalidDataException("Invalid or incompatible building-frame brain state.");
             if (m.Claim != null && (!Finite(m.Claim.centre) || !BrainMath.Finite(m.Claim.radiusM) || m.Claim.radiusM <= 0 ||
                 !ValidTime(m.Claim.expiresAt, m.SentAt + c.peer_claim_s + 1e-6) || m.Claim.expiresAt < m.SentAt)) throw new InvalidDataException("Invalid peer claim.");
+            if (m.RoomClaim != null && (!Finite(m.RoomClaim.anchor) || !BrainMath.Finite(m.RoomClaim.radiusM) || m.RoomClaim.radiusM < 0 ||
+                !BrainMath.Finite(m.RoomClaim.bidS) || m.RoomClaim.bidS < 0 || !ValidTime(m.RoomClaim.since, m.SentAt) ||
+                !ValidTime(m.RoomClaim.expiresAt, m.SentAt + c.peer_claim_s + 1e-6) || m.RoomClaim.expiresAt < m.SentAt)) throw new InvalidDataException("Invalid peer room claim.");
             foreach (var s in m.Survivors)
                 if (!Finite(s.position) || !ValidTime(s.confirmedAt, m.SentAt) || string.IsNullOrWhiteSpace(s.sourceRobot)) throw new InvalidDataException("Invalid peer confirmation.");
             foreach (var h in m.Hotspots)

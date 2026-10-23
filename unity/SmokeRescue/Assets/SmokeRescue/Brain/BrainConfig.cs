@@ -15,6 +15,11 @@ namespace SmokeRescue.Brain
         public float room_ledger_door_width_m = 1.2f;
         public float room_ledger_covered_share = .9f;
         public float room_ledger_dwell_s = 40;
+        public bool room_auction = false;
+        public float room_auction_margin_s = 2;
+        public float corridor_max_width_m = 2.44f;
+        public float corridor_min_elongation = 3;
+        public int corridor_min_openings = 3;
         public float full_snapshot_s = 10;
         public float peer_claim_s = 15;
         public float peer_claim_radius_m = 1;
@@ -213,7 +218,8 @@ namespace SmokeRescue.Brain
                 }
             }
             if (room_ledger_period_s <= 0 || room_ledger_door_width_m < cell_m * 2 ||
-                room_ledger_covered_share <= 0 || room_ledger_covered_share > 1 || room_ledger_dwell_s <= 0)
+                room_ledger_covered_share <= 0 || room_ledger_covered_share > 1 || room_ledger_dwell_s <= 0 ||
+                room_auction_margin_s < 0 || corridor_max_width_m < cell_m * 2 || corridor_min_elongation < 1 || corridor_min_openings < 2)
                 throw new ArgumentException("Invalid room ledger configuration.");
             if (obstacle_cost_margin_m <= 0 || obstacle_cost_weight < 0)
                 throw new ArgumentException("Invalid obstacle clearance cost configuration.");
