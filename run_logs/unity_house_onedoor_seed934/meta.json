@@ -1,0 +1,33 @@
+{
+  "run_id": "unity_house_onedoor_seed934",
+  "complete": true,
+  "sim_seconds_written": 240.0,
+  "scenario": "scenario_house_onedoor_seed934.json",
+  "seed": 934,
+  "unity_version": "6000.6.6f1",
+  "sim_rate_hz": 15.0,
+  "robots": [
+    "robot_A",
+    "robot_B"
+  ],
+  "smoke_level": 0.15,
+  "smoke_rooms": {
+    "kitchen": 0.35,
+    "living": 0.25,
+    "bedroom_2": 0.3,
+    "default": 0.15
+  },
+  "recorded_offline": true,
+  "clock_hz": 600,
+  "noise": true,
+  "thermal": "thermal/<t>.png 16-bit kelvin x 10, 320x256, 15 Hz, see thermal.yaml",
+  "air_temperature": "air_temp.txt, 10 Hz, C",
+  "lidar": "lidar.txt, planar 360 degree, 720 beams, 10 Hz, 0.45 m up",
+  "fire": "spreading fire (config/fire.json), head start 320 s",
+  "camera_mount": {
+    "height_m": 1.6,
+    "forward_offset_m": 0.25,
+    "pitch_down_deg": 10.0
+  },
+  "exposure": "per-sensor deterministic auto exposure, target grey 105, EV100 0 to 12"
+}

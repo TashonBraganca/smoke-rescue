@@ -1,0 +1,13 @@
+%YAML:1.0
+---
+# Long-wave infrared camera, pinhole, no distortion; PNG value = kelvin x 10
+Camera1.fx: 343.121
+Camera1.fy: 343.121
+Camera1.cx: 159.5
+Camera1.cy: 127.5
+Camera.width: 320
+Camera.height: 256
+Camera.fps: 15
+T_rgb_thermal.translation_m: [0.030, 0.0, 0.0]
+NETD_K: 0.050
+Range_max_C: 650
