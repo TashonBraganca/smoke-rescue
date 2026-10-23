@@ -63,7 +63,15 @@ namespace SmokeRescue.Brain
             if (!facing.HasValue) return null;
             if (returning || retreating) { facing = null; return null; }
             float error = BrainMath.Angle(motion.Pose.yawRad, BrainMath.Heading(facing.Value - motion.Pose.position));
-            if (Mathf.Abs(error) > c.survivor_face_tolerance_deg && t < facingUntil)
+            float tolerance = c.survivor_face_tolerance_deg;
+            if (c.motion_face_visible)
+            {
+                var cam = sensors.camera; var thermal = sensors.thermal;
+                float rgbHalf = Mathf.Atan(Mathf.Min(cam.cx + .5f, cam.width - .5f - cam.cx) / cam.fx) * Mathf.Rad2Deg;
+                float thermalHalf = Mathf.Atan(Mathf.Min(thermal.cx + .5f, thermal.width - .5f - thermal.cx) / thermal.fx) * Mathf.Rad2Deg;
+                tolerance = Mathf.Max(tolerance, .5f * Mathf.Min(rgbHalf, thermalHalf));
+            }
+            if (Mathf.Abs(error) > tolerance && t < facingUntil)
                 return Command(0, Mathf.Clamp(error * c.heading_gain, -c.sweep_yaw_dps, c.sweep_yaw_dps), dt, true);
             Emit(t, "agent_goal_reached", "Arrived where the agent asked and turned to face the point it named: " + facingReason,
                 "x_m", facing.Value.x, "y_m", facing.Value.y, "bearing_error_deg", error);
