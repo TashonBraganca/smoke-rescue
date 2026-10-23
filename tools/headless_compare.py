@@ -19,6 +19,8 @@ def summary(r: dict) -> dict:
     rooms = [v["searched_pct"] for v in r["rooms"].values()]
     people = list(r["people"].values())
     robots = list(r["robots"].values())
+    beliefs = list(r.get('team_map_by_receiver', {}).values())
+    wall_shares = [b['occupied_within_0_2_m_wall_share'] for b in beliefs if b['occupied_within_0_2_m_wall_share'] is not None]
     return {
         "room_mean_pct": round(sum(rooms) / len(rooms)),
         "rooms_under_50": sum(p < 50 for p in rooms), "rooms": len(rooms),
@@ -34,6 +36,9 @@ def summary(r: dict) -> dict:
         "peak_air_c": max(x.get("peak_air_c", 20) for x in robots), "over_60_s": sum(x.get("air_over_60_s", 0) for x in robots),
         # Fewest rooms any one robot searched past 30 %: 1 means a robot spent the run in one room (sealed in, 5013-5016).
         "min_robot_rooms": min(sum(v["by_robot_pct"][k] >= 30 for v in r["rooms"].values()) for k in range(len(robots))),
+        "wall_match_pct": round(100 * sum(wall_shares) / len(wall_shares), 1) if wall_shares else 0,
+        "team_search_m2": round(max((b['searched_floor_m2'] for b in beliefs), default=0), 1),
+        "mean_packet_bytes": round(r['radio'].get('mean_packet_bytes', 0)),
     }
 
 
@@ -44,7 +49,7 @@ def main(folder: Path):
         r = report(run)
         (run / "report.json").write_text(json.dumps(r, indent=1))
         by_variant[variant][seed] = summary(r)
-    keys = ["room_mean_pct", "rooms_under_50", "sighted", "confirmed", "false", "walked_m", "turning_s", "still_s", "outside_s", "stuck_events", "yields", "peak_air_c", "over_60_s", "min_robot_rooms"]
+    keys = ["room_mean_pct", "rooms_under_50", "sighted", "confirmed", "false", "walked_m", "turning_s", "still_s", "outside_s", "stuck_events", "yields", "peak_air_c", "over_60_s", "min_robot_rooms", "wall_match_pct", "team_search_m2", "mean_packet_bytes"]
     print("variant".ljust(22) + "".join(k[:12].rjust(13) for k in keys))
     for variant, seeds in by_variant.items():
         mean = {k: round(sum(s[k] for s in seeds.values()) / len(seeds), 1) for k in keys}

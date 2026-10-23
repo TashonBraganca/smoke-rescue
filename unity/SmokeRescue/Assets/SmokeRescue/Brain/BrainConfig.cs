@@ -160,6 +160,8 @@ namespace SmokeRescue.Brain
         public bool thermal_lidar_range_fallback = true;
         public float carried_person_radius_m = 0.85f, search_max_range_m = 4.0f;
         public bool frames_shared_at_start = true;
+        public bool team_map_planner = false;
+        public float team_map_entry_position_std_m = .05f, team_map_entry_yaw_std_deg = 3;
         public bool stay_inside = false;
         public float keyframe_spacing_m = 1.0f, keyframe_turn_deg = 45f;
         public int keyframe_beams = 360, keyframe_max = 400, keyframes_per_message = 2;
@@ -241,6 +243,8 @@ namespace SmokeRescue.Brain
         }
         public void Validate()
         {
+            if (team_map_entry_position_std_m < 0 || team_map_entry_yaw_std_deg < 0 || team_map_entry_yaw_std_deg > 180)
+                throw new ArgumentException("Invalid team-map entry uncertainty.");
             foreach (var field in typeof(BrainConfig).GetFields(BindingFlags.Instance | BindingFlags.Public))
             {
                 if (field.FieldType == typeof(float))

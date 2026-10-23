@@ -20,6 +20,14 @@ namespace SmokeRescue.Brain
         OdometrySample lastO;
         ImuSample lastI;
         bool hasO, hasI;
+        // The tail beyond the newest complete sensor interval is a prediction only.
+        // Rebuild it when the next interval mean arrives instead of committing it twice.
+        struct Checkpoint
+        {
+            public double now; public BrainPose pose; public int oi, ii, segments;
+            public OdometrySample o; public ImuSample i; public bool hasO, hasI;
+        }
+        Checkpoint complete;
         public BrainPose Pose { get; private set; }
         public float Speed { get; private set; }
         public float YawRate { get; private set; }
@@ -38,11 +46,12 @@ namespace SmokeRescue.Brain
         }
         public bool Healthy(double t) => hasO && hasI && t - lastO.Timestamp <= stale && t - lastI.Timestamp <= stale;
         public DeadReckoning(float staleSeconds, float historySeconds, BrainPose entry)
-        { stale = staleSeconds; retention = historySeconds; Pose = entry; }
+        { stale = staleSeconds; retention = historySeconds; Pose = entry; complete.pose = entry; }
         // Left-compose a building-frame rigid delta. Grids keep their existing cells.
         public void ApplyCorrection(BrainPose delta)
         {
             Pose = Correct(Pose, delta);
+            complete.pose = Correct(complete.pose, delta);
             for (int i = 0; i < history.Count; i++)
             { var s = history[i]; s.pose = Correct(s.pose, delta); history[i] = s; }
         }
@@ -68,6 +77,34 @@ namespace SmokeRescue.Brain
         }
         public void Advance(double t)
         {
+            BrainMath.Time(t);
+            if (t < now) throw new ArgumentException("Motion time must increase.");
+            // Discard only the extrapolated tail. Complete intervals keep their capture poses.
+            if (history.Count > complete.segments) history.RemoveRange(complete.segments, history.Count - complete.segments);
+            now = complete.now; Pose = complete.pose; oi = complete.oi; ii = complete.ii;
+            lastO = complete.o; lastI = complete.i; hasO = complete.hasO; hasI = complete.hasI;
+            if (oi > 1024) { odometry.RemoveRange(0, oi); oi = 0; }
+            if (ii > 1024) { imu.RemoveRange(0, ii); ii = 0; }
+            int old = 0;
+            while (old < history.Count && history[old].end < t - retention) old++;
+            if (old > 0) history.RemoveRange(0, old);
+            double odomEnd = hasO ? lastO.Timestamp : 0, imuEnd = hasI ? lastI.Timestamp : 0;
+            for (int j = oi; j < odometry.Count && odometry[j].Timestamp <= t; j++) odomEnd = odometry[j].Timestamp;
+            for (int j = ii; j < imu.Count && imu[j].Timestamp <= t; j++) imuEnd = imu[j].Timestamp;
+            // A long outage cannot be repaired by a late interval mean. Commit the stopped stream after its stale
+            // limit, so a missing sensor cannot retain an entire run of the other sensor for replay every step.
+            if (t - odomEnd > stale) odomEnd = t;
+            if (t - imuEnd > stale) imuEnd = t;
+            IntegrateTo(Math.Max(now, Math.Min(odomEnd, imuEnd)));
+            complete = new Checkpoint { now = now, pose = Pose, oi = oi, ii = ii, segments = history.Count,
+                o = lastO, i = lastI, hasO = hasO, hasI = hasI };
+            IntegrateTo(t);
+            ForwardSpeed = hasO && t - lastO.Timestamp <= stale ? lastO.Vx : 0;
+            Speed = hasO && t - lastO.Timestamp <= stale ? Mathf.Sqrt(lastO.Vx * lastO.Vx + lastO.Vy * lastO.Vy) : 0;
+            YawRate = hasI && t - lastI.Timestamp <= stale ? -lastI.AngularRate.y : 0;
+        }
+        void IntegrateTo(double t)
+        {
             while (true)
             {
                 while (oi < odometry.Count && odometry[oi].Timestamp <= now + 1e-9) { lastO = odometry[oi++]; hasO = true; }
@@ -91,14 +128,6 @@ namespace SmokeRescue.Brain
                 history.Add(segment);
                 Pose = Integrate(segment, (float)(end - now)); now = end;
             }
-            ForwardSpeed = hasO && t - lastO.Timestamp <= stale ? lastO.Vx : 0;
-            Speed = hasO && t - lastO.Timestamp <= stale ? Mathf.Sqrt(lastO.Vx * lastO.Vx + lastO.Vy * lastO.Vy) : 0;
-            YawRate = hasI && t - lastI.Timestamp <= stale ? -lastI.AngularRate.y : 0;
-            if (oi > 1024) { odometry.RemoveRange(0, oi); oi = 0; }
-            if (ii > 1024) { imu.RemoveRange(0, ii); ii = 0; }
-            int old = 0;
-            while (old < history.Count && history[old].end < t - retention) old++;
-            if (old > 0) history.RemoveRange(0, old);
         }
         /// <summary>False when t is older than the retained history (At would return a zero pose).</summary>
         public bool Covers(double t) => t >= now - 1e-9 || (history.Count > 0 && t >= history[0].start);
