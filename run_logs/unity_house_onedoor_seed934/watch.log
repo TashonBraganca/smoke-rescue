@@ -1,0 +1,535 @@
+==== 20:27:29 sim 120.0 s complete False
+  robot_A 0.0 agent_order: go_to: closer look to confirm the person seen at (-0.23, 7.5)
+  robot_A 4.0 agent_order: go_to: closer look to confirm the person seen at (-0.51, 7.31)
+  MISTAKE robot_A 8.0 goal_blacklisted: Air here is rising fast: search elsewhere for a while.
+  robot_A 10.8 entrance_locked: Inside and clear of the way in: floor near the way in is now locked; this robot never goes back to it.
+  robot_A 14.8 agent_order: go_to: explore: Nearest ranked indoor frontier remains the appropriate next search after the candidate was rul
+  robot_A 18.8 survivor_confirmed: Agent confirmed a person with OpenCV evidence 6276d4521504445b.
+  robot_A 26.8 agent_order: go_to: explore: Continue the highest-ranked reachable indoor unsearched floor while the wall-associated therma
+  robot_A 78.0 agent_order: go_to: explore: This is an indoor, unentered room with the largest mapped unsearched area (20.7 m²), substanti
+  robot_A 82.0 agent_order: go_to: explore: Top-ranked frontier 0 cannot be verified indoors from the current view, and the prior goal has
+  robot_A 95.9 agent_order: go_to: explore: Continue ranked reachable proven-indoor search; the newly inspected clipped warm surface is un
+  robot_A 99.9 agent_order: go_to: closer look at an uncertain warm region (-1.68, 9.85)
+  robot_A 109.3 agent_order: go_to: Back away to obtain an unclipped, floor-visible thermal view of the strong warm person-sized candidate 
+  MISTAKE robot_A 119.1 goal_blacklisted: The fire margin cut the path to this frontier; leave it until the retry time.
+  MISTAKE robot_A 119.3 goal_blacklisted: The fire margin cut the path to this frontier; leave it until the retry time.
+  robot_A 120.1 agent_order: go_to: explore: Frontier 0 cannot be established as indoors and frontier 1's route was just fire-blacklisted; 
+  MISTAKE robot_A 122.0 goal_blacklisted: The fire margin cut the path to this frontier; leave it until the retry time.
+  robot_A 124.1 agent_order: go_to: explore: Redirect to the nearest materially unsearched proven-indoor room after the prior route was fir
+  MISTAKE robot_A 125.0 goal_blacklisted: The fire margin cut the path to this frontier; leave it until the retry time.
+  robot_A 128.1 agent_order: go_to: Frontier 0 is the highest-ranked reachable unsearched area, but its indoor status must be verified befo
+  robot_A 132.1 agent_order: explore_frontier on floor not yet proven indoors, citing OpenCV evidence 352cd5180db0c2cb: Frontier 0 is the c
+  MISTAKE robot_A 133.8 goal_blacklisted: The fire margin cut the path to this frontier; leave it until the retry time.
+  robot_B 0.0 agent_order: go_to: Face the highest-ranked nearby frontier so its indoor status can be verified before entry.
+  robot_B 4.0 agent_order: go_to: explore: Continue the ranked indoor search: both nearby thermal-only edge-clipped wall candidates were 
+  MISTAKE robot_B 9.1 goal_blacklisted: Air here is rising fast: search elsewhere for a while.
+  MISTAKE robot_B 10.5 goal_blacklisted: The fire margin cut the path to this frontier; leave it until the retry time.
+  robot_B 12.0 agent_order: go_to: explore: Continue the highest-ranked reachable proven-indoor frontier; the current clipped thermal cand
+  robot_B 16.0 agent_order: go_to: explore: Continue the highest-ranked reachable proven-indoor frontier after the visible warm region was
+  robot_B 20.1 survivor_from_peer: Confirmation received from robot_A, originally confirmed by robot_A.
+  MISTAKE robot_B 21.6 body_swing_blocked: Turning here would swing the body into a mapped wall; back off first.
+  robot_B 23.9 entrance_locked: Inside and clear of the way in: floor near the way in is now locked; this robot never goes back to it.
+  robot_B 34.0 agent_order: go_to: explore: Continue the controller-ranked nearby proven-indoor frontier to complete the partially searche
+  robot_B 38.0 agent_order: go_to: explore: The warm patch is wall-associated and remains uncertain without colour/body evidence; complete
+  robot_B 42.5 agent_order: go_to: explore: Continue the highest-ranked proven-indoor frontier search; the newly rescanned wall-associated
+  robot_B 50.5 agent_order: go_to: closer look at an uncertain warm region (7.49, 9.72)
+  robot_B 68.7 agent_order: go_to: closer look at an uncertain warm region (9.69, 4.58)
+  robot_B 81.7 agent_order: go_to: explore: The close unresolved candidate is now fully viewed and rejected; continue searching the neares
+  robot_B 101.7 agent_order: go_to: explore: Continue the ranked search at the nearest proven-indoor unsearched floor; current thermal/RGB 
+  robot_B 121.7 agent_order: go_to: explore: Continue the ranked search at the nearest proven-indoor unsearched floor; current thermal/RGB 
+  robot_B 141.7 agent_order: go_to: explore: Nearest proven-indoor frontier with the highest immediate unsearched area; current thermal/RGB
+  agent robot_B@0.017 rounds 2 orders ['go_to'] :: I will face the nearest highest-ranked frontier to verify it is indoors before exploring, since it is not yet proven ind
+  agent robot_A@0.017 inspect -> person: Too little registered depth to judge shape.; OpenCV dnn person detector (YOLO11m) confidence 0.63 at bearing -
+  agent robot_A@0.017 rounds 4 orders ['go_to'] :: I am approaching the colour-detected person candidate near (-0.23, 7.5) for a confirmable inspection, since the nearest 
+  agent robot_A@4.017 inspect -> person: Too little registered depth to judge shape.; OpenCV dnn person detector (YOLO11m) confidence 0.59 at bearing 0
+  agent robot_B@4.017 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.; It is 1.6 m away and
+  agent robot_A@4.017 rounds 4 orders ['go_to', 'send_team_message'] :: I am approaching the detected person-sized candidate at (-0.51, 7.31) for a close confirmable inspection and have alerte
+  agent robot_B@4.017 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.; It is 1.6 m away and
+  agent robot_B@4.017 rounds 5 orders ['explore_frontier'] :: I inspected the two nearby warm edge-clipped wall-like regions, found neither confirmable nor colour-supported as a pers
+  agent robot_A@8.017 inspect -> not_person: Warm region is at least 0.8 m behind its surrounding depth, consistent with an opening.; Metric dimensions fal
+  AGENT-REFUSED robot_A@8.017 avoid_area: the cited scan found no hotspot
+  agent robot_B@8.017 inspect -> uncertain: Too little registered depth to judge shape.
+  agent robot_B@8.017 rounds 3 orders [] :: I found the new wall-associated thermal candidate too depth-poor to verify and will let the ongoing ranked proven-indoor
+  agent robot_A@8.017 rounds 4 orders ['reject_candidate'] :: I rejected the apparent warm region as a non-person opening and, with no detected fire hotspot to localize, am allowing 
+  agent robot_B@12.017 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.
+  agent robot_B@12.017 rounds 3 orders ['explore_frontier'] :: I will search the highest-ranked reachable proven-indoor frontier because the only current warm candidate is clipped and
+  agent robot_A@14.817 inspect -> not_person: Metric dimensions fall outside the body-size bounds.
+  agent robot_A@14.817 rounds 3 orders ['reject_candidate', 'explore_frontier'] :: I rejected the oversized warm blob as a non-person and will search the nearest proven indoor frontier because no fire is
+  agent robot_B@16.033 inspect -> not_person: Metric dimensions fall outside the body-size bounds.
+  agent robot_B@16.033 rounds 4 orders ['reject_candidate', 'explore_frontier'] :: I rejected the oversized, unstructured warm patch as not a person and continued to the highest-ranked reachable proven-i
+  agent robot_A@18.817 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.; It is 1.7 m away and
+  agent robot_A@18.817 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.; It is 1.7 m away and
+  agent robot_A@18.817 inspect -> person: Body-sized warm component has temperature structure and nonplanar depth without a background recess.
+  agent robot_A@18.817 inspect -> person: Body-sized warm component has temperature structure and nonplanar depth without a background recess.
+  AGENT-REFUSED robot_A@18.817 approach_candidate: this person is already confirmed and reported, and this robot has no rescue arm: walking to them adds nothing;
+  agent robot_A@18.817 rounds 4 orders ['confirm_survivor', 'send_team_message'] :: I confirmed and reported a survivor at (-0.46, 12.18) from a 4.8 m thermal/depth person verdict; with no fire and no nee
+  agent robot_A@22.817 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.; It is 1.5 m away and
+  AGENT-REFUSED robot_A@22.817 approach_candidate: the cited inspection measured this warm region as a flat surface (enough registered depth, no protrusion from 
+  AGENT-REFUSED robot_A@22.817 reject_candidate: the cited inspection is not a not_person verdict at that position, nor an uncertain one at a shape looked at c
+  agent robot_A@22.817 inspect -> not_person: Metric dimensions fall outside the body-size bounds.
+  agent robot_A@22.817 rounds 6 orders ['reject_candidate'] :: (no summary: the step ended before finish) reject_candidate; refused approach_candidate; refused reject_candidate
+  agent robot_B@24.033 inspect -> uncertain: No warm component matches the requested bearing and depth.
+  agent robot_B@24.033 inspect -> not_person: No warm component matches the requested bearing and depth.; The asked spot is in full view and holds nothing i
+  agent robot_B@24.033 rounds 5 orders ['reject_candidate'] :: I rejected the new distant warm candidate at (8.53, 9.52) because the current full-view thermal/RGB inspection found no 
+  agent robot_A@26.817 inspect -> uncertain: No warm component matches the requested bearing and depth.
+  agent robot_A@26.817 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.
+  agent robot_A@26.817 rounds 4 orders ['explore_frontier'] :: I inspected the reappearing wall patch and a newly visible plausible warm form, but both were inconclusive, so I continu
+  agent commander@30.000 rounds None orders ['broadcast'] :: One survivor is confirmed and reported to outside crews; continue searching unsearched floor.
+  agent robot_B@34.017 rounds 3 orders ['explore_frontier'] :: I found no warm or colour-person targets or fire and am continuing to the nearest ranked proven-indoor frontier to finis
+  agent robot_B@38.017 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.; It is 2.0 m away and
+  AGENT-REFUSED robot_B@38.017 approach_candidate: a thermal-only warm patch on a long wall: over 15 runs 1 in 151 of these was a person. Search the offered fron
+  agent robot_B@38.017 rounds 5 orders ['explore_frontier'] :: I inspected the new wall-associated warm patch but it was too close and remained uncertain; because it has no colour/bod
+  agent robot_B@42.550 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.; It is 2.4 m away and
+  agent robot_B@42.550 rounds 3 orders ['explore_frontier'] :: I resumed the top-ranked proven-indoor frontier because the nearby wall-associated thermal patch remains an uncertain cl
+  agent robot_A@46.817 inspect -> uncertain: Too little registered depth to judge shape.
+  AGENT-REFUSED robot_A@46.817 explore_frontier: your explore_frontier to (-2.25, 8.35) is still being driven (last_orders_outcome: under way); it is replaced 
+  agent robot_A@46.817 rounds 4 orders [] :: I found no fire and an additional warm shape could not be resolved from this view, so I will let the already-under-way h
+  agent robot_B@50.550 inspect -> not_person: No warm component matches the requested bearing and depth.; The asked spot is in full view and holds nothing i
+  agent robot_B@50.550 inspect -> uncertain: Too little registered depth to judge shape.
+  agent robot_B@50.550 rounds 4 orders ['go_to'] :: I started toward the newly detected plausible warm body at (7.48, 9.71) for a resolving close inspection, because the im
+  agent robot_B@50.867 inspect -> uncertain: Too little registered depth to judge shape.
+  AGENT-REFUSED robot_B@50.867 explore_frontier: you are walking to look closer at an unresolved warm candidate 3.3 m away at bearing 10 deg; finish that first
+  agent robot_B@50.867 rounds 4 orders [] :: I inspected the newly seen warm region but depth was insufficient to classify it, so I will continue the already active 
+  agent robot_B@54.867 inspect -> uncertain: No warm component matches the requested bearing and depth.
+  agent robot_B@54.867 inspect -> uncertain: No warm component matches the requested bearing and depth.
+  AGENT-REFUSED robot_B@54.867 explore_frontier: you are walking to look closer at an unresolved warm candidate 3.3 m away at bearing -87 deg; finish that firs
+  agent robot_B@54.867 rounds 4 orders ['send_team_message'] :: I will continue the active close approach to the unresolved warm candidate because the current inspection could not see 
+  agent commander@60.000 rounds None orders [] :: Robot B found no confirmed person; no new route, hazard, or completed-area information requires a broadcast.
+  agent robot_A@66.833 inspect -> uncertain: Too little registered depth to judge shape.
+  agent robot_A@66.833 rounds 3 orders [] :: I inspected the newly seen warm region immediately; it remains unresolved from insufficient depth, so I will keep the cu
+  agent robot_B@68.683 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.; It is 2.0 m away and
+  agent robot_B@68.683 rounds 4 orders ['go_to'] :: I will step back to the prescribed viewing distance and re-inspect the unresolved warm human-sized candidate at (9.69, 4
+  agent robot_B@72.683 inspect -> uncertain: No warm component matches the requested bearing and depth.
+  AGENT-REFUSED robot_B@72.683 explore_frontier: you are walking to look closer at an unresolved warm candidate 1.8 m away at bearing 152 deg; finish that firs
+  agent robot_B@72.683 rounds 4 orders [] :: I will continue to the planned safer viewing position and re-inspect the unresolved nearby wall-associated candidate, be
+  agent robot_A@78.017 inspect -> not_person: Warm region is at least 0.8 m behind its surrounding depth, consistent with an opening.
+  agent robot_A@78.017 rounds 5 orders ['reject_candidate', 'explore_frontier'] :: I rejected the opening-like false warm region and redirected to the unentered indoor frontier with 20.7 m² of mapped uns
+  agent robot_B@81.667 inspect -> not_person: No warm component matches the requested bearing and depth.; The asked spot is in full view and holds nothing i
+  agent robot_B@81.667 rounds 4 orders ['reject_candidate', 'explore_frontier'] :: I rejected the fully visible empty warm-candidate location and will search frontier 3, the nearest proven-indoor unsearc
+  agent robot_A@82.017 inspect -> uncertain: Too little registered depth to judge shape.
+  agent robot_A@82.017 rounds 5 orders ['explore_frontier'] :: I inspected the current weak thermal return but it remains unresolved, then redirected to proven-indoor frontier 1 becau
+  agent robot_A@95.900 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.; It is 2.0 m away and
+  AGENT-REFUSED robot_A@95.900 approach_candidate: the cited inspection measured this warm region as a flat surface (enough registered depth, no protrusion from 
+  AGENT-REFUSED robot_A@95.900 reject_candidate: the cited inspection is not a not_person verdict at that position, nor an uncertain one at a shape looked at c
+  agent robot_A@95.900 rounds 5 orders ['explore_frontier'] :: I will continue to proven-indoor frontier 0 because the new warm return is not a verified person and reachable unsearche
+  agent robot_A@99.900 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.; It is 1.7 m away and
+  AGENT-REFUSED robot_A@99.900 approach_candidate: the cited inspection measured this warm region as a flat surface (enough registered depth, no protrusion from 
+  AGENT-REFUSED robot_A@99.900 reject_candidate: the cited inspection is not a not_person verdict at that position, nor an uncertain one at a shape looked at c
+  agent robot_A@99.900 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.; It is 2.3 m away and
+  agent robot_A@99.900 rounds 6 orders ['go_to'] :: (no summary: the step ended before finish) go_to; refused approach_candidate; refused reject_candidate
+  agent robot_B@101.667 rounds 3 orders ['explore_frontier'] :: I will search frontier 0 next because it is the nearest proven-indoor unsearched floor and the current scan shows neithe
+  agent robot_A@109.350 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.; It is 1.8 m away and
+  agent robot_A@109.350 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.; It is 2.4 m away and
+  AGENT-REFUSED robot_A@109.350 approach_candidate: the cited inspection measured this warm region as a flat surface (enough registered depth, no protrusion from 
+  AGENT-REFUSED robot_A@109.350 reject_candidate: the cited inspection is not a not_person verdict at that position, nor an uncertain one at a shape looked at c
+  agent robot_A@109.350 rounds 6 orders ['go_to'] :: I am backing to a clearer viewpoint to resolve the strongest nearby person-sized warm candidate, because both current th
+  agent robot_A@113.350 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.; It is 2.1 m away and
+  AGENT-REFUSED robot_A@113.350 approach_candidate: a thermal-only warm patch on a long wall: over 15 runs 1 in 151 of these was a person. Search the offered fron
+  agent robot_A@113.350 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.; It is 1.9 m away and
+  AGENT-REFUSED robot_A@113.350 explore_frontier: you are walking to look closer at an unresolved warm candidate 3.6 m away at bearing -136 deg; finish that fir
+  agent robot_A@113.350 rounds 6 orders [] :: (no summary: the step ended before finish) refused approach_candidate; refused explore_frontier
+  agent robot_A@116.100 inspect -> not_person: Metric dimensions fall outside the body-size bounds.
+  AGENT-REFUSED robot_A@116.100 explore_frontier: you are walking to look closer at an unresolved warm candidate 4.0 m away at bearing -140 deg; finish that fir
+  agent robot_A@116.100 rounds 4 orders ['reject_candidate'] :: I rejected the full-view oversized non-person warm region and will continue the already pending close look at the unreso
+  agent robot_A@120.100 inspect -> not_person: No warm component matches the requested bearing and depth.; The asked spot is in full view and holds nothing i
+  AGENT-REFUSED robot_A@120.100 turn_to_face: a thermal-only warm patch on a long wall: over 15 runs 1 in 151 of these was a person. Search the offered fron
+  agent robot_A@120.100 rounds 6 orders ['reject_candidate', 'explore_frontier'] :: I rejected the empty full-view warm return and redirected to proven-indoor frontier 2 because the nearer route is fire-b
+  agent robot_B@121.667 rounds 3 orders ['explore_frontier'] :: I will search frontier 0 next because it is the nearest proven-indoor unsearched floor and the current scan shows neithe
+  agent robot_A@124.100 inspect -> not_person: Metric dimensions fall outside the body-size bounds.
+  agent robot_A@124.100 rounds 4 orders ['reject_candidate', 'explore_frontier'] :: I rejected the oversized non-person thermal return and redirected to proven-indoor frontier 2, the nearest substantially
+  agent robot_A@128.100 inspect -> not_person: Metric dimensions fall outside the body-size bounds.
+  agent robot_A@128.100 rounds 5 orders ['reject_candidate', 'go_to', 'send_team_message'] :: I rejected the oversized non-person thermal return, reported that finding, and turned toward the highest-ranked unsearch
+  agent robot_A@132.100 inspect -> uncertain: No warm component matches the requested bearing and depth.
+  agent robot_A@132.100 inspect -> uncertain: No warm component matches the requested bearing and depth.
+  agent robot_A@132.100 rounds 6 orders ['explore_frontier'] :: I inspected the new wall thermal patch without substantiation and sent the robot to the highest-ranked verified-indoor f
+  agent robot_A@136.100 inspect -> not_person: Metric dimensions fall outside the body-size bounds.
+  agent robot_A@136.100 rounds 3 orders ['reject_candidate'] :: I rejected the newly observed warm wall-region as not a person because inspection found its measured body dimensions imp
+  agent robot_A@140.100 inspect -> uncertain: No warm component matches the requested bearing and depth.
+  agent robot_A@140.100 inspect -> uncertain: No warm component matches the requested bearing and depth.
+  agent robot_A@140.100 inspect -> not_person: No warm component matches the requested bearing and depth.; The asked spot is in full view and holds nothing i
+  agent robot_A@140.100 rounds 6 orders ['reject_candidate'] :: I rejected the new thermal-only wall patch because the target was fully visible with no warm body or colour-detected per
+  agent robot_B@141.683 rounds 3 orders ['explore_frontier'] :: I will search frontier 0 next because it is the nearest proven-indoor unsearched floor and the current scan shows neithe
+  agent robot_A@144.817 inspect -> not_person: Metric dimensions fall outside the body-size bounds.
+  agent robot_A@144.817 rounds 3 orders ['reject_candidate'] :: I rejected the newly detected thermal region as non-person because its measured dimensions are implausible, and will let
+  agent robot_B@149.483 inspect -> not_person: Metric dimensions fall outside the body-size bounds.
+  agent robot_B@149.483 rounds 3 orders ['reject_candidate'] :: I rejected the nearby wall-associated warm blob as not a person on inspection, so the ongoing search of nearest frontier
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 1.2
+==== 20:27:49 sim 150.0 s complete False
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:28:09 sim 150.0 s complete False
+  agent robot_B@153.483 inspect -> uncertain: No warm component matches the requested bearing and depth.; The colour detector sees a whole person elsewhere 
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:28:29 sim 150.0 s complete False
+  robot_B 153.5 survivor_confirmed: Agent confirmed a person with OpenCV evidence e37e89c10b6e2792.
+  agent robot_B@153.483 inspect -> person: No warm component matches the requested bearing and depth.; OpenCV dnn person detector (YOLO11m) confidence 0.
+  agent robot_B@153.483 rounds 4 orders ['confirm_survivor', 'send_team_message'] :: I confirmed and reported a newly detected survivor at (7.34, 5.74); the nearby wall thermal blob was not corroborated, s
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:28:49 sim 150.0 s complete False
+  MISTAKE robot_B 155.5 goal_blacklisted: Air here is rising fast: search elsewhere for a while.
+  agent robot_A@155.217 inspect -> not_person: Metric dimensions fall outside the body-size bounds.
+  agent robot_A@155.217 rounds 3 orders ['reject_candidate'] :: I rejected the repeated wall-associated warm region as non-person based on its implausible measured dimensions, and will
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:29:09 sim 150.0 s complete False
+  agent robot_B@157.483 inspect -> person: No warm component matches the requested bearing and depth.; OpenCV dnn person detector (YOLO11m) confidence 0.
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:29:29 sim 150.0 s complete False
+  MISTAKE robot_A 158.5 goal_blacklisted: The fire margin cut the path to this frontier; leave it until the retry time.
+  robot_B 157.5 agent_order: avoid_area refused: the robot is inside or at the edge of it; it backs off on heat by itself.
+  AGENT-REFUSED robot_B@157.483 avoid_area: the cited scan found no hotspot
+  agent robot_B@157.483 rounds 6 orders ['confirm_survivor', 'send_team_message', 'avoid_area'] :: (no summary: the step ended before finish) confirm_survivor; send_team_message; avoid_area; refused avoid_area
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:29:49 sim 150.0 s complete False
+  robot_A 159.2 agent_order: go_to: closer look at an uncertain warm region (1.51, 10.64)
+  agent robot_A@159.217 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.; It is 1.9 m away and
+  agent robot_A@159.217 rounds 4 orders ['go_to'] :: I stepped back to obtain an unclipped inspection of the newly reappearing wall-side warm candidate, because the current 
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:30:09 sim 150.0 s complete False
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:30:29 sim 150.0 s complete False
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:30:49 sim 150.0 s complete False
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:31:09 sim 150.0 s complete False
+  agent robot_A@167.950 inspect -> not_person: Metric dimensions fall outside the body-size bounds.
+  agent robot_A@167.950 rounds 4 orders ['reject_candidate'] :: I rejected the current warm region as not a person because inspection found body dimensions outside plausible bounds.
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:31:29 sim 150.0 s complete False
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:31:49 sim 150.0 s complete False
+  agent robot_A@172.083 inspect -> not_person: No warm component matches the requested bearing and depth.; The asked spot is in full view and holds nothing i
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:32:09 sim 150.0 s complete False
+  robot_A 172.1 agent_order: go_to: Face the highest-ranked frontier so I can establish whether its unmapped opening is indoors before sear
+  agent robot_A@172.083 rounds 5 orders ['reject_candidate', 'go_to'] :: I rejected the empty warm region and turned toward the highest-ranked unproven frontier to verify it is indoors before s
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:32:29 sim 150.0 s complete False
+  robot_A 173.8 agent_order: go_to: explore: Frontier 0 cannot be searched because its opening is still not established as indoors; frontie
+  MISTAKE robot_A 174.3 goal_blacklisted: The fire margin cut the path to this frontier; leave it until the retry time.
+  agent robot_A@173.800 rounds 3 orders ['explore_frontier'] :: I found no credible person or nearby fire in the current view; because the top unproven opening remains indeterminate, I
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:32:49 sim 150.0 s complete False
+  MISTAKE robot_A 175.3 goal_blacklisted: The fire margin cut the path to this frontier; leave it until the retry time.
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:33:27 sim 180.0 s complete False
+  robot_A 0.0 agent_order: go_to: closer look to confirm the person seen at (-0.23, 7.5)
+  robot_A 4.0 agent_order: go_to: closer look to confirm the person seen at (-0.51, 7.31)
+  MISTAKE robot_A 8.0 goal_blacklisted: Air here is rising fast: search elsewhere for a while.
+  robot_A 10.8 entrance_locked: Inside and clear of the way in: floor near the way in is now locked; this robot never goes back to it.
+  robot_A 14.8 agent_order: go_to: explore: Nearest ranked indoor frontier remains the appropriate next search after the candidate was rul
+  robot_A 18.8 survivor_confirmed: Agent confirmed a person with OpenCV evidence 6276d4521504445b.
+  robot_A 26.8 agent_order: go_to: explore: Continue the highest-ranked reachable indoor unsearched floor while the wall-associated therma
+  robot_A 78.0 agent_order: go_to: explore: This is an indoor, unentered room with the largest mapped unsearched area (20.7 m²), substanti
+  robot_A 82.0 agent_order: go_to: explore: Top-ranked frontier 0 cannot be verified indoors from the current view, and the prior goal has
+  robot_A 95.9 agent_order: go_to: explore: Continue ranked reachable proven-indoor search; the newly inspected clipped warm surface is un
+  robot_A 99.9 agent_order: go_to: closer look at an uncertain warm region (-1.68, 9.85)
+  robot_A 109.3 agent_order: go_to: Back away to obtain an unclipped, floor-visible thermal view of the strong warm person-sized candidate 
+  MISTAKE robot_A 119.1 goal_blacklisted: The fire margin cut the path to this frontier; leave it until the retry time.
+  MISTAKE robot_A 119.3 goal_blacklisted: The fire margin cut the path to this frontier; leave it until the retry time.
+  robot_A 120.1 agent_order: go_to: explore: Frontier 0 cannot be established as indoors and frontier 1's route was just fire-blacklisted; 
+  MISTAKE robot_A 122.0 goal_blacklisted: The fire margin cut the path to this frontier; leave it until the retry time.
+  robot_A 124.1 agent_order: go_to: explore: Redirect to the nearest materially unsearched proven-indoor room after the prior route was fir
+  MISTAKE robot_A 125.0 goal_blacklisted: The fire margin cut the path to this frontier; leave it until the retry time.
+  robot_A 128.1 agent_order: go_to: Frontier 0 is the highest-ranked reachable unsearched area, but its indoor status must be verified befo
+  robot_A 132.1 agent_order: explore_frontier on floor not yet proven indoors, citing OpenCV evidence 352cd5180db0c2cb: Frontier 0 is the c
+  MISTAKE robot_A 133.8 goal_blacklisted: The fire margin cut the path to this frontier; leave it until the retry time.
+  MISTAKE robot_A 158.5 goal_blacklisted: The fire margin cut the path to this frontier; leave it until the retry time.
+  robot_A 159.2 agent_order: go_to: closer look at an uncertain warm region (1.51, 10.64)
+  robot_A 172.1 agent_order: go_to: Face the highest-ranked frontier so I can establish whether its unmapped opening is indoors before sear
+  robot_A 173.8 agent_order: go_to: explore: Frontier 0 cannot be searched because its opening is still not established as indoors; frontie
+  MISTAKE robot_A 174.3 goal_blacklisted: The fire margin cut the path to this frontier; leave it until the retry time.
+  MISTAKE robot_A 175.3 goal_blacklisted: The fire margin cut the path to this frontier; leave it until the retry time.
+  MISTAKE robot_A 177.1 goal_blacklisted: The fire margin cut the path to this frontier; leave it until the retry time.
+  robot_A 177.8 agent_order: go_to: closer look at an uncertain warm region (1.38, 10.69)
+  robot_B 0.0 agent_order: go_to: Face the highest-ranked nearby frontier so its indoor status can be verified before entry.
+  robot_B 4.0 agent_order: go_to: explore: Continue the ranked indoor search: both nearby thermal-only edge-clipped wall candidates were 
+  MISTAKE robot_B 9.1 goal_blacklisted: Air here is rising fast: search elsewhere for a while.
+  MISTAKE robot_B 10.5 goal_blacklisted: The fire margin cut the path to this frontier; leave it until the retry time.
+  robot_B 12.0 agent_order: go_to: explore: Continue the highest-ranked reachable proven-indoor frontier; the current clipped thermal cand
+  robot_B 16.0 agent_order: go_to: explore: Continue the highest-ranked reachable proven-indoor frontier after the visible warm region was
+  robot_B 20.1 survivor_from_peer: Confirmation received from robot_A, originally confirmed by robot_A.
+  MISTAKE robot_B 21.6 body_swing_blocked: Turning here would swing the body into a mapped wall; back off first.
+  robot_B 23.9 entrance_locked: Inside and clear of the way in: floor near the way in is now locked; this robot never goes back to it.
+  robot_B 34.0 agent_order: go_to: explore: Continue the controller-ranked nearby proven-indoor frontier to complete the partially searche
+  robot_B 38.0 agent_order: go_to: explore: The warm patch is wall-associated and remains uncertain without colour/body evidence; complete
+  robot_B 42.5 agent_order: go_to: explore: Continue the highest-ranked proven-indoor frontier search; the newly rescanned wall-associated
+  robot_B 50.5 agent_order: go_to: closer look at an uncertain warm region (7.49, 9.72)
+  robot_B 68.7 agent_order: go_to: closer look at an uncertain warm region (9.69, 4.58)
+  robot_B 81.7 agent_order: go_to: explore: The close unresolved candidate is now fully viewed and rejected; continue searching the neares
+  robot_B 101.7 agent_order: go_to: explore: Continue the ranked search at the nearest proven-indoor unsearched floor; current thermal/RGB 
+  robot_B 121.7 agent_order: go_to: explore: Continue the ranked search at the nearest proven-indoor unsearched floor; current thermal/RGB 
+  robot_B 141.7 agent_order: go_to: explore: Nearest proven-indoor frontier with the highest immediate unsearched area; current thermal/RGB
+  robot_B 153.5 survivor_confirmed: Agent confirmed a person with OpenCV evidence e37e89c10b6e2792.
+  MISTAKE robot_B 155.5 goal_blacklisted: Air here is rising fast: search elsewhere for a while.
+  robot_B 157.5 agent_order: avoid_area refused: the robot is inside or at the edge of it; it backs off on heat by itself.
+  robot_B 177.5 agent_order: go_to: explore: Highest-ranked reachable indoor frontier, serving a nearly unsearched room (room 328, 1.4 m² a
+  agent robot_B@0.017 rounds 2 orders ['go_to'] :: I will face the nearest highest-ranked frontier to verify it is indoors before exploring, since it is not yet proven ind
+  agent robot_A@0.017 inspect -> person: Too little registered depth to judge shape.; OpenCV dnn person detector (YOLO11m) confidence 0.63 at bearing -
+  agent robot_A@0.017 rounds 4 orders ['go_to'] :: I am approaching the colour-detected person candidate near (-0.23, 7.5) for a confirmable inspection, since the nearest 
+  agent robot_A@4.017 inspect -> person: Too little registered depth to judge shape.; OpenCV dnn person detector (YOLO11m) confidence 0.59 at bearing 0
+  agent robot_B@4.017 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.; It is 1.6 m away and
+  agent robot_A@4.017 rounds 4 orders ['go_to', 'send_team_message'] :: I am approaching the detected person-sized candidate at (-0.51, 7.31) for a close confirmable inspection and have alerte
+  agent robot_B@4.017 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.; It is 1.6 m away and
+  agent robot_B@4.017 rounds 5 orders ['explore_frontier'] :: I inspected the two nearby warm edge-clipped wall-like regions, found neither confirmable nor colour-supported as a pers
+  agent robot_A@8.017 inspect -> not_person: Warm region is at least 0.8 m behind its surrounding depth, consistent with an opening.; Metric dimensions fal
+  AGENT-REFUSED robot_A@8.017 avoid_area: the cited scan found no hotspot
+  agent robot_B@8.017 inspect -> uncertain: Too little registered depth to judge shape.
+  agent robot_B@8.017 rounds 3 orders [] :: I found the new wall-associated thermal candidate too depth-poor to verify and will let the ongoing ranked proven-indoor
+  agent robot_A@8.017 rounds 4 orders ['reject_candidate'] :: I rejected the apparent warm region as a non-person opening and, with no detected fire hotspot to localize, am allowing 
+  agent robot_B@12.017 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.
+  agent robot_B@12.017 rounds 3 orders ['explore_frontier'] :: I will search the highest-ranked reachable proven-indoor frontier because the only current warm candidate is clipped and
+  agent robot_A@14.817 inspect -> not_person: Metric dimensions fall outside the body-size bounds.
+  agent robot_A@14.817 rounds 3 orders ['reject_candidate', 'explore_frontier'] :: I rejected the oversized warm blob as a non-person and will search the nearest proven indoor frontier because no fire is
+  agent robot_B@16.033 inspect -> not_person: Metric dimensions fall outside the body-size bounds.
+  agent robot_B@16.033 rounds 4 orders ['reject_candidate', 'explore_frontier'] :: I rejected the oversized, unstructured warm patch as not a person and continued to the highest-ranked reachable proven-i
+  agent robot_A@18.817 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.; It is 1.7 m away and
+  agent robot_A@18.817 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.; It is 1.7 m away and
+  agent robot_A@18.817 inspect -> person: Body-sized warm component has temperature structure and nonplanar depth without a background recess.
+  agent robot_A@18.817 inspect -> person: Body-sized warm component has temperature structure and nonplanar depth without a background recess.
+  AGENT-REFUSED robot_A@18.817 approach_candidate: this person is already confirmed and reported, and this robot has no rescue arm: walking to them adds nothing;
+  agent robot_A@18.817 rounds 4 orders ['confirm_survivor', 'send_team_message'] :: I confirmed and reported a survivor at (-0.46, 12.18) from a 4.8 m thermal/depth person verdict; with no fire and no nee
+  agent robot_A@22.817 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.; It is 1.5 m away and
+  AGENT-REFUSED robot_A@22.817 approach_candidate: the cited inspection measured this warm region as a flat surface (enough registered depth, no protrusion from 
+  AGENT-REFUSED robot_A@22.817 reject_candidate: the cited inspection is not a not_person verdict at that position, nor an uncertain one at a shape looked at c
+  agent robot_A@22.817 inspect -> not_person: Metric dimensions fall outside the body-size bounds.
+  agent robot_A@22.817 rounds 6 orders ['reject_candidate'] :: (no summary: the step ended before finish) reject_candidate; refused approach_candidate; refused reject_candidate
+  agent robot_B@24.033 inspect -> uncertain: No warm component matches the requested bearing and depth.
+  agent robot_B@24.033 inspect -> not_person: No warm component matches the requested bearing and depth.; The asked spot is in full view and holds nothing i
+  agent robot_B@24.033 rounds 5 orders ['reject_candidate'] :: I rejected the new distant warm candidate at (8.53, 9.52) because the current full-view thermal/RGB inspection found no 
+  agent robot_A@26.817 inspect -> uncertain: No warm component matches the requested bearing and depth.
+  agent robot_A@26.817 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.
+  agent robot_A@26.817 rounds 4 orders ['explore_frontier'] :: I inspected the reappearing wall patch and a newly visible plausible warm form, but both were inconclusive, so I continu
+  agent commander@30.000 rounds None orders ['broadcast'] :: One survivor is confirmed and reported to outside crews; continue searching unsearched floor.
+  agent robot_B@34.017 rounds 3 orders ['explore_frontier'] :: I found no warm or colour-person targets or fire and am continuing to the nearest ranked proven-indoor frontier to finis
+  agent robot_B@38.017 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.; It is 2.0 m away and
+  AGENT-REFUSED robot_B@38.017 approach_candidate: a thermal-only warm patch on a long wall: over 15 runs 1 in 151 of these was a person. Search the offered fron
+  agent robot_B@38.017 rounds 5 orders ['explore_frontier'] :: I inspected the new wall-associated warm patch but it was too close and remained uncertain; because it has no colour/bod
+  agent robot_B@42.550 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.; It is 2.4 m away and
+  agent robot_B@42.550 rounds 3 orders ['explore_frontier'] :: I resumed the top-ranked proven-indoor frontier because the nearby wall-associated thermal patch remains an uncertain cl
+  agent robot_A@46.817 inspect -> uncertain: Too little registered depth to judge shape.
+  AGENT-REFUSED robot_A@46.817 explore_frontier: your explore_frontier to (-2.25, 8.35) is still being driven (last_orders_outcome: under way); it is replaced 
+  agent robot_A@46.817 rounds 4 orders [] :: I found no fire and an additional warm shape could not be resolved from this view, so I will let the already-under-way h
+  agent robot_B@50.550 inspect -> not_person: No warm component matches the requested bearing and depth.; The asked spot is in full view and holds nothing i
+  agent robot_B@50.550 inspect -> uncertain: Too little registered depth to judge shape.
+  agent robot_B@50.550 rounds 4 orders ['go_to'] :: I started toward the newly detected plausible warm body at (7.48, 9.71) for a resolving close inspection, because the im
+  agent robot_B@50.867 inspect -> uncertain: Too little registered depth to judge shape.
+  AGENT-REFUSED robot_B@50.867 explore_frontier: you are walking to look closer at an unresolved warm candidate 3.3 m away at bearing 10 deg; finish that first
+  agent robot_B@50.867 rounds 4 orders [] :: I inspected the newly seen warm region but depth was insufficient to classify it, so I will continue the already active 
+  agent robot_B@54.867 inspect -> uncertain: No warm component matches the requested bearing and depth.
+  agent robot_B@54.867 inspect -> uncertain: No warm component matches the requested bearing and depth.
+  AGENT-REFUSED robot_B@54.867 explore_frontier: you are walking to look closer at an unresolved warm candidate 3.3 m away at bearing -87 deg; finish that firs
+  agent robot_B@54.867 rounds 4 orders ['send_team_message'] :: I will continue the active close approach to the unresolved warm candidate because the current inspection could not see 
+  agent commander@60.000 rounds None orders [] :: Robot B found no confirmed person; no new route, hazard, or completed-area information requires a broadcast.
+  agent robot_A@66.833 inspect -> uncertain: Too little registered depth to judge shape.
+  agent robot_A@66.833 rounds 3 orders [] :: I inspected the newly seen warm region immediately; it remains unresolved from insufficient depth, so I will keep the cu
+  agent robot_B@68.683 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.; It is 2.0 m away and
+  agent robot_B@68.683 rounds 4 orders ['go_to'] :: I will step back to the prescribed viewing distance and re-inspect the unresolved warm human-sized candidate at (9.69, 4
+  agent robot_B@72.683 inspect -> uncertain: No warm component matches the requested bearing and depth.
+  AGENT-REFUSED robot_B@72.683 explore_frontier: you are walking to look closer at an unresolved warm candidate 1.8 m away at bearing 152 deg; finish that firs
+  agent robot_B@72.683 rounds 4 orders [] :: I will continue to the planned safer viewing position and re-inspect the unresolved nearby wall-associated candidate, be
+  agent robot_A@78.017 inspect -> not_person: Warm region is at least 0.8 m behind its surrounding depth, consistent with an opening.
+  agent robot_A@78.017 rounds 5 orders ['reject_candidate', 'explore_frontier'] :: I rejected the opening-like false warm region and redirected to the unentered indoor frontier with 20.7 m² of mapped uns
+  agent robot_B@81.667 inspect -> not_person: No warm component matches the requested bearing and depth.; The asked spot is in full view and holds nothing i
+  agent robot_B@81.667 rounds 4 orders ['reject_candidate', 'explore_frontier'] :: I rejected the fully visible empty warm-candidate location and will search frontier 3, the nearest proven-indoor unsearc
+  agent robot_A@82.017 inspect -> uncertain: Too little registered depth to judge shape.
+  agent robot_A@82.017 rounds 5 orders ['explore_frontier'] :: I inspected the current weak thermal return but it remains unresolved, then redirected to proven-indoor frontier 1 becau
+  agent robot_A@95.900 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.; It is 2.0 m away and
+  AGENT-REFUSED robot_A@95.900 approach_candidate: the cited inspection measured this warm region as a flat surface (enough registered depth, no protrusion from 
+  AGENT-REFUSED robot_A@95.900 reject_candidate: the cited inspection is not a not_person verdict at that position, nor an uncertain one at a shape looked at c
+  agent robot_A@95.900 rounds 5 orders ['explore_frontier'] :: I will continue to proven-indoor frontier 0 because the new warm return is not a verified person and reachable unsearche
+  agent robot_A@99.900 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.; It is 1.7 m away and
+  AGENT-REFUSED robot_A@99.900 approach_candidate: the cited inspection measured this warm region as a flat surface (enough registered depth, no protrusion from 
+  AGENT-REFUSED robot_A@99.900 reject_candidate: the cited inspection is not a not_person verdict at that position, nor an uncertain one at a shape looked at c
+  agent robot_A@99.900 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.; It is 2.3 m away and
+  agent robot_A@99.900 rounds 6 orders ['go_to'] :: (no summary: the step ended before finish) go_to; refused approach_candidate; refused reject_candidate
+  agent robot_B@101.667 rounds 3 orders ['explore_frontier'] :: I will search frontier 0 next because it is the nearest proven-indoor unsearched floor and the current scan shows neithe
+  agent robot_A@109.350 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.; It is 1.8 m away and
+  agent robot_A@109.350 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.; It is 2.4 m away and
+  AGENT-REFUSED robot_A@109.350 approach_candidate: the cited inspection measured this warm region as a flat surface (enough registered depth, no protrusion from 
+  AGENT-REFUSED robot_A@109.350 reject_candidate: the cited inspection is not a not_person verdict at that position, nor an uncertain one at a shape looked at c
+  agent robot_A@109.350 rounds 6 orders ['go_to'] :: I am backing to a clearer viewpoint to resolve the strongest nearby person-sized warm candidate, because both current th
+  agent robot_A@113.350 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.; It is 2.1 m away and
+  AGENT-REFUSED robot_A@113.350 approach_candidate: a thermal-only warm patch on a long wall: over 15 runs 1 in 151 of these was a person. Search the offered fron
+  agent robot_A@113.350 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.; It is 1.9 m away and
+  AGENT-REFUSED robot_A@113.350 explore_frontier: you are walking to look closer at an unresolved warm candidate 3.6 m away at bearing -136 deg; finish that fir
+  agent robot_A@113.350 rounds 6 orders [] :: (no summary: the step ended before finish) refused approach_candidate; refused explore_frontier
+  agent robot_A@116.100 inspect -> not_person: Metric dimensions fall outside the body-size bounds.
+  AGENT-REFUSED robot_A@116.100 explore_frontier: you are walking to look closer at an unresolved warm candidate 4.0 m away at bearing -140 deg; finish that fir
+  agent robot_A@116.100 rounds 4 orders ['reject_candidate'] :: I rejected the full-view oversized non-person warm region and will continue the already pending close look at the unreso
+  agent robot_A@120.100 inspect -> not_person: No warm component matches the requested bearing and depth.; The asked spot is in full view and holds nothing i
+  AGENT-REFUSED robot_A@120.100 turn_to_face: a thermal-only warm patch on a long wall: over 15 runs 1 in 151 of these was a person. Search the offered fron
+  agent robot_A@120.100 rounds 6 orders ['reject_candidate', 'explore_frontier'] :: I rejected the empty full-view warm return and redirected to proven-indoor frontier 2 because the nearer route is fire-b
+  agent robot_B@121.667 rounds 3 orders ['explore_frontier'] :: I will search frontier 0 next because it is the nearest proven-indoor unsearched floor and the current scan shows neithe
+  agent robot_A@124.100 inspect -> not_person: Metric dimensions fall outside the body-size bounds.
+  agent robot_A@124.100 rounds 4 orders ['reject_candidate', 'explore_frontier'] :: I rejected the oversized non-person thermal return and redirected to proven-indoor frontier 2, the nearest substantially
+  agent robot_A@128.100 inspect -> not_person: Metric dimensions fall outside the body-size bounds.
+  agent robot_A@128.100 rounds 5 orders ['reject_candidate', 'go_to', 'send_team_message'] :: I rejected the oversized non-person thermal return, reported that finding, and turned toward the highest-ranked unsearch
+  agent robot_A@132.100 inspect -> uncertain: No warm component matches the requested bearing and depth.
+  agent robot_A@132.100 inspect -> uncertain: No warm component matches the requested bearing and depth.
+  agent robot_A@132.100 rounds 6 orders ['explore_frontier'] :: I inspected the new wall thermal patch without substantiation and sent the robot to the highest-ranked verified-indoor f
+  agent robot_A@136.100 inspect -> not_person: Metric dimensions fall outside the body-size bounds.
+  agent robot_A@136.100 rounds 3 orders ['reject_candidate'] :: I rejected the newly observed warm wall-region as not a person because inspection found its measured body dimensions imp
+  agent robot_A@140.100 inspect -> uncertain: No warm component matches the requested bearing and depth.
+  agent robot_A@140.100 inspect -> uncertain: No warm component matches the requested bearing and depth.
+  agent robot_A@140.100 inspect -> not_person: No warm component matches the requested bearing and depth.; The asked spot is in full view and holds nothing i
+  agent robot_A@140.100 rounds 6 orders ['reject_candidate'] :: I rejected the new thermal-only wall patch because the target was fully visible with no warm body or colour-detected per
+  agent robot_B@141.683 rounds 3 orders ['explore_frontier'] :: I will search frontier 0 next because it is the nearest proven-indoor unsearched floor and the current scan shows neithe
+  agent robot_A@144.817 inspect -> not_person: Metric dimensions fall outside the body-size bounds.
+  agent robot_A@144.817 rounds 3 orders ['reject_candidate'] :: I rejected the newly detected thermal region as non-person because its measured dimensions are implausible, and will let
+  agent robot_B@149.483 inspect -> not_person: Metric dimensions fall outside the body-size bounds.
+  agent robot_B@149.483 rounds 3 orders ['reject_candidate'] :: I rejected the nearby wall-associated warm blob as not a person on inspection, so the ongoing search of nearest frontier
+  agent robot_B@153.483 inspect -> uncertain: No warm component matches the requested bearing and depth.; The colour detector sees a whole person elsewhere 
+  agent robot_B@153.483 inspect -> person: No warm component matches the requested bearing and depth.; OpenCV dnn person detector (YOLO11m) confidence 0.
+  agent robot_B@153.483 rounds 4 orders ['confirm_survivor', 'send_team_message'] :: I confirmed and reported a newly detected survivor at (7.34, 5.74); the nearby wall thermal blob was not corroborated, s
+  agent robot_A@155.217 inspect -> not_person: Metric dimensions fall outside the body-size bounds.
+  agent robot_A@155.217 rounds 3 orders ['reject_candidate'] :: I rejected the repeated wall-associated warm region as non-person based on its implausible measured dimensions, and will
+  agent robot_B@157.483 inspect -> person: No warm component matches the requested bearing and depth.; OpenCV dnn person detector (YOLO11m) confidence 0.
+  AGENT-REFUSED robot_B@157.483 avoid_area: the cited scan found no hotspot
+  agent robot_B@157.483 rounds 6 orders ['confirm_survivor', 'send_team_message', 'avoid_area'] :: (no summary: the step ended before finish) confirm_survivor; send_team_message; avoid_area; refused avoid_area
+  agent robot_A@159.217 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.; It is 1.9 m away and
+  agent robot_A@159.217 rounds 4 orders ['go_to'] :: I stepped back to obtain an unclipped inspection of the newly reappearing wall-side warm candidate, because the current 
+  agent robot_A@167.950 inspect -> not_person: Metric dimensions fall outside the body-size bounds.
+  agent robot_A@167.950 rounds 4 orders ['reject_candidate'] :: I rejected the current warm region as not a person because inspection found body dimensions outside plausible bounds.
+  agent robot_A@172.083 inspect -> not_person: No warm component matches the requested bearing and depth.; The asked spot is in full view and holds nothing i
+  agent robot_A@172.083 rounds 5 orders ['reject_candidate', 'go_to'] :: I rejected the empty warm region and turned toward the highest-ranked unproven frontier to verify it is indoors before s
+  agent robot_A@173.800 rounds 3 orders ['explore_frontier'] :: I found no credible person or nearby fire in the current view; because the top unproven opening remains indeterminate, I
+  agent robot_B@177.483 rounds 3 orders ['explore_frontier'] :: I found no person or local fire in the current thermal/RGB view and directed the robot to the highest-ranked nearby indo
+  agent robot_A@177.800 inspect -> uncertain: Warm component touches the image edge, so its size is clipped and cannot confirm a body.; It is 1.7 m away and
+  agent robot_A@177.800 rounds 4 orders ['go_to'] :: I am repositioning for a complete view of the new nearby warm, body-shaped candidate, because the first inspection was c
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:33:47 sim 180.0 s complete False
+  agent commander@180.000 rounds None orders [] :: Robot B confirmed a survivor, and the location has already been provided to outside crews; both robots should prioritize
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:34:07 sim 180.0 s complete False
+  agent robot_A@181.800 inspect -> not_person: Metric dimensions fall outside the body-size bounds.
+  AGENT-REFUSED robot_A@181.800 explore_frontier: your go_to to (0.41, 13.84) is still being driven (last_orders_outcome: under way); it is replaced only on arr
+  agent robot_A@181.800 rounds 4 orders ['reject_candidate'] :: I rejected the newly viewed oversized warm region as not a person; the existing repositioning drive remains under way, s
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:34:27 sim 180.0 s complete False
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:34:47 sim 180.0 s complete False
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:35:07 sim 180.0 s complete False
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:35:27 sim 180.0 s complete False
+  robot_A 189.8 agent_order: go_to: Frontier 0 is the ranked largest reachable unsearched area, but its indoor status must be verified befo
+  agent robot_A@189.800 inspect -> uncertain: No warm component matches the requested bearing and depth.
+  agent robot_A@189.800 rounds 5 orders ['go_to'] :: I found no current warm body at the reappearing wall patch and am turning toward the top-ranked unverified frontier to e
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:35:47 sim 180.0 s complete False
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:36:07 sim 180.0 s complete False
+  agent robot_A@193.583 inspect -> person: No warm component matches the requested bearing and depth.; OpenCV dnn person detector (YOLO11m) confidence 0.
+  AGENT-REFUSED robot_A@193.583 explore_frontier: you are walking to look closer at an unresolved warm candidate 3.1 m away at bearing -57 deg; finish that firs
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:36:27 sim 180.0 s complete False
+  MISTAKE robot_A 195.2 goal_blacklisted: The fire margin cut the path to this frontier; leave it until the retry time.
+  agent robot_A@193.583 rounds 6 orders ['confirm_survivor', 'send_team_message'] :: I confirmed and reported a new survivor at (-0.41, 12.64); the unverified top frontier is not established indoors, and I
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:36:47 sim 180.0 s complete False
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:37:07 sim 180.0 s complete False
+  MISTAKE robot_A 197.5 goal_blacklisted: The fire margin cut the path to this frontier; leave it until the retry time.
+  robot_A 197.6 agent_order: go_to: explore: Frontier 1's route is temporarily blacklisted by the fire margin, while frontier 0 is not yet 
+  MISTAKE robot_A 197.9 goal_blacklisted: The fire margin cut the path to this frontier; leave it until the retry time.
+  agent robot_B@197.483 rounds 3 orders ['go_to'] :: I scanned the current view (no plausible person) and turned toward the highest-ranked nearby frontier to establish that 
+  agent robot_A@197.583 inspect -> not_person: No warm component matches the requested bearing and depth.; The asked spot is in full view and holds nothing i
+  agent robot_A@197.583 rounds 3 orders ['reject_candidate', 'explore_frontier'] :: I rejected the cleared nearby warm candidate and redirected to reachable proven-indoor frontier 4 because the prior rout
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:37:27 sim 180.0 s complete False
+  MISTAKE robot_A 198.4 goal_blacklisted: The fire margin cut the path to this frontier; leave it until the retry time.
+  MISTAKE robot_A 198.5 goal_blacklisted: The fire margin cut the path to this frontier; leave it until the retry time.
+  robot_B 197.5 agent_order: go_to: Frontier 0 is the highest-ranked nearby unsearched area, but it lacks indoor proof; face it to verify b
+  AGENT-REFUSED robot_B@198.533 explore_frontier: the cited indoor check must say indoors within its bearing tolerance of this frontier
+  agent robot_B@198.533 rounds 3 orders [] :: I verified the forward view is indoors but did not enter Frontier 0 because that check was not aligned tightly enough to
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:37:47 sim 180.0 s complete False
+  MISTAKE robot_A 199.1 goal_blacklisted: The fire margin cut the path to this frontier; leave it until the retry time.
+  MISTAKE robot_A 199.4 goal_blacklisted: The fire margin cut the path to this frontier; leave it until the retry time.
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:38:07 sim 180.0 s complete False
+  agent robot_A@201.583 rounds 4 orders ['explore_frontier'] :: I redirected to reachable proven-indoor frontier 2 because the prior route was blocked and the larger remaining options 
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:38:27 sim 180.0 s complete False
+  robot_A 201.6 agent_order: go_to: explore: The previously selected route has no known free path/fire blacklist, and this is the next rank
+  agent robot_B@202.533 inspect -> not_person: No warm component matches the requested bearing and depth.; The asked spot is in full view and holds nothing i
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:38:47 sim 180.0 s complete False
+  robot_B 202.5 agent_order: go_to: Align the camera with Frontier 0 so I can verify this unproven opening is indoors before exploring it.
+  agent robot_B@202.533 rounds 4 orders ['go_to'] :: I am turning to Frontier 0 to verify it is indoors before entering; the attempted forward inspection did not target the 
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:39:07 sim 180.0 s complete False
+  MISTAKE robot_A 203.5 no_progress: Map grew by only 39 cells in 15 s; leave this spot for the next unexplored area.
+  MISTAKE robot_A 204.6 goal_blacklisted: Air here is rising fast: search elsewhere for a while.
+  robot_B 203.9 agent_order: go_to: explore: Frontier 0 remains unproven indoors after the directed enclosure check, so I will search the n
+  agent robot_B@203.933 rounds 3 orders ['explore_frontier'] :: Frontier 0 could not be verified indoors, so I am searching the next ranked proven-indoor frontier instead.
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:39:27 sim 180.0 s complete False
+  robot_A 205.6 agent_order: avoid_area around spreading fire, OpenCV evidence e3c82baa4f41c29d.
+  MISTAKE robot_A 205.6 goal_blacklisted: The fire margin cut the path to this frontier beyond the partner's floor; leave it until the retry time.
+  agent robot_A@205.583 rounds 3 orders ['avoid_area', 'send_team_message'] :: I ordered avoidance of the newly measured fire hotspot because the air is rising rapidly, while reporting the fire and t
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:39:47 sim 180.0 s complete False
+  MISTAKE robot_A 206.4 goal_blacklisted: The fire margin cut the path to this frontier beyond the partner's floor; leave it until the retry time.
+  closest approach (m): s1 laundry 6.4, s2 bedroom_1 3.3, s3 bedroom_2 3.7, s4 kitchen 1.0, s6 study 0.9
+==== 20:40:07 sim 210.0 s complete False
+  MISTAKE robot_A 209.1 no_frontier: No reachable unsearched floor in this robot's map; returning after the scan unless ordered on.
+  robot_A 209.6 agent_order: avoid_area around spreading fire, OpenCV evidence e1320cd8529af42a.
+  agent robot_A@209.583 rounds 4 orders ['avoid_area', 'send_team_message'] :: I confirmed no visible person and avoided the growing nearby fire, reporting it because a single water stream cannot kno
+  closest approach (m): s1 laundry 6.2, s2 bedroom_1 3.3, s3 bedroom_2 3.5, s4 kitchen 1.0, s6 study 0.9
+==== 20:40:27 sim 210.0 s complete False
+  agent commander@210.000 rounds None orders ['broadcast'] :: Priority is unexplored floor away from Robot A’s reported heat hazard.
+  closest approach (m): s1 laundry 6.2, s2 bedroom_1 3.3, s3 bedroom_2 3.5, s4 kitchen 1.0, s6 study 0.9
+==== 20:40:47 sim 210.0 s complete False
+  closest approach (m): s1 laundry 6.2, s2 bedroom_1 3.3, s3 bedroom_2 3.5, s4 kitchen 1.0, s6 study 0.9
+==== 20:41:07 sim 210.0 s complete False
+  closest approach (m): s1 laundry 6.2, s2 bedroom_1 3.3, s3 bedroom_2 3.5, s4 kitchen 1.0, s6 study 0.9
+==== 20:41:27 sim 210.0 s complete False
+  MISTAKE robot_A 217.2 goal_blacklisted: The fire margin cut the path to this frontier; leave it until the retry time.
+  MISTAKE robot_A 217.2 no_frontier: No reachable unsearched floor in this robot's map; returning after the scan unless ordered on.
+  MISTAKE robot_B 217.7 goal_blacklisted: The fire margin cut the path to this frontier; leave it until the retry time.
+  agent robot_B@217.683 inspect -> uncertain: No warm component matches the requested bearing and depth.
+  closest approach (m): s1 laundry 6.2, s2 bedroom_1 3.3, s3 bedroom_2 3.5, s4 kitchen 1.0, s6 study 0.9
+==== 20:41:47 sim 210.0 s complete False
+  robot_A 218.1 survivor_from_peer: Confirmation received from robot_B, originally confirmed by robot_B.
+  robot_B 217.7 agent_order: go_to: Investigate the new nearby RGB person detection after thermal inspection was inconclusive.
+  agent robot_B@217.683 rounds 4 orders ['go_to'] :: I am moving to investigate the nearby RGB person detection, since its thermal inspection was inconclusive and the previo
+  closest approach (m): s1 laundry 6.2, s2 bedroom_1 3.3, s3 bedroom_2 3.5, s4 kitchen 1.0, s6 study 0.9
+==== 20:42:07 sim 210.0 s complete False
+  MISTAKE robot_B 220.1 goal_blacklisted: Air here is rising fast: search elsewhere for a while.
+  closest approach (m): s1 laundry 6.2, s2 bedroom_1 3.3, s3 bedroom_2 3.5, s4 kitchen 1.0, s6 study 0.9
+==== 20:42:27 sim 210.0 s complete False
+  agent robot_B@221.683 inspect -> uncertain: No warm component matches the requested bearing and depth.
+  agent robot_B@221.683 rounds 5 orders ['explore_frontier'] :: I dismissed the unresolvable wall thermal patch as unconfirmed for now and am searching the verified indoor frontier 0 b
+  closest approach (m): s1 laundry 6.2, s2 bedroom_1 3.3, s3 bedroom_2 3.5, s4 kitchen 1.0, s6 study 0.9
+==== 20:42:47 sim 210.0 s complete False
+  MISTAKE robot_A 223.3 goal_blacklisted: The fire margin cut the path to this frontier; leave it until the retry time.
+  robot_B 221.7 agent_order: explore_frontier on floor not yet proven indoors, citing OpenCV evidence 5c4c65dbc78692e9: Frontier 0 is the r
+  closest approach (m): s1 laundry 6.2, s2 bedroom_1 3.3, s3 bedroom_2 3.5, s4 kitchen 1.0, s6 study 0.9
+==== 20:43:07 sim 210.0 s complete False
+  agent robot_A@225.583 rounds 3 orders ['explore_frontier'] :: I redirected to the nearest alternative indoor frontier because fire blacklisted the top-ranked route, and the current t
+  closest approach (m): s1 laundry 6.2, s2 bedroom_1 3.3, s3 bedroom_2 3.5, s4 kitchen 1.0, s6 study 0.9
+==== 20:43:27 sim 210.0 s complete False
+  robot_A 225.6 agent_order: go_to: explore: The ranked first frontier route has just been blacklisted by the fire margin; continue the nea
+  closest approach (m): s1 laundry 6.2, s2 bedroom_1 3.3, s3 bedroom_2 3.5, s4 kitchen 1.0, s6 study 0.9
+==== 20:43:47 sim 210.0 s complete False
+  MISTAKE robot_A 228.2 goal_blacklisted: The fire margin cut the path to this frontier; leave it until the retry time.
+  MISTAKE robot_A 228.3 goal_blacklisted: The fire margin cut the path to this frontier; leave it until the retry time.
+  MISTAKE robot_A 228.3 goal_blacklisted: The fire margin cut the path to this frontier; leave it until the retry time.
+  robot_A 229.6 agent_order: go_to: Face the nearby unresolved warm-candidate direction for a fresh inspection while the prior frontier rou
+  agent robot_A@229.583 rounds 3 orders ['go_to'] :: I kept the robot on its current reachable frontier route and scanned clear in the present view; the nearby fire is not s
+  closest approach (m): s1 laundry 6.2, s2 bedroom_1 3.3, s3 bedroom_2 3.5, s4 kitchen 1.0, s6 study 0.9
+==== 20:44:07 sim 210.0 s complete False
+  closest approach (m): s1 laundry 6.2, s2 bedroom_1 3.3, s3 bedroom_2 3.5, s4 kitchen 1.0, s6 study 0.9
+==== 20:44:27 sim 210.0 s complete False
+  robot_A 232.3 agent_order: go_to: explore: The fresh thermal/RGB view contains no person or fire component, and this is the sole reachabl
+  agent robot_A@232.267 rounds 3 orders ['explore_frontier'] :: I found no person or active thermal component in the newly faced view, so I ordered search of the only reachable proven-
+  closest approach (m): s1 laundry 6.2, s2 bedroom_1 3.3, s3 bedroom_2 3.5, s4 kitchen 1.0, s6 study 0.9
+==== 20:44:47 sim 210.0 s complete False
+  closest approach (m): s1 laundry 6.2, s2 bedroom_1 3.3, s3 bedroom_2 3.5, s4 kitchen 1.0, s6 study 0.9
+==== 20:45:07 sim 210.0 s complete False
+  closest approach (m): s1 laundry 6.2, s2 bedroom_1 3.3, s3 bedroom_2 3.5, s4 kitchen 1.0, s6 study 0.9
+==== 20:45:27 sim 240.0 s complete True
+  agent commander@240.000 rounds None orders ['broadcast'] :: Active fire is expanding in hazard, so both robots should prioritize unsearched areas accessible without crossing it.
+  closest approach (m): s1 laundry 6.1, s2 bedroom_1 3.3, s3 bedroom_2 3.5, s4 kitchen 1.0, s6 study 0.9
+recording complete
+render: data/evidence/showcase_onedoor_seed934.mp4: 2400 frames, 80 s at 3x

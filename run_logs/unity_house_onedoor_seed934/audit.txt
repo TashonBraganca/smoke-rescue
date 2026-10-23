@@ -1,0 +1,58 @@
+AUDIT unity_house_onedoor_seed934: 240 s simulated, complete=True, 5 people, 30 rooms
+
+PEOPLE
+  s1 laundry (lying_on_side): MISSED; closest robot 6.3 m
+  s2 bedroom_1 (slumped_against_wall): MISSED; closest robot 3.6 m
+  s3 bedroom_2 (collapsed_at_desk): MISSED; closest robot 3.7 m
+  s4 kitchen (curled_on_bed): confirmed [('robot_B', 153.5, 0.44)]; closest robot 1.0 m
+  s6 study (slumped_against_wall): confirmed [('robot_A', 18.8, 0.31)]; closest robot 0.9 m
+
+ROBOT_A
+  turning in place 70 s, 3596 deg (10.0 full turns)
+  walked 51 m, still 94 s (39 %), outside 4 s, rooms entered 3/30
+    MISTAKE still 25 s at 39-64 s, after goal: At survivor viewing distance; stop and face the person for confirmation.
+    MISTAKE still 5 s at 106-112 s, after goal: At the agent's goal; turn to face the point it named.
+    MISTAKE still 6 s at 169-175 s, after goal: At the agent's goal; turn to face the point it named.
+    MISTAKE still 6 s at 189-195 s, after goal: At the agent's goal; turn to face the point it named.
+    MISTAKE still 9 s at 207-216 s, after goal: Unsearched floor lies only past floor not yet proven indoors: stand at the edge 
+    MISTAKE still 7 s at 226-233 s, after goal: Agent order: explore: The ranked first frontier route has just been blacklisted 
+  events goal_blacklisted 25, no_progress 1, no_frontier 2, survivor_candidate 28
+    MISTAKE fire cut 23 routes (119-228 s)
+  warm-wall candidates raised: 22 of 28 candidates
+
+ROBOT_B
+  turning in place 35 s, 1856 deg (5.2 full turns)
+  walked 73 m, still 57 s (24 %), outside 8 s, rooms entered 4/30
+    MISTAKE still 12 s at 156-168 s, after survivor_confirmed: Agent confirmed a person with OpenCV evidence e37e89c10b6e2792.
+  events goal_blacklisted 5, body_swing_blocked 1, survivor_candidate 18
+    MISTAKE fire cut 2 routes (10-218 s)
+  warm-wall candidates raised: 16 of 18 candidates
+
+AGENTS
+  tool calls: finish 68, scan_thermal 62, inspect_candidate/uncertain 38, explore_frontier 26, inspect_candidate/not_person 22, reject_candidate 20, check_indoors/unknown 19, send_team_message 9, turn_to_face 7, inspect_candidate/person 7, approach_candidate 7, confirm_survivor 4, broadcast 3, check_indoors/indoors 3, avoid_area 3, go_to 2, track_fire_spread 1
+  steps 72; hit 6 rounds 9; no summary 4; model errors 0; deadlines 0
+  model latency per round: median 3.0 s, max 9.2 s, 276 rounds
+    REFUSED robot_A@8.017 avoid_area: the cited scan found no hotspot
+    REFUSED robot_A@18.817 approach_candidate: this person is already confirmed and reported, and this robot has no rescue arm: walking to them adds nothing; search un
+    REFUSED robot_A@22.817 approach_candidate: the cited inspection measured this warm region as a flat surface (enough registered depth, no protrusion from the plane,
+    REFUSED robot_A@22.817 reject_candidate: the cited inspection is not a not_person verdict at that position, nor an uncertain one at a shape looked at closely 2 t
+    REFUSED robot_B@38.017 approach_candidate: a thermal-only warm patch on a long wall: over 15 runs 1 in 151 of these was a person. Search the offered frontiers firs
+    REFUSED robot_A@46.817 explore_frontier: your explore_frontier to (-2.25, 8.35) is still being driven (last_orders_outcome: under way); it is replaced only on ar
+    REFUSED robot_B@50.867 explore_frontier: you are walking to look closer at an unresolved warm candidate 3.3 m away at bearing 10 deg; finish that first: once the
+    REFUSED robot_B@54.867 explore_frontier: you are walking to look closer at an unresolved warm candidate 3.3 m away at bearing -87 deg; finish that first: once th
+    REFUSED robot_B@72.683 explore_frontier: you are walking to look closer at an unresolved warm candidate 1.8 m away at bearing 152 deg; finish that first: once th
+    REFUSED robot_A@95.900 approach_candidate: the cited inspection measured this warm region as a flat surface (enough registered depth, no protrusion from the plane,
+    REFUSED robot_A@95.900 reject_candidate: the cited inspection is not a not_person verdict at that position, nor an uncertain one at a shape looked at closely 2 t
+    REFUSED robot_A@99.900 approach_candidate: the cited inspection measured this warm region as a flat surface (enough registered depth, no protrusion from the plane,
+    REFUSED robot_A@99.900 reject_candidate: the cited inspection is not a not_person verdict at that position, nor an uncertain one at a shape looked at closely 2 t
+    REFUSED robot_A@109.350 approach_candidate: the cited inspection measured this warm region as a flat surface (enough registered depth, no protrusion from the plane,
+    REFUSED robot_A@109.350 reject_candidate: the cited inspection is not a not_person verdict at that position, nor an uncertain one at a shape looked at closely 2 t
+    REFUSED robot_A@113.350 approach_candidate: a thermal-only warm patch on a long wall: over 15 runs 1 in 151 of these was a person. Search the offered frontiers firs
+    REFUSED robot_A@113.350 explore_frontier: you are walking to look closer at an unresolved warm candidate 3.6 m away at bearing -136 deg; finish that first: once t
+    REFUSED robot_A@116.100 explore_frontier: you are walking to look closer at an unresolved warm candidate 4.0 m away at bearing -140 deg; finish that first: once t
+    REFUSED robot_A@120.100 turn_to_face: a thermal-only warm patch on a long wall: over 15 runs 1 in 151 of these was a person. Search the offered frontiers firs
+    REFUSED robot_B@157.483 avoid_area: the cited scan found no hotspot
+    REFUSED robot_A@181.800 explore_frontier: your go_to to (0.41, 13.84) is still being driven (last_orders_outcome: under way); it is replaced only on arrival, a fa
+    REFUSED robot_A@193.583 explore_frontier: you are walking to look closer at an unresolved warm candidate 3.1 m away at bearing -57 deg; finish that first: once th
+    REFUSED robot_B@198.533 explore_frontier: the cited indoor check must say indoors within its bearing tolerance of this frontier
+  spray offers 7 steps, sprays 0
