@@ -16,6 +16,15 @@ namespace SmokeRescue.Brain
             public float coveredShare, indoorFloorM2;
             public double dwellS;
             public bool entered;
+            /// <summary>Twice the widest clearance inside the room, floor area over that width, and the number of other rooms it
+            /// touches across at least one body width. A corridor is long, narrow and opens onto several rooms.</summary>
+            public float widthM, lengthM;
+            public int openings;
+            public bool corridor;
+            /// <summary>The room's own cell nearest its centroid (the centroid of an L-shaped room can lie in a wall), and the
+            /// farthest room cell from it. A radio room claim names the room by these.</summary>
+            public Vector2 anchor;
+            public float radiusM;
         }
 
         readonly OccupancyGrid grid;
@@ -65,6 +74,8 @@ namespace SmokeRescue.Brain
             if (cell >= 0 && grid.OwnOccupancy(cell) == 1 && byId.TryGetValue(labels[cell], out var current)) current.entered = true;
             lastCell = cell >= 0 && grid.OwnOccupancy(cell) == 1 ? cell : -1; lastT = t;
         }
+
+        public Room Get(int id) => byId.TryGetValue(id, out var room) ? room : null;
 
         public int RoomAt(Vector2 at)
         {
@@ -159,6 +170,50 @@ namespace SmokeRescue.Brain
                 rooms[i].coveredShare = indoorCount[i] > 0 ? searched[i] / (float)indoorCount[i] : 0;
             }
             labels = next;
+            Shape(clearance, free);
+        }
+
+        /// <summary>Width, length, openings, corridor flag, anchor and radius of every room, from labels and clearance.</summary>
+        void Shape(float[] clearance, bool[] free)
+        {
+            var widest = new Dictionary<int, float>(); var area = new Dictionary<int, int>();
+            var contact = new Dictionary<(int, int), int>(); var nearest = new Dictionary<int, float>();
+            foreach (var room in rooms) { widest[room.id] = 0; area[room.id] = 0; nearest[room.id] = float.PositiveInfinity; }
+            for (int i = 0; i < grid.Count; i++)
+            {
+                int id = labels[i]; if (id < 0 || !free[i]) continue;
+                widest[id] = Math.Max(widest[id], clearance[i]); area[id]++;
+                var room = byId[id]; float d = Vector2.Distance(grid.Centre(i), room.centre);
+                if (d < nearest[id]) { nearest[id] = d; room.anchor = grid.Centre(i); }
+                int x = i % grid.Size, y = i / grid.Size;
+                // Right and up neighbours only, so each touching pair of cells is counted once.
+                if (x + 1 < grid.Size) Touch(contact, id, i + 1, free);
+                if (y + 1 < grid.Size) Touch(contact, id, i + grid.Size, free);
+            }
+            foreach (var room in rooms) { room.openings = 0; room.radiusM = 0; }
+            foreach (var pair in contact)
+                if (pair.Value * grid.CellM >= 2 * config.robot_radius_m) { byId[pair.Key.Item1].openings++; byId[pair.Key.Item2].openings++; }
+            for (int i = 0; i < grid.Count; i++)
+            {
+                int id = labels[i]; if (id < 0 || !free[i]) continue;
+                var room = byId[id]; room.radiusM = Math.Max(room.radiusM, Vector2.Distance(grid.Centre(i), room.anchor));
+            }
+            foreach (var room in rooms)
+            {
+                // KnownFreeClearance is measured from the cell centre to the nearest cell that is not known free, less half a
+                // cell, so twice the widest clearance is the free width across the room.
+                room.widthM = 2 * (widest[room.id] + grid.CellM / 2);
+                room.lengthM = area[room.id] * grid.CellM * grid.CellM / Math.Max(room.widthM, grid.CellM);
+                room.corridor = room.widthM <= config.corridor_max_width_m && room.lengthM >= config.corridor_min_elongation * room.widthM &&
+                    room.openings >= config.corridor_min_openings;
+            }
+        }
+
+        void Touch(Dictionary<(int, int), int> contact, int id, int n, bool[] free)
+        {
+            if (!free[n] || labels[n] < 0 || labels[n] == id) return;
+            var key = id < labels[n] ? (id, labels[n]) : (labels[n], id);
+            contact[key] = contact.TryGetValue(key, out int k) ? k + 1 : 1;
         }
 
         /// <summary>A frontier just short of a doorway can serve known unsearched floor on the other side.

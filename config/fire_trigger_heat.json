@@ -534,8 +534,8 @@
     "_reason": "Flow is shared equally across visible cone cell centres, including cold fuel. Tick-interval overlap conserves litres for non-grid times. Exact room boundaries block water except within current door widths; no furniture occlusion. Flame heat is absorbed first; surplus cools toward ambient using gas.effective_heat_capacity_kj_m2_k times cell area, the existing effective heated-lining capacity. There is no separate solid-cell capacity in this model. Smoke and room gas use the remaining heat release. Wetting is a dry-out timer, not moisture transport or a validated suppression model. Sources accessed 2026-10-21."
   },
   "spread": {
-    "growth_alpha_kw_s2": 0.01172,
-    "growth_alpha_kw_s2_reason": "Medium design-fire coefficient per independent configured origin. NFPA 72, National Fire Alarm Code, 2002 edition, Annex B, pp.72-168 to 72-169, equations B.4/B.5 give Q=alpha*(t-tv)^2 and alpha=1055/tg^2; choosing tg=300 s gives 0.0117222, rounded here to the requested 0.01172 kW/s^2, or 1054.8 kW at 300 s. https://previewnorm.com/nfpa/NFPA%2072-2002%20PDF.pdf . One budget is shared by all cells descended from that origin, across rooms. Mass loss cannot exceed burning fuel capacity. Step energy integrates the quadratic exactly. Zero explicitly selects the legacy uncapped model for diagnostic configurations; older files without this field retain that behaviour. No growth clock ignites a new room. Accessed 2026-10-23.",
+    "growth_alpha_kw_s2": 0.1876,
+    "growth_alpha_kw_s2_reason": "Trigger rigs only: NFPA 72 (2002) Annex B ultra-fast t-squared growth, t_g 75 s, alpha = 1055/75^2 = 0.1876 kW/s^2 (the same table as the medium class used by real runs in config/fire.json). A trigger scenario lasts 40 to 90 s and exists to make one robot reaction happen; under the medium class a fire 22 s old releases about 6 kW and no trigger fires. Real runs keep the medium class.",
     "neighbour_heat_per_s": 0.028,
     "surface_cooling_per_s": 0.012,
     "gas_surface_heat_per_s": 0.05,

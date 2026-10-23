@@ -59,7 +59,7 @@ namespace SmokeRescue.Brain
             home = entry.position;
             airC = c.ambient_c; motion = new DeadReckoning(c.motion_stale_s, c.frame_max_age_s + c.frame_pair_tolerance_s, entry); grid = new OccupancyGrid(c) { SeeOverMaxM = cfg.camera.mount.height_m - c.see_over_clearance_m }; grid.TeammateAt = OnTeammate;
             if (grid.Cell(home) < 0) throw new ArgumentException("Entry door is outside the configured building grid.");
-            planner = new GridPlanner(grid, c) { Home = home }; health = new CameraHealth(c); matcher = new ScanMatcher(grid, c);
+            planner = new GridPlanner(grid, c) { Home = home }; planner.RoomTaken = RoomTaken; health = new CameraHealth(c); matcher = new ScanMatcher(grid, c);
             grid.MarkFootprint(home);
             observedSequence = new long[SharedSize * SharedSize];
         }
@@ -467,7 +467,7 @@ namespace SmokeRescue.Brain
                     else if (agentPath.Count > 0)
                     {
                         SetPath(agentPath, agentGoalIsFrontier); scanSince = double.NaN;
-                        if (agentGoalIsFrontier) { frontierCentre = agentGoal.Value; frontierRadius = c.peer_claim_radius_m; }
+                        if (agentGoalIsFrontier) { frontierCentre = agentGoal.Value; frontierRadius = c.peer_claim_radius_m; ClaimRoom(t, agentGoal.Value, PathLength(agentPath)); }
                         Emit(t, "goal", "Agent order: " + agentGoalReason, "x_m", agentGoal.Value.x, "y_m", agentGoal.Value.y, "path_points", path.Count);
                     }
                     else if (agentFace.HasValue && !agentGoalIsFrontier && (agentPath = planner.ApproachPath(motion.Pose.position, agentFace.Value)).Count > 0)
@@ -511,7 +511,7 @@ namespace SmokeRescue.Brain
                     else if (frontier != null)
                     {
                         SetPath(frontier.path, true); frontierCentre = frontier.claimCentre; frontierRadius = frontier.claimRadius;
-                        scanSince = double.NaN; noFrontierAt = double.NaN;
+                        scanSince = double.NaN; noFrontierAt = double.NaN; ClaimRoom(t, frontier.position, frontier.cost);
                         if (c.room_ledger)
                             Emit(t, "goal", "Room ledger ranks admitted frontiers by room completion, entry history, coverage and travel time.",
                                 "x_m", frontier.position.x, "y_m", frontier.position.y, "path_cost", frontier.cost, "information_cells", frontier.information, "score", frontier.score,

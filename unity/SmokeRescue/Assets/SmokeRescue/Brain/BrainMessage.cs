@@ -20,6 +20,10 @@ namespace SmokeRescue.Brain
 
     [Serializable] public sealed class BrainClaim
     { public Vector2 centre; public float radiusM; public double expiresAt; }
+    /// <summary>The room this robot is searching (sender's frame): a cell inside the room, the farthest room cell from it, the
+    /// sender's bid (seconds of travel to the room's nearest frontier), when it took the room, and when the claim lapses.</summary>
+    [Serializable] public sealed class BrainRoomClaim
+    { public Vector2 anchor; public float radiusM, bidS; public double since, expiresAt; }
     [Serializable] public struct BrainSurvivor
     { public Vector2 position; public double confirmedAt; public string sourceRobot; }
     /// <summary>A person this robot strapped onto its sled, at the position they were confirmed (sender's frame).</summary>
@@ -44,11 +48,11 @@ namespace SmokeRescue.Brain
     [Serializable] public struct BrainKeyframe
     { public int id; public BrainPose pose; public float angleMinRad, incrementRad, minM, maxM, mountForwardM; public ushort[] rangesCm; }
     public sealed class PeerSnapshot
-    { public string robot; public long sequence; public double sentAt; public BrainPose pose; public Vector2? goal; public BrainClaim claim; public bool linked; }
+    { public string robot; public long sequence; public double sentAt; public BrainPose pose; public Vector2? goal; public BrainClaim claim; public BrainRoomClaim room; public bool linked; }
     [Serializable] public struct SurvivorSnapshot
     { public Vector2 position; public double confirmedAt; public string source, sourceRobot; }
 
-    /// <summary>Version 6 binary radio state (version 1 plus LiDAR keyframes, people carried out, camera keyframes, rejected warm spots and air samples), in the sender's own map frame. Masks are row-major,
+    /// <summary>Version 7 binary radio state (version 1 plus LiDAR keyframes, people carried out, camera keyframes, rejected warm spots, air samples and a room claim), in the sender's own map frame. Masks are row-major,
     /// least-significant bit first. Explored is cumulative since BaseSequence; Occupied is always full.
     /// ToBytes is the transport format. JSON/base64 and transport headers are outside EstimatedBytes.
     /// Sequence numbers last for one run; create new brains when restarting a sender.</summary>
@@ -74,13 +78,16 @@ namespace SmokeRescue.Brain
         public BrainVisualKeyframe[] VisualKeyframes = Array.Empty<BrainVisualKeyframe>();
         public BrainRejected[] Rejected = Array.Empty<BrainRejected>();
         public BrainAirSample[] Air = Array.Empty<BrainAirSample>();
+        public BrainRoomClaim RoomClaim;
         /// <summary>Version 3 adds CarriedOut after the keyframes (hidden-corner run: robot B went back for a person
         /// robot A had already carried out, because only confirmations travelled). Version 4 adds VisualKeyframes after
         /// CarriedOut, so maps can also be linked by places the cameras recognise (run 3 never linked by LiDAR alone). Version 5
         /// adds Rejected after VisualKeyframes (seed 928: both robots raised and inspected the same warm spot four times between
         /// them, because a rejection stayed on the robot that made it). Version 6 adds Air after Rejected (seed 932: robot A
-        /// held in 44 C air, remembering 20 C in the foyer from 100 s earlier, while robot B stood there in 54 C).</summary>
-        public const byte Version = 6;
+        /// held in 44 C air, remembering 20 C in the foyer from 100 s earlier, while robot B stood there in 54 C). Version 7 adds
+        /// RoomClaim after Air, so code splits rooms between any number of robots (seed 932: the agents split the house in words,
+        /// "west" and "north", and nobody searched the east).</summary>
+        public const byte Version = 7;
         public const int MaxRejected = 16, MaxAir = 32;
         public const int MaxVisualPayloadBytes = 8192;
         public int EstimatedBytes => ToBytes().Length;
@@ -130,6 +137,8 @@ namespace SmokeRescue.Brain
                 if (Air.Length > MaxAir) throw new InvalidDataException("Too many air samples.");
                 w.Write(Air.Length);
                 foreach (var a in Air) { Write(w, a.position); w.Write(a.c); w.Write(a.at); }
+                w.Write(RoomClaim != null);
+                if (RoomClaim != null) { Write(w, RoomClaim.anchor); w.Write(RoomClaim.radiusM); w.Write(RoomClaim.bidS); w.Write(RoomClaim.since); w.Write(RoomClaim.expiresAt); }
                 w.Flush();
                 if (stream.Length >= MaxBytes) throw new InvalidDataException("Brain state exceeds the 40000-byte radio limit; increase compression before using this scene.");
                 return stream.ToArray();
@@ -182,6 +191,8 @@ namespace SmokeRescue.Brain
                     m.Air[i] = new BrainAirSample { position = ReadPoint(r), c = r.ReadSingle(), at = r.ReadDouble() };
                     if (!BrainMath.Finite(m.Air[i].c)) throw new InvalidDataException("Nonfinite air sample.");
                 }
+                if (r.ReadBoolean())
+                    m.RoomClaim = new BrainRoomClaim { anchor = ReadPoint(r), radiusM = r.ReadSingle(), bidS = r.ReadSingle(), since = r.ReadDouble(), expiresAt = r.ReadDouble() };
                 if (stream.Position != stream.Length) throw new InvalidDataException("Trailing brain packet bytes.");
                 return m;
             }

@@ -11,6 +11,8 @@ namespace SmokeRescue.Brain
         readonly BrainConfig c;
         public Vector2 Home { get; set; }
         public RoomLedger Rooms { get; }
+        /// <summary>Room auction filter set by the brain: does a partner hold this room against this robot's bid in seconds?</summary>
+        public Func<int, float, bool> RoomTaken;
         public GridPlanner(OccupancyGrid map, BrainConfig config) { grid = map; c = config; Rooms = new RoomLedger(map, config); }
         public List<Vector2> Plan(Vector2 from, Vector2 to)
         {
@@ -201,6 +203,14 @@ namespace SmokeRescue.Brain
             order.Sort((x, y) => { int k = choices[x].score.CompareTo(choices[y].score); return k != 0 ? k : x.CompareTo(y); });
             var sorted = new List<FrontierChoice>(); foreach (int i in order) sorted.Add(choices[i]);
             Rooms.Rank(sorted, from);
+            if (RoomTaken != null && c.room_ledger && c.room_auction)
+            {
+                // This robot's bid for a room is its travel time to that room's nearest offered frontier.
+                var bid = new Dictionary<int, float>();
+                foreach (var f in sorted)
+                    if (f.roomId >= 0) bid[f.roomId] = Math.Min(bid.TryGetValue(f.roomId, out float b) ? b : float.PositiveInfinity, f.cost / c.open_speed_mps);
+                sorted.RemoveAll(f => f.roomId >= 0 && RoomTaken(f.roomId, bid[f.roomId]));
+            }
             return sorted;
         }
         /// <summary>

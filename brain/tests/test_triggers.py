@@ -57,7 +57,11 @@ def test_scenarios_use_only_world_changes_and_real_fire_schema():
         assert scenario['target_fixes']
         fire=json.loads((ROOT/'config'/scenario['fire']['config_file']).read_text())
         assert 'spread' in fire and isinstance(fire['ignitions'],list) and fire['ignitions']
-        assert fire['spread']==json.loads((ROOT/'config/fire.json').read_text())['spread']
+        main_spread=json.loads((ROOT/'config/fire.json').read_text())['spread']
+        growth=('growth_alpha_kw_s2','growth_alpha_kw_s2_reason')
+        assert {k:v for k,v in fire['spread'].items() if k not in growth}=={k:v for k,v in main_spread.items() if k not in growth}
+        # Trigger rigs may use a faster NFPA 72 Annex B class (alpha = 1055/t_g^2 for t_g 75, 150 or 300 s), never a made-up rate.
+        assert any(abs(fire['spread']['growth_alpha_kw_s2']-1055/tg**2)<5e-4 for tg in (75,150,300))
         if '57' in scenario['target_fixes']:
             assert scenario['duration_s']>45
             assert min(i['time_s'] for i in fire['ignitions'])>scenario['duration_s']+scenario['fire']['head_start_s']
