@@ -21,6 +21,9 @@ namespace SmokeRescue.Brain
             public float widthM, lengthM;
             public int openings;
             public bool corridor;
+            /// <summary>Enclosed by mapped walls and partly proven indoors: all its floor counts as search area.</summary>
+            public bool promoted;
+            public float floorM2, wallShare;
             /// <summary>The room's own cell nearest its centroid (the centroid of an L-shaped room can lie in a wall), and the
             /// farthest room cell from it. A radio room claim names the room by these.</summary>
             public Vector2 anchor;
@@ -76,6 +79,12 @@ namespace SmokeRescue.Brain
         }
 
         public Room Get(int id) => byId.TryGetValue(id, out var room) ? room : null;
+        /// <summary>Is p on the floor of a promoted room (see Shape)?</summary>
+        public bool Promoted(Vector2 p) { var r = Get(RoomAt(p)); return r != null && r.promoted; }
+        /// <summary>Time to finish a room: the dwell budget, or longer for a big room, its floor area over the strip a camera
+        /// sweeps per second (search_max_range_m wide at near_speed_mps). Headless seed 5001: a 102 m2 bedroom got the same 40 s
+        /// as a 7 m2 closet.</summary>
+        public double DwellBudget(Room r) => Math.Max(config.room_ledger_dwell_s, r.indoorFloorM2 / (config.search_max_range_m * config.near_speed_mps));
 
         public int RoomAt(Vector2 at)
         {
@@ -170,11 +179,11 @@ namespace SmokeRescue.Brain
                 rooms[i].coveredShare = indoorCount[i] > 0 ? searched[i] / (float)indoorCount[i] : 0;
             }
             labels = next;
-            Shape(clearance, free);
+            Shape(clearance, free, indoors);
         }
 
         /// <summary>Width, length, openings, corridor flag, anchor and radius of every room, from labels and clearance.</summary>
-        void Shape(float[] clearance, bool[] free)
+        void Shape(float[] clearance, bool[] free, Func<Vector2, bool> indoors)
         {
             var widest = new Dictionary<int, float>(); var area = new Dictionary<int, int>();
             var contact = new Dictionary<(int, int), int>(); var nearest = new Dictionary<int, float>();
@@ -197,6 +206,45 @@ namespace SmokeRescue.Brain
             {
                 int id = labels[i]; if (id < 0 || !free[i]) continue;
                 var room = byId[id]; room.radiusM = Math.Max(room.radiusM, Vector2.Distance(grid.Centre(i), room.anchor));
+            }
+            // Room-level indoor proof (room_indoor_promotion). A robot entering a room proves the floor near it indoors from
+            // ceiling sight lines, while the LiDAR maps the whole room at once; the far side stayed unproven, was never offered as
+            // a frontier, and the robot left after the near corner (headless seeds 5001 to 5004). A room whose own floor is partly
+            // proven and whose edge is mostly mapped wall (enclosure_min_closed_share, the walled-in test's share) is one enclosed
+            // space, so all its floor is search area. Edges to other rooms count neither way; a yard's edge is mostly unknown.
+            var wall = new Dictionary<int, int>(); var open = new Dictionary<int, int>(); var proven = new Dictionary<int, int>();
+            foreach (var room in rooms) { wall[room.id] = 0; open[room.id] = 0; proven[room.id] = 0; }
+            for (int i = 0; i < grid.Count; i++)
+            {
+                int id = labels[i]; if (id < 0 || !free[i]) continue;
+                if (indoors(grid.Centre(i))) proven[id]++;
+                int x = i % grid.Size, y = i / grid.Size;
+                for (int k = 0; k < 4; k++)
+                {
+                    int nx = x + (k == 0 ? 1 : k == 1 ? -1 : 0), ny = y + (k == 2 ? 1 : k == 3 ? -1 : 0);
+                    if (nx < 0 || ny < 0 || nx >= grid.Size || ny >= grid.Size) { open[id]++; continue; }
+                    int o = grid.OwnOccupancy(ny * grid.Size + nx);
+                    if (o == 255) wall[id]++; else if (o == 0) open[id]++;
+                }
+            }
+            foreach (var room in rooms)
+            {
+                room.floorM2 = area[room.id] * grid.CellM * grid.CellM;
+                room.wallShare = wall[room.id] + open[room.id] > 0 ? wall[room.id] / (float)(wall[room.id] + open[room.id]) : 0;
+                room.promoted = config.room_indoor_promotion && proven[room.id] >= config.frontier_min_information_cells &&
+                    room.wallShare >= config.enclosure_min_closed_share;
+            }
+            if (config.room_indoor_promotion)
+            {
+                // A promoted room's coverage is measured on all its floor, not only the proven part.
+                var searchedAll = new Dictionary<int, int>(); foreach (var room in rooms) searchedAll[room.id] = 0;
+                for (int i = 0; i < grid.Count; i++)
+                {
+                    int id = labels[i]; if (id < 0 || !free[i] || !byId[id].promoted) continue;
+                    if (grid.OwnObserved(i) || grid.PeerExplored(i)) searchedAll[id]++;
+                }
+                foreach (var room in rooms)
+                    if (room.promoted) { room.indoorFloorM2 = room.floorM2; room.coveredShare = area[room.id] > 0 ? searchedAll[room.id] / (float)area[room.id] : 0; }
             }
             foreach (var room in rooms)
             {
@@ -241,22 +289,32 @@ namespace SmokeRescue.Brain
             return best;
         }
 
-        /// <summary>Complete the current room while its coverage and time budgets permit. After that, unentered rooms
-        /// precede entered rooms. Within a group, missing coverage earns up to one dwell budget against travel seconds.
+        /// <summary>Enter every room, sweep it, mark it done. Tiers, best first: (0) the room this robot stands in while it is
+        /// unfinished and within its dwell budget; (1) rooms not yet entered; (2) corridor frontiers, since walking a corridor
+        /// reveals the doors along it; (3) leftover floor in rooms already entered; (4) rooms already covered past
+        /// room_ledger_covered_share; (5) floor the ledger has no room for. Within a tier, travel seconds plus covered share
+        /// times the dwell budget. A corridor is never the room being finished. Headless seed 5001: ranked as an ordinary
+        /// entered room, the corridor came last whenever a robot stood in it, so both robots kept returning to pockets in the
+        /// living room and bedroom and never walked far enough up the corridor to see the kitchen door.
         /// Only candidates that the planner already admitted can move in this ordering.</summary>
         public void Rank(List<GridPlanner.FrontierChoice> choices, Vector2 at)
         {
             if (!config.room_ledger || rooms.Count == 0) return;
             int current = RoomAt(at);
-            bool finishing = byId.TryGetValue(current, out var here) && here.indoorFloorM2 > 0 &&
-                here.coveredShare < config.room_ledger_covered_share && here.dwellS < config.room_ledger_dwell_s;
+            bool finishing = byId.TryGetValue(current, out var here) && here.indoorFloorM2 > 0 && !here.corridor &&
+                here.coveredShare < config.room_ledger_covered_share && here.dwellS < DwellBudget(here);
             var order = new Dictionary<GridPlanner.FrontierChoice, int>();
             for (int i = 0; i < choices.Count; i++)
             {
                 var f = choices[i]; order[f] = i; f.roomId = RoomForFrontier(f.position);
                 bool known = byId.TryGetValue(f.roomId, out var room) && room.indoorFloorM2 > 0;
-                f.roomTier = !known ? 3 : finishing ? (f.roomId == current ? 0 : 1) :
-                    !room.entered ? 0 : f.roomId == current ? 2 : 1;
+                // room_ledger_corridor_first: walk the corridor before the rooms off it, which reveals every door along it
+                // (UK Operational Guidance, Breathing Apparatus, Appendix 5, directional search; Miami-Dade threshold search at each
+                // door). Headless seed 5001: the kitchen door 17 m down the corridor was never seen from its lower half, so the
+                // kitchen was never in either robot's ledger.
+                int corridorTier = config.room_ledger_corridor_first ? 1 : 2, unenteredTier = config.room_ledger_corridor_first ? 2 : 1;
+                f.roomTier = !known ? 5 : finishing && f.roomId == current ? 0 : room.corridor ? corridorTier : !room.entered ? unenteredTier :
+                    room.coveredShare >= config.room_ledger_covered_share ? 4 : 3;
                 f.roomScore = f.cost / config.open_speed_mps + (known ? room.coveredShare * config.room_ledger_dwell_s : 0);
             }
             choices.Sort((a, b) =>

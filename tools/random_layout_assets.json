@@ -1,0 +1,361 @@
+{
+  "note": "Conservative centred horizontal envelopes. Union of transformed glTF accessor bounds and fire fuel estimates, plus 0.10 m on each side. fit_width and part offsets match FurnitureBuilder. No runtime mesh measurement is claimed.",
+  "kinds": {
+    "antique_globe": {
+      "conservative_size_m": [
+        0.85,
+        0.85
+      ],
+      "assets": [
+        {
+          "path": "candidates/antique_globe/0318ad51a7294885b452ff4f408353ba/model.glb",
+          "sha256": "ea97b3e455d67ce355ce7838e53d0bbeee25758b78f038ccf8e755f4360d5dcb",
+          "min_m": [
+            -0.2865263819694519,
+            6.752088665962219e-08,
+            -0.2870926856994629
+          ],
+          "max_m": [
+            0.2865263819694519,
+            0.9999998211860657,
+            0.28709304332733154
+          ]
+        }
+      ]
+    },
+    "apartment_counter": {
+      "conservative_size_m": [
+        3.2,
+        2.0447
+      ],
+      "assets": [
+        {
+          "path": "candidates_v2/furniture_models/objaverse_6ad39b0f/6ad39b0f52ad439ea12cbfdc1a1dd37f.glb",
+          "sha256": "af959cce05e47c75767d930f752370b1ad07ed861b06aa7d542c1bb64fa34261",
+          "min_m": [
+            0.0,
+            -4.0381241414472027e-17,
+            0.0
+          ],
+          "max_m": [
+            0.30005295260328246,
+            0.18951175717494273,
+            0.18449915602305472
+          ]
+        }
+      ]
+    },
+    "apartment_modern_sofa": {
+      "conservative_size_m": [
+        2.5,
+        1.3
+      ],
+      "assets": [
+        {
+          "path": "models/sofa_02.glb",
+          "sha256": "5b80214133ac0ff25d32524e05cdd12db206a38771e94f26266872f9032564ae",
+          "min_m": [
+            -0.9035836458206177,
+            0.0,
+            -0.4088757038116455
+          ],
+          "max_m": [
+            0.9035836458206177,
+            0.7094888687133789,
+            0.4088757038116455
+          ]
+        }
+      ]
+    },
+    "blue_double_bed": {
+      "conservative_size_m": [
+        2.0,
+        2.3
+      ],
+      "assets": [
+        {
+          "path": "models/GothicBed_01.glb",
+          "sha256": "239028990a7f164977ae5b9b73300a29ec3ad28a7fc5cb2a536a032e56a6b5cd",
+          "min_m": [
+            -0.7468759417533875,
+            0.0,
+            -1.0199999809265137
+          ],
+          "max_m": [
+            0.7468759417533875,
+            1.533840298652649,
+            1.0199999809265137
+          ]
+        }
+      ]
+    },
+    "clawfoot_bathtub": {
+      "conservative_size_m": [
+        2.0,
+        1.0
+      ],
+      "assets": [
+        {
+          "path": "candidates/clawfoot_bathtub/536dbfc2fdbe4dec9203ab390b9a6eda/model.glb",
+          "sha256": "79004b7e67ae22a05a4b2ffec4b664cfc5c3c10d6c976e49c01b47bb3a495a5f",
+          "min_m": [
+            -0.8499999642372131,
+            2.3283064365386963e-10,
+            -0.35867229104042053
+          ],
+          "max_m": [
+            0.8500000238418579,
+            0.727158784866333,
+            0.35867229104042053
+          ]
+        }
+      ]
+    },
+    "console_table_with_vase": {
+      "conservative_size_m": [
+        1.743,
+        0.7893
+      ],
+      "assets": [
+        {
+          "path": "models/ClassicConsole_01.glb",
+          "sha256": "c1e194d63ba958428ee9c25deb29d55560b44e6ca23709156e3aff97f4fa0bbb",
+          "min_m": [
+            -0.7715101838111877,
+            0.0,
+            -0.2946377098560333
+          ],
+          "max_m": [
+            0.7715101838111877,
+            0.9490714073181152,
+            0.2946377098560333
+          ]
+        },
+        {
+          "path": "models/antique_ceramic_vase_01.glb",
+          "sha256": "28fe3758b0b7754daea4d300435a74ad409b160a18b8d8b004383a72c62071a2",
+          "min_m": [
+            -0.12751498818397522,
+            0.0,
+            -0.12751497328281403
+          ],
+          "max_m": [
+            0.12751498818397522,
+            0.43955305218696594,
+            0.12751497328281403
+          ]
+        }
+      ]
+    },
+    "sink_with_mirror": {
+      "conservative_size_m": [
+        0.95,
+        0.9844
+      ],
+      "assets": [
+        {
+          "path": "candidates/sink_with_mirror/c976dd7dddab48a3a2848ff560a3c7b6/model.glb",
+          "sha256": "45367d885866e2caa002cee5038b0b36c3ce173be44407d11a2b4c8509cc5b52",
+          "min_m": [
+            -0.3749999701976776,
+            -1.322315767993132e-07,
+            -0.39217597246170044
+          ],
+          "max_m": [
+            0.375,
+            1.8560787439346313,
+            0.3921753168106079
+          ]
+        }
+      ]
+    },
+    "stove_and_hood": {
+      "conservative_size_m": [
+        1.1,
+        0.9
+      ],
+      "assets": [
+        {
+          "path": "models/electric_stove.glb",
+          "sha256": "5c2b4e8fe7422656d4d29f06b6fcf3fdb8d8fa6ffa8122d726aafa90d5ff7f02",
+          "min_m": [
+            -0.2512974143028259,
+            0.0,
+            -0.3238105773925781
+          ],
+          "max_m": [
+            0.2512974143028259,
+            0.8586971759796143,
+            0.3238105773925781
+          ]
+        },
+        {
+          "path": "candidates/range_hood/a8c9ef47afd541b0a13a1df1e0dfe0b8/model.glb",
+          "sha256": "dd02e4f5ab1bae2a86c000188bd5a712cecf90fd7b081114fb93094a37ccb33b",
+          "min_m": [
+            -0.44999998807907104,
+            -3.0550534546591734e-08,
+            -0.330310583114624
+          ],
+          "max_m": [
+            0.44999998807907104,
+            0.8927475810050964,
+            0.3303106129169464
+          ]
+        }
+      ]
+    },
+    "supply_boxes": {
+      "conservative_size_m": [
+        1.6,
+        0.9
+      ],
+      "assets": [
+        {
+          "path": "models/cardboard_box_01.glb",
+          "sha256": "127c53a74f54f01faad147517c64bb2490a93c96bcbb09e34b7387f70b477e37",
+          "min_m": [
+            -0.19351179897785187,
+            0.0,
+            -0.25793522596359253
+          ],
+          "max_m": [
+            0.19351179897785187,
+            0.3417995572090149,
+            0.25793522596359253
+          ]
+        },
+        {
+          "path": "models/cardboard_box_01.glb",
+          "sha256": "127c53a74f54f01faad147517c64bb2490a93c96bcbb09e34b7387f70b477e37",
+          "min_m": [
+            -0.19351179897785187,
+            0.0,
+            -0.25793522596359253
+          ],
+          "max_m": [
+            0.19351179897785187,
+            0.3417995572090149,
+            0.25793522596359253
+          ]
+        },
+        {
+          "path": "models/cardboard_box_01.glb",
+          "sha256": "127c53a74f54f01faad147517c64bb2490a93c96bcbb09e34b7387f70b477e37",
+          "min_m": [
+            -0.19351179897785187,
+            0.0,
+            -0.25793522596359253
+          ],
+          "max_m": [
+            0.19351179897785187,
+            0.3417995572090149,
+            0.25793522596359253
+          ]
+        }
+      ]
+    },
+    "tall_steel_fridge": {
+      "conservative_size_m": [
+        1.1764,
+        1.0
+      ],
+      "assets": [
+        {
+          "path": "candidates/fridge/ebe62ed6dd9b446a9c9b7d7d6a8086e7/model.glb",
+          "sha256": "4fd6e1096f40d3a4bc10ad29a1cb2ef83055872c7f654b6c646b2cc25b55d69a",
+          "min_m": [
+            -0.4882243573665619,
+            5.960464477539063e-08,
+            -0.31572532653808594
+          ],
+          "max_m": [
+            0.4882243573665619,
+            1.8499999046325684,
+            0.3157251477241516
+          ]
+        }
+      ]
+    },
+    "tall_wardrobe": {
+      "conservative_size_m": [
+        1.9191,
+        1.3165
+      ],
+      "assets": [
+        {
+          "path": "models/GothicCabinet_01.glb",
+          "sha256": "48820073806a990e22bb5bc59b4493b74f37eb69e420304cce3aa5e7c4739c01",
+          "min_m": [
+            -0.8595718741416931,
+            0.0,
+            -0.5582694411277771
+          ],
+          "max_m": [
+            0.8595718741416931,
+            2.36090087890625,
+            0.5582694411277771
+          ]
+        }
+      ]
+    },
+    "utility_washer": {
+      "conservative_size_m": [
+        1.0,
+        0.95
+      ],
+      "assets": [
+        {
+          "path": "candidates_v2/furniture_models/objaverse_0e0f2802/0e0f28026fec40da8c0f1dfd7a8dd45f.glb",
+          "sha256": "d2b64da693838c414863b261768a06e2ec881a18921df52ab45ef53874a5bcac",
+          "min_m": [
+            -11.811023712158203,
+            -16.73228263854981,
+            -10.62992095947266
+          ],
+          "max_m": [
+            11.811023712158203,
+            16.73228263854981,
+            11.338582992553714
+          ]
+        }
+      ]
+    },
+    "wooden_desk_with_lamp": {
+      "conservative_size_m": [
+        2.2,
+        1.1472
+      ],
+      "assets": [
+        {
+          "path": "models/metal_office_desk.glb",
+          "sha256": "e45c31b358d6620bdf5e9e02ecfc4d8e643e9f4e0a0f5d17732cfe81b4419e4d",
+          "min_m": [
+            -1.000000238418579,
+            0.0,
+            -0.47360676527023315
+          ],
+          "max_m": [
+            1.000000238418579,
+            0.7875000238418579,
+            0.47360676527023315
+          ]
+        },
+        {
+          "path": "models/desk_lamp_arm_01.glb",
+          "sha256": "d7571f7696d8bba14a6689f0f1f814b8b7e14a6130f677c2d6b388d21ef8d2cd",
+          "min_m": [
+            -0.10086466372013092,
+            0.0,
+            -0.3069362938404083
+          ],
+          "max_m": [
+            0.10086466372013092,
+            0.8926106691360474,
+            0.3069362938404083
+          ]
+        }
+      ]
+    }
+  }
+}

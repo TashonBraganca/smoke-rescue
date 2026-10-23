@@ -111,7 +111,7 @@ namespace SmokeRescue.Brain
             grid.ClearBody(motion.Pose.position, c.robot_radius_m - grid.CellM * .5f);
             InvalidatePeerGoal(t); CheckMapOverlap(t);
             grid.PrepareNavigation();
-            planner.Rooms.Update(t, motion.Pose.position, InSearchArea);
+            planner.Rooms.Update(t, motion.Pose.position, InSearchAreaOwn); planner.HeadingRad = motion.Pose.yawRad; CertifyRooms(t);
             int cell = grid.Cell(motion.Pose.position);
             bool fireNow = grid.FireDistance(cell) < c.heat_cost_radius_m;
             if (fireNow && !nearFire)
@@ -146,7 +146,7 @@ namespace SmokeRescue.Brain
             }
             NoteBodyTrack();
             NoteEntrance(t);
-            if (survivors.Count != keptOut) { keptOut = survivors.Count; grid.SetKeepOut(survivors, c.survivor_keepout_core_m, c.survivor_keepout_m + c.robot_radius_m); }   // the ring is for the robot's centre
+            if (survivors.Count != keptOut) { keptOut = survivors.Count; grid.SetKeepOut(survivors, squeezePast ? c.survivor_squeeze_core_m : c.survivor_keepout_core_m, c.survivor_keepout_m + c.robot_radius_m); }   // the ring is for the robot's centre
             CheckReenter(t);
             if (doorwayProbeGoal.HasValue && (returning || retreating || completed || nearFire || active != null ||
                 (AgentGoalActive(t) && !(c.frontier_doorway_looks && agentGoalIsFrontier)) || recoveryPhase != 0 || t - doorwayProbeStarted >= c.sweep_max_s))
@@ -488,6 +488,9 @@ namespace SmokeRescue.Brain
                     System.Func<Vector2, bool> excluded = p => ClaimBlocks(p, t) || GoalBlacklisted(p, t) || VisitedGoal(p, t) || !InSearchArea(p);
                     var frontier = planner.Frontier(motion.Pose.position, excluded);
                     lastPlan = t;
+                    // Only leftovers (or nothing) are reachable while unsearched floor lies cut off: a confirmed person may be
+                    // sealing a corridor. The shrunk keep-out applies from the next step.
+                    if (frontier == null || (c.room_ledger && frontier.roomTier >= 3)) SqueezePastPerson(t);
                     // Only the partner stands between this robot and unsearched floor (its claim or the floor its camera
                     // searched): follow through, without claiming, rather than end the search. One-door seed 922, robot B:
                     // behind A at the one door, it yielded the door frontier 120 times in 2 s, found nothing else, and
@@ -511,7 +514,7 @@ namespace SmokeRescue.Brain
                     else if (frontier != null)
                     {
                         SetPath(frontier.path, true); frontierCentre = frontier.claimCentre; frontierRadius = frontier.claimRadius;
-                        scanSince = double.NaN; noFrontierAt = double.NaN; ClaimRoom(t, frontier.position, frontier.cost);
+                        scanSince = double.NaN; noFrontierAt = double.NaN; ClaimRoom(t, frontier.position, PathLength(frontier.path));
                         if (c.room_ledger)
                             Emit(t, "goal", "Room ledger ranks admitted frontiers by room completion, entry history, coverage and travel time.",
                                 "x_m", frontier.position.x, "y_m", frontier.position.y, "path_cost", frontier.cost, "information_cells", frontier.information, "score", frontier.score,
@@ -528,6 +531,17 @@ namespace SmokeRescue.Brain
                             "x_m", goal.Value.x, "y_m", goal.Value.y, "beyond_x_m", beyond.x, "beyond_y_m", beyond.y);
                     }
                     else if (WaitBehindPartner(t)) { ClearPath(); lastPlan = t; scanSince = double.NaN; noFrontierAt = double.NaN; }
+                    else if (c.room_ledger && UnfinishedRoomRetry(t, out var retry))
+                    {
+                        // A room of the ledger is still under room_ledger_covered_share: the house is not done. Floor this robot
+                        // walked past recently (VisitedGoal, visited_hold_s) is offered again; blacklists for fire, stalls and
+                        // claims still apply. Exploration that stops while frontiers sit in an expiring exclusion leaves rooms
+                        // unsearched (explore_lite blacklist, prior_art_23oct.txt finding 1).
+                        SetPath(retry.path, true); frontierCentre = retry.claimCentre; frontierRadius = retry.claimRadius;
+                        scanSince = double.NaN; noFrontierAt = double.NaN; ClaimRoom(t, retry.position, PathLength(retry.path));
+                        Emit(t, "goal", "A room is still under its coverage threshold: search its remaining floor again before holding.",
+                            "x_m", retry.position.x, "y_m", retry.position.y, "room_id", retry.roomId, "path_cost", retry.cost);
+                    }
                     else
                     {
                         ClearPath(); lastPlan = t; if (double.IsNaN(scanSince))
@@ -1313,7 +1327,7 @@ namespace SmokeRescue.Brain
             // 0.6 m from where it stood).
             var from = relocateFrom ?? motion.Pose.position; float here = Vector2.Distance(motion.Pose.position, from);
             var options = planner.Frontiers(motion.Pose.position, p => InSearchArea(p) || VisitedGoal(p, t) || GoalBlacklisted(p, t) ||
-                grid.ObstacleDistance(grid.Cell(p)) > c.facade_band_m || Vector2.Distance(p, from) <= here + c.visited_radius_m);
+                grid.ObstacleDistance(grid.Cell(p)) > c.facade_band_m || Vector2.Distance(p, from) <= here + c.visited_radius_m, false, false);
             if (options.Count == 0) { completedAt = t; return null; }
             var f = options[0];
             SetPath(f.path); relocateGoal = f.position; relocateFrom = from; lastPlan = t;
@@ -1507,6 +1521,7 @@ namespace SmokeRescue.Brain
         }
         readonly List<Vector2> walkedIn = new List<Vector2>();
         int keptOut;   // how many confirmed people the planner's keep-out discs cover
+        bool squeezePast;   // the keep-out core is down to survivor_squeeze_core_m (see SqueezePastPerson)
         bool searchedOut;   // stay_inside: a full scan found nothing reachable; hold still instead of turning
         /// <summary>A route to the last proven-indoor floor on the way to an unproven frontier, when no proven one is left.
         /// Floor seen through an interior doorway is mapped free but not proven indoors until the camera sees its ceiling,
@@ -1520,7 +1535,7 @@ namespace SmokeRescue.Brain
             route = null; beyond = default;
             if (!c.search_requires_ceiling) return false;
             var options = planner.Frontiers(motion.Pose.position, p => InSearchArea(p) || GoalBlacklisted(p, t) || VisitedGoal(p, t) ||
-                lookedAt.Exists(q => Vector2.Distance(q, p) <= c.stuck_repeat_radius_m));
+                lookedAt.Exists(q => Vector2.Distance(q, p) <= c.stuck_repeat_radius_m), false, false);
             for (int k = 0; k < options.Count && k < c.threshold_look_options; k++)
             {
                 var f = options[k]; lookedAt.Add(f.position);
@@ -1736,11 +1751,32 @@ namespace SmokeRescue.Brain
             float nextYaw = Mathf.Clamp(yaw, -c.limits.max_yaw_rate_dps, c.limits.max_yaw_rate_dps);
             var midPose = motion.Pose; midPose.yawRad += nextYaw * Mathf.Deg2Rad * dt / 2;
             // Check the speed after acceleration limiting, including motion while braking.
-            if (nextSpeed > 0 && !planner.SegmentSafe(position, position + midPose.Forward * nextSpeed * dt))
+            if (nextSpeed > 0 && !planner.SegmentSafe(position, position + midPose.Forward * nextSpeed * dt) &&
+                !LeavingTightSpot(position, position + midPose.Forward * Mathf.Max(nextSpeed * dt, grid.CellM)))
             {
-                Emit(t, "collision_risk", "The next commanded translation leaves known safe free space.");
-                return Command(0, arc ? 0 : yaw, dt, true);
+                // (23 Oct, motion branch.) The chord to the target is safe but a step along the current heading is not (the
+                // body stands in a cell too close to a wall, slightly off the chord). Returning the pursuit yaw here pinned the
+                // robot: with the target nearly ahead that yaw is near zero, so it neither moved nor turned, and no escape fired
+                // (the stop bypasses the swept-path hold, the stuck detector needs a forward command, the progress watchdog
+                // ignores a robot that is not travelling). Headless house 5003, robot A: 122 s pinned at a doorway jamb after an
+                // evidence look, 7356 identical events. Now: turn onto the chord when the body can swing; if still held after
+                // collision_escape_s, back off and turn by the existing recovery.
+                if (double.IsNaN(translationHeldSince))
+                {
+                    translationHeldSince = t;
+                    Emit(t, "collision_risk", "The next commanded translation leaves known safe free space; turn onto the safe chord.",
+                        "heading_error_deg", error);
+                }
+                if (t - translationHeldSince >= c.collision_escape_s && recoveryPhase == 0)
+                {
+                    translationHeldSince = double.NaN;
+                    BeginRecovery(t, "collision_hold", "Held facing a route whose first step leaves safe free space; back up and choose another route.", goal, false);
+                    return Command(0, 0, dt, true);
+                }
+                if (arc) return Command(0, 0, dt, true);
+                return Command(0, SwingClear(error) ? Mathf.Clamp(error * c.heading_gain, -c.sweep_yaw_dps, c.sweep_yaw_dps) : 0, dt, true);
             }
+            translationHeldSince = double.NaN;
             if (policy != motionPolicy)
             {
                 motionPolicy = policy;
@@ -1750,7 +1786,20 @@ namespace SmokeRescue.Brain
             }
             return Command(speed, yaw, dt, false);
         }
-        double blockedSince = double.NaN, lastBlocked = double.NegativeInfinity;
+        double blockedSince = double.NaN, lastBlocked = double.NegativeInfinity, translationHeldSince = double.NaN;
+
+        /// <summary>(23 Oct.) A step out of a cell closer to a mapped obstacle than the walking clearance: allowed when the
+        /// cell ahead is mapped free and no nearer to an obstacle or to fire than the robot's own cell, the same rule GridPlanner.Lead
+        /// uses to leave a fire margin. SegmentSafe judged the robot's own cell and refused every step from it in every direction:
+        /// headless house 5003, robot A stood 122 s at a doorway jamb where an evidence look had parked its camera. Contact is
+        /// still prevented by the swept-body brake (SafeForward), which this does not bypass.</summary>
+        bool LeavingTightSpot(Vector2 from, Vector2 to)
+        {
+            int a = grid.Cell(from), b = grid.Cell(to);
+            if (a < 0 || b < 0 || grid.Walkable(a)) return false;
+            return grid.Occupancy(b) == 1 && grid.ObstacleDistance(b) >= grid.ObstacleDistance(a) - 1e-4f &&
+                   grid.FireDistance(b) >= grid.FireDistance(a) - 1e-4f;
+        }
 
         /// <summary>Distance the body can drive straight ahead before its circle (robot radius plus half a cell, since
         /// a mapped cell's surface can sit half a cell from its centre) touches an occupied cell. Cells beside or
@@ -1877,7 +1926,54 @@ namespace SmokeRescue.Brain
         /// ceiling over (OccupancyGrid.Indoors): no building outline, floor plan or operator map is given to any robot.</summary>
         /// <summary>The live 3D map's top-height layer (centimetres per cell, this brain's grid), from the agent service.</summary>
         public void OnTopHeights(ushort[] cm) => grid.SetTopHeights(cm);
-        public bool InSearchArea(Vector2 p) => !c.search_requires_ceiling || grid.Indoors(p);
+        /// <summary>Floor to search: proven indoors by this robot's own ceiling or enclosure evidence, or (room_indoor_promotion)
+        /// anywhere in an enclosed room of its own map that already has proven floor (RoomLedger.Promoted).</summary>
+        /// <summary>A frontier in a ledger room still under room_ledger_covered_share, admitted without the visited filter.</summary>
+        /// <summary>A confirmed person's hard keep-out (survivor_keepout_core_m, which includes the position error) plus the
+        /// walking clearance closes any corridor under about 1.8 m wide. Headless seed 5001: a person lying in the hallway sealed
+        /// it, and the kitchen, bathroom, laundry and closet beyond went unsearched by both robots. When no frontier is
+        /// reachable but unsearched floor in the search area is (NearestBlocked), the core shrinks once to the body's own
+        /// half-width so the robot can pass along the far side; the costed ring still keeps it as far away as the space allows.</summary>
+        bool SqueezePastPerson(double t)
+        {
+            if (!c.survivor_squeeze || squeezePast || survivors.Count == 0 || c.survivor_squeeze_core_m >= c.survivor_keepout_core_m) return false;
+            if (planner.NearestBlocked(motion.Pose.position, InSearchArea) == null) return false;
+            squeezePast = true; keptOut = -1;
+            Emit(t, "squeeze_past_person", "Unsearched floor lies beyond a confirmed person's keep-out: pass them with the keep-out at the body's half-width.",
+                "people", survivors.Count, "core_m", c.survivor_squeeze_core_m);
+            return true;
+        }
+        readonly Dictionary<int, int> roomRetries = new Dictionary<int, int>();
+        readonly HashSet<int> certified = new HashSet<int>();
+        /// <summary>A room's certificate, once: its covered share reached room_ledger_covered_share on its own floor (proven, or
+        /// all of it when promoted). Audited offline by tools/eval/room_coverage.py check against the floor truly visible.</summary>
+        void CertifyRooms(double t)
+        {
+            if (!c.room_ledger || planner.Rooms.LastSegmentationAt != t) return;
+            foreach (var room in planner.Rooms.Rooms)
+            {
+                if (room.corridor || room.indoorFloorM2 <= 0 || room.coveredShare < c.room_ledger_covered_share || !certified.Add(room.id)) continue;
+                Emit(t, "room_searched", "Room covered past the ledger's threshold on its own map: marked searched.", "room_id", room.id,
+                    "x_m", room.anchor.x, "y_m", room.anchor.y, "covered_share", room.coveredShare, "floor_m2", room.indoorFloorM2,
+                    "promoted", room.promoted ? 1 : 0);
+            }
+        }
+        /// <summary>At most two retries per room: floor that stays unseen after two passes (under a bed, behind a closed
+        /// wardrobe) must not hold the robot in a loop.</summary>
+        bool UnfinishedRoomRetry(double t, out GridPlanner.FrontierChoice retry)
+        {
+            retry = null;
+            foreach (var f in planner.Frontiers(motion.Pose.position, p => ClaimBlocks(p, t) || GoalBlacklisted(p, t) || !InSearchArea(p)))
+            {
+                var room = planner.Rooms.Get(f.roomId);
+                if (room == null || room.corridor || room.indoorFloorM2 <= 0 || room.coveredShare >= c.room_ledger_covered_share) continue;
+                int n = roomRetries.TryGetValue(room.id, out int k) ? k : 0; if (n >= 2) continue;
+                roomRetries[room.id] = n + 1; retry = f; return true;
+            }
+            return false;
+        }
+        public bool InSearchArea(Vector2 p) => InSearchAreaOwn(p) || (c.room_ledger && c.room_indoor_promotion && planner.Rooms.Promoted(p));
+        bool InSearchAreaOwn(Vector2 p) => !c.search_requires_ceiling || grid.Indoors(p);
         /// <summary>Seconds until the robot's operating limit (mission_time_limit_s), for the agent.</summary>
         public double MissionTimeLeft(double t) => Math.Max(0, c.mission_time_limit_s - t);
         /// <summary>The indoor layer (OccupancyGrid.CopyIndoors), written beside each map snapshot.</summary>

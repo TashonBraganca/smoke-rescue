@@ -1,0 +1,143 @@
+{
+  "id": "random_5010",
+  "description": "Unseen seeded world. Autonomous robots get sensors and local launch-pad poses only.",
+  "seed": 5010,
+  "duration_s": 480,
+  "time_limit": false,
+  "floorplan_file": "floorplan_random_5010.json",
+  "search_area": [
+    0,
+    0,
+    16.704,
+    15.546
+  ],
+  "dark_rooms": [],
+  "sim_rate_hz": 15,
+  "robots": [
+    {
+      "id": "robot_A",
+      "color": "#F2A900",
+      "spawn": {
+        "at": [
+          -1.2,
+          8.522
+        ],
+        "yaw": 90.0
+      },
+      "control": "autonomous",
+      "cruise_speed": 0.5,
+      "doorway_speed": 0.3,
+      "route": [],
+      "look_around_at": [],
+      "torch": "wide",
+      "launch_pad": [
+        0,
+        -0.0,
+        0
+      ]
+    },
+    {
+      "id": "robot_B",
+      "color": "#2FA3E6",
+      "spawn": {
+        "at": [
+          -2.4,
+          8.522
+        ],
+        "yaw": 90.0
+      },
+      "control": "autonomous",
+      "cruise_speed": 0.5,
+      "doorway_speed": 0.3,
+      "route": [],
+      "look_around_at": [],
+      "torch": "wide",
+      "launch_pad": [
+        0,
+        -1.2,
+        0
+      ]
+    }
+  ],
+  "survivor_placement": "random",
+  "survivors": [
+    {
+      "id": "s1",
+      "room": "r06",
+      "at": [
+        3.795917272567749,
+        10.256381034851074
+      ],
+      "yaw": 25.134912490844727,
+      "pose": "lying_on_side"
+    },
+    {
+      "id": "s2",
+      "room": "r02",
+      "at": [
+        10.673874855041504,
+        5.0394206047058105
+      ],
+      "yaw": 4.085917949676514,
+      "pose": "lying_on_side"
+    },
+    {
+      "id": "s3",
+      "room": "r08",
+      "at": [
+        7.965083599090576,
+        12.6370210647583
+      ],
+      "yaw": 171.71827697753906,
+      "pose": "lying_on_side"
+    },
+    {
+      "id": "s4",
+      "room": "r03",
+      "at": [
+        5.175442218780518,
+        5.770691394805908
+      ],
+      "yaw": 281.46136474609375,
+      "pose": "lying_on_side"
+    },
+    {
+      "id": "s5",
+      "room": "r07",
+      "at": [
+        13.788002967834473,
+        10.697687149047852
+      ],
+      "yaw": 220.00390625,
+      "pose": "lying_on_side"
+    }
+  ],
+  "smoke": {
+    "model": "fluid",
+    "global_haze": 0.15,
+    "rooms": {
+      "default": 0.15
+    },
+    "ramp_per_minute": 0
+  },
+  "fire": {
+    "spread": true,
+    "head_start_s": 0,
+    "config_file": "fire_random_5010.json"
+  },
+  "obstacles": [],
+  "warm_objects": [],
+  "radio": {
+    "range_m": 12,
+    "max_walls": 1,
+    "broadcast_period_s": 2,
+    "budget_bytes_per_s": 2048
+  },
+  "launch": {
+    "door": "d11",
+    "pad_spacing_m": 1.2,
+    "placement_sigma_m": 0,
+    "placement_sigma_deg": 0,
+    "reason": "Two surveyed pads outside the only entrance. Exact placement is an explicit simulation assumption; no house coordinates enter the brain."
+  }
+}
