@@ -124,15 +124,17 @@ namespace SmokeRescue.Brain
             CheckWayOut(t);
             CheckEmergencyExit(t);
             CheckHeatBuilding(t);
-            // Staying inside there is no early "leave while the way out is open", so a fast rise (the rate-of-rise detector,
-            // air_rise_c_per_min) starts the retreat to cooler floor and holds it while the rise lasts; the 70 C trigger alone
-            // came after the 60 C limit (seed 927, robot B: air 28 C at 168 s, 59 C at 172 s, retreat at 174 s, peak 169 C).
-            // Warm but steady air does not, or a robot in a warm house would never search.
+            // Staying inside, a fast rise in the robot's own air (the rate-of-rise detector, air_rise_c_per_min) steers the
+            // search away from where it stands; it does not stop it. As a retreat it held robots still in cool air: in seed 932
+            // every retreat fired at about 24 C, and the robots spent 62 s and 66 s retreating in air below 50 C (air at them
+            // passed 50 C only at 141 s and 158 s). Holding still is left to the hard limits (heat_retreat_c, the heat budget).
             // Once seen, a rise counts for one more air_rise_window_s: at the +air_rise_min_delta_c edge, sensor noise of a few
-            // tenths of a degree flipped the test each sample (seed 929, robot B at 42.5 to 44 s: 4 retreats in 1.5 s at 24 C).
-            if (c.stay_inside && HeatRising(t)) heatRisingUntil = t + c.air_rise_window_s;
+            // tenths of a degree flipped the test each sample (seed 929, robot B at 42.5 to 44 s).
+            bool rising = c.stay_inside && HeatRising(t);
+            if (rising && t >= heatRisingUntil && !retreating) SteerFromHeat(t);
+            if (rising) heatRisingUntil = t + c.air_rise_window_s;
             bool heatInside = c.stay_inside && t < heatRisingUntil;
-            if (!retreating && !emergencyExit && (airC > c.heat_retreat_c || budget < c.heat_retreat_fraction || heatInside))
+            if (!retreating && !emergencyExit && (airC > c.heat_retreat_c || budget < c.heat_retreat_fraction))
             {
                 ResetStuckRecovery(); retreating = true; sweeping = false; active = null; dwell = 0; ClearPath();
                 Emit(t, "retreat", "Air temperature or remaining heat budget requires a cool reachable goal.", "air_c", airC, "heat_budget", budget);
@@ -1378,6 +1380,18 @@ namespace SmokeRescue.Brain
         /// <summary>The rate-of-rise half of HeatBuilding: air rising at air_rise_c_per_min or faster, by at least
         /// air_rise_min_delta_c over its recent low.</summary>
         double heatRisingUntil = double.NegativeInfinity;
+        /// <summary>A new rise in the robot's own air: set aside the floor within heat_steer_radius_m of where it stands for
+        /// heat_steer_s and drop a frontier or agent goal there, so the search goes on elsewhere. An inspection under way is
+        /// kept: a rise below the hard limits is no reason to leave a person.</summary>
+        void SteerFromHeat(double t)
+        {
+            var here = motion.Pose.position;
+            BlacklistGoal(here, t, 0, c.heat_steer_s, "Air here is rising fast: search elsewhere for a while.", c.heat_steer_radius_m);
+            if (agentGoal.HasValue && Vector2.Distance(agentGoal.Value, here) <= c.heat_steer_radius_m) agentGoal = null;
+            if (active == null) ClearPath();
+            Emit(t, "avoid_fire", "The air at this robot is rising fast: leave this area and search elsewhere; holding still is only for the heat limits.",
+                "air_c", airC, "radius_m", c.heat_steer_radius_m, "seconds", c.heat_steer_s);
+        }
         bool HeatRising(double t)
         {
             if (t - lastAir > c.frame_max_age_s || AirSlopePerMin(t) < c.air_rise_c_per_min) return false;
