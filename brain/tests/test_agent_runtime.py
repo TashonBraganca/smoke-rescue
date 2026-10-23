@@ -872,3 +872,19 @@ def test_a_person_already_confirmed_nearby_is_not_confirmed_again(tmp_path, monk
     dup = confirm([[5.3, 8.2]], 3.0)
     assert dup["orders"] == [] and "already confirmed" in dup["refusals"][0]["reason"]
     assert [o["type"] for o in confirm([[5.0, 11.0]], 3.0)["orders"]] == ["confirm_survivor"], "control: 3 m away is someone else"
+
+
+def test_the_step_scan_is_in_the_first_rounds_context_and_citable(tmp_path, monkeypatch):
+    # Seed 934: 62 of 72 steps spent their first round (about 3 s) on scan_thermal; steps averaged 15 s. Code now runs the
+    # scan before round 1, so its id is evidence from the start. Control: a frame that cannot be scanned leaves it out
+    # and the step still finishes.
+    fake_vision(monkeypatch, "uncertain")
+    monkeypatch.setattr(T.vision, "scan_thermal", lambda f: {"id": "scan1", "tool": "scan_thermal", "hotspots": [], "people": []})
+    out = RobotAgent(Scripted([[ToolCall("finish", {"summary": "nothing warm"})]]), tmp_path / "t.jsonl").step(request(tmp_path))
+    start = [json.loads(l) for l in (tmp_path / "t.jsonl").read_text().splitlines() if '"step_start"' in l][-1]
+    assert start["context"]["scan_thermal"]["id"] == "scan1" and "scan1" in out["evidence_ids"] and out["rounds"] == 1
+    def broken(f): raise AttributeError("no frame")
+    monkeypatch.setattr(T.vision, "scan_thermal", broken)
+    out = RobotAgent(Scripted([[ToolCall("finish", {"summary": "no frame"})]]), tmp_path / "u.jsonl").step(request(tmp_path) | {"t": 20.0})
+    start = [json.loads(l) for l in (tmp_path / "u.jsonl").read_text().splitlines() if '"step_start"' in l][-1]
+    assert "scan_thermal" not in start["context"] and out["summary"] == "no frame", "control: no scan, step still runs"
