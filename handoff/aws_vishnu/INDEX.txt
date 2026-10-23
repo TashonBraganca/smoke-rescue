@@ -1,0 +1,24 @@
+AWS handoff for Vishnu, 23 Oct 2026 (Smoke Rescue, OpenCV AI Competition 2026, deadline 26 Oct 23:59 PT)
+
+Nothing here has been deployed. No AWS resource was ever created. No credential is in this repo; keep it that way.
+
+Where the AWS code lives (all committed on main):
+  deploy/aws/                    CloudFormation (agent.yaml Fargate ARM64 agent + OpenCV API, storage.yaml S3 + CloudFront
+                                 results site, batch.yaml Batch for the OpenCV 5 SLAM container, budget.yaml alarms),
+                                 deploy.sh, smoke_test.sh, teardown.sh, submit_slam_job.sh, Dockerfiles, site/
+  brain/brain/agent/server.py    the agent server that runs in Fargate (FastAPI; PUT /runs/{run}/{robot}/files receives
+  brain/brain/agent/recording_transport.py   recording frames from the Mac when the agents run remotely)
+
+Files in this folder:
+  aws_operating_tips.txt         the owner's operating rules (count 1, scale to 0 between demos, teardown 10 Nov, budget)
+  aws_ready.report.txt           Codex report on the deploy stack: what was checked (cfn-lint, shellcheck) and what was not
+  aws_transport.report.txt       Codex report on sending recording frames to a remote agent server
+  aws_transport_unity.patch      the Unity side of that transport (RemoteRecordingFiles.cs + tests). NOT applied to main.
+                                 It applies cleanly to main 270c8e0 (checked 23 Oct 11:30 with git apply --check), but it
+                                 has never been compiled in Unity or run against a server.
+
+Not done, said plainly:
+  - No deploy, no live smoke test, no measured cost.
+  - The Unity transport patch is unapplied and untested in Unity.
+  - Transport bandwidth on a real recording is unmeasured (each recording is 5 to 7 GB locally).
+  - Before using Bedrock, check the per-token price of the chosen model; the runs so far used Azure (gpt-5.6-terra).

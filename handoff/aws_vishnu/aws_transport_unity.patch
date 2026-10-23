@@ -1,0 +1,469 @@
+diff --git a/unity/SmokeRescue/Assets/SmokeRescue/Recording/RecordingSession.Agents.cs b/unity/SmokeRescue/Assets/SmokeRescue/Recording/RecordingSession.Agents.cs
+--- a/unity/SmokeRescue/Assets/SmokeRescue/Recording/RecordingSession.Agents.cs
++++ b/unity/SmokeRescue/Assets/SmokeRescue/Recording/RecordingSession.Agents.cs
+@@ -413,6 +413,7 @@
+             File.WriteAllText(Path.Combine(rig.dir, "camera.yaml"), CameraYaml(cfg));
+             if (cfg.thermal != null) File.WriteAllText(Path.Combine(rig.dir, "thermal.yaml"), ThermalYaml(cfg));
+             // Decision and brain-state logs too, so a run that dies keeps them and progress can be watched live.
++            if (rig.lidarTxt != null) File.WriteAllText(Path.Combine(rig.dir, "lidar.txt"), rig.lidarTxt.ToString());
+             File.WriteAllText(Path.Combine(rig.dir, "decisions.jsonl"), rig.decisions.ToString());
+             File.WriteAllText(Path.Combine(rig.dir, "brain_state.jsonl"), rig.brainState.ToString());
+         }
+@@ -477,7 +478,15 @@
+             if (t - rig.lastMap3dExport >= Map3dExportPeriodS - 1e-9)
+             {
+                 rig.lastMap3dExport = t;
+-                Post($"/map3d/{id}/export", new JObject { ["path"] = Path.GetFullPath(Path.Combine(rig.dir, "map3d.ply")) }, PeopleUrl);
++                string output = Path.GetFullPath(Path.Combine(rig.dir, "map3d.ply"));
++                var request = new JObject { ["path"] = output };
++                if (RemoteRecordingFiles.Enabled(PeopleUrl)) { request["robot_dir"] = Path.GetFullPath(rig.dir); request["t"] = t; }
++                var exported = Post($"/map3d/{id}/export", request, PeopleUrl);
++                if (exported?.Value<string>("download_url") is string download)
++                {
++                    try { File.WriteAllBytes(output, Http.GetByteArrayAsync(PeopleUrl.TrimEnd('/') + download).GetAwaiter().GetResult()); }
++                    catch (Exception e) { Debug.LogWarning("[SmokeRescue] map download failed: " + e.GetBaseException().Message); }
++                }
+             }
+         }
+ 
+@@ -492,10 +501,9 @@
+         {
+             try
+             {
+-                var content = new StringContent(body.ToString(Formatting.None), Encoding.UTF8, "application/json");
+-                var resp = Http.PostAsync((baseUrl ?? AgentUrl).TrimEnd('/') + path, content).Result;
+-                string text = resp.Content.ReadAsStringAsync().Result;
+-                if (!resp.IsSuccessStatusCode) { Debug.LogWarning($"[SmokeRescue] agent {path}: HTTP {(int)resp.StatusCode} {text}"); return null; }
++                // Agent/person/map calls still wait here with the simulation clock paused.
++                string text = RemoteRecordingFiles.Post(Http, baseUrl ?? AgentUrl, path, body,
++                    System.Threading.CancellationToken.None).GetAwaiter().GetResult();
+                 return JObject.Parse(text);
+             }
+             catch (Exception e)
+diff --git a/unity/SmokeRescue/Assets/SmokeRescue/Recording/RecordingSession.cs b/unity/SmokeRescue/Assets/SmokeRescue/Recording/RecordingSession.cs
+--- a/unity/SmokeRescue/Assets/SmokeRescue/Recording/RecordingSession.cs
++++ b/unity/SmokeRescue/Assets/SmokeRescue/Recording/RecordingSession.cs
+@@ -123,6 +123,7 @@
+             PeoplePeriodS = BrainConfig.Load().person_rgb_scan_period_s;
+             PlaceHttpTimeoutS = JObject.Parse(File.ReadAllText(Path.Combine(SensorConfig.ConfigDir, "perception.json"))).Value<float>("place_http_timeout_s");
+             string root = Path.GetFullPath(Path.Combine(FloorPlan.ConfigDir, "..", "data", "recordings", runId));
++            RemoteRecordingFiles.BeginRun(root);
+             if (Directory.Exists(root))
+             {
+                 // Move the old run aside first: a recursive delete of thousands of files can race with macOS
+diff --git a/unity/SmokeRescue/Assets/SmokeRescue/Recording/VisualPlaceClient.cs b/unity/SmokeRescue/Assets/SmokeRescue/Recording/VisualPlaceClient.cs
+--- a/unity/SmokeRescue/Assets/SmokeRescue/Recording/VisualPlaceClient.cs
++++ b/unity/SmokeRescue/Assets/SmokeRescue/Recording/VisualPlaceClient.cs
+@@ -30,15 +30,13 @@
+             try
+             {
+                 using (var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutS)))
+-                using (var content = new StringContent(body.ToString(Formatting.None), Encoding.UTF8, "application/json"))
+-                using (var response = await http.PostAsync(new Uri(baseUri, path.TrimStart('/')), content, timeout.Token).ConfigureAwait(false))
+                 {
+-                    string text = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+-                    if (!response.IsSuccessStatusCode) return new Response { error = "HTTP " + (int)response.StatusCode };
++                    string text = await RemoteRecordingFiles.Post(http, baseUri.ToString().TrimEnd('/'), path, body,
++                        timeout.Token).ConfigureAwait(false);
+                     return new Response { body = JObject.Parse(text) };
+                 }
+             }
+-            catch (Exception e) when (e is HttpRequestException || e is OperationCanceledException || e is JsonException || e is ObjectDisposedException)
++            catch (Exception e) when (e is System.IO.IOException || e is ArgumentException || e is FormatException || e is InvalidOperationException || e is HttpRequestException || e is OperationCanceledException || e is JsonException || e is ObjectDisposedException)
+             { return new Response { error = e.GetBaseException().Message }; }
+         }
+         public void Dispose() => http.Dispose();
+diff --git a/unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/VisualPlaceServiceTests.cs b/unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/VisualPlaceServiceTests.cs
+--- a/unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/VisualPlaceServiceTests.cs
++++ b/unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/VisualPlaceServiceTests.cs
+@@ -33,7 +33,7 @@
+                     if (slow) await Task.Delay(Timeout.Infinite, token).ConfigureAwait(false);   // as a real handler: not on Unity's main thread, which the test blocks
+                     throw new HttpRequestException("service unavailable");
+                 } };
+-                using (var worker = new VisualPlaceWorker(f.brain, "B", "/tmp/own-camera", new VisualPlaceClient("http://place/", .05f, handler)))
++                using (var worker = new VisualPlaceWorker(f.brain, "B", "/tmp/own-camera", new VisualPlaceClient("http://localhost/", .05f, handler)))
+                 {
+                     Assert.That(worker.TryCapture(0, new BrainPose()), Is.True);
+                     worker.Step(.01);
+@@ -46,7 +46,7 @@
+             }
+             var off = CameraScene(enabled: false); int requests = 0;
+             var control = new PlaceHandler { send = (request, token) => { requests++; throw new Exception("must not call"); } };
+-            using (var worker = new VisualPlaceWorker(off.brain, "B", "/tmp/own-camera", new VisualPlaceClient("http://place/", .05f, control)))
++            using (var worker = new VisualPlaceWorker(off.brain, "B", "/tmp/own-camera", new VisualPlaceClient("http://localhost/", .05f, control)))
+             {
+                 Assert.That(worker.TryCapture(0, new BrainPose()), Is.False); worker.Step(1);
+                 Assert.That(requests, Is.Zero, "control: the disabled feature makes no service requests");
+@@ -68,7 +68,7 @@
+                 return PlaceResponse(new JObject { ["matched"] = true, ["database_id"] = "db1", ["mine_id"] = 7,
+                     ["dx_m"] = 0, ["dy_m"] = match++ == 0 ? 0 : 1.5, ["dyaw_deg"] = 0, ["inliers"] = 30, ["rmse_m"] = .02 });
+             } };
+-            using (var worker = new VisualPlaceWorker(f.brain, "B", "/tmp/own-camera", new VisualPlaceClient("http://place/", 1f, handler)))
++            using (var worker = new VisualPlaceWorker(f.brain, "B", "/tmp/own-camera", new VisualPlaceClient("http://localhost/", 1f, handler)))
+             {
+                 worker.TryCapture(0, new BrainPose()); worker.Step(.01); worker.Step(.02);
+                 Assert.That(f.brain.TryPartnerLink("A", out _), Is.False, "one HTTP match still waits for an independent place");
+@@ -89,7 +89,7 @@
+                 return PlaceResponse(new JObject { ["ok"] = true, ["id"] = 0, ["database_id"] = "db" + capture++,
+                     ["t"] = body.Value<double>("t") - (capture == 3 ? .1 : 0), ["payload_b64"] = Convert.ToBase64String(VisualPayload()) });
+             } };
+-            using (var worker = new VisualPlaceWorker(f.brain, "B", "/tmp/own-camera", new VisualPlaceClient("http://place/", 1f, handler)))
++            using (var worker = new VisualPlaceWorker(f.brain, "B", "/tmp/own-camera", new VisualPlaceClient("http://localhost/", 1f, handler)))
+             {
+                 worker.TryCapture(0, new BrainPose()); worker.Step(2);
+                 var first = f.brain.BuildMessage(2).VisualKeyframes[0];
+@@ -112,7 +112,7 @@
+                 var handler = new PlaceHandler { send = (request, token) => Task.FromResult(invalidJson
+                     ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("truncated {") }
+                     : PlaceResponse(new JObject { ["ok"] = true })) };
+-                using (var worker = new VisualPlaceWorker(f.brain, "B", "/tmp/own-camera", new VisualPlaceClient("http://place/", 1f, handler)))
++                using (var worker = new VisualPlaceWorker(f.brain, "B", "/tmp/own-camera", new VisualPlaceClient("http://localhost/", 1f, handler)))
+                 {
+                     worker.TryCapture(0, new BrainPose());
+                     Assert.DoesNotThrow(() => worker.Step(.01));
+@@ -121,7 +121,7 @@
+                 }
+             }
+             var off = CameraScene(enabled: false);
+-            using (var worker = new VisualPlaceWorker(off.brain, "B", "/tmp/own-camera", new VisualPlaceClient("http://place/", 1f)))
++            using (var worker = new VisualPlaceWorker(off.brain, "B", "/tmp/own-camera", new VisualPlaceClient("http://localhost/", 1f)))
+                 Assert.That(worker.TryCapture(0, new BrainPose()), Is.False, "control: disabled requests leave the old result");
+         }
+         [Test]
+@@ -130,7 +130,7 @@
+             var f = CameraScene();
+             var gate = new TaskCompletionSource<HttpResponseMessage>();
+             var handler = new PlaceHandler { send = (request, token) => gate.Task };
+-            using (var worker = new VisualPlaceWorker(f.brain, "B", "/tmp/own-camera", new VisualPlaceClient("http://place/", 1f, handler)))
++            using (var worker = new VisualPlaceWorker(f.brain, "B", "/tmp/own-camera", new VisualPlaceClient("http://localhost/", 1f, handler)))
+             {
+                 Task<bool> capture = null; Task poll = null;
+                 bool captureReturned = false, pollReturned = false;
+@@ -162,14 +162,14 @@
+                 ["ok"] = true, ["id"] = 0, ["database_id"] = "subsecond", ["t"] = imageStamp,
+                 ["payload_b64"] = Convert.ToBase64String(VisualPayload())
+             })) };
+-            using (var worker = new VisualPlaceWorker(f.brain, "B", "/tmp/own-camera", new VisualPlaceClient("http://place/", 1f, handler)))
++            using (var worker = new VisualPlaceWorker(f.brain, "B", "/tmp/own-camera", new VisualPlaceClient("http://localhost/", 1f, handler)))
+             {
+                 Assert.That(worker.TryCapture(captureTime, pose), Is.True); worker.Step(3);
+                 var sent = f.brain.BuildMessage(3).VisualKeyframes.Single();
+                 Assert.That(sent.pose.position, Is.EqualTo(pose.position)); Assert.That(sent.pose.yawRad, Is.EqualTo(pose.yawRad));
+             }
+             var off = CameraScene(enabled: false);
+-            using (var worker = new VisualPlaceWorker(off.brain, "B", "/tmp/own-camera", new VisualPlaceClient("http://place/", 1f)))
++            using (var worker = new VisualPlaceWorker(off.brain, "B", "/tmp/own-camera", new VisualPlaceClient("http://localhost/", 1f)))
+                 Assert.That(worker.TryCapture(captureTime, pose), Is.False, "control: disabled capture leaves the old result");
+         }
+     }
+diff --git a/unity/SmokeRescue/Assets/SmokeRescue/Recording/RemoteRecordingFiles.cs b/unity/SmokeRescue/Assets/SmokeRescue/Recording/RemoteRecordingFiles.cs
+new file mode 100644
+--- /dev/null
++++ b/unity/SmokeRescue/Assets/SmokeRescue/Recording/RemoteRecordingFiles.cs
+@@ -0,0 +1,197 @@
++using System;
++using System.Collections.Generic;
++using System.Globalization;
++using System.IO;
++using System.IO.Compression;
++using System.Linq;
++using System.Net.Http;
++using System.Security.Cryptography;
++using System.Text;
++using System.Text.RegularExpressions;
++using System.Threading;
++using System.Threading.Tasks;
++using Newtonsoft.Json.Linq;
++
++namespace SmokeRescue.Recording
++{
++    /// <summary>Sensor-only ZIP uploads. Each recording gets a fresh id, even when the local folder is reused.</summary>
++    public static class RemoteRecordingFiles
++    {
++        static readonly object Gate = new object();
++        static readonly Dictionary<string, string> Runs = new Dictionary<string, string>();
++        static readonly Dictionary<string, Cursor> Cursors = new Dictionary<string, Cursor>();
++        static readonly string[] SmallFiles = { "camera.yaml", "thermal.yaml", "rgb.txt", "depth.txt", "thermal.txt", "lidar.txt", "decisions.jsonl" };
++        static long sequence;
++        sealed class Cursor
++        {
++            public readonly SemaphoreSlim upload = new SemaphoreSlim(1, 1);
++            public readonly HashSet<string> sent = new HashSet<string>();
++            public readonly Dictionary<string, string> hashes = new Dictionary<string, string>();
++            // A high-water mark alone misses history frames skipped by person scans. sent fills those gaps.
++            public double highestFrameTime = double.NegativeInfinity;
++            public long latestSnapshot;
++        }
++        sealed class Snapshot
++        {
++            public string directory, uri, endpoint;
++            public long order;
++            public Cursor cursor;
++            public JObject body;
++            public readonly Dictionary<string, byte[]> small = new Dictionary<string, byte[]>();
++            public readonly Dictionary<string, double> images = new Dictionary<string, double>();
++        }
++        public static bool Enabled(string url) => Environment.GetEnvironmentVariable("SMOKE_REMOTE_FILES") == "1" || !new Uri(url).IsLoopback;
++        public static void BeginRun(string root)
++        {
++            lock (Gate) { Runs.Clear(); Cursors.Clear(); Runs[Path.GetFullPath(root)] = Guid.NewGuid().ToString("N"); }
++        }
++        static string Run(string root)
++        {
++            lock (Gate)
++            {
++                if (!Runs.TryGetValue(root, out string id)) Runs[root] = id = Guid.NewGuid().ToString("N");
++                return id;
++            }
++        }
++        static string Hash(byte[] data)
++        {
++            using (var sha = SHA256.Create()) return Convert.ToBase64String(sha.ComputeHash(data));
++        }
++        static List<(double time, string file)> Index(string directory, string sensor, byte[] bytes)
++        {
++            var rows = new List<(double time, string file)>();
++            foreach (string line in Encoding.UTF8.GetString(bytes).Split('\n'))
++            {
++                if (string.IsNullOrWhiteSpace(line) || line.TrimStart().StartsWith("#")) continue;
++                string[] parts = line.Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
++                if (parts.Length != 2 || !Regex.IsMatch(parts[1], "^" + sensor + @"/[0-9]+(?:\.[0-9]+)?\.png$"))
++                    throw new IOException("Invalid sensor index entry.");
++                double stamp = double.Parse(parts[0], CultureInfo.InvariantCulture);
++                if (double.IsNaN(stamp) || double.IsInfinity(stamp) || (rows.Count > 0 && stamp <= rows[rows.Count - 1].time))
++                    throw new IOException("Sensor timestamps must increase.");
++                rows.Add((stamp, parts[1]));
++            }
++            if (rows.Count == 0) throw new IOException("Empty " + sensor + " index in " + directory);
++            return rows;
++        }
++        static Snapshot Capture(string url, string path, JObject original)
++        {
++            var body = (JObject)original.DeepClone();
++            body.Remove("trace_path"); body.Remove("debug_dir");
++            var snapshot = new Snapshot { body = body, endpoint = url.TrimEnd('/'), order = Interlocked.Increment(ref sequence) };
++            string directory = original.Value<string>("robot_dir");
++            if (directory == null) return snapshot;  // commander logs use the server's writable default
++            directory = Path.GetFullPath(directory);
++            string root = Path.GetDirectoryName(directory), robot = Path.GetFileName(directory);
++            if (!Regex.IsMatch(robot, "^[A-Za-z0-9][A-Za-z0-9_-]{0,95}$")) throw new IOException("Invalid robot id.");
++            string run = Run(root), key = snapshot.endpoint + "|" + run + "|" + directory;
++            snapshot.directory = directory; snapshot.uri = "run://" + run + "/" + robot;
++            lock (Gate)
++            {
++                if (!Cursors.TryGetValue(key, out snapshot.cursor)) Cursors[key] = snapshot.cursor = new Cursor();
++            }
++            body["robot_dir"] = snapshot.uri;
++            foreach (string name in SmallFiles)
++            {
++                string file = Path.Combine(directory, name);
++                if (File.Exists(file)) snapshot.small[name] = File.ReadAllBytes(file);
++            }
++            // Freeze metadata before the first await. The async place client may continue while Unity records more.
++            string[] sensors = path.EndsWith("/match") || path.EndsWith("/export") ? new string[0]
++                : path.EndsWith("/integrate") ? new[] { "depth" }
++                : path.EndsWith("/keyframe") ? new[] { "rgb", "depth" } : new[] { "rgb", "depth", "thermal" };
++            double t = original.Value<double>("t");
++            var times = new List<double> { t };
++            if (original["frame_times"] is JArray history) times.AddRange(history.Values<double>());
++            if (times.Any(x => double.IsNaN(x) || double.IsInfinity(x))) throw new IOException("Invalid requested frame time.");
++            foreach (string sensor in sensors)
++            {
++                if (!snapshot.small.TryGetValue(sensor + ".txt", out byte[] index)) throw new IOException("Missing " + sensor + " index.");
++                var rows = Index(directory, sensor, index);
++                foreach (double stamp in times)
++                {
++                    var row = rows.OrderBy(r => Math.Abs(r.time - stamp)).ThenBy(r => r.time).First();
++                    snapshot.images[row.file] = row.time;
++                }
++            }
++            return snapshot;
++        }
++        static async Task<JObject> Upload(HttpClient http, Snapshot snapshot, CancellationToken token)
++        {
++            if (snapshot.cursor == null) return snapshot.body;
++            var cursor = snapshot.cursor;
++            await cursor.upload.WaitAsync(token).ConfigureAwait(false);
++            try
++            {
++                var files = new Dictionary<string, byte[]>();
++                foreach (var image in snapshot.images)
++                    if (!cursor.sent.Contains(image.Key)) files[image.Key] = File.ReadAllBytes(Path.Combine(snapshot.directory, image.Key));
++                var hashes = new Dictionary<string, string>();
++                if (snapshot.order >= cursor.latestSnapshot)
++                    foreach (var file in snapshot.small)
++                    {
++                        string hash = Hash(file.Value);
++                        if (!cursor.hashes.TryGetValue(file.Key, out string prior) || prior != hash)
++                        { files[file.Key] = file.Value; hashes[file.Key] = hash; }
++                    }
++                if (files.Count == 0) return snapshot.body;
++                using (var stream = new MemoryStream())
++                {
++                    using (var zip = new ZipArchive(stream, ZipArchiveMode.Create, true))
++                        foreach (var file in files)
++                            using (var entry = zip.CreateEntry(file.Key, CompressionLevel.NoCompression).Open())
++                                entry.Write(file.Value, 0, file.Value.Length);
++                    if (stream.Length > 64L * 1024 * 1024) throw new IOException("Sensor batch exceeds the server's 64 MiB limit.");
++                    stream.Position = 0;
++                    string[] id = snapshot.uri.Substring("run://".Length).Split('/');
++                    string endpoint = snapshot.endpoint + "/runs/" + id[0] + "/" + id[1] + "/files";
++                    using (var request = new HttpRequestMessage(HttpMethod.Put, endpoint))
++                    {
++                        request.Headers.Add("X-Recording-Source", snapshot.directory);
++                        request.Content = new StreamContent(stream);
++                        request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/zip");
++                        using (var response = await http.SendAsync(request, token).ConfigureAwait(false))
++                        {
++                            if (!response.IsSuccessStatusCode) throw new IOException("Recording upload HTTP " + (int)response.StatusCode + ": " + await response.Content.ReadAsStringAsync().ConfigureAwait(false));
++                            var receipt = JObject.Parse(await response.Content.ReadAsStringAsync().ConfigureAwait(false));
++                            if (receipt.Value<string>("robot_dir") != snapshot.uri) throw new IOException("Unexpected recording upload receipt.");
++                        }
++                    }
++                }
++                // Advance only after the server acknowledges publication. A failed request can retry unchanged bytes.
++                foreach (var image in snapshot.images)
++                    if (files.ContainsKey(image.Key)) { cursor.sent.Add(image.Key); cursor.highestFrameTime = Math.Max(cursor.highestFrameTime, image.Value); }
++                foreach (var hash in hashes) cursor.hashes[hash.Key] = hash.Value;
++                cursor.latestSnapshot = Math.Max(cursor.latestSnapshot, snapshot.order);
++                return snapshot.body;
++            }
++            finally { cursor.upload.Release(); }
++        }
++        public static async Task<string> Post(HttpClient http, string url, string path, JObject body, CancellationToken token)
++        {
++            path = "/" + path.TrimStart('/');
++            // Capture runs synchronously on entry, before any wait lets the recorder rewrite an index.
++            var snapshot = Enabled(url) ? Capture(url, path, body) : null;
++            for (int attempt = 0; ; attempt++)
++            {
++                JObject request = snapshot == null ? body : await Upload(http, snapshot, token).ConfigureAwait(false);
++                using (var content = new StringContent(request.ToString(Newtonsoft.Json.Formatting.None), Encoding.UTF8, "application/json"))
++                using (var response = await http.PostAsync(url.TrimEnd('/') + path, content, token).ConfigureAwait(false))
++                {
++                    string text = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
++                    if (response.IsSuccessStatusCode) return text;
++                    // A restarted task has empty disk. Re-send this request's files once before reporting the error.
++                    if (attempt == 0 && snapshot?.cursor != null &&
++                        ((int)response.StatusCode == 404 || ((int)response.StatusCode == 400 && text.Contains("missing"))))
++                    {
++                        await snapshot.cursor.upload.WaitAsync(token).ConfigureAwait(false);
++                        try { snapshot.cursor.sent.Clear(); snapshot.cursor.hashes.Clear(); snapshot.cursor.latestSnapshot = 0; snapshot.cursor.highestFrameTime = double.NegativeInfinity; }
++                        finally { snapshot.cursor.upload.Release(); }
++                        continue;
++                    }
++                    throw new IOException("HTTP " + (int)response.StatusCode + " " + text);
++                }
++            }
++        }
++    }
++}
+diff --git a/unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/RemoteRecordingFilesTests.cs b/unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/RemoteRecordingFilesTests.cs
+new file mode 100644
+--- /dev/null
++++ b/unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/RemoteRecordingFilesTests.cs
+@@ -0,0 +1,104 @@
++using System;
++using System.Collections.Generic;
++using System.IO;
++using System.IO.Compression;
++using System.Linq;
++using System.Net;
++using System.Net.Http;
++using System.Text;
++using System.Threading;
++using System.Threading.Tasks;
++using Newtonsoft.Json.Linq;
++using SmokeRescue.Recording;
++public class RemoteRecordingFilesTests
++{
++    string previous;
++    [NUnit.Framework.SetUp] public void SaveEnvironment() => previous = Environment.GetEnvironmentVariable("SMOKE_REMOTE_FILES");
++    [NUnit.Framework.TearDown] public void RestoreEnvironment() => Environment.SetEnvironmentVariable("SMOKE_REMOTE_FILES", previous);
++    class Handler : HttpMessageHandler
++    {
++        public List<string[]> batches = new List<string[]>();
++        public bool missing, failUpload;
++        public string uri;
++        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage req, CancellationToken token)
++        {
++            Check(req.RequestUri.AbsolutePath.StartsWith("/api/"), "lost API prefix");
++            if (req.Method == HttpMethod.Put)
++            {
++                if (failUpload) { failUpload = false; return new HttpResponseMessage(HttpStatusCode.InternalServerError); }
++                var bytes = await req.Content.ReadAsByteArrayAsync();
++                using (var zip = new ZipArchive(new MemoryStream(bytes), ZipArchiveMode.Read))
++                    batches.Add(zip.Entries.Select(e => e.FullName).ToArray());
++                var parts = req.RequestUri.AbsolutePath.Split('/');
++                uri = "run://" + parts[3] + "/" + parts[4];
++                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(new JObject { ["robot_dir"] = uri }.ToString()) };
++            }
++            var body = JObject.Parse(await req.Content.ReadAsStringAsync());
++            Check(body.Value<string>("robot_dir") == uri, "not a run URI");
++            Check(body["trace_path"] == null && body["debug_dir"] == null, "sent Mac output paths");
++            if (missing) { missing = false; return new HttpResponseMessage(HttpStatusCode.NotFound) { Content = new StringContent("upload first") }; }
++            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{}") };
++        }
++    }
++    static void Check(bool condition, string why) { if (!condition) throw new Exception(why); }
++    static void Send(HttpClient client, string dir, double t, bool history = false)
++    {
++        var body = new JObject { ["robot_dir"] = dir, ["t"] = t, ["trace_path"] = "/mac/trace", ["debug_dir"] = "/mac/debug" };
++        if (history) body["frame_times"] = new JArray(0.0, .5, 1.0);
++        RemoteRecordingFiles.Post(client, "http://remote/api", "/robot/robot_A/step", body, CancellationToken.None).GetAwaiter().GetResult();
++    }
++    [NUnit.Framework.Test]
++    public void UploadAcknowledgementsHistoryRestartAndRunIdentity()
++    {
++        Environment.SetEnvironmentVariable("SMOKE_REMOTE_FILES", null);
++        Check(!RemoteRecordingFiles.Enabled("http://localhost:8080"), "localhost default on");
++        Check(!RemoteRecordingFiles.Enabled("http://127.0.0.1:8080"), "IPv4 loopback on");
++        Check(!RemoteRecordingFiles.Enabled("http://[::1]:8080"), "IPv6 loopback on");
++        Check(RemoteRecordingFiles.Enabled("https://remote/api"), "remote default off");
++        Environment.SetEnvironmentVariable("SMOKE_REMOTE_FILES", "1");
++        Check(RemoteRecordingFiles.Enabled("http://localhost:8080"), "env ignored");
++        Environment.SetEnvironmentVariable("SMOKE_REMOTE_FILES", null);
++        string root = Path.Combine(Path.GetTempPath(), "transport-csharp-" + Guid.NewGuid().ToString("N"));
++        string dir = Path.Combine(root, "robot_A");
++        Directory.CreateDirectory(dir);
++        try
++        {
++            foreach (string sensor in new[] { "rgb", "depth", "thermal" })
++            {
++                Directory.CreateDirectory(Path.Combine(dir, sensor));
++                File.WriteAllText(Path.Combine(dir, sensor + ".txt"), "0 " + sensor + "/0.png\n0.5 " + sensor + "/0.5.png\n1 " + sensor + "/1.png\n");
++                foreach (string stamp in new[] { "0", "0.5", "1" }) File.WriteAllText(Path.Combine(dir, sensor, stamp + ".png"), "image bytes");
++            }
++            File.WriteAllText(Path.Combine(dir, "camera.yaml"), "calibration");
++            File.WriteAllText(Path.Combine(dir, "thermal.yaml"), "calibration");
++            File.WriteAllText(Path.Combine(dir, "scene.json"), "forbidden");
++            var handler = new Handler();
++            using (var client = new HttpClient(handler))
++            {
++                RemoteRecordingFiles.BeginRun(root);
++                Send(client, dir, 0.0);
++                Check(handler.batches.Count == 1 && handler.batches[0].Count(x => x.EndsWith(".png")) == 3, "first frame missing");
++                Check(!handler.batches[0].Contains("scene.json"), "sent truth");
++                Send(client, dir, 0.0);
++                Check(handler.batches.Count == 1, "resent acknowledged files");
++                Send(client, dir, 1.0);
++                Check(handler.batches.Count == 2 && handler.batches[1].Length == 3, "latest delta wrong");
++                Send(client, dir, 1.0, true);
++                Check(handler.batches.Last().Length == 3 && handler.batches.Last().All(x => x.EndsWith("/0.5.png")), "history holes lost");
++                handler.missing = true;
++                Send(client, dir, 1.0, true);
++                Check(handler.batches.Last().Count(x => x.EndsWith(".png")) == 9, "restart did not resend history");
++                string prior = handler.uri;
++                RemoteRecordingFiles.BeginRun(root);
++                handler.failUpload = true;
++                bool refused = false;
++                try { Send(client, dir, 0.0); } catch (IOException) { refused = true; }
++                Check(refused, "upload failure hidden");
++                Send(client, dir, 0.0);
++                Check(handler.uri != prior && handler.batches.Last().Count(x => x.EndsWith(".png")) == 3, "new run or failed-upload cursor wrong");
++            }
++            Console.WriteLine("PASS C# transport: loopback/env, API prefix, sensor allowlist, acknowledgement deltas, history holes, restart resend, new-run ids, failed-upload retry, remote output paths");
++        }
++        finally { Directory.Delete(root, true); }
++    }
++}
