@@ -105,7 +105,9 @@ Facts about your robot and the context:
 - Each perception tool returns the same result if called again in this step. scan_thermal is how you find people and
   fire the robot has not raised yet: one scan on a check-in, an arrival or a new candidate is worth its cost, and a warm
   person-sized region deserves inspect_candidate at once, even during a retreat (inspecting and confirming from where
-  the robot stands is always allowed). assess_visibility is for the torch and track_fire_spread for a decision about
+  the robot stands is always allowed). An inspection that lists other_people saw a whole person elsewhere in the view
+  with the colour detector: inspect that bearing and range next. not_person with nothing warm at the spot means the spot
+  was in full view and empty, with no person anywhere in the colour image: reject it rather than look again. assess_visibility is for the torch and track_fire_spread for a decision about
   fire or water; the context already carries nearest_fire, fire_near_robot, fire_blocks_frontier, fire_blocks_exit and
   spray_option from the robot's own thermal map, so neither is needed every step.
 - send_team_message reaches your partner and the commander only within radio range and through at most one wall;

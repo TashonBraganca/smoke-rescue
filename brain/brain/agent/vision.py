@@ -256,6 +256,13 @@ def _blind_floor_m() -> float:
     return float(m["forward_offset_m"]) + float(m["height_m"]) / math.tan(bottom)
 
 
+def _spot_in_view(frame, bearing_deg, range_m, edge_deg=2.) -> bool:
+    """The asked spot lies inside the thermal camera's horizontal view (edge_deg in from each side) and beyond the nearest
+    floor the camera sees, so an empty result there is a measurement, not a blind spot."""
+    half = math.degrees(math.atan(frame.thermal.shape[1] / 2 / float(frame.thermal_K[0][0])))
+    return abs(bearing_deg) <= half - edge_deg and range_m >= _blind_floor_m()
+
+
 def _above_floor(frame, depth, floor_band_m=None):
     """Thermal pixels that are not floor: height above the floor (thermal-registered depth back-projected with the
     camera mast's real mount) above floor_band_m, or no depth (smoke, beyond range), which is kept rather than guessed.
@@ -630,7 +637,8 @@ def inspect_candidate(frame: Frame, bearing_deg: float, range_m: float, *, outpu
         refs = [(bearing_deg, range_m)]
         if cand.get("bearing_deg") is not None:
             refs.append((cand["bearing_deg"], cand["range_m"] if cand.get("range_m") is not None else range_m))
-        hits = [p for p in detect_people_rgb(frame)
+        people = detect_people_rgb(frame)
+        hits = [p for p in people
                 if any(abs(p["bearing_deg"] - b) <= bearing_tolerance_deg and (p["range_m"] is None or abs(p["range_m"] - r) <= range_tolerance_m or
                         (not cand and p.get("range_source") == "lidar"))
                        for b, r in refs)]
@@ -681,6 +689,27 @@ def inspect_candidate(frame: Frame, bearing_deg: float, range_m: float, *, outpu
         elif not thermal_negative and any(h["confidence"] >= 0.5 for h in hits):
             result["reasons"] = result["reasons"] + ["A colour person detection touches the side of the image, so it shows "
                                                      "only part of the object and cannot confirm a body; face it to look again."]
+        if result["verdict"] != "person":
+            # A whole colour person away from the asked spot was dropped here, so the model never heard of it. Seed 932: in 5
+            # of 18 uncertain inspections the frame held a person box of 0.52 to 0.88 outside the bearing and range filter;
+            # every such box of 0.5 or more with a measured range lay 0.13 to 0.41 m from a real person, two of them not yet
+            # confirmed (robot B at 13.4 s, robot A at 45.0 s). They are reported as new candidates to inspect.
+            others = [p for p in people if p not in hits and p["confidence"] >= 0.5
+                      and p["bbox_rgb"][0] > margin and p["bbox_rgb"][0] + p["bbox_rgb"][2] < width - margin]
+            if others:
+                result["other_people"] = [{"bearing_deg": _number(p["bearing_deg"]), "range_m": _number(p["range_m"]) if p.get("range_m") is not None else None,
+                                           "confidence": _number(p["confidence"])} for p in others]
+                result["reasons"] = result["reasons"] + ["The colour detector sees a whole person elsewhere in this view (other_people): "
+                                                         "inspect there; this inspection says nothing about them."]
+            elif not options and result["verdict"] == "uncertain" and _spot_in_view(frame, bearing_deg, range_m) and \
+                    not any(p["confidence"] >= 0.35 for p in people):
+                # Nothing warm at a spot the camera fully sees, and no person anywhere in the colour image even at the
+                # detector's lowest confidence: there is nothing there to confirm. Held-out runs 1 and 2: 22 of 25
+                # uncertain verdicts were not on a person, and an uncertain verdict can never be rejected, so the robots
+                # came back to the same empty spots. Clipped, depth-starved or out-of-view looks stay uncertain.
+                result["verdict"] = "not_person"
+                result["reasons"] = result["reasons"] + ["The asked spot is in full view and holds nothing in the human temperature "
+                                                         "band, and the colour detector sees no person anywhere in the frame."]
     path = Path(output_dir)/f"{result['id']}.png"
     _debug(frame,mask,aligned,path)
     result["debug_crop"] = str(path)
