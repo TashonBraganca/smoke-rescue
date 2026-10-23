@@ -175,3 +175,11 @@ def test_heat_events_offer_only_the_tools_that_can_act_there():
             "send_team_message", "finish"} <= names
     everything = {t["function"]["name"] for t in T.tool_specs("survivor_candidate")}
     assert "go_to" in everything and "explore_frontier" in everything and len(everything) > len(names)
+
+
+def test_partner_findings_carry_their_age():
+    from brain.agent.team import TeamState
+    team = TeamState.of("robot_A")
+    team.ingest([{"message_id": "robot_B-9", "from": "robot_B", "t": 40.0, "kind": "finding", "text": "fire in the hall"}], 41.0)
+    ctx = team.context(70.0)
+    assert ctx["partner_findings"][0]["age_s"] == 30.0 and ctx["partner_last_heard_s"] == 30.0
