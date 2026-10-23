@@ -32,7 +32,7 @@ namespace SmokeRescue.Recording
         /// <summary>Vision service for the live colour person detector (OpenCV 5 dnn, YOLO11m). It is perception, not
         /// the language model, so it runs with or without agents. Null skips it (logged at the start of a run).</summary>
         public static string PeopleUrl;
-        public static float PeoplePeriodS = 1f;
+        public static float PeoplePeriodS = 1f, PeopleBoostS = .2f;
         /// <summary>How often the brain takes the live 3D map's height layer, and how often the map is saved as a point
         /// cloud in the recording (for the replay and the video).</summary>
         const double Map3dLayersPeriodS = 5, Map3dExportPeriodS = 30;
@@ -469,7 +469,10 @@ namespace SmokeRescue.Recording
             if (PeopleUrl == null) return;
             foreach (var rig in rigs)
             {
-                if (rig.brain == null || rig.missionDone || t - rig.lastPeople < PeoplePeriodS - 1e-9) continue;
+                // A live person sighting asks for a faster scan (RobotBrain.WantsPeopleBoost): seed 934, robot B had a person in view
+                // for 1.2 s and the once-a-second scan caught one frame.
+                double period = rig.brain != null && rig.brain.WantsPeopleBoost(t) ? PeopleBoostS : PeoplePeriodS;
+                if (rig.brain == null || rig.missionDone || t - rig.lastPeople < period - 1e-9) continue;
                 rig.lastPeople = t;
                 FlushForAgent(rig, pending, cfg);
                 var reply = Post("/perceive/people", new JObject { ["robot_dir"] = Path.GetFullPath(rig.dir), ["t"] = t, ["min_conf"] = 0.25 }, PeopleUrl);

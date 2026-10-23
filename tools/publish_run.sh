@@ -22,6 +22,7 @@ done
 cp "$repo/config/$scenario" "$dst/$scenario"
 cd "$repo"
 git add "run_logs/$run"
-git commit -q -m "run_logs: $run (robot logs without rgb/depth frames, oracle, meta, $scenario)"
+# Commit only this run folder: another session may have staged other files.
+git commit -q -m "run_logs: $run (robot logs without rgb/depth frames, agent and radio logs, oracle, meta, $scenario)" -- "run_logs/$run"
 git push -q origin main
 du -sh "$dst"; git log --oneline -1

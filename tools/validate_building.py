@@ -355,10 +355,17 @@ def validate():
     for group, value in [('rooms', plan['rooms'][:10]), ('landmarks', plan['landmarks'][:34]),
                          ('fires', plan['fires']), ('emergency_lights', plan['emergency_lights'][:3])]:
         check(digest(value) == REFERENCE[group], 'Original ' + group + ' changed')
-    old_doors = json.loads(json.dumps(plan['doors'][:14]))
-    old_doors[2]['between'] = ['outside', 'laundry']
-    check(digest(old_doors) == REFERENCE['doors'], 'Original doors changed beyond the permitted d_back connection')
-    check(plan['doors'][2]['between'] == ['laundry', 'office_link'], 'd_back must join laundry and office_link while still swinging into laundry')
+    if 'one_building_note' in plan:
+        # One building, one entrance (owner, 23 Oct 2026): d_west, d_back and d_house_apartment are walled; the house keeps
+        # every other original door unchanged.
+        ids = [d['id'] for d in plan['doors']]
+        check(not any(i in ids for i in ('d_west', 'd_back', 'd_house_apartment')), 'one-building plan must wall d_west, d_back and d_house_apartment')
+        check(sum(d['between'][0] == 'outside' for d in plan['doors'] if d['at'][0] <= 20 and d['at'][1] <= 14) == 1, 'the house must have exactly one entrance')
+    else:
+        old_doors = json.loads(json.dumps(plan['doors'][:14]))
+        old_doors[2]['between'] = ['outside', 'laundry']
+        check(digest(old_doors) == REFERENCE['doors'], 'Original doors changed beyond the permitted d_back connection')
+        check(plan['doors'][2]['between'] == ['laundry', 'office_link'], 'd_back must join laundry and office_link while still swinging into laundry')
     for name, current, nested, added in [
         ('props', props, 'landmarks', REFERENCE['new_kinds']),
         ('materials', materials, 'materials', REFERENCE['new_materials']),
@@ -440,7 +447,15 @@ def validate():
             for nxt in graph[queue.popleft()] - seen:
                 seen.add(nxt)
                 queue.append(nxt)
-        check(entry['state'] in ('open', 'removed') and len(seen) == len(rooms), entry['id'] + ' cannot reach every room internally')
+        if 'one_building_note' in plan:
+            # Separate buildings: d_front must reach every house room, and no other entrance may reach any of them.
+            house = {r['id'] for r in plan['rooms'] if r['rect'][2] <= 20 and r['rect'][3] <= 14}
+            if entry['id'] == 'd_front':
+                check(entry['state'] in ('open', 'removed') and house <= seen, 'd_front cannot reach every house room')
+            else:
+                check(not (house & seen), entry['id'] + ' reaches the house, which must have one entrance')
+        else:
+            check(entry['state'] in ('open', 'removed') and len(seen) == len(rooms), entry['id'] + ' cannot reach every room internally')
     check(len({boundary_side(d, plan['footprint']) for d in exterior}) == 4, 'Entries must cover four cardinal sides')
 
     for index, landmark in enumerate(plan['landmarks']):

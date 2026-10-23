@@ -232,6 +232,9 @@ namespace SmokeRescue.Tests.EditMode
             solidBodies = (bool?)run["robot_collision"] ?? false;
             if (run["probes"] != null) Probes = run["probes"].Select(q => new Vector2((float)q[0], (float)q[1])).ToList();
             cal = SensorConfig.Load(); cfg = BrainConfig.Load(); cfg.frames_shared_at_start = true;
+            // camera_pitch_deg (request option): the colour/depth camera pitched further down, as the owner asked (23 Oct), so a
+            // lying person close in front is in view; the cost is ceiling evidence, which the camera then sees only farther out.
+            if (run["camera_pitch_deg"] != null) cal.camera.mount.pitch_down_deg = (float)run["camera_pitch_deg"];
             // As the recorder does for a scenario with time_limit false (RecordingSession: mission_time_limit_s = 86400).
             if (!((bool?)run["time_limit"] ?? false)) cfg.mission_time_limit_s = 86400f;
             var overrides = (JObject)run["settings"] ?? new JObject();
@@ -287,7 +290,7 @@ namespace SmokeRescue.Tests.EditMode
                     renderClock.Stop();
                     if (t >= r.nextSight)
                     {
-                        r.nextSight = t + cfg.person_rgb_scan_period_s;
+                        r.nextSight = t + (r.brain.WantsPeopleBoost(t) ? cfg.person_rgb_boost_period_s : cfg.person_rgb_scan_period_s);
                         foreach (var (pid, at) in people)
                         {
                             Vector2 d = at - r.p; float range = d.magnitude;
