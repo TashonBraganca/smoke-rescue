@@ -27,7 +27,7 @@ namespace SmokeRescue.Brain
         {
             grid.PrepareNavigation();
             int end = grid.Cell(to);
-            if (!Lead(from, out int start, out var lead) || !grid.Walkable(end)) return new List<Vector2>();
+            if (!Lead(from, out int start, out var lead) || !grid.Standable(end)) return new List<Vector2>();
             Search(start, end, out var distance, out var parent);
             return float.IsPositiveInfinity(distance[end]) ? new List<Vector2>() : Join(lead, Reconstruct(parent, start, end));
         }
@@ -114,7 +114,7 @@ namespace SmokeRescue.Brain
             Search(start, -1, out var distance, out var parent, Allowed, c.search_max_range_m);
             var stands = new List<int>();
             for (int i = 0; i < grid.Count; i++)
-                if (!float.IsPositiveInfinity(distance[i]) && (excluded == null || !excluded(grid.Centre(i)))) stands.Add(i);
+                if (!float.IsPositiveInfinity(distance[i]) && grid.Standable(i) && (excluded == null || !excluded(grid.Centre(i)))) stands.Add(i);
             if (stands.Count == 0) return null;
             var labels = grid.UnsearchedRegions(); var counts = new Dictionary<int, int>();
             foreach (int label in labels) if (label >= 0) counts[label] = counts.TryGetValue(label, out int n) ? n + 1 : 1;
@@ -157,7 +157,7 @@ namespace SmokeRescue.Brain
             var peek = PeekCells();
             for (int i = 0; i < grid.Count; i++)
             {
-                if (float.IsPositiveInfinity(distance[i]) || !grid.Walkable(i) || (!partnerSearchedToo && grid.PeerExplored(i))) continue;
+                if (float.IsPositiveInfinity(distance[i]) || !grid.Standable(i) || (!partnerSearchedToo && grid.PeerExplored(i))) continue;
                 int x = i % grid.Size, y = i / grid.Size;
                 for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++)
                     if (Math.Abs(dx) + Math.Abs(dy) == 1 && grid.Inside(x + dx, y + dy) && grid.Unsearched((y + dy) * grid.Size + x + dx))
@@ -288,7 +288,7 @@ namespace SmokeRescue.Brain
             {
                 // Walkable floor the paths cannot reach: a separate pocket of floor. Free cells too close to a wall are left
                 // out, since every wall has a strip of them.
-                if (!float.IsPositiveInfinity(distance[i]) || !grid.Walkable(i) || !grid.Unsearched(i) || !inSearchArea(grid.Centre(i))) continue;
+                if (!float.IsPositiveInfinity(distance[i]) || !grid.Standable(i) || !grid.Unsearched(i) || !inSearchArea(grid.Centre(i))) continue;
                 count++; float m = Vector2.Distance(from, grid.Centre(i));
                 if (m < bestM) { bestM = m; best = i; }
             }
@@ -296,7 +296,7 @@ namespace SmokeRescue.Brain
             int approach = -1; float approachM = float.PositiveInfinity;
             for (int i = 0; i < grid.Count; i++)
             {
-                if (float.IsPositiveInfinity(distance[i]) || !grid.Walkable(i)) continue;
+                if (float.IsPositiveInfinity(distance[i]) || !grid.Standable(i)) continue;
                 float m = Vector2.Distance(grid.Centre(i), grid.Centre(best));
                 if (m < approachM) { approachM = m; approach = i; }
             }
@@ -323,7 +323,7 @@ namespace SmokeRescue.Brain
                 {
                     float a = sample * 2 * Mathf.PI / c.standoff_samples;
                     int cell = grid.Cell(person + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * radius);
-                    if (cell < 0 || !grid.Walkable(cell) || distance[cell] >= score) continue;
+                    if (cell < 0 || !grid.Standable(cell) || distance[cell] >= score) continue;
                     float range = Vector2.Distance(grid.Centre(cell), person);
                     if (range < c.survivor_stop_min_m || range > c.survivor_stop_max_m || !ClearView(grid.Centre(cell), person)) continue;
                     score = distance[cell]; best = cell;
@@ -352,7 +352,7 @@ namespace SmokeRescue.Brain
             int best = -1; float bestScore = float.PositiveInfinity;
             for (int i = 0; i < grid.Count; i++)
             {
-                if (float.IsPositiveInfinity(distance[i]) || Vector2.Distance(from, grid.Centre(i)) < c.retreat_min_distance_m) continue;
+                if (float.IsPositiveInfinity(distance[i]) || !grid.Standable(i) || Vector2.Distance(from, grid.Centre(i)) < c.retreat_min_distance_m) continue;
                 if (allowed != null && !allowed(grid.Centre(i))) continue;
                 // Heat dominates, then prefer the start and a short escape. All candidates are known and reachable.
                 float score = grid.Heat(i) + (airCost != null ? airCost(i) : 0) +

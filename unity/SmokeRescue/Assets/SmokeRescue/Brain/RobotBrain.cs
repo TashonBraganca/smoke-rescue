@@ -974,17 +974,24 @@ namespace SmokeRescue.Brain
         void SetPath(List<Vector2> value, bool isFrontier = false) { frontierGoal = isFrontier && value.Count > 0; throughCentre = null; path = value; cursor = 0; goal = path.Count > 0 ? path[path.Count - 1] : (Vector2?)null; }
         void ClearPath() { frontierGoal = false; throughCentre = null; path.Clear(); cursor = 0; goal = null; lastPlan = double.NegativeInfinity; }
         Vector2? throughCentre;   // the frontier a follow-through path leads to, when the path is one
-        Vector2? entryPoint; bool entranceLocked;
+        Vector2? entryPoint; bool entranceLocked; double nextLockRefresh;
         /// <summary>Staying inside, the first point where this robot stands on floor it has proven indoors is its way in. Once
         /// it is entrance_lock_m beyond that point, the floor within entrance_lock_m of it is locked for good (OccupancyGrid
         /// .SetEntranceLock). Only the robot's own track decides; nothing about the building is given.</summary>
         void NoteEntrance(double t)
         {
-            if (!c.stay_inside || c.entrance_lock_m <= 0 || entranceLocked) return;
+            if (!c.stay_inside || c.entrance_lock_m <= 0) return;
+            // A passage lock follows the map: floor proven indoors after the lock becomes passage, not wall.
+            if (entranceLocked)
+            {
+                if (c.entrance_lock_passage && t >= nextLockRefresh) { grid.SetEntranceLock(entryPoint.Value, c.entrance_lock_m, InSearchArea); nextLockRefresh = t + 1; }
+                return;
+            }
             var p = motion.Pose.position;
             if (!entryPoint.HasValue) { if (InSearchArea(p)) entryPoint = p; return; }
             if (Vector2.Distance(p, entryPoint.Value) <= c.entrance_lock_m + c.robot_radius_m) return;
-            grid.SetEntranceLock(entryPoint.Value, c.entrance_lock_m); entranceLocked = true;
+            grid.SetEntranceLock(entryPoint.Value, c.entrance_lock_m, c.entrance_lock_passage ? InSearchArea : (System.Func<Vector2, bool>)null);
+            entranceLocked = true; nextLockRefresh = t + 1;
             Emit(t, "entrance_locked", "Inside and clear of the way in: floor near the way in is now locked; this robot never goes back to it.",
                 "x_m", entryPoint.Value.x, "y_m", entryPoint.Value.y, "radius_m", c.entrance_lock_m);
         }
