@@ -138,3 +138,11 @@ def test_a_plan_names_a_place_only_when_the_maps_are_linked(tmp_path):
     assert proposal["target"] == target
     _, seen_b = step(tmp_path, "robot_B", 24.0, [], inbox=[radio(proposal, "robot_A")])
     assert seen_b[0]["team"]["awaiting_your_answer"][0]["target"] == target
+
+
+def test_the_spray_option_carries_where_the_fire_cuts_the_route():
+    # Seed 934: robot A was never offered water for the fire cutting its frontiers; when it is, it must be able to walk
+    # to within the nozzle's reach, so the block's position travels with the option. Control: no position, no "at".
+    with_at = T.spray_option({"fire_blocks_frontier": {"bearing_deg": 10, "distance_m": 7.5, "burning_m2": 0.5, "x": 1.2, "y": 6.0}, "water_l": 12})
+    assert with_at["at"] == [1.2, 6.0] and with_at["within_nozzle_reach"] is False and with_at["blocks"] == "frontier"
+    assert T.spray_option({"fire_blocks_frontier": {"bearing_deg": 10, "distance_m": 7.5, "burning_m2": 0.5}, "water_l": 12})["at"] is None

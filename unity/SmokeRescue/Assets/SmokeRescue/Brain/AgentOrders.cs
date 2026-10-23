@@ -252,7 +252,10 @@ namespace SmokeRescue.Brain
             try
             {
                 grid.FireClearance = -1;   // fire distance is never below zero: every fire cell counts as clear
-                all = planner.Frontiers(motion.Pose.position, p => ClaimBlocks(p, t) || GoalBlacklisted(p, t) || VisitedGoal(p, t) || !InSearchArea(p));
+                // Blacklisted goals stay in: when fire cuts a route the brain blacklists that frontier (fire_cut_blacklist_s), and
+                // filtering it here hid exactly the fire the agent could spray. Seed 934 (23 Oct), robot A: 6 fire-cut blacklists
+                // from 119 s, fire_blocks_frontier never sent, 0 sprays with 12 L aboard.
+                all = planner.Frontiers(motion.Pose.position, p => ClaimBlocks(p, t) || VisitedGoal(p, t) || !InSearchArea(p));
             }
             finally { grid.FireClearance = saved; }
             float margin = c.fire_clearance_m + grid.CellM * .707107f;
