@@ -253,7 +253,7 @@ namespace SmokeRescue.Brain
                 {
                     m.Doors[i] = new BrainDoor { position = ReadPoint(r), inward = ReadPoint(r), owner = ReadString(r), state = r.ReadByte(), since = r.ReadDouble() };
                     if (!BrainMath.Finite(m.Doors[i].position.x) || !BrainMath.Finite(m.Doors[i].position.y) || !BrainMath.Finite(m.Doors[i].inward.x) ||
-                        !BrainMath.Finite(m.Doors[i].inward.y) || (m.Doors[i].state != 1 && m.Doors[i].state != 2)) throw new InvalidDataException("Invalid door.");
+                        !BrainMath.Finite(m.Doors[i].inward.y) || (m.Doors[i].state < 1 || m.Doors[i].state > 3)) throw new InvalidDataException("Invalid door.");
                 }
                 if (stream.Position != stream.Length) throw new InvalidDataException("Trailing brain packet bytes.");
                 return m;
