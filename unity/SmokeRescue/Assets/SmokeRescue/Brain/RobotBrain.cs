@@ -219,6 +219,9 @@ namespace SmokeRescue.Brain
                 // the nearest walkable cell short of it (house reflex check: robot B stopped 0.3 m from its start and replanned
                 // the same 3-point path for 45 s). Within return_arrive_m of the start counts as back.
                 float toExit = float.PositiveInfinity; foreach (var e in Exits()) toExit = Mathf.Min(toExit, Vector2.Distance(motion.Pose.position, e));
+                // return_home_at_end: back means on this robot's own start pad, not in the doorway: headless 5001 and 5017, robot B
+                // stopped in the only doorway (0, 0.43) and robot A, behind it, found no route out.
+                if (EndReturn) toExit = Vector2.Distance(motion.Pose.position, home);
                 bool clearing = !float.IsNaN(carryClearFrom.x);
                 bool arrived = toExit <= Mathf.Max(c.goal_tolerance_m, c.return_arrive_m) || clearing;
                 if (arrived && returnReason == CarryingOut && carryTowM > 0 && float.IsNaN(stepAwayFrom.x))
@@ -1829,8 +1832,16 @@ namespace SmokeRescue.Brain
             }
             return best;
         }
+        /// <summary>The end-of-mission walk out (return_home_at_end): to this robot's own start pad.</summary>
+        bool EndReturn => c.return_home_at_end && returning && returnReason == MissionTimeUp;
         List<Vector2> PlanOut()
         {
+            if (EndReturn)
+            {
+                if (!lockLifted) { lockLifted = true; grid.ClearEntranceLock(); }
+                var pad = planner.Plan(motion.Pose.position, home);
+                if (pad.Count > 0) return pad;
+            }
             var route = PlanOutFrom(motion.Pose.position);
             // return_home_at_end: with stay_inside no sensed exit is kept, so the way out is the start pad itself, where the robot
             // came in (shared gate frame). Headless 5001, 5017, 5020, 5022: the route out came back empty every tick at 240 s.
@@ -1848,7 +1859,7 @@ namespace SmokeRescue.Brain
         /// mission_time_limit_s (CheckWayOut does this without stay_inside, and returns at once with it).</summary>
         void CheckHomeTime(double t)
         {
-            if (!c.return_home_at_end || completed || returning || t < nextHomeCheck) return;
+            if (!c.return_home_at_end || !c.return_home_early || completed || returning || t < nextHomeCheck) return;
             nextHomeCheck = t + c.escape_check_s;
             // The entrance lock keeps the way in out of every plan while searching; the route out is measured with it lifted.
             bool locked = entranceLocked && !lockLifted && entryPoint.HasValue;

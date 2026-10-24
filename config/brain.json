@@ -679,6 +679,8 @@
   "turn_stall_dps_reason": "A commanded turn measuring under this yaw rate is not turning. Turns run at 45 to 60 deg/s; gyro noise is well under 1 deg/s.",
   "return_home_at_end": false,
   "return_home_at_end_reason": "Owner, 24 Oct 11:10: at the end of the mission both robots walk back out the main exit, along the planned route to the start in the shared gate frame; stay_inside still turns every other reason to leave (heat, a closing way out) into a retreat inside. The walk starts when the walk out, times escape_time_factor, would reach mission_time_limit_s. Headless 5001, 5017, 5022 (time limit on): without it both robots stopped where they stood at 240 s, 7.7 to 19.5 m from the way in.",
+  "return_home_early": false,
+  "return_home_early_reason": "With return_home_at_end, start the walk out early enough to be out by mission_time_limit_s. Off (owner, 24 Oct 13:05): search the full mission_time_limit_s, then walk out; being out by 240 s cost 20 -> 15 of 20 people and about 80 -> 68 % coverage on headless houses 5001, 5017, 5020, 5022.",
   "door_claims": false,
   "door_claims_reason": "Owner, 24 Oct: a robot that walks through a doorway into a room records the doorway point and radios it taken; walking back out radios it cleared. The partner never routes through a taken doorway (heard within door_claim_lease_s) and nobody routes through a cleared one. Doorways come from the robot's own LiDAR map. Seed 934 (24 Oct 04:53 run): robot A walked into the kitchen robot B was searching and stayed 28.7 s; 68 room claims were sent and none stopped it (Codex cx-rooms report). OFF until measured.",
   "door_min_width_m": 0.6,
