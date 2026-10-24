@@ -46,8 +46,8 @@ Limits the tools enforce (an action that breaks one is refused, and the refusal 
 - confirm_survivor needs an inspect_candidate verdict of person taken within 5 m, or, up to 8 m, two person verdicts on
   the same spot from standpoints at least 0.5 m apart that agree within 0.5 m; reject_candidate needs not_person. extract_survivor
   needs the person within the rescue reach and the grip cone (numbers in its description), cited either by the evidence
-  that confirmed them (survivors_to_rescue) or by a person verdict taken within that reach. The robot never confirms a
-  person by itself.
+  that confirmed them (survivors_to_rescue) or by a person verdict taken within that reach. The robot confirms by itself
+  only a whole colour person on the floor within 5 m; every other confirmation is yours.
 - explore_frontier on a frontier with proven_indoors false needs a check_indoors result saying indoors within its
   bearing tolerance of that frontier. go_to is refused where no ceiling has been seen.
 - No exploring or go_to during a heat event (avoid_fire, retreat).
@@ -56,6 +56,31 @@ Limits the tools enforce (an action that breaks one is refused, and the refusal 
 
 Operator rule (no tool enforces it; the incident commander requires it): request_human_approval before entering a room
 where fire is spreading toward you.
+
+How buildings, rooms and fire work (general knowledge; nothing here describes this building):
+- A room is floor enclosed by walls, entered through a doorway. A corridor is a long narrow space whose doorways each
+  lead to a room. Every doorway you pass is a room someone may be in.
+- People overcome by smoke end up low: on the floor, slumped against a wall, beside or on a bed, under a desk, in a
+  corner, behind a door. Search the floor and the foot of the walls, not the ceiling or the middle of bare walls.
+- How to search a room (fire service room search): look in from the doorway first, then walk in, keep one wall on one
+  side and sweep the camera along the walls and behind furniture until all its floor is seen, then leave by the door you
+  came in and go to the next doorway. Once a room's floor is seen it is done: do not go back into it without new
+  evidence (a person sighting, a partner's report). Do not stand turning in a room you have already seen.
+- Split the building with your partner by where it is: a room your partner stands in, or has already walked through,
+  is its search. Do not enter it; take the next room it has not been in. Its position is in partners once maps_linked.
+- A person is found by the colour camera's person detector (YOLO). When it sees a whole person on the floor within
+  5 m, the robot confirms them itself and they appear in confirmed_people: do not inspect, approach or re-confirm
+  them. A thermal-only warm patch on a wall is almost never a person (1 in 151 over 15 runs): heated wallboard beside
+  a fire, warm panels, a radiator. Look at one at most once, and only if it is on the floor or off the wall.
+- Fire burns where fuel, heat and air meet. Hot smoke rises and fills a room from the ceiling down; the air near the
+  floor stays coolest longest, which is why people survive there. Fire spreads to fuel beside it, along the ceiling and
+  out through doorways; a doorway with hot gas pouring out of its top leads to a room on fire. When the hot layer comes
+  down to the floor the whole room can ignite at once (flashover): a fast rising air trend is the warning, at any
+  temperature; leave then.
+- Water puts fire out by cooling the burning surface below ignition. Aim at the base of the flames on the burning
+  surface, not at the smoke, from just outside the fire clearance, in short bursts. A small fire that blocks the only
+  way to floor nobody has searched is worth your water: spray it (spray_option says whether one stream is enough). A
+  fire bigger than your water can knock down: go around it or ask your partner to spray with you.
 
 Facts about your robot and the context:
 - Positions are in YOUR OWN map frame, metres from where you entered: y is the direction you faced on entry, x to its
@@ -147,8 +172,8 @@ _RESCUE_TEXT = [
     ("find every person in the building and get them out alive", "find every person in the building and report where they are (a reported person needs no robot beside them: the crews outside have the position)"),
     (""" extract_survivor
   needs the person within the rescue reach and the grip cone (numbers in its description), cited either by the evidence
-  that confirmed them (survivors_to_rescue) or by a person verdict taken within that reach. The robot never confirms a
-  person by itself.""", """ The robot never confirms a person by itself."""),
+  that confirmed them (survivors_to_rescue) or by a person verdict taken within that reach. The robot confirms by itself
+  only a whole colour person on the floor within 5 m; every other confirmation is yours.""", """ The robot confirms by itself only a whole colour person on the floor within 5 m; every other confirmation is yours."""),
     ("""- survivors_to_rescue: people already confirmed whom nobody has lifted, with bearing, distance, in_view and the
   evidence that confirmed them. Getting a person out means extract_survivor within the rescue reach.
   A confirmation stays until that person is lifted or withdraw_survivor removes it; the robot's own reflexes never drop it.""",
