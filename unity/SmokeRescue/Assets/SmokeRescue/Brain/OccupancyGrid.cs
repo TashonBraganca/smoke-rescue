@@ -307,6 +307,21 @@ namespace SmokeRescue.Brain
         }
         /// <summary>This robot's own LiDAR saw open ground here (wide no-return spans, MarkOpenGround).</summary>
         public bool OpenGroundAt(Vector2 p) { int i = Cell(p); return i >= 0 && openGround[i]; }
+        internal float HeatRise(int i) => rise[i];
+        /// <summary>A fire cell within the route cell's clearance, measured between cell centres as FireDistance does.</summary>
+        internal int FireCellNear(int cell, float radius, bool measuredOnly)
+        {
+            if (cell < 0 || cell >= Count) return -1;
+            int reach = Mathf.CeilToInt(radius / CellM), cx = cell % Size, cy = cell / Size;
+            var at = Centre(cell);
+            for (int y = Math.Max(0, cy - reach); y <= Math.Min(Size - 1, cy + reach); y++)
+                for (int x = Math.Max(0, cx - reach); x <= Math.Min(Size - 1, cx + reach); x++)
+                {
+                    int i = y * Size + x;
+                    if ((measuredOnly ? heat[i] >= c.fire_c : Dangerous(i)) && Vector2.Distance(at, Centre(i)) <= radius) return i;
+                }
+            return -1;
+        }
         public bool Dangerous(int i) => heat[i] >= c.fire_c ||
             (firePrediction && time - heatTime[i] <= c.heat_rise_memory_s && heat[i] + rise[i] * c.heat_prediction_s >= c.fire_c);
         /// <summary>Whether a cell forecast to reach fire_c within heat_prediction_s counts as fire. True while searching; false

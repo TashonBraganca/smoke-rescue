@@ -29,12 +29,20 @@ namespace SmokeRescue.Brain
             /// farthest room cell from it. A radio room claim names the room by these.</summary>
             public Vector2 anchor;
             public float radiusM;
+            /// <summary>partner_rooms: a partner's radioed body stood on this room's floor (partnerEntered), or stands there now
+            /// (partnerInside, set at each ranking from poses no older than peer_claim_s).</summary>
+            public bool partnerEntered, partnerInside;
         }
 
         readonly OccupancyGrid grid;
         readonly BrainConfig config;
         double[] dwellByCell;
-        bool[] enteredCells;
+        bool[] enteredCells, partnerCells;
+        /// <summary>Partner bodies now, in this robot's frame, with the partner's ID and its radioed goal (null when it sent
+        /// none); the brain refreshes it every step.</summary>
+        public readonly List<(string id, Vector2 at, Vector2? goal)> PartnersNow = new List<(string, Vector2, Vector2?)>();
+        /// <summary>This robot's ID, for the tie-break when two robots stand in one room.</summary>
+        public string SelfId = "";
         readonly List<Room> rooms = new List<Room>();
         readonly Dictionary<int, Room> byId = new Dictionary<int, Room>();
         int[] labels;
@@ -59,7 +67,7 @@ namespace SmokeRescue.Brain
             {
                 labels = new int[grid.Count];
                 for (int i = 0; i < labels.Length; i++) labels[i] = -1;
-                dwellByCell = new double[grid.Count]; enteredCells = new bool[grid.Count];
+                dwellByCell = new double[grid.Count]; enteredCells = new bool[grid.Count]; partnerCells = new bool[grid.Count];
             }
             if (!double.IsNaN(lastT) && t < lastT) throw new ArgumentException("Room ledger timestamps must not decrease.");
             if (!double.IsNaN(lastT) && t == lastT) return;
@@ -85,6 +93,33 @@ namespace SmokeRescue.Brain
 
         readonly Dictionary<int, Vector2> entryById = new Dictionary<int, Vector2>();
         public Room Get(int id) => byId.TryGetValue(id, out var room) ? room : null;
+        /// <summary>A partner's radioed pose, converted into this frame: the floor under its body is floor it stood on.</summary>
+        public void MarkPartner(Vector2 at, float radius)
+        {
+            if (partnerCells == null) { partnerCells = new bool[grid.Count]; }
+            int cell = grid.Cell(at); if (cell < 0) return;
+            int r = Mathf.CeilToInt(radius / grid.CellM), cx = cell % grid.Size, cy = cell / grid.Size;
+            for (int y = Math.Max(0, cy - r); y <= Math.Min(grid.Size - 1, cy + r); y++)
+                for (int x = Math.Max(0, cx - r); x <= Math.Min(grid.Size - 1, cx + r); x++)
+                    if (Vector2.Distance(grid.Centre(y * grid.Size + x), at) <= radius) partnerCells[y * grid.Size + x] = true;
+        }
+        /// <summary>The room at p, or the nearest labelled cell within three cells (two maps place one wall a cell or two apart).</summary>
+        /// <summary>partner_rooms applies only to a room one robot finishes within room_ledger_dwell_s (its floor over the strip a
+        /// camera sweeps per second, as DwellBudget): about 48 m2. A larger labelled space is open plan or several rooms the
+        /// ledger has not split, and is shared. Headless 5001 (24 Oct): a 9 m radius space left to robot A alone held it from
+        /// 30 to 108 s.</summary>
+        public bool OneRobotRoom(Room r) => r.indoorFloorM2 > 0 && DwellBudget(r) <= config.room_ledger_dwell_s;
+        public int RoomNear(Vector2 p)
+        {
+            int room = RoomAt(p); if (room >= 0) return room;
+            float best = float.PositiveInfinity;
+            for (int dy = -3; dy <= 3; dy++) for (int dx = -3; dx <= 3; dx++)
+            {
+                var q = p + new Vector2(dx, dy) * grid.CellM; int r = RoomAt(q); float d = Vector2.Distance(p, q);
+                if (r >= 0 && d < best) { best = d; room = r; }
+            }
+            return room;
+        }
         /// <summary>Is p on the floor of a promoted room (see Shape)?</summary>
         public bool Promoted(Vector2 p) { var r = Get(RoomAt(p)); return r != null && r.promoted; }
         /// <summary>Time to finish a room: the dwell budget, or longer for a big room, its floor area over the strip a camera
@@ -180,6 +215,7 @@ namespace SmokeRescue.Brain
                 int label = next[i]; if (label < 0) continue;
                 var room = rooms[label]; room.centre += grid.Centre(i); floor[label]++;
                 room.entered |= enteredCells[i]; room.dwellS += dwellByCell[i];
+                if (partnerCells != null && partnerCells[i]) room.partnerEntered = true;
                 if (indoors(grid.Centre(i)))
                 {
                     indoorCount[label]++;
@@ -368,6 +404,21 @@ namespace SmokeRescue.Brain
             bool finishing = byId.TryGetValue(current, out var here) && here.indoorFloorM2 > 0 && !here.corridor &&
                 here.coveredShare < config.room_ledger_covered_share && here.dwellS < DwellBudget(here);
             var order = new Dictionary<GridPlanner.FrontierChoice, int>();
+            // partner_rooms: the room a partner is searching now: its body stands there and its goal, when it radioed one, lies
+            // there too. A partner passing through (its goal in another room) holds nothing, and a corridor is the way to
+            // every room off it, never one robot's room. Headless seed 934 with one door per room (24 Oct): with the hall
+            // left to robot A whenever A stood in it, robot B's only options after the kitchen were the kitchen again, and it
+            // went back in from 140 to 202 s. When both search one room, the higher ID yields it.
+            var partnerNow = new HashSet<int>();
+            foreach (var r in rooms) r.partnerInside = false;
+            if (config.partner_rooms)
+                foreach (var (pid, p, goal) in PartnersNow)
+                {
+                    int r = RoomNear(p); if (r < 0 || byId[r].corridor || !OneRobotRoom(byId[r])) continue;
+                    if (goal.HasValue && RoomNear(goal.Value) != r) continue;
+                    if (r == current && string.CompareOrdinal(SelfId, pid) < 0) continue;
+                    partnerNow.Add(r); byId[r].partnerInside = true;
+                }
             for (int i = 0; i < choices.Count; i++)
             {
                 var f = choices[i]; order[f] = i; f.roomId = RoomForFrontier(f.position);
@@ -377,8 +428,21 @@ namespace SmokeRescue.Brain
                 // door). Headless seed 5001: the kitchen door 17 m down the corridor was never seen from its lower half, so the
                 // kitchen was never in either robot's ledger.
                 int corridorTier = config.room_ledger_corridor_first ? 1 : 2, unenteredTier = config.room_ledger_corridor_first ? 2 : 1;
+                // An unentered room stays unentered however covered it looks from the door: walking in sees behind the furniture.
+                // Headless 24 Oct, houses 5001-5004: ranking covered rooms done before entry (all of them, or only those enclosed
+                // by mapped walls) reached 23 and 24 of 31 rooms against 26, mean floor searched 69.2 and 74.0 % against 75.5 %.
                 f.roomTier = !known ? 5 : finishing && f.roomId == current ? 0 : room.corridor ? corridorTier : !room.entered ? unenteredTier :
                     room.coveredShare >= config.room_ledger_covered_share ? 4 : 3;
+                // partner_rooms (owner, 24 Oct: "it knows the coordinates of the other; it won't even go near that room"). A room a
+                // partner stands in now is left to it: last tier, kept only as a fallback. A room a partner already walked
+                // through is entered, never "unentered" again. Seed 934 (24 Oct 04:53): A walked into the kitchen four times
+                // between 107 and 117 s while B stood in it, and B into rooms A had searched.
+                if (config.partner_rooms && known)
+                {
+                    if (partnerNow.Contains(f.roomId)) f.roomTier = 4;
+                    else if (room.partnerEntered && !room.corridor && f.roomTier == unenteredTier && OneRobotRoom(room))
+                        f.roomTier = room.coveredShare >= config.room_ledger_covered_share ? 4 : 3;
+                }
                 f.roomScore = f.cost / config.open_speed_mps + (known ? room.coveredShare * config.room_ledger_dwell_s : 0);
                 // room_sweep (owner, 23 Oct): finish a room from the left side across to the right, as seen from where the robot
                 // came in, then leave on the right. Frontiers in the room being finished cost extra the further right of the line
