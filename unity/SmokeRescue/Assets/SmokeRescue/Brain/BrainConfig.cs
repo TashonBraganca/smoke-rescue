@@ -60,6 +60,8 @@ namespace SmokeRescue.Brain
         public bool survivor_view_sight_line = false;
         public float survivor_close_view_min_m = 0f;
         public bool turn_stall_flip = false; public float turn_stall_dps = 3f;
+        public bool door_claims = false; public float door_min_width_m = .6f, door_max_width_m = 1.3f, door_side_extra_m = .5f, door_cross_m = .8f,
+            door_match_m = .8f, door_home_clear_m = 2.5f, door_claim_lease_s = 90f;
         public float room_walk_in_min_m2 = 2f, room_walk_in_max_m = 8f;
         public float pinned_yield_m = 1.2f, pinned_yield_back_s = 3f, pinned_yield_speed_mps = .15f;
         public float pinned_window_s = 8f, pinned_move_m = .15f;
