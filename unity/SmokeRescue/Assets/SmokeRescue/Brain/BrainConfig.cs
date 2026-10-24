@@ -104,6 +104,7 @@ namespace SmokeRescue.Brain
         public float heat_decay_c_per_s = 0.2f;
         public float heat_prediction_s = 1.0f;
         public float heat_rise_memory_s = 2.0f;
+        public float heat_rise_window_s = 0f;
         public float frame_pair_tolerance_s = 0.08f;
         public float frame_max_age_s = 0.5f;
         public float motion_stale_s = 0.25f;
@@ -298,7 +299,7 @@ namespace SmokeRescue.Brain
                 robot_radius_m <= 0 || free_log_odds >= 0 || occupied_log_odds <= 0 || free_threshold >= 0 || occupied_threshold <= 0 ||
                 log_odds_cap < Math.Max(-free_threshold, occupied_threshold) || obstacle_max_height_m <= obstacle_min_height_m ||
                 fire_clearance_m < robot_radius_m || heat_cost_radius_m <= fire_clearance_m || heat_cost_weight < 0 ||
-                heat_decay_c_per_s < 0 || fire_c <= heat_project_min_c || heat_project_min_c <= ambient_c || heat_prediction_s < 0 || heat_rise_memory_s <= 0 ||
+                heat_decay_c_per_s < 0 || fire_c <= heat_project_min_c || heat_project_min_c <= ambient_c || heat_prediction_s < 0 || heat_rise_memory_s <= 0 || heat_rise_window_s < 0 || heat_rise_window_s > heat_rise_memory_s ||
                 frame_pair_tolerance_s < 0 || frame_max_age_s <= 0 || motion_stale_s <= 0 || health_max_gap_s <= 0 ||
                 corner_target < 1 || contrast_target <= 0 || corner_gradient <= 0 || health_threshold <= 0 || health_threshold >= 1 ||
                 health_corner_weight < 0 || health_contrast_weight < 0 || health_depth_weight < 0 ||
