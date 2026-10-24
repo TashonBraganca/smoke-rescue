@@ -116,6 +116,8 @@ namespace SmokeRescue.Tests.EditMode
             ledger.Rank(new List<GridPlanner.FrontierChoice> { door, leftover }, at);
             Assert.That(door.roomTier, Is.EqualTo(unentered), "a door onto unseen space out of a covered room is a new room");
             Assert.That(leftover.roomTier, Is.EqualTo(4), "control: the room's own last pocket stays a leftover");
+            Assert.That(door.roomScore, Is.EqualTo(door.cost / c.open_speed_mps).Within(1e-4),
+                "the door carries no share of the covered room behind it: the space beyond is unseen");
             c.frontier_beyond_room = false; ledger.Rank(new List<GridPlanner.FrontierChoice> { door }, at);
             Assert.That(door.roomTier, Is.EqualTo(4), "switch off: the door ranks with its room, as before");
         }
