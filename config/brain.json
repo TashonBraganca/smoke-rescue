@@ -697,6 +697,8 @@
   "door_claim_lease_s_reason": "A taken doorway not heard of for this long lapses, so a stuck or silent owner cannot lock a room; radio gaps reached 58 s in seed 934.",
   "door_room_reach_m": 4,
   "door_room_reach_m_reason": "Without a ledger room at either point, a robot on the inward side of a doorway within this distance counts as inside that room and may walk out; rooms in these houses are up to about 4 m deep.",
+  "door_frame_depth_m": 0.3,
+  "door_frame_depth_m_reason": "Floor this far ahead of and behind each jamb must be free: a door frame is a wall's thickness (about 0.1 to 0.2 m) deep, while a hallway's walls run along the axis. Without it, a 1.2 m hallway beside a doorway read as a doorway.",
   "room_walk_in_min_m2": 2.0,
   "room_walk_in_min_m2_reason": "Smaller spaces are alcoves or furniture gaps, not rooms to walk into.",
   "room_walk_in_max_m": 8.0,

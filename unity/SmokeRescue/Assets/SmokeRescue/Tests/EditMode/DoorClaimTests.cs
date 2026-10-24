@@ -91,5 +91,31 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(back.Doors[0].position, Is.EqualTo(new Vector2(1.5f, -2))); Assert.That(back.Doors[0].owner, Is.EqualTo("robot_A"));
             Assert.That(back.Doors[0].state, Is.EqualTo(2)); Assert.That(back.Doors[0].since, Is.EqualTo(.5));
         }
+        /// <summary>A doorway crossed at 45 deg from a 1.2 m hallway is still taken: the gap is measured as the narrowest cut
+        /// through the robot, not across its heading (headless houses 5001-5022: 28 of 77 room entries were claimed).</summary>
+        [Test]
+        public void ADoorwayCrossedAtAnAngleFromAHallwayIsTaken()
+        {
+            var c = Settings(); c.grid_size_m = 12; c.door_claims = true; c.door_home_clear_m = .5f;
+            var b = new RobotBrain(Calibration(), c, "A", 0, new EntryPose(-.6f, -.6f, 0)); var g = Map(b);
+            Room(b, -4, 4, -1.2f, 4.5f);
+            for (int i = 0; i < g.Count; i++)
+            {
+                var q = g.Centre(i);
+                if ((Mathf.Abs(q.y) < .06f && Mathf.Abs(q.x) > .45f) || Mathf.Abs(q.y + 1.25f) < .06f) g.ObserveOccupied(i);
+            }
+            var motion = (DeadReckoning)typeof(RobotBrain).GetField("motion", Private).GetValue(b);
+            var update = typeof(RobotBrain).GetMethod("UpdateDoors", Private);
+            float yaw = -45 * Mathf.Deg2Rad; var now = motion.Pose.position;
+            motion.ApplyCorrection(new BrainPose { position = now - new BrainPose { position = Vector2.zero, yawRad = yaw }.Transform(now.x, now.y), yawRad = yaw });
+            var step = new Vector2(.05f, .05f).normalized * .05f; var events = new List<BrainEvent>();
+            for (int k = 1; k <= 70; k++)
+            {
+                motion.ApplyCorrection(new BrainPose { position = step, yawRad = 0 });
+                update.Invoke(b, new object[] { k * .05 }); events.AddRange(b.DrainEvents());
+            }
+            Assert.That(motion.Pose.position.y, Is.GreaterThan(1.2f), "walked through into the room");
+            Assert.That(events.Count(e => e.kind == "door_taken"), Is.EqualTo(1));
+        }
     }
 }

@@ -31,19 +31,39 @@ namespace SmokeRescue.Brain
             return maxM;
         }
 
-        /// <summary>The gap across the heading at p: its width and its middle; with the widths 0.8 m (door_cross_m) ahead and behind.</summary>
-        bool InDoorway(Vector2 p, Vector2 axis, out Vector2 middle)
+        /// <summary>The narrowest free gap through p over axes within 60 deg of the heading (a doorway crossed at an angle reads
+        /// wider across the heading), when it is door_min_width_m to door_max_width_m wide, the floor door_cross_m along its axis
+        /// opens up by door_side_extra_m on at least one side, and is no narrower than the gap on the other (a door off a narrow
+        /// hallway; walking along a corridor never opens up). Headless houses 5001-5022: the across-the-heading test with wider
+        /// floor required on both sides claimed 28 of 77 room entries.</summary>
+        bool InDoorway(Vector2 p, Vector2 heading, out Vector2 middle, out Vector2 axis)
         {
-            middle = p; var side = new Vector2(-axis.y, axis.x);
-            float l = FreeRun(p, side, c.door_max_width_m), r = FreeRun(p, -side, c.door_max_width_m), w = l + r;
-            if (w < c.door_min_width_m || w > c.door_max_width_m) return false;
-            float reach = c.door_max_width_m + c.door_side_extra_m;
+            middle = p; axis = heading; float best = float.PositiveInfinity, bestL = 0, bestR = 0; Vector2 bestSide = Vector2.zero;
+            float h = Mathf.Atan2(heading.y, heading.x);
+            for (int k = -6; k <= 6; k++)
+            {
+                float a = h + k * 10 * Mathf.Deg2Rad; var ax = new Vector2(Mathf.Cos(a), Mathf.Sin(a)); var side = new Vector2(-ax.y, ax.x);
+                float l = FreeRun(p, side, c.door_max_width_m), r = FreeRun(p, -side, c.door_max_width_m);
+                if (l + r < best) { best = l + r; bestL = l; bestR = r; bestSide = side; axis = ax; }
+            }
+            if (best < c.door_min_width_m || best > c.door_max_width_m) return false;
+            float reach = c.door_max_width_m + c.door_side_extra_m, wide = 0, narrow = float.PositiveInfinity;
             foreach (float k in new[] { 1f, -1f })
             {
                 var q = p + axis * (k * c.door_cross_m);
-                if (FreeRun(q, side, reach) + FreeRun(q, -side, reach) < w + c.door_side_extra_m) return false;
+                float wq = FreeRun(q, bestSide, reach) + FreeRun(q, -bestSide, reach);
+                wide = Mathf.Max(wide, wq); narrow = Mathf.Min(narrow, wq);
             }
-            middle = p + side * ((l - r) / 2); return true;
+            if (wide < best + c.door_side_extra_m || narrow < best - grid.CellM) return false;
+            // A door frame is thin along the axis (a wall's thickness); a hallway's walls run along it. Standing in a 1.2 m
+            // hallway beside a doorway, the cut across the hallway passed every other test.
+            foreach (var jamb in new[] { p + bestSide * (bestL - grid.CellM * .5f), p - bestSide * (bestR - grid.CellM * .5f) })
+                foreach (float k in new[] { 1f, -1f })
+                {
+                    int cell = grid.Cell(jamb + axis * (k * c.door_frame_depth_m));
+                    if (cell < 0 || grid.OwnOccupancy(cell) == 255) return false;
+                }
+            middle = p + bestSide * ((bestL - bestR) / 2); return true;
         }
 
         void UpdateDoors(double t)
@@ -51,9 +71,10 @@ namespace SmokeRescue.Brain
             if (!c.door_claims || t < nextDoorCheck) return;
             nextDoorCheck = t + .1;
             var at = motion.Pose.position; var forward = motion.Pose.Forward;
-            if (InDoorway(at, forward, out var middle))
+            if (InDoorway(at, forward, out var middle, out var axis))
             {
-                if (!doorwayAt.HasValue) { doorwayAt = middle; doorwayAxis = forward; }
+                if (!doorwayAt.HasValue || Vector2.Distance(doorwayAt.Value, middle) > c.door_match_m)
+                { doorwayAt = middle; doorwayAxis = Vector2.Dot(axis, forward) >= 0 ? axis : -axis; }
             }
             else if (doorwayAt.HasValue)
             {
