@@ -317,6 +317,32 @@ namespace SmokeRescue.Brain
                         Emit(t, "emergency_exit", "Carrying a person, the way out blocked and the air heating: leave past the fire at reduced clearance.",
                             "clearance_m", c.emergency_fire_clearance_m, "route_points", path.Count, "air_c", airC);
                     }
+                    if (path.Count == 0 && c.walk_out_past_fire && (EndReturn || returnReason == NoFrontierLeft))
+                    {
+                        // walk_out_past_fire (owner, 25 Oct: every run ends with both robots out). The leave-when-done or deadline
+                        // walk out is blocked at the normal fire margin: walk out past the fire at the emergency margin, then the
+                        // last-resort one, never through a burning cell. Seed 934 live (25 Oct 02:36): robot A held 94 s at
+                        // "the known return route is blocked" after leaving at 146.5 s.
+                        foreach (float margin in new[] { c.emergency_fire_clearance_m, c.last_resort_fire_clearance_m })
+                        {
+                            if (grid.FireClearance <= margin) continue;
+                            grid.FireClearance = margin; grid.FirePrediction = false; SetPath(PlanOut());
+                            if (path.Count > 0)
+                            {
+                                Emit(t, "replan", "The way out is blocked at the normal fire margin: walk out past the fire at a reduced margin, never through a burning cell.",
+                                    "clearance_m", margin, "path_points", path.Count);
+                                break;
+                            }
+                        }
+                        if (path.Count == 0 && returnReason == NoFrontierLeft)
+                        {
+                            // Still no way out: search on, so code sprays can open it, and leave after the next full scan.
+                            returning = false; grid.FireClearance = c.fire_clearance_m; grid.FirePrediction = true; ClearPath();
+                            scanSince = double.NaN; noFrontierAt = double.NaN;
+                            Emit(t, "goal", "No way out even past the fire at the last-resort margin: search on and spray the fire in the way, then try to leave again.");
+                            return Command(0, 0, dt, true);
+                        }
+                    }
                     if (path.Count == 0 && returnReason != EmergencyExit && returnReason != CarryingOut && returnReason != WayOutClosing &&
                         returnReason != HeatLeave && returnReason != MissionTimeUp && HeatBuilding(t, out _) &&
                         TryEmergencyExit(t, "The way out is blocked and the air is heating: leave by the nearest way out"))
