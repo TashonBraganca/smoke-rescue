@@ -708,16 +708,15 @@ def test_the_agent_is_told_the_robot_stays_inside_when_configured(monkeypatch):
     assert "It leaves the building when its own heat rules say so" in RA.system_prompt(), "control"
 
 
-def test_a_fire_heating_the_robot_is_a_spray_option(tmp_path):
-    # Seed 929, robot B: air 30 to 211 C beside a fire in its own room; the spray option existed only for a fire blocking
-    # a way out or a frontier, so its agent was never offered its water. Control: with no fire near, no option.
+def test_only_a_fire_blocking_a_way_is_a_spray_option(tmp_path):
+    # Owner, 24 Oct 11:00: spray only to open the way to floor not yet searched (or the way out), never to go fight a fire.
+    # A fire beside the robot that blocks nothing is no longer offered. Controls: a blocked frontier and a blocked exit are.
     from brain.agent.tools import spray_option
     near = {"bearing_deg": 12.0, "distance_m": 3.1, "burning_m2": 1.5}
-    opt = spray_option({"fire_near_robot": near, "water_l": 12.0})
-    assert opt is not None and opt["blocks"] == "near" and opt["within_nozzle_reach"] and opt["in_camera_view"]
-    assert spray_option({"water_l": 12.0}) is None, "control: no fire near the robot, no option"
+    assert spray_option({"fire_near_robot": near, "water_l": 12.0}) is None, "a fire that blocks nothing"
     blocked = {"bearing_deg": 0.0, "distance_m": 2.0, "burning_m2": 1.0}
-    assert spray_option({"fire_blocks_exit": blocked, "fire_near_robot": near, "water_l": 12.0})["blocks"] == "exit", "a blocked route still comes first"
+    assert spray_option({"fire_blocks_frontier": blocked, "fire_near_robot": near, "water_l": 12.0})["blocks"] == "frontier"
+    assert spray_option({"fire_blocks_exit": blocked, "fire_blocks_frontier": blocked, "water_l": 12.0})["blocks"] == "exit"
 
 
 def test_without_the_rescue_arm_walking_to_a_confirmed_person_is_refused(tmp_path, monkeypatch):
