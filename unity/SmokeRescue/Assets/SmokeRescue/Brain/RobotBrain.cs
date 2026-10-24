@@ -111,7 +111,7 @@ namespace SmokeRescue.Brain
             double previous = double.IsNaN(lastStep) ? t : lastStep; lastStep = t;
             motion.Advance(t); UpdateTeamUncertainty(t); grid.DecayTo(t); ConsumeLidar(t); ConsumeImages(t); UpdateHeatBudget(previous, t);
             grid.ClearBody(motion.Pose.position, c.robot_radius_m - grid.CellM * .5f);
-            InvalidatePeerGoal(t); CheckMapOverlap(t);
+            InvalidatePeerGoal(t); CheckMapOverlap(t); UpdateDoors(t);
             // partner_rooms: where each linked partner's body is now, from poses no older than peer_claim_s.
             planner.Rooms.PartnersNow.Clear();
             if (c.partner_rooms)
