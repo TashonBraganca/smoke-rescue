@@ -279,6 +279,68 @@ namespace SmokeRescue.Brain
             return null;
         }
 
+        /// <summary>The nozzle and burning-floor numbers code_sprays_fire judges a fire by: config/actuators.json nozzle and
+        /// config/perception.json, read by the host (the same values the agent's spray advice uses, never the simulator's).</summary>
+        public struct NozzleSpec
+        {
+            public float flowLps, coolingKjPerL, efficiency, halfAngleDeg, rangeM, maxSprayS, burningKwPerM2, burningSurfaceC, knockdownC, fuelKjPerM2K;
+        }
+        /// <summary>Set by the host when the robot carries a nozzle; null leaves code_sprays_fire idle.</summary>
+        public NozzleSpec? Nozzle { get; set; }
+        double nextCodeSpray = double.NegativeInfinity;
+
+        /// <summary>Seconds of one stream that knock down areaM2 of burning floor distanceM away, or null when the stream
+        /// cannot outpace the fire: the stream spreads over the nozzle's sector, only the burning share of its footprint lands
+        /// on fire, that share first takes up the fire's heat release, and the rest cools the burning surface from
+        /// burningSurfaceC to knockdownC. The same model as the agent's spray advice (brain/brain/agent/tools.py knock_down_s).</summary>
+        public static double? KnockDownS(NozzleSpec n, float areaM2, float distanceM)
+        {
+            if (areaM2 <= 0) return 0;
+            float d = Mathf.Max(distanceM, 1f);
+            float footprint = Mathf.Max(areaM2, n.halfAngleDeg * Mathf.Deg2Rad * d * d);
+            float net = n.flowLps * n.coolingKjPerL * n.efficiency * Mathf.Min(1f, areaM2 / footprint) - areaM2 * n.burningKwPerM2;
+            if (net <= 0) return null;
+            return areaM2 * n.fuelKjPerM2K * (n.burningSurfaceC - n.knockdownC) / net;
+        }
+
+        /// <summary>code_sprays_fire (owner, 24 Oct: "the nearest fire block in the way, put it out, walk through and scan the
+        /// room"): fire this robot measured burning (heat at or above fire_c, never a forecast) on the route to unsearched floor,
+        /// that one stream knocks down with the water aboard, is sprayed by the robot itself; from beyond the nozzle's throw,
+        /// or where the stream is too spread to win, it first walks to the spray spot fire_clearance_m + 0.4 m short of the
+        /// fire, facing it. Seed 934 (24 Oct 04:53): 64 spray offers to the agents, two 2 s sprays, the living room fire never
+        /// put out. True with the bearing and seconds the host passes to the nozzle.</summary>
+        public bool CodeSpray(double t, float waterL, out float bearingDegRight, out float seconds)
+        {
+            bearingDegRight = 0; seconds = 0;
+            if (!c.code_sprays_fire || !Nozzle.HasValue || waterL <= 1e-6f || t < nextCodeSpray || returning || active != null) return false;
+            var block = FireBlockedFrontier(t);
+            if (!block.HasValue || !(block.Value.burningM2 > 0)) return false;
+            var n = Nozzle.Value; var b = block.Value; float waterS = waterL / n.flowLps;
+            double? here = b.distanceM <= n.rangeM ? KnockDownS(n, b.burningM2, b.distanceM) : null;
+            if (here.HasValue && here.Value <= waterS)
+            {
+                bearingDegRight = b.bearingDegRight;
+                seconds = Mathf.Min(waterS, n.maxSprayS, (float)here.Value + c.code_spray_margin_s);
+                nextCodeSpray = t + seconds + c.code_spray_repeat_s;
+                Emit(t, "code_spray", "Measured fire blocks the way to unsearched floor and one stream knocks it down: spray it.",
+                    "x_m", b.blockAt.x, "y_m", b.blockAt.y, "burning_m2", b.burningM2, "distance_m", b.distanceM, "bearing_deg", b.bearingDegRight,
+                    "seconds", seconds, "knock_down_s", here.Value, "water_l", waterL);
+                return true;
+            }
+            // Too far or too spread from here: walk to the spray spot on this robot's side, facing the fire, if one stream wins there.
+            float standoff = c.fire_clearance_m + .4f;
+            double? there = KnockDownS(n, b.burningM2, standoff);
+            if (there.HasValue && there.Value <= waterS && !AgentGoalActive(t) && b.distanceM > standoff + c.goal_tolerance_m)
+            {
+                Vector2 from = motion.Pose.position, dir = (b.blockAt - from).normalized;
+                GoTo(b.blockAt - dir * standoff, t, c.code_spray_repeat_s * 2, "walk to the spray spot of the fire blocking the way", b.blockAt, false);
+                nextCodeSpray = t + c.replan_s;
+                Emit(t, "code_spray_approach", "Measured fire blocks the way; one stream knocks it down from the spray spot: walk there facing it.",
+                    "x_m", b.blockAt.x, "y_m", b.blockAt.y, "burning_m2", b.burningM2, "distance_m", b.distanceM, "standoff_m", standoff);
+            }
+            return false;
+        }
+
         /// <summary>Agent order: search this frontier next. It is driven like a go_to, and on arrival the robot sweeps
         /// and marks it visited exactly as for a frontier it chose itself.</summary>
         public void AgentExplore(Vector2 target, double t, double holdS, string reason, string indoorEvidence = null)
