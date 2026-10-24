@@ -118,15 +118,18 @@ def test_evaluation_counts_misses_and_bootstraps():
     assert r == summarize(rows)
 
 
-@pytest.mark.parametrize("bbox,verdict", [([0, 50, 22, 64], "uncertain"), ([138, 50, 22, 64], "uncertain"),
-                                          ([60, 30, 30, 70], "person"), ([60, 60, 30, 60], "person")])
-def test_colour_detection_cut_by_the_image_side_cannot_confirm(bbox, verdict, tmp_path, monkeypatch):
+@pytest.mark.parametrize("bbox,verdict,conf", [([0, 50, 22, 64], "uncertain", .58), ([138, 50, 22, 64], "uncertain", .58),
+                                               ([60, 30, 30, 70], "person", .58), ([60, 60, 30, 60], "person", .58),
+                                               ([0, 40, 22, 64], "uncertain", .9), ([0, 40, 40, 64], "uncertain", .58),
+                                               ([0, 40, 40, 64], "person", .67)])
+def test_colour_detection_cut_by_the_image_side_cannot_confirm(bbox, verdict, conf, tmp_path, monkeypatch):
     # Held-out seed 914 run 3: with no warm body at the bearing, a 22 px colour box cut by the left border (confidence
     # 0.58) confirmed a person 2.6 m from anyone. Cut by either side it stays uncertain; whole, or cut only at the
-    # bottom (a person lying close), it still confirms.
+    # bottom (a person lying close), it still confirms. Owner, 24 Oct (too rigid): a side-cut box confirms when it is both
+    # strong (0.6 or more) and wide (a sixth of the image or more); narrow at 0.9 or wide at 0.58 stays uncertain.
     f = scene()
     f.thermal[:] = 2932                                   # 20 C everywhere: no warm component
-    hit = {"confidence": 0.58, "bbox_rgb": bbox, "bearing_deg": 0.0, "range_m": 3.0}
+    hit = {"confidence": conf, "bbox_rgb": bbox, "bearing_deg": 0.0, "range_m": 3.0}
     monkeypatch.setattr(v, "detect_people_rgb", lambda frame, **k: [hit])
     r = v.inspect_candidate(f, 0.0, 3.0, output_dir=tmp_path)
     assert r["verdict"] == verdict

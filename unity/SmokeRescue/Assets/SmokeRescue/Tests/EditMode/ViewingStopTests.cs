@@ -35,5 +35,36 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(Stops(true, false), Is.True, "control: a clear line stops");
             Assert.That(Stops(true, true, atGoal: true), Is.True, "control: at the planned viewpoint it stops");
         }
+        /// <summary>survivor_close_view_min_m. Headless house 5027: s5 lay in a 3.1 x 3.0 m bathroom; no standable 3 to 4 m spot had
+        /// a clear line to her and she was never confirmed. Here only floor within 2.9 m of the person is mapped, so the band has
+        /// no spot. With the closer view the approach ends 2.0 to 3.0 m away with a clear line and the robot stops there to view.
+        /// Controls: off, there is no approach (as before); a robot 2.5 m away that is not at its approach's end does not stop.</summary>
+        [Test]
+        public void ASmallRoomIsViewedFromCloserWhenTheViewingBandHasNoClearSpot()
+        {
+            var person = new Vector2(0, 4);
+            (RobotBrain b, GridPlanner planner) Brain(float closeMin)
+            {
+                var c = Settings(); c.survivor_standoff_m = 3.3f; c.survivor_stop_min_m = 3; c.survivor_stop_max_m = 4; c.survivor_close_view_min_m = closeMin;
+                var b = new RobotBrain(Calibration(), c, "A", 0); var g = Map(b);
+                for (int i = 0; i < g.Count; i++) { var p = g.Centre(i); if (Vector2.Distance(p, person) < 2.9f && Mathf.Abs(p.x) < 4) g.ObserveFree(i); }
+                return (b, (GridPlanner)typeof(RobotBrain).GetField("planner", Private).GetValue(b));
+            }
+            var from = new Vector2(0, 1.4f);
+            Assert.That(Brain(0).planner.ApproachPath(from, person), Is.Empty, "control: the band alone has no spot");
+            var on = Brain(2);
+            var path = on.planner.ApproachPath(from, person);
+            Assert.That(path, Is.Not.Empty, "a closer viewpoint");
+            float range = Vector2.Distance(path[path.Count - 1], person);
+            Assert.That(range, Is.InRange(2f, 3f), $"viewed from closer than the band, got {range}");
+            // At the approach's end the closer range is a viewing stop; 2.5 m away without having arrived it is not.
+            var track = Activator.CreateInstance(typeof(RobotBrain).GetNestedType("Track", Private | System.Reflection.BindingFlags.Public));
+            track.GetType().GetField("position").SetValue(track, person);
+            typeof(RobotBrain).GetField("active", Private).SetValue(on.b, track);
+            var stops = typeof(RobotBrain).GetMethod("StartsViewingStop", Private);
+            Assert.That(stops.Invoke(on.b, new object[] { 2.5f }), Is.False, "control: not at the approach's end");
+            typeof(RobotBrain).GetMethod("SetPath", Private).Invoke(on.b, new object[] { new List<Vector2> { new Vector2(0, .05f) }, false });
+            Assert.That(stops.Invoke(on.b, new object[] { 2.5f }), Is.True, "at the end of a closer approach it views");
+        }
     }
 }
