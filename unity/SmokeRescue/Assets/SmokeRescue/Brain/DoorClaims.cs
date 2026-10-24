@@ -190,7 +190,9 @@ namespace SmokeRescue.Brain
                     var p = at + new Vector2(dx, dy); int cell = grid.Cell(p);
                     if (cell < 0 || grid.OwnOccupancy(cell) != 1) continue;
                     if (!InDoorway(p, Vector2.right, out var middle, out var axis) && !InDoorway(p, Vector2.up, out middle, out axis)) continue;
-                    if (Vector2.Distance(middle, home) <= c.door_home_clear_m || doors.Exists(d => Vector2.Distance(d.position, middle) <= c.door_match_m)) continue;
+                    // One doorway is listed once: its narrowest cut shifts along the wall as more of the wall is mapped (headless houses
+                    // 5001-5021, first 15 s: 40 % of listings repeated a doorway 0.8 to 1.2 m from its first one).
+                    if (Vector2.Distance(middle, home) <= c.door_home_clear_m || doors.Exists(d => Vector2.Distance(d.position, middle) <= c.door_seen_merge_m)) continue;
                     var inward = Vector2.Dot(axis, middle - at) >= 0 ? axis : -axis;
                     doors.Add(new Door { position = middle, inward = inward, state = DoorSeen, since = t, heardAt = t });
                     Emit(t, "door_seen", "A doorway in this robot's own map: a room to walk into.", "x_m", middle.x, "y_m", middle.y,
@@ -226,6 +228,7 @@ namespace SmokeRescue.Brain
             var candidates = doors.FindAll(d =>
                 (d.state == DoorSeen || (d.state == DoorHeading && (d.owner == id || t - d.heardAt > c.door_heading_lease_s))) &&
                 !BeenNear(d.position + d.inward * c.door_enter_depth_m) && !DoorBlocksGoal(d.position + d.inward * c.door_enter_depth_m, t) &&
+                !doors.Exists(o => (o.state == DoorTaken || o.state == DoorCleared) && Vector2.Distance(o.position, d.position) <= c.door_seen_merge_m) &&
                 !GoalBlacklisted(d.position, t));
             candidates.Sort((a, b) => Vector2.Distance(a.position, at).CompareTo(Vector2.Distance(b.position, at)));
             int plans = 0;
