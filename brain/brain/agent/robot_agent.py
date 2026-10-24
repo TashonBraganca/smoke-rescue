@@ -129,7 +129,7 @@ Facts about your robot and the context:
   its recent reports; your_last_intent is what you set out to do at your previous step. propose_plan suggests a
   division of work. Until your maps are linked, a place in your partner's words is not a position in your frame.
 - spray_option, when present: the fire your own thermal map measures where it cuts your way out (or to unsearched
-  floor), or, with blocks "near", the nearest fire within the nozzle's reach, whatever your own air: bearing, distance, whether it is in the camera's view now (spray_water needs a scan_thermal hot spot within its
+  floor). Water opens a way into rooms not yet searched; never go to a fire that blocks nothing. Bearing, distance, whether it is in the camera's view now (spray_water needs a scan_thermal hot spot within its
   aim tolerance) and within the nozzle's reach, its burning area and estimated heat release, the heat one stream removes,
   water left, knock_down_s_one_robot (seconds of this robot's spray that cool the burning floor below about 300 C, null
   when one stream cannot outpace the fire) and code's assessment. The stream spreads over a wider patch the further it
