@@ -729,6 +729,8 @@
   "door_enter_max_plans_reason": "Most routes planned per doorway choice.",
   "door_seen_merge_m": 1.3,
   "door_seen_merge_m_reason": "A doorway found within this distance of a listed, taken or cleared one is the same doorway. Headless houses 5001-5021, first 15 s: 40 % of listings repeated a doorway 0.8 to 1.2 m from its first listing, and a repeat looked unvisited.",
+  "door_geometric_room": false,
+  "door_geometric_room_reason": "The room behind a doorway is the floor on its far side within door_room_reach_m and in clear line of sight, not the ledger room, which merges a hallway with the rooms seen through its doorways. Headless 5004 and 5021 with door_enter: one cleared doorway blocked half the house and a robot held still from about 100 s to 240 s with rooms left.",
   "room_walk_in_min_m2": 2.0,
   "room_walk_in_min_m2_reason": "Smaller spaces are alcoves or furniture gaps, not rooms to walk into.",
   "room_walk_in_max_m": 8.0,

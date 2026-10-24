@@ -165,8 +165,14 @@ namespace SmokeRescue.Brain
         /// half the house as behind every doorway.</summary>
         bool InsideDoorRoom(Door d, Vector2 at)
         {
-            int here = planner.Rooms.RoomAt(at), room = planner.Rooms.RoomAt(d.position + d.inward * c.door_cross_m);
-            if (here >= 0 && room >= 0) return here == room;
+            // door_geometric_room: the robot's ledger room merges a hallway with the rooms seen through its doorways, so one
+            // cleared doorway blocked half the house (headless 5004 and 5021 with door_enter: a robot held still from about 100 s
+            // to 240 s with rooms left). Only the side, reach and line of sight below decide.
+            if (!c.door_geometric_room)
+            {
+                int here = planner.Rooms.RoomAt(at), room = planner.Rooms.RoomAt(d.position + d.inward * c.door_cross_m);
+                if (here >= 0 && room >= 0) return here == room;
+            }
             // Without ledger rooms: on the inward side, within reach, and in a clear straight line of known free floor from just
             // inside the doorway. Headless 5021: without the line test a study through the wall from a cleared bedroom counted as
             // behind its doorway, and its person (s5) was never found.
@@ -225,6 +231,17 @@ namespace SmokeRescue.Brain
             route = null; Door chosen = null; float best = float.PositiveInfinity;
             if (!c.door_enter || StayInTakenRoom(t)) return false;
             var at = motion.Pose.position;
+            // Keep the chosen doorway while it can still be reached (headless door_enter: robots re-picked the nearest doorway at
+            // every replan, 7 to 15 targets each, and walked into 0 to 5 rooms).
+            if (doorTarget != null && doorTarget.owner == id && doorTarget.state == DoorHeading && !BeenNear(doorTarget.position + doorTarget.inward * c.door_enter_depth_m))
+            {
+                foreach (float depth in new[] { c.door_enter_depth_m, c.door_cross_m + grid.CellM })
+                {
+                    var keep = planner.Plan(at, doorTarget.position + doorTarget.inward * depth);
+                    if (keep.Count > 0) { route = keep; doorTarget.heardAt = t; doorSweep = true; return true; }
+                }
+                BlacklistGoal(doorTarget.position, t, 0); doorTarget.state = DoorSeen; doorTarget.owner = null; doorTarget = null;
+            }
             var candidates = doors.FindAll(d =>
                 (d.state == DoorSeen || (d.state == DoorHeading && (d.owner == id || t - d.heardAt > c.door_heading_lease_s))) &&
                 !BeenNear(d.position + d.inward * c.door_enter_depth_m) && !DoorBlocksGoal(d.position + d.inward * c.door_enter_depth_m, t) &&

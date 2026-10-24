@@ -63,7 +63,7 @@ namespace SmokeRescue.Brain
         public bool return_home_at_end = false, return_home_early = false;
         public bool door_claims = false; public float door_min_width_m = .6f, door_max_width_m = 1.3f, door_side_extra_m = .5f, door_cross_m = .8f,
             door_match_m = .8f, door_home_clear_m = 2.5f, door_claim_lease_s = 90f, door_room_reach_m = 4f, door_frame_depth_m = .3f, door_claim_max_m2 = 48f, door_left_s = 3f;
-        public bool door_enter = false; public float door_scan_m = 6f, door_scan_step_m = .2f, door_scan_period_s = 1f, door_enter_depth_m = 1.2f, door_been_m = .8f, door_trail_step_m = .4f, door_heading_lease_s = 20f, door_room_max_s = 45f, door_done_share = .75f, door_seen_merge_m = 1.3f; public int door_enter_max_plans = 6;
+        public bool door_enter = false; public float door_scan_m = 6f, door_scan_step_m = .2f, door_scan_period_s = 1f, door_enter_depth_m = 1.2f, door_been_m = .8f, door_trail_step_m = .4f, door_heading_lease_s = 20f, door_room_max_s = 45f, door_done_share = .75f, door_seen_merge_m = 1.3f; public bool door_geometric_room = false; public int door_enter_max_plans = 6;
         public float room_walk_in_min_m2 = 2f, room_walk_in_max_m = 8f;
         public float pinned_yield_m = 1.2f, pinned_yield_back_s = 3f, pinned_yield_speed_mps = .15f;
         public float pinned_window_s = 8f, pinned_move_m = .15f;
