@@ -118,7 +118,7 @@ namespace SmokeRescue.Brain
                 foreach (var pair in peers)
                     if (pair.Value.poseKnown && t - pair.Value.poseT <= c.peer_claim_s) planner.Rooms.PartnersNow.Add((pair.Key, pair.Value.pose.position, pair.Value.goal));
             grid.PrepareNavigation();
-            planner.Rooms.Update(t, motion.Pose.position, InSearchAreaOwn); planner.HeadingRad = motion.Pose.yawRad; CertifyRooms(t);
+            planner.Rooms.Update(t, motion.Pose.position, InSearchAreaOwn); UpdateRoomMemory(t); planner.HeadingRad = motion.Pose.yawRad; CertifyRooms(t);
             int cell = grid.Cell(motion.Pose.position);
             bool fireNow = grid.FireDistance(cell) < c.heat_cost_radius_m;
             if (fireNow && !nearFire)
@@ -551,7 +551,16 @@ namespace SmokeRescue.Brain
                 }
                 // An agent replacement above has already repaired the old blocked route. Test the new path before fallback.
                 bool fallback = path.Count == 0 || (blocked && (!c.motion_keep_agent_route || !planner.PathSafe(path, cursor)));
-                if (fallback && c.door_claims && c.door_enter && EnterDoorway(t, out var doorRoute))
+                if (fallback && c.room_memory && NextRoom(t, out var roomRoute))
+                {
+                    // room_memory: walk to the centre of the next remembered room on the tour; the room this robot stands in is
+                    // finished first (NextRoom returns false while it is), and the room it chose is kept (RoomMemory.cs).
+                    SetPath(roomRoute, false); scanSince = double.NaN; noFrontierAt = double.NaN; lastPlan = t;
+                    ClaimRoom(t, roomTarget.seat, PathLength(roomRoute));
+                    Emit(t, "goal", "Walk into the next room this robot remembers but has not entered.", "x_m", goal.Value.x, "y_m", goal.Value.y,
+                        "room_key", roomTarget.key);
+                }
+                else if (fallback && c.door_claims && c.door_enter && EnterDoorway(t, out var doorRoute))
                 {
                     // door_enter (owner, 24 Oct): every room is entered through its doorway, nearest first, and swept.
                     SetPath(doorRoute, true); frontierCentre = goal.Value; frontierRadius = c.door_been_m; scanSince = double.NaN; lastPlan = t;
