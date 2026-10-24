@@ -2073,6 +2073,31 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(all.Count(e => e.kind == "survivor_confirmed"), Is.EqualTo(1));
         }
 
+        [Test]
+        public void AWarmShapeTheColourDetectorNeverSawIsNotConfirmedByDwell()
+        {
+            // thermal_dwell_confirms off (owner, 24 Oct: only YOLO confirms). The same scene as the test above: a thermal-only
+            // person-sized shape the robot approaches and faces. It is not confirmed; the robot reports it and searches on.
+            // Control: with the switch on, the dwell confirms it (the test above).
+            var s = Calibration(); var c = Settings(); c.thermal_dwell_confirms = false; var b = new RobotBrain(s, c, "A", 4);
+            var position = Vector2.zero; float yaw = 0, v = 0, w = 0;
+            var all = new List<BrainEvent>();
+            for (int tick = 0; tick < 900; tick++)
+            {
+                double t = tick / 60.0;
+                position += new Vector2(-Mathf.Sin(yaw), Mathf.Cos(yaw)) * v / 60;
+                yaw += w * Mathf.Deg2Rad / 60;
+                Motion(b, t, v, w * Mathf.Deg2Rad);
+                if (tick % 6 == 0) b.OnAirTemperature(t, 20);
+                if (tick % 4 == 0) { var pair = SceneImages(t, position, yaw, s); b.OnRgbd(pair.Item1); b.OnThermal(pair.Item2); }
+                var command = b.Step(t, 1f / 60); v = command.forwardMps; w = command.yawRateDeg;
+                all.AddRange(b.DrainEvents());
+            }
+            Assert.That(all.Any(e => e.kind == "survivor_candidate"), Is.True, "the warm shape is still a candidate");
+            Assert.That(all.Any(e => e.kind == "survivor_unconfirmed"), Is.True, "the dwell ends without a colour sighting");
+            Assert.That(all.Any(e => e.kind == "survivor_confirmed"), Is.False, "only the colour detector confirms");
+        }
+
         static Tuple<RgbdFrame, ThermalFrame> SceneImages(double t, Vector2 robot, float yaw, SensorConfig s)
         {
             var image = Image(t, true, 6000); var temperatures = Enumerable.Repeat((ushort)2932, 4800).ToArray();
