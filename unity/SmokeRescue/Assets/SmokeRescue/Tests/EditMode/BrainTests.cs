@@ -123,6 +123,30 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void AtAForkTheRobotTakesTheWayAwayFromItsPartner()
+        {
+            // partner_territory (owner, 24 Oct: "one goes on the right, one goes on the left"). Two frontiers of one tier, one
+            // either side of the robot; the nearer one lies on the partner's side, so with the switch on the robot takes the
+            // other way. Controls: switch off, and no partner, keep the nearer one.
+            var fixture = RoomLedgerFixture(); var c = fixture.config;
+            var ledger = new RoomLedger(fixture.grid, c); var at = new Vector2(-2, 0);
+            ledger.Update(0, at);
+            GridPlanner.FrontierChoice First(bool on, bool partner)
+            {
+                c.partner_territory = on; ledger.PartnersNow.Clear();
+                if (partner) ledger.PartnersNow.Add(("robot_B", at + new Vector2(0, 2.3f), null));
+                var near = new GridPlanner.FrontierChoice { position = at + new Vector2(0, 1.8f), cost = 1.8f };
+                var far = new GridPlanner.FrontierChoice { position = at + new Vector2(0, -2.2f), cost = 2.2f };   // both on the room floor, |y| < 2.5
+                var list = new List<GridPlanner.FrontierChoice> { near, far }; ledger.Rank(list, at);
+                Assert.That(near.roomTier, Is.EqualTo(far.roomTier), "both frontiers in one tier"); return list[0];
+            }
+            Assert.That(First(true, true).position.y, Is.LessThan(0), "the partner is up the near side: take the other way");
+            Assert.That(First(false, true).position.y, Is.GreaterThan(0), "control: switch off keeps the nearer one");
+            Assert.That(First(true, false).position.y, Is.GreaterThan(0), "control: no partner keeps the nearer one");
+            c.partner_territory = false;
+        }
+
+        [Test]
         public void ARoomThePartnerStandsInOrWalkedThroughIsNotSearchedAgain()
         {
             // partner_rooms. Seed 934 (24 Oct 04:53): A walked into the kitchen four times while B stood in it.

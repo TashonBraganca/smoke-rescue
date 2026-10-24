@@ -482,6 +482,19 @@ namespace SmokeRescue.Brain
                 // A frontier looking past its room carries the coverage of the space beyond, none: with its room's share it
                 // lost to an unentered room 9 m away (headless seed 934 one door, 24 Oct, robot A 1.6 m from bedroom_1's door).
                 f.roomScore = f.cost / config.open_speed_mps + (known && !beyond ? room.coveredShare * config.room_ledger_dwell_s : 0);
+                // partner_territory (owner, 24 Oct: "one goes on the right, one goes on the left"): a frontier nearer a partner,
+                // or the goal it radioed, than this robot is the partner's side and costs a room's dwell more, so two robots at
+                // one fork take different ways; still a fallback when nothing else is left (Burgard et al., IEEE T-RO 2005,
+                // coordinated multi-robot exploration: discount targets near another robot's target). Seed 934 (24 Oct
+                // 04:53): both robots entered the house together; headless houses (tour session, 24 Oct): the same first
+                // room in 3 of 8 houses.
+                if (config.partner_territory)
+                    foreach (var (pid, p, goal) in PartnersNow)
+                    {
+                        float mine = Vector2.Distance(f.position, at);
+                        bool theirs = Vector2.Distance(f.position, p) < mine || (goal.HasValue && Vector2.Distance(f.position, goal.Value) < mine);
+                        if (theirs) { f.roomScore += config.room_ledger_dwell_s; break; }
+                    }
                 // room_sweep (owner, 23 Oct): finish a room from the left side across to the right, as seen from where the robot
                 // came in, then leave on the right. Frontiers in the room being finished cost extra the further right of the line
                 // from the entry point to the room centre they lie, up to room_sweep_s; travel time still counts within a band.
