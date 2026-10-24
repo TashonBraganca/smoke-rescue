@@ -249,6 +249,32 @@ namespace SmokeRescue.Brain
                 !GoalBlacklisted(d.position, t));
             candidates.Sort((a, b) => Vector2.Distance(a.position, at).CompareTo(Vector2.Distance(b.position, at)));
             int plans = 0;
+            if (c.door_tour)
+            {
+                // door_tour: head for the doorway that starts the shortest walk through all open doorways (walked metres to it,
+                // then a nearest-neighbour tour over the rest by straight-line distance), not simply the nearest one; a doorway
+                // nearer a partner than this robot costs door_partner_side_m more. FUEL (Zhou et al., RA-L 2021) and TARE (Cao
+                // et al., RSS 2021): a global tour over open targets instead of greedy nearest-first stops back-and-forth.
+                var reach = new List<(Door d, List<Vector2> p, float m)>();
+                foreach (var d in candidates)
+                {
+                    if (plans >= c.door_enter_max_plans) break;
+                    foreach (float depth in new[] { c.door_enter_depth_m, c.door_cross_m + grid.CellM })
+                    {
+                        plans++;
+                        var p = planner.Plan(at, d.position + d.inward * depth);
+                        if (p.Count == 0) continue;
+                        reach.Add((d, p, PathLength(p))); break;
+                    }
+                }
+                float bestTour = float.PositiveInfinity;
+                foreach (var first in reach)
+                {
+                    float tour = first.m + TourRest(first.d, reach.ConvertAll(r => r.d)) + PartnerSide(first.d.position, at);
+                    if (tour < bestTour) { bestTour = tour; best = first.m; route = first.p; chosen = first.d; }
+                }
+            }
+            else
             foreach (var d in candidates)
             {
                 if (Vector2.Distance(d.position, at) >= best || plans >= c.door_enter_max_plans) break;
@@ -268,6 +294,26 @@ namespace SmokeRescue.Brain
                 "x_m", chosen.position.x, "y_m", chosen.position.y, "path_m", best); }
             doorTarget = chosen; chosen.cost = best / c.open_speed_mps; chosen.state = DoorHeading; chosen.owner = id; chosen.heardAt = t; doorSweep = true;
             return true;
+        }
+
+        /// <summary>door_tour: straight-line length of a nearest-neighbour walk from first through every other open doorway.</summary>
+        static float TourRest(Door first, List<Door> open)
+        {
+            var left = open.FindAll(d => d != first); var here = first.position; float total = 0;
+            while (left.Count > 0)
+            {
+                int k = 0; float m = Vector2.Distance(here, left[0].position);
+                for (int i = 1; i < left.Count; i++) { float q = Vector2.Distance(here, left[i].position); if (q < m) { m = q; k = i; } }
+                total += m; here = left[k].position; left.RemoveAt(k);
+            }
+            return total;
+        }
+        /// <summary>door_tour: door_partner_side_m when a linked partner (pose no older than peer_claim_s) is nearer the doorway.</summary>
+        float PartnerSide(Vector2 door, Vector2 at)
+        {
+            foreach (var (pid, p, goal) in planner.Rooms.PartnersNow)
+                if (Vector2.Distance(p, door) < Vector2.Distance(at, door)) return c.door_partner_side_m;
+            return 0;
         }
 
         internal BrainDoor[] DoorsToSend()

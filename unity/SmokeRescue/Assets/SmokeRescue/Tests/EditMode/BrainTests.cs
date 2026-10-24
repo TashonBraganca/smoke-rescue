@@ -123,6 +123,36 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void TheRoomMemoryKeepsARoomAcrossResegmentationsAndMarksItEnteredOnlyAtItsSeat()
+        {
+            // room_memory. The ledger re-labels rooms every room_ledger_period_s; a record must keep its key and seat, count as
+            // entered only once the robot stood near its seat (not in its doorway), and be done once entered and covered.
+            var fixture = RoomLedgerFixture(); var c = fixture.config; c.room_memory = true;
+            var ledger = new RoomLedger(fixture.grid, c); var left = new Vector2(-2, 0);
+            ledger.Update(0, left);
+            var right = ledger.Records.First(r => ledger.RoomAt(r.seat) == ledger.RoomAt(new Vector2(2, 0)));
+            int key = right.key; var seat = right.seat;
+            Assert.That(seat.x, Is.GreaterThan(0), "the right room's seat is inside the right room");
+            for (int k = 1; k <= 3; k++) ledger.Update(k * (c.room_ledger_period_s + .1), left);
+            var again = ledger.Records.First(r => ledger.RoomAt(r.seat) == ledger.RoomAt(new Vector2(2, 0)));
+            Assert.That(again.key, Is.EqualTo(key), "the same record after three re-segmentations");
+            Assert.That(Vector2.Distance(again.seat, seat), Is.LessThan(.11f), "its seat stays put");
+            Assert.That(ledger.Records.Count(r => r.missing < 1000 && ledger.RoomAt(r.seat) == ledger.RoomAt(new Vector2(2, 0))), Is.EqualTo(1), "one record per room");
+            var doorway = new Vector2(-.3f, 0);   // in the doorway, on the near side of the opening
+            Assert.That(ledger.MarkEnteredNear(doorway, 10), Is.Not.SameAs(again), "standing in the doorway does not enter the room beyond it");
+            Assert.That(again.entered, Is.False);
+            var entered = ledger.MarkEnteredNear(again.seat, 11);
+            Assert.That(entered, Is.SameAs(again), "standing at its seat enters it");
+            Assert.That(again.entered, Is.True);
+            Assert.That(again.done, Is.False, "control: entered but its floor is not yet covered");
+            // The left room's floor is searched in the fixture (covered past the share): once entered it is done.
+            var leftRec = ledger.Records.First(r => ledger.RoomAt(r.seat) == ledger.RoomAt(left));
+            ledger.MarkEnteredNear(leftRec.seat, 12); ledger.Update(20, left);
+            Assert.That(leftRec.done, Is.True, "entered and covered past room_ledger_covered_share: done");
+            c.room_memory = false;
+        }
+
+        [Test]
         public void AtAForkTheRobotTakesTheWayAwayFromItsPartner()
         {
             // partner_territory (owner, 24 Oct: "one goes on the right, one goes on the left"). Two frontiers of one tier, one
