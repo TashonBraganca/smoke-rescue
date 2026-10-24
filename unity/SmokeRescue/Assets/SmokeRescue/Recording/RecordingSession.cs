@@ -197,6 +197,7 @@ namespace SmokeRescue.Recording
                     if (missionS > 0 && !float.IsInfinity(missionS)) brainCfg.mission_time_limit_s = missionS;
                     // The owner's toggle: no deadline for the robots; they search until done (a day, so JSON stays finite).
                     if (!scenario.time_limit) brainCfg.mission_time_limit_s = 86400f;
+                    if (scenario.time_limit && scenario.search_s > 0 && scenario.search_s < brainCfg.mission_time_limit_s) brainCfg.mission_time_limit_s = scenario.search_s;
                     // One launch gate: every robot's brain starts at its pad in the shared gate frame. Never the spawn's house
                     // coordinates, which would hand the brains the building's own frame.
                     brainCfg.frames_shared_at_start = GateLaunch(scenario.robots);

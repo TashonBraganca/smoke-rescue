@@ -123,6 +123,110 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void TheRoomMemoryKeepsARoomAcrossResegmentationsAndMarksItEnteredOnlyAtItsSeat()
+        {
+            // room_memory. The ledger re-labels rooms every room_ledger_period_s; a record must keep its key and seat, count as
+            // entered only once the robot stood near its seat (not in its doorway), and be done once entered and covered.
+            var fixture = RoomLedgerFixture(); var c = fixture.config; c.room_memory = true;
+            var ledger = new RoomLedger(fixture.grid, c); var left = new Vector2(-2, 0);
+            ledger.Update(0, left);
+            var right = ledger.Records.First(r => ledger.RoomAt(r.seat) == ledger.RoomAt(new Vector2(2, 0)));
+            int key = right.key; var seat = right.seat;
+            Assert.That(seat.x, Is.GreaterThan(0), "the right room's seat is inside the right room");
+            for (int k = 1; k <= 3; k++) ledger.Update(k * (c.room_ledger_period_s + .1), left);
+            var again = ledger.Records.First(r => ledger.RoomAt(r.seat) == ledger.RoomAt(new Vector2(2, 0)));
+            Assert.That(again.key, Is.EqualTo(key), "the same record after three re-segmentations");
+            Assert.That(Vector2.Distance(again.seat, seat), Is.LessThan(.11f), "its seat stays put");
+            Assert.That(ledger.Records.Count(r => r.missing < 1000 && ledger.RoomAt(r.seat) == ledger.RoomAt(new Vector2(2, 0))), Is.EqualTo(1), "one record per room");
+            var doorway = new Vector2(-.3f, 0);   // in the doorway, on the near side of the opening
+            Assert.That(ledger.MarkEnteredNear(doorway, 10), Is.Not.SameAs(again), "standing in the doorway does not enter the room beyond it");
+            Assert.That(again.entered, Is.False);
+            var entered = ledger.MarkEnteredNear(again.seat, 11);
+            Assert.That(entered, Is.SameAs(again), "standing at its seat enters it");
+            Assert.That(again.entered, Is.True);
+            Assert.That(again.done, Is.False, "control: entered but its floor is not yet covered");
+            // The left room's floor is searched in the fixture (covered past the share): once entered it is done.
+            var leftRec = ledger.Records.First(r => ledger.RoomAt(r.seat) == ledger.RoomAt(left));
+            ledger.MarkEnteredNear(leftRec.seat, 12); ledger.Update(20, left);
+            Assert.That(leftRec.done, Is.True, "entered and covered past room_ledger_covered_share: done");
+            c.room_memory = false;
+        }
+
+        [Test]
+        public void TheRoomMemoryNeverHandsOneRoomsFlagsToAnotherAcrossAMergeAndSplit()
+        {
+            // The opening reads 2 m wide for one segmentation (a door frame not yet mapped), then 0.9 m again.
+            var fixture = RoomLedgerFixture(); var c = fixture.config; var g = fixture.grid; c.room_memory = true;
+            var ledger = new RoomLedger(g, c); var left = new Vector2(-2, 0); var right = new Vector2(2, 0);
+            ledger.Update(0, left);
+            var L = ledger.Records.First(r => r.label == ledger.RoomAt(left)); var R = ledger.Records.First(r => r.label == ledger.RoomAt(right));
+            Assert.That(ledger.MarkEnteredNear(R.seat, 1), Is.SameAs(R));
+            for (int i = 0; i < g.Count; i++) { var p = g.Centre(i); if (Mathf.Abs(p.x) < .15f && Mathf.Abs(p.y) < 1f) for (int n = 0; n < 60; n++) g.ObserveFree(i); }
+            ledger.Update(3.1, left);
+            Assert.That(ledger.Rooms.Count, Is.EqualTo(1), "control: the wide opening merges the two rooms");
+            for (int i = 0; i < g.Count; i++) { var p = g.Centre(i); if (Mathf.Abs(p.x) < .15f && Mathf.Abs(p.y) >= .45f && Mathf.Abs(p.y) < 1f) for (int n = 0; n < 60; n++) g.ObserveOccupied(i); }
+            ledger.Update(6.2, left);
+            Assert.That(ledger.Rooms.Count, Is.EqualTo(2), "control: split again");
+            Assert.That(L.label, Is.EqualTo(ledger.RoomAt(left))); Assert.That(R.label, Is.EqualTo(ledger.RoomAt(right)), "each record finds its own room again");
+            Assert.That(L.entered || L.done, Is.False, "the room never entered is not entered or done");
+            Assert.That(R.entered, Is.True, "the room entered stays entered");
+            c.room_memory = false;
+        }
+
+        /// <summary>A big room (x below the wall) and a small room given by its rectangle, a wall band |x| below wall/2 with a door
+        /// |y| below door/2; mirror flips x.</summary>
+        static (BrainConfig c, OccupancyGrid g) SmallRoomFixture(float rx0, float rx1, float ry0, float ry1, bool mirror, float wall = .3f, float door = .9f)
+        {
+            var c = Settings(); c.grid_size_m = 14; c.room_ledger = true; c.room_memory = true; c.room_entered_near_seat = true;
+            c.frontier_gain_weight = .01f; c.frontier_peek_m = 0; c.search_requires_ceiling = false; c.robot_radius_m = .25f;
+            var g = new OccupancyGrid(c);
+            for (int i = 0; i < g.Count; i++)
+            {
+                var p = g.Centre(i); float x = mirror ? -p.x : p.x, y = p.y;
+                bool band = Mathf.Abs(x) < wall / 2 && Mathf.Abs(y) < 2.5f;
+                if (band) { if (Mathf.Abs(y) < door / 2) g.ObserveFree(i); else g.ObserveOccupied(i); }
+                else if ((x > -5 && x < -wall / 2 && Mathf.Abs(y) < 2.5f) || (x > rx0 && x < rx1 && y > ry0 && y < ry1)) g.ObserveFree(i);
+            }
+            return (c, g);
+        }
+
+        [Test]
+        public void AStepInsideNeedsTheBodyPastTheDoorwayWhicheverWayTheRoomFaces()
+        {
+            // A 2.0 x 2.9 m bathroom (the smallest in the floorplans) behind a 0.9 m door, its long or short wall to the door, and
+            // mirrored. Its floor starts at +0.15; a body centred at +0.30 straddles the threshold (0.375 m half-length).
+            foreach (var (rx1, ry, mirror) in new[] { (2.15f, 1.45f, false), (3.05f, 1f, false), (3.05f, 1f, true) })
+            {
+                var (c, g) = SmallRoomFixture(.15f, rx1, -ry, ry, mirror); float s = mirror ? -1 : 1;
+                var ledger = new RoomLedger(g, c); ledger.Update(0, new Vector2(-2 * s, 0));
+                var rec = ledger.Records.First(r => r.label == ledger.RoomAt(new Vector2(s, 0)));
+                Assert.That(ledger.MarkEnteredNear(new Vector2(.3f * s, 0), 1), Is.Null, $"straddling the threshold is not inside (x1 {rx1}, mirror {mirror})");
+                Assert.That(rec.entered, Is.False);
+                var deep = ledger.Get(rec.label).seat;
+                Assert.That(ledger.MarkEnteredNear(deep, 2), Is.SameAs(rec), "standing at its seat is inside");
+                var room = ledger.Get(rec.label); var clearance = g.KnownFreeClearance(); float firstX = float.NaN;
+                for (float x = 0; x <= 3; x += .05f)
+                    if (ledger.RoomAt(new Vector2(x * s, 0)) == rec.label && clearance[g.Cell(new Vector2(x * s, 0))] >= c.room_memory_seat_keep * room.seatR) { firstX = x; break; }
+                Assert.That(firstX - c.body_half_length_m, Is.GreaterThan(.15f), "the whole body is past the threshold where entry starts");
+            }
+        }
+
+        [Test]
+        public void APartnerInTheDoorwayHasNotEnteredTheRoom()
+        {
+            foreach (var (px, inside) in new[] { (-.1f, false), (0f, false), (2f, true) })
+            {
+                var fixture = RoomLedgerFixture(); var c = fixture.config; c.room_memory = true; c.partner_rooms = true;
+                var ledger = new RoomLedger(fixture.grid, c); var left = new Vector2(-2, 0);
+                ledger.Update(0, left);
+                ledger.MarkPartner(new Vector2(px, 0), c.body_radius_m);
+                ledger.Update(3.1, left);
+                var R = ledger.Records.First(r => r.label == ledger.RoomAt(new Vector2(2, 0)));
+                Assert.That(R.partnerEntered, Is.EqualTo(inside), $"partner at x {px}: the right room's floor starts at 0.15");
+            }
+        }
+
+        [Test]
         public void AtAForkTheRobotTakesTheWayAwayFromItsPartner()
         {
             // partner_territory (owner, 24 Oct: "one goes on the right, one goes on the left"). Two frontiers of one tier, one
