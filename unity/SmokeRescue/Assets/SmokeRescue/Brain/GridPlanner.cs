@@ -330,6 +330,25 @@ namespace SmokeRescue.Brain
                 }
                 if (best >= 0) return Join(lead, Reconstruct(parent, start, best));
             }
+            // survivor_close_view_min_m: no clear spot in the viewing band, so view from closer, down to this range, nearest to
+            // the band first. Headless house 5027 (23-24 Oct, every variant): s5 lay in a 3.1 x 3.0 m bathroom off a 1.7 m
+            // corridor; both robots' colour detectors saw her from 2.0 to 2.5 m, no standable 3 to 4 m spot had a clear line
+            // through the door, "No safe known survivor approach" repeated every 3 s, and she was never confirmed.
+            if (c.survivor_close_view_min_m > 0)
+                for (float r = c.survivor_stop_min_m - step; r >= c.survivor_close_view_min_m - 1e-4f; r -= step)
+                {
+                    int best = -1; float score = float.PositiveInfinity;
+                    for (int sample = 0; sample < c.standoff_samples; sample++)
+                    {
+                        float a = sample * 2 * Mathf.PI / c.standoff_samples;
+                        int cell = grid.Cell(person + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * r);
+                        if (cell < 0 || !grid.Standable(cell) || distance[cell] >= score) continue;
+                        float range = Vector2.Distance(grid.Centre(cell), person);
+                        if (range < c.survivor_close_view_min_m || range >= c.survivor_stop_min_m || !ClearView(grid.Centre(cell), person)) continue;
+                        score = distance[cell]; best = cell;
+                    }
+                    if (best >= 0) return Join(lead, Reconstruct(parent, start, best));
+                }
             return new List<Vector2>();
         }
         /// <summary>No mapped wall on the straight line from a standpoint to a person, ignoring the last
