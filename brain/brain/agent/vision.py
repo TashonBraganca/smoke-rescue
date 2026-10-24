@@ -649,7 +649,11 @@ def inspect_candidate(frame: Frame, bearing_deg: float, range_m: float, *, outpu
         # stays usable: that is a person lying close, below the lower edge of the view.
         width = frame.rgb.shape[1]
         margin = config["rgb_side_margin_px"]
-        whole = [h for h in hits if h["bbox_rgb"][0] > margin and h["bbox_rgb"][0] + h["bbox_rgb"][2] < width - margin]
+        # A strong, wide box cut by a side still shows enough of a body (owner, 24 Oct: verification too rigid). In three
+        # seed 934 runs, 27 inspections aimed at real people; a 0.67 box cut by the side was one of the 6 that stayed
+        # uncertain. The 22 px, 0.58 sliver of held-out seed 914 stays out.
+        whole = [h for h in hits if (h["bbox_rgb"][0] > margin and h["bbox_rgb"][0] + h["bbox_rgb"][2] < width - margin) or
+                 (h["confidence"] >= config["rgb_clipped_min_confidence"] and h["bbox_rgb"][2] >= config["rgb_clipped_min_width_fraction"] * width)]
         result["cues"]["rgb_dnn"] = {"model": PERSON_ONNX.name, "hits": hits, "clipped_by_side": len(hits) - len(whole)}
         if thermal_negative:
             # A negative shape cue applies to the selected warm object. It cannot
