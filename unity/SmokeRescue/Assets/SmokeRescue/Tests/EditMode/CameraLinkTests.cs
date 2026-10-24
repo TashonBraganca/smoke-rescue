@@ -262,14 +262,32 @@ namespace SmokeRescue.Tests.EditMode
         [Test]
         public void TwoCameraMatchesTwoDegreesApartDoNotRefineTheSharedFrame()
         {
-            var f = CameraScene(padsLive: true, padErrorDeg: 2.4f); f.Match(0);
-            f.brain.OnVisualPlaceMatch("A", 2, 11, 0, 0, 2f, 30, 2);   // the second view's camera turn is off by 2 deg
+            // Two verified placements 1.5 m apart whose links differ by 2 deg (injected after verification) do not refine.
+            // Control: the old 4 deg tolerance accepts them.
+            var add = typeof(RobotBrain).GetMethod("AddLinkCandidate", BindingFlags.NonPublic | BindingFlags.Instance);
+            void Two(CameraFixture f)
+            {
+                var turned = f.own[1]; turned.yawRad += 2 * Mathf.Deg2Rad;
+                add.Invoke(f.brain, new object[] { "A", f.own[0], f.partner[0], f.own[0], 10, 1, 30f, "camera", 1.0, Array.Empty<object>() });
+                add.Invoke(f.brain, new object[] { "A", turned, f.partner[1], f.own[1], 11, 2, 30f, "camera", 2.0, Array.Empty<object>() });
+            }
+            var f = CameraScene(padsLive: true, padErrorDeg: 2.4f); Two(f);
             Assert.That(f.brain.TryPartnerLink("A", out var link), Is.True);
             Assert.That(Mathf.Abs(link.yawRad), Is.LessThan(1e-6f), "2 deg apart is beyond visual_refine_agree_deg: identity kept");
-            var loose = CameraScene(padsLive: true, padErrorDeg: 2.4f); loose.config.visual_refine_agree_deg = 4; loose.Match(0);
-            loose.brain.OnVisualPlaceMatch("A", 2, 11, 0, 0, 2f, 30, 2);
+            var loose = CameraScene(padsLive: true, padErrorDeg: 2.4f); loose.config.visual_refine_agree_deg = 4; Two(loose);
             loose.brain.TryPartnerLink("A", out var looseLink);
             Assert.That(Mathf.Abs(looseLink.yawRad), Is.GreaterThan(.01f), "control: the old 4 deg tolerance would have accepted it");
+        }
+
+        [Test]
+        public void TheLidarSweepSuppliesThePrecisionOfACameraFoundPlace()
+        {
+            // A camera turn off by 2 deg on the second view (RANSAC scatter) is placed by the partner's LiDAR sweep in the
+            // own map, so both candidates agree on the true 2.4 deg and the link is refined to it.
+            var f = CameraScene(padsLive: true, padErrorDeg: 2.4f); f.Match(0);
+            f.brain.OnVisualPlaceMatch("A", 2, 11, 0, 0, 2f, 30, 2);
+            Assert.That(f.brain.TryPartnerLink("A", out var link), Is.True);
+            Assert.That(Mathf.Abs(link.yawRad * Mathf.Rad2Deg - 2.4f), Is.LessThan(.3f), "LiDAR-refined: " + link.yawRad * Mathf.Rad2Deg);
         }
 
         [Test]

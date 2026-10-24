@@ -155,7 +155,8 @@ namespace SmokeRescue.Brain
         {
             if (links.ContainsKey(sender)) return;
             // Partner frame -> this frame: the verified pose of their keyframe, composed with the inverse of its pose there.
-            float yaw = placedTheirs.yawRad - theirsPose.yawRad, cos = Mathf.Cos(yaw), sin = Mathf.Sin(yaw);
+            // Normalised: two headings near +-180 deg differ by a small turn, not by 360 deg (seed 934 live, 24 Oct: -363.5 deg).
+            float yaw = BrainMath.Angle(theirsPose.yawRad, placedTheirs.yawRad) * Mathf.Deg2Rad, cos = Mathf.Cos(yaw), sin = Mathf.Sin(yaw);
             var p = theirsPose.position;
             var link = new BrainPose { yawRad = yaw, position = placedTheirs.position - new Vector2(cos * p.x - sin * p.y, sin * p.x + cos * p.y) };
             bool refine = c.frames_shared_at_start;
@@ -276,15 +277,25 @@ namespace SmokeRescue.Brain
             var mine = visualKeyframes.Find(k => k.id == mineId);
             if (mine == null || !partnerVisualPoses.TryGetValue(sender, out var poses) || !poses.TryGetValue(theirsId, out var theirsPose)) return;
             var placed = new BrainPose { position = mine.pose.Transform(dxM, dyM), yawRad = mine.pose.yawRad + dyawDeg * Mathf.Deg2Rad };
-            if (!VerifyVisualPlacement(sender, theirsPose, placed, t)) return;
-            AddLinkCandidate(sender, placed, theirsPose, mine.pose, mineId, theirsId, inliers, "camera", t, "inliers", inliers);
+            if (!VerifyVisualPlacement(sender, theirsPose, placed, t, out var sweepHere, out var sweepThere)) return;
+            // Refining the launch pads' shared frame needs better than the camera's turn: RANSAC on 200 features scattered
+            // 1.7 to 3.5 deg live (seed 934, 24 Oct 23:58) around a 2.4 deg error. The camera finds the place; the partner's
+            // LiDAR sweep placed in the own map (0.5 deg steps) measures it, as a LiDAR fingerprint match does.
+            if (c.frames_shared_at_start)
+                AddLinkCandidate(sender, sweepHere, sweepThere, mine.pose, mineId, theirsId, inliers, "camera", t, "inliers", inliers,
+                    "camera_yaw_deg", BrainMath.Angle(theirsPose.yawRad, placed.yawRad));
+            else AddLinkCandidate(sender, placed, theirsPose, mine.pose, mineId, theirsId, inliers, "camera", t, "inliers", inliers);
         }
 
         // RANSAC measures a body-to-body pose. A nearby partner LiDAR sweep must also fit this robot's own map at that
         // pose, without moving farther than the same agreement limits used by LiDAR candidates. The uniqueness check
         // rejects the repeated-corridor case even when ORB produces enough inliers (place_eval database negatives).
-        bool VerifyVisualPlacement(string sender, BrainPose cameraThere, BrainPose cameraHere, double t)
+        bool VerifyVisualPlacement(string sender, BrainPose cameraThere, BrainPose cameraHere, double t) =>
+            VerifyVisualPlacement(sender, cameraThere, cameraHere, t, out _, out _);
+        /// <summary>The same, giving the verified LiDAR placement: the partner sweep's pose in this map and its pose there.</summary>
+        bool VerifyVisualPlacement(string sender, BrainPose cameraThere, BrainPose cameraHere, double t, out BrainPose sweepHere, out BrainPose sweepThere)
         {
+            sweepHere = sweepThere = default;
             Keyframe nearest = null; float distance = c.keyframe_spacing_m;
             if (partnerKeyframes.TryGetValue(sender, out var scans)) foreach (var k in scans)
             {
@@ -309,6 +320,7 @@ namespace SmokeRescue.Brain
                 Mathf.Abs(BrainMath.Angle(placed.pose.yawRad, prior.yawRad)) > c.link_agree_deg)
                 return RejectVisual(t, "Camera RANSAC pose disagrees with its LiDAR map placement.");
             if (!Unique(nearest.scan, placed)) return RejectVisual(t, "Camera placement is not unique in the LiDAR map.");
+            sweepHere = placed.pose; sweepThere = nearest.pose;
             return true;
         }
         /// <summary>Whether camera matches with this partner can still change anything: frames not yet linked by measurement.</summary>
