@@ -117,5 +117,35 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(motion.Pose.position.y, Is.GreaterThan(1.2f), "walked through into the room");
             Assert.That(events.Count(e => e.kind == "door_taken"), Is.EqualTo(1));
         }
+
+        /// <summary>door_enter. A robot 3 m from a 0.9 m doorway lists it from its map and plans a route that ends inside the room
+        /// beyond. Controls: switched off, nothing is listed; a partner already heading there (radio) wins it.</summary>
+        [Test]
+        public void ADoorwayInTheMapBecomesAGoalInsideItsRoom()
+        {
+            (RobotBrain b, List<BrainEvent> ev, List<Vector2> route, bool ok) Run(bool enter, bool partnerFirst)
+            {
+                var c = Settings(); c.grid_size_m = 12; c.door_claims = true; c.door_enter = enter; c.door_home_clear_m = 1;
+                var b = new RobotBrain(Calibration(), c, "A", 0, new EntryPose(0, -3, 0)); Room(b, -2.5f, 2.5f, -3.5f, 4.5f);
+                var g = Map(b);
+                for (int i = 0; i < g.Count; i++) { var q = g.Centre(i); if (Mathf.Abs(q.y) < .06f && Mathf.Abs(q.x) <= 2.5f && Mathf.Abs(q.x) > .45f) g.ObserveOccupied(i); }
+                typeof(RobotBrain).GetMethod("UpdateDoors", Private).Invoke(b, new object[] { 1.0 });
+                if (partnerFirst)
+                    typeof(RobotBrain).GetMethod("ReceiveDoors", Private).Invoke(b, new object[] { new[] { new BrainDoor { position = Vector2.zero, inward = Vector2.up, owner = "robot_B", state = 3, since = .5 } }, 1.0 });
+                var args = new object[] { 1.1, null };
+                bool ok = (bool)typeof(RobotBrain).GetMethod("EnterDoorway", Private).Invoke(b, args);
+                return (b, b.DrainEvents().ToList(), (List<Vector2>)args[1], ok);
+            }
+            var on = Run(true, false);
+            Assert.That(on.ev.Count(e => e.kind == "door_seen"), Is.EqualTo(1), "one doorway listed");
+            Assert.That(on.ok, Is.True, "a route to it");
+            Assert.That(on.route[on.route.Count - 1].y, Is.GreaterThan(.8f), "the route ends inside the room, past the crossing distance");
+            Assert.That(on.b.BuildMessage(2).Doors.Count(d => d.state == 3), Is.EqualTo(1), "radioed as heading");
+            var off = Run(false, false);
+            Assert.That(off.ev.Any(e => e.kind == "door_seen"), Is.False, "control: off");
+            Assert.That(off.ok, Is.False, "control: off, no route");
+            var partner = Run(true, true);
+            Assert.That(partner.ok, Is.False, "control: the partner was heading there first");
+        }
     }
 }

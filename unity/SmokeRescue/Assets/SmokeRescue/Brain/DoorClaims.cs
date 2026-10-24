@@ -15,7 +15,11 @@ namespace SmokeRescue.Brain
     /// </summary>
     public sealed partial class RobotBrain
     {
-        internal const byte DoorTaken = 1, DoorCleared = 2;
+        internal const byte DoorSeen = 0, DoorTaken = 1, DoorCleared = 2, DoorHeading = 3;
+        /// <summary>Order of states when two reports of one doorway meet: seen, then heading, then taken, then cleared.</summary>
+        static int DoorRank(byte state) => state == DoorSeen ? 0 : state == DoorHeading ? 1 : state == DoorTaken ? 2 : 3;
+        Door doorTarget; double nextDoorScan = double.NegativeInfinity; bool doorSweep;
+        readonly List<Vector2> trail = new List<Vector2>();
         sealed class Door { public Vector2 position, inward; public string owner; public byte state; public double since, heardAt; }
         readonly List<Door> doors = new List<Door>();
         Vector2? doorwayAt; Vector2 doorwayAxis; double nextDoorCheck = double.NegativeInfinity;
@@ -71,6 +75,19 @@ namespace SmokeRescue.Brain
             if (!c.door_claims || t < nextDoorCheck) return;
             nextDoorCheck = t + .1;
             var at = motion.Pose.position; var forward = motion.Pose.Forward;
+            if (trail.Count == 0 || Vector2.Distance(trail[trail.Count - 1], at) >= c.door_trail_step_m) trail.Add(at);
+            ScanDoorways(t);
+            if (doorTarget != null && (doorTarget.owner != id || doorTarget.state != DoorHeading))
+            {
+                // The partner won this doorway (it was heading there first) or it was taken: drop the route to it.
+                if (doorTarget.owner != id && doorTarget.state == DoorHeading)
+                {
+                    Emit(t, "door_yielded", "The partner was heading to this doorway first: leave the room to it and pick another.",
+                        "x_m", doorTarget.position.x, "y_m", doorTarget.position.y);
+                    ClearPath();
+                }
+                doorTarget = null;
+            }
             if (InDoorway(at, forward, out var middle, out var axis))
             {
                 if (!doorwayAt.HasValue || Vector2.Distance(doorwayAt.Value, middle) > c.door_match_m)
@@ -100,6 +117,11 @@ namespace SmokeRescue.Brain
         void Crossed(double t, Vector2 door, Vector2 direction)
         {
             var known = doors.Find(d => Vector2.Distance(d.position, door) <= c.door_match_m);
+            // A doorway seen from the map, or the one this robot was heading for, is taken like an unknown one.
+            if (known != null && (known.state == DoorSeen || (known.state == DoorHeading && known.owner == id)) && Vector2.Dot(direction, known.inward) > 0)
+            {
+                doors.Remove(known); if (doorTarget == known) doorTarget = null; known = null;
+            }
             if (known != null)
             {
                 if (known.owner == id && known.state == DoorTaken && Vector2.Dot(direction, known.inward) < 0)
@@ -152,10 +174,86 @@ namespace SmokeRescue.Brain
                    grid.OwnFreeLine(d.position + d.inward * grid.CellM * 3, at);
         }
 
+        /// <summary>door_enter: doorways in this robot's own map within door_scan_m, found with the same narrow-cut test as the
+        /// doorway underfoot, are listed as seen; the room is taken to lie on the far side from the robot. Headless houses
+        /// 5001-5022: 14 of 63 rooms were never entered, and in 5022 robot A confirmed four people from the hallway without
+        /// stepping into a room, because floor seen through a doorway leaves no frontier inside.</summary>
+        void ScanDoorways(double t)
+        {
+            if (!c.door_enter || t < nextDoorScan) return;
+            nextDoorScan = t + c.door_scan_period_s;
+            var at = motion.Pose.position; float r = c.door_scan_m, step = c.door_scan_step_m;
+            for (float dx = -r; dx <= r; dx += step)
+                for (float dy = -r; dy <= r; dy += step)
+                {
+                    if (dx * dx + dy * dy > r * r) continue;
+                    var p = at + new Vector2(dx, dy); int cell = grid.Cell(p);
+                    if (cell < 0 || grid.OwnOccupancy(cell) != 1) continue;
+                    if (!InDoorway(p, Vector2.right, out var middle, out var axis) && !InDoorway(p, Vector2.up, out middle, out axis)) continue;
+                    if (Vector2.Distance(middle, home) <= c.door_home_clear_m || doors.Exists(d => Vector2.Distance(d.position, middle) <= c.door_match_m)) continue;
+                    var inward = Vector2.Dot(axis, middle - at) >= 0 ? axis : -axis;
+                    doors.Add(new Door { position = middle, inward = inward, state = DoorSeen, since = t, heardAt = t });
+                    Emit(t, "door_seen", "A doorway in this robot's own map: a room to walk into.", "x_m", middle.x, "y_m", middle.y,
+                        "inward_x", inward.x, "inward_y", inward.y);
+                }
+        }
+
+        bool BeenNear(Vector2 p) => trail.Exists(q => Vector2.Distance(q, p) <= c.door_been_m);
+
+        /// <summary>Stay in the room this robot took until door_done_share of it is seen or door_room_max_s has passed.</summary>
+        bool StayInTakenRoom(double t)
+        {
+            var at = motion.Pose.position;
+            foreach (var d in doors)
+            {
+                if (d.owner != id || d.state != DoorTaken || !InsideDoorRoom(d, at)) continue;
+                if (t - d.since >= c.door_room_max_s) return false;
+                var room = planner.Rooms.Get(planner.Rooms.RoomAt(at));
+                return room == null || room.coveredShare < c.door_done_share;
+            }
+            return false;
+        }
+
+        /// <summary>The nearest listed doorway this robot has not been through, that no robot has taken or cleared and the
+        /// partner is not heading for: a route to door_enter_depth_m inside it (or just past the doorway when the floor
+        /// deeper in is not yet known). Radioed as heading, so the partner picks another doorway; the first to head for one
+        /// keeps it.</summary>
+        bool EnterDoorway(double t, out List<Vector2> route)
+        {
+            route = null; Door chosen = null; float best = float.PositiveInfinity;
+            if (!c.door_enter || StayInTakenRoom(t)) return false;
+            var at = motion.Pose.position;
+            var candidates = doors.FindAll(d =>
+                (d.state == DoorSeen || (d.state == DoorHeading && (d.owner == id || t - d.heardAt > c.door_heading_lease_s))) &&
+                !BeenNear(d.position + d.inward * c.door_enter_depth_m) && !DoorBlocksGoal(d.position + d.inward * c.door_enter_depth_m, t) &&
+                !GoalBlacklisted(d.position, t));
+            candidates.Sort((a, b) => Vector2.Distance(a.position, at).CompareTo(Vector2.Distance(b.position, at)));
+            int plans = 0;
+            foreach (var d in candidates)
+            {
+                if (Vector2.Distance(d.position, at) >= best || plans >= c.door_enter_max_plans) break;
+                foreach (float depth in new[] { c.door_enter_depth_m, c.door_cross_m + grid.CellM })
+                {
+                    plans++;
+                    var p = planner.Plan(at, d.position + d.inward * depth);
+                    if (p.Count == 0) continue;
+                    float m = PathLength(p);
+                    if (m < best) { best = m; route = p; chosen = d; }
+                    break;
+                }
+            }
+            if (chosen == null) return false;
+            if (doorTarget != null && doorTarget != chosen && doorTarget.owner == id && doorTarget.state == DoorHeading) { doorTarget.state = DoorSeen; doorTarget.owner = null; }
+            if (doorTarget != chosen) { chosen.since = t; Emit(t, "door_heading", "Nearest doorway not yet entered: walk into its room; the partner hears this robot is heading there.",
+                "x_m", chosen.position.x, "y_m", chosen.position.y, "path_m", best); }
+            doorTarget = chosen; chosen.state = DoorHeading; chosen.owner = id; chosen.heardAt = t; doorSweep = true;
+            return true;
+        }
+
         internal BrainDoor[] DoorsToSend()
         {
-            var own = doors.FindAll(d => d.owner == id);
-            if (own.Count > BrainMessage.MaxDoors) own = own.GetRange(own.Count - BrainMessage.MaxDoors, BrainMessage.MaxDoors);
+            var own = doors.FindAll(d => d.owner == id && d.state != DoorSeen);
+            if (own.Count > BrainMessage.MaxDoors) { own.Sort((a, b) => b.since.CompareTo(a.since)); own = own.GetRange(0, BrainMessage.MaxDoors); }
             return own.ConvertAll(d => new BrainDoor { position = d.position, inward = d.inward, owner = d.owner, state = d.state, since = d.since }).ToArray();
         }
 
@@ -167,7 +265,11 @@ namespace SmokeRescue.Brain
                 var known = doors.Find(d => Vector2.Distance(d.position, r.position) <= c.door_match_m);
                 if (known == null) { doors.Add(new Door { position = r.position, inward = r.inward, owner = r.owner, state = r.state, since = r.since, heardAt = t }); continue; }
                 if (known.owner == id && known.state == DoorCleared) continue;   // this robot's own cleared room stays cleared
-                if (r.state >= known.state || known.owner == r.owner) { known.owner = r.owner; known.state = Math.Max(known.state, r.state); known.since = r.since; known.inward = r.inward; }
+                // Both heading for one doorway: the first to choose it keeps it (equal times: the lower id).
+                if (known.owner == id && known.state == DoorHeading && r.state == DoorHeading &&
+                    !(r.since < known.since || (r.since == known.since && string.CompareOrdinal(r.owner, id) < 0))) continue;
+                if (DoorRank(r.state) >= DoorRank(known.state) || known.owner == r.owner)
+                { known.owner = r.owner; known.state = DoorRank(r.state) >= DoorRank(known.state) ? r.state : known.state; known.since = r.since; known.inward = r.inward; }
                 known.heardAt = t;
             }
         }

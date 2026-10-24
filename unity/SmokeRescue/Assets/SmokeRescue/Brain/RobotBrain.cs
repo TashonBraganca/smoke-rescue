@@ -551,7 +551,13 @@ namespace SmokeRescue.Brain
                 }
                 // An agent replacement above has already repaired the old blocked route. Test the new path before fallback.
                 bool fallback = path.Count == 0 || (blocked && (!c.motion_keep_agent_route || !planner.PathSafe(path, cursor)));
-                if (fallback && c.room_walk_in && WalkIntoRoom(t, out var walkIn, out int walkRoom))
+                if (fallback && c.door_claims && c.door_enter && EnterDoorway(t, out var doorRoute))
+                {
+                    // door_enter (owner, 24 Oct): every room is entered through its doorway, nearest first, and swept.
+                    SetPath(doorRoute, true); frontierCentre = goal.Value; frontierRadius = c.door_been_m; scanSince = double.NaN; lastPlan = t;
+                    Emit(t, "goal", "Walk into the nearest room not yet entered, through its doorway.", "x_m", goal.Value.x, "y_m", goal.Value.y);
+                }
+                else if (fallback && c.room_walk_in && WalkIntoRoom(t, out var walkIn, out int walkRoom))
                 {
                     // room_walk_in: a room searched from its doorway is still entered. Headless (23 Oct): 17 of 55 rooms were never
                     // entered, because floor seen from the door counts as searched and leaves no frontier inside.
