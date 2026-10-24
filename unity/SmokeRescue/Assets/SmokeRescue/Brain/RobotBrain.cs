@@ -2371,7 +2371,8 @@ namespace SmokeRescue.Brain
                 // partner_rooms: a room a partner's body has stood in, or stands in now, needs no second body.
                 if (c.partner_rooms && (room.partnerEntered || room.partnerInside)) continue;
                 if (room.entered || room.corridor || walkInRooms.Contains(room.id) || room.indoorFloorM2 < c.room_walk_in_min_m2 ||
-                    room.coveredShare < c.room_ledger_covered_share || !InSearchArea(room.anchor) || GoalBlacklisted(room.anchor, t) || ClaimBlocks(room.anchor, t)) continue;
+                    (!c.room_walk_in_any_coverage && room.coveredShare < c.room_ledger_covered_share) || !InSearchArea(room.anchor) ||
+                    GoalBlacklisted(room.anchor, t) || ClaimBlocks(room.anchor, t)) continue;
                 if (Vector2.Distance(room.anchor, motion.Pose.position) > best) continue;
                 // Thrash guard: room ids can change when the ledger re-segments, so a spot walked to once is not a goal again
                 // (opencv-e5's room-entry goal re-picked one goal 1,097 to 5,924 times per run).
