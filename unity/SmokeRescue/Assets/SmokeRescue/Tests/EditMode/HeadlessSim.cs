@@ -167,6 +167,41 @@ namespace SmokeRescue.Tests.EditMode
             return new RgbdFrame(t, W, H, rgb, depth);
         }
 
+        /// <summary>capsule_walls (request option): the deepest any of the body's three circles (centre, and
+        /// body_half_length_m - body_radius_m fore and aft) reaches into a wall up to 0.6 m above the floor or into furniture;
+        /// 0 or less is clear. Without it only the centre circle met walls: the nose and tail passed through walls and
+        /// furniture and turning was never checked, so headless runs allowed turns and corner cuts a 0.75 m Unity capsule
+        /// cannot make.</summary>
+        bool capsuleWalls;
+        float WallPenetration(Vector2 p, float yaw)
+        {
+            var f = Fwd(yaw) * Mathf.Max(0, cfg.body_half_length_m - cfg.body_radius_m); float worst = float.NegativeInfinity;
+            foreach (var q in new[] { p - f, p, p + f }) worst = Mathf.Max(worst, cfg.body_radius_m - WallClearance(q));
+            return worst;
+        }
+        float WallClearance(Vector2 q)
+        {
+            float best = float.PositiveInfinity;
+            foreach (var s in segs)
+            {
+                if (s[4] > .6f) continue;
+                Vector2 a = new Vector2(s[0], s[1]), b = new Vector2(s[2], s[3]), e = b - a;
+                float k = Mathf.Clamp01(Vector2.Dot(q - a, e) / Mathf.Max(1e-9f, e.sqrMagnitude));
+                best = Mathf.Min(best, Vector2.Distance(q, a + e * k));
+            }
+            foreach (var pr in prisms)
+            {
+                if (pr.height < .1f) continue;
+                if (Inside(pr.poly, q)) return -1;
+                for (int i = 0; i < 4; i++)
+                {
+                    Vector2 a = pr.poly[i], e = pr.poly[(i + 1) % 4] - a;
+                    float k = Mathf.Clamp01(Vector2.Dot(q - a, e) / Mathf.Max(1e-9f, e.sqrMagnitude));
+                    best = Mathf.Min(best, Vector2.Distance(q, a + e * k));
+                }
+            }
+            return best;
+        }
         bool Collides(Vector2 q)
         {
             float rad = cfg.body_radius_m;
@@ -229,7 +264,7 @@ namespace SmokeRescue.Tests.EditMode
                 poly = q["poly"].Select(c => new Vector2((float)c[0], (float)c[1])).ToArray() }).ToList();
             roofs = world["rooms"].Select(q => q["poly"].Select(c => new Vector2((float)c[0], (float)c[1])).ToArray()).ToList();
             people = world["people"].Select(q => ((string)q["id"], new Vector2((float)q["at"][0], (float)q["at"][1]))).ToList();
-            solidBodies = (bool?)run["robot_collision"] ?? false;
+            solidBodies = (bool?)run["robot_collision"] ?? false; capsuleWalls = (bool?)run["capsule_walls"] ?? false;
             if (run["probes"] != null) Probes = run["probes"].Select(q => new Vector2((float)q[0], (float)q[1])).ToList();
             cal = SensorConfig.Load(); cfg = BrainConfig.Load(); cfg.frames_shared_at_start = true;
             // camera_pitch_deg (request option): the colour/depth camera pitched further down, as the owner asked (23 Oct), so a
@@ -311,7 +346,18 @@ namespace SmokeRescue.Tests.EditMode
                     float v = Mathf.Clamp(cmd.forwardMps, -cfg.limits.max_reverse_mps, cfg.limits.max_forward_mps);
                     float w = Mathf.Clamp(cmd.yawRateDeg, -cfg.limits.max_yaw_rate_dps, cfg.limits.max_yaw_rate_dps) * Mathf.Deg2Rad;
                     float yaw = r.yaw + w * (float)dt; Vector2 next = r.p + Fwd(yaw) * v * (float)dt;
-                    if (Collides(next) && !Collides(r.p)) { next = r.p; v = 0; }
+                    if (capsuleWalls)
+                    {
+                        // capsule_walls: walls and furniture stop all three body circles, turning included, and no step may
+                        // press deeper into them; leaving a wall is always allowed.
+                        float before = WallPenetration(r.p, r.yaw), after = WallPenetration(next, yaw);
+                        if (after > 1e-4f && after > before + 1e-5f)
+                        {
+                            if (WallPenetration(r.p, yaw) <= Mathf.Max(before, 0) + 1e-5f) { next = r.p; v = 0; }
+                            else { next = r.p; yaw = r.yaw; v = 0; w = 0; }
+                        }
+                    }
+                    else if (Collides(next) && !Collides(r.p)) { next = r.p; v = 0; }
                     // A step that would press into another robot is refused (turn and move apart are tried in that order);
                     // moving out of an overlap is always allowed.
                     if (solidBodies)
