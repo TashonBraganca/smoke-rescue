@@ -20,7 +20,7 @@ namespace SmokeRescue.Brain
         static int DoorRank(byte state) => state == DoorSeen ? 0 : state == DoorHeading ? 1 : state == DoorTaken ? 2 : 3;
         Door doorTarget; double nextDoorScan = double.NegativeInfinity; bool doorSweep;
         readonly List<Vector2> trail = new List<Vector2>();
-        sealed class Door { public Vector2 position, inward; public string owner; public byte state; public double since, heardAt; }
+        sealed class Door { public Vector2 position, inward; public string owner; public byte state; public double since, heardAt; public float cost; }
         readonly List<Door> doors = new List<Door>();
         Vector2? doorwayAt; Vector2 doorwayAxis; double nextDoorCheck = double.NegativeInfinity;
 
@@ -266,7 +266,7 @@ namespace SmokeRescue.Brain
             if (doorTarget != null && doorTarget != chosen && doorTarget.owner == id && doorTarget.state == DoorHeading) { doorTarget.state = DoorSeen; doorTarget.owner = null; }
             if (doorTarget != chosen) { chosen.since = t; Emit(t, "door_heading", "Nearest doorway not yet entered: walk into its room; the partner hears this robot is heading there.",
                 "x_m", chosen.position.x, "y_m", chosen.position.y, "path_m", best); }
-            doorTarget = chosen; chosen.state = DoorHeading; chosen.owner = id; chosen.heardAt = t; doorSweep = true;
+            doorTarget = chosen; chosen.cost = best / c.open_speed_mps; chosen.state = DoorHeading; chosen.owner = id; chosen.heardAt = t; doorSweep = true;
             return true;
         }
 
@@ -274,7 +274,7 @@ namespace SmokeRescue.Brain
         {
             var own = doors.FindAll(d => d.owner == id && d.state != DoorSeen);
             if (own.Count > BrainMessage.MaxDoors) { own.Sort((a, b) => b.since.CompareTo(a.since)); own = own.GetRange(0, BrainMessage.MaxDoors); }
-            return own.ConvertAll(d => new BrainDoor { position = d.position, inward = d.inward, owner = d.owner, state = d.state, since = d.since }).ToArray();
+            return own.ConvertAll(d => new BrainDoor { position = d.position, inward = d.inward, owner = d.owner, state = d.state, since = d.since, cost = d.cost }).ToArray();
         }
 
         /// <summary>The partner's doorways, already converted into this frame.</summary>
@@ -283,13 +283,13 @@ namespace SmokeRescue.Brain
             foreach (var r in received)
             {
                 var known = doors.Find(d => Vector2.Distance(d.position, r.position) <= c.door_match_m);
-                if (known == null) { doors.Add(new Door { position = r.position, inward = r.inward, owner = r.owner, state = r.state, since = r.since, heardAt = t }); continue; }
+                if (known == null) { doors.Add(new Door { position = r.position, inward = r.inward, owner = r.owner, state = r.state, since = r.since, heardAt = t, cost = r.cost }); continue; }
                 if (known.owner == id && known.state == DoorCleared) continue;   // this robot's own cleared room stays cleared
                 // Both heading for one doorway: the first to choose it keeps it (equal times: the lower id).
                 if (known.owner == id && known.state == DoorHeading && r.state == DoorHeading &&
                     !(r.since < known.since || (r.since == known.since && string.CompareOrdinal(r.owner, id) < 0))) continue;
                 if (DoorRank(r.state) >= DoorRank(known.state) || known.owner == r.owner)
-                { known.owner = r.owner; known.state = DoorRank(r.state) >= DoorRank(known.state) ? r.state : known.state; known.since = r.since; known.inward = r.inward; }
+                { known.owner = r.owner; known.state = DoorRank(r.state) >= DoorRank(known.state) ? r.state : known.state; known.since = r.since; known.inward = r.inward; known.cost = r.cost; }
                 known.heardAt = t;
             }
         }

@@ -85,11 +85,11 @@ namespace SmokeRescue.Tests.EditMode
         {
             var b = new RobotBrain(Calibration(), Settings(), "A", 0);
             var m = b.BuildMessage(1);
-            m.Doors = new[] { new BrainDoor { position = new Vector2(1.5f, -2), inward = new Vector2(0, 1), owner = "robot_A", state = 2, since = .5 } };
+            m.Doors = new[] { new BrainDoor { position = new Vector2(1.5f, -2), inward = new Vector2(0, 1), owner = "robot_A", state = 2, since = .5, cost = 7.25f } };
             var back = Wire(m);
             Assert.That(back.Doors.Length, Is.EqualTo(1));
             Assert.That(back.Doors[0].position, Is.EqualTo(new Vector2(1.5f, -2))); Assert.That(back.Doors[0].owner, Is.EqualTo("robot_A"));
-            Assert.That(back.Doors[0].state, Is.EqualTo(2)); Assert.That(back.Doors[0].since, Is.EqualTo(.5));
+            Assert.That(back.Doors[0].state, Is.EqualTo(2)); Assert.That(back.Doors[0].since, Is.EqualTo(.5)); Assert.That(back.Doors[0].cost, Is.EqualTo(7.25f));
         }
         /// <summary>A doorway crossed at 45 deg from a 1.2 m hallway is still taken: the gap is measured as the narrowest cut
         /// through the robot, not across its heading (headless houses 5001-5022: 28 of 77 room entries were claimed).</summary>
