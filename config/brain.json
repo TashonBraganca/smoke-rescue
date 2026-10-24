@@ -682,5 +682,7 @@
   "room_walk_in_min_m2": 2.0,
   "room_walk_in_min_m2_reason": "Smaller spaces are alcoves or furniture gaps, not rooms to walk into.",
   "room_walk_in_max_m": 8.0,
-  "room_walk_in_max_m_reason": "About 13 s at open speed: a detour, not a cross-house trip."
+  "room_walk_in_max_m_reason": "About 13 s at open speed: a detour, not a cross-house trip.",
+  "room_walk_in_any_coverage": false,
+  "room_walk_in_any_coverage_reason": "room_walk_in also takes an unentered room whatever its coverage, not only one covered past room_ledger_covered_share: between goals the robot walks into any real room it has never stood in within room_walk_in_max_m (not a corridor, at least room_walk_in_min_m2, not a room a partner has been in, each spot once). Owner, 24 Oct: 'a robot must step inside every room'. Tour session, 24 Oct: a room seen from its doorway at 50 to 85 % has no frontier inside and no walk-in, so it is never entered. Off until measured. MEASURED AND REJECTED (24 Oct, g10, 240 s, main 886ae7fc): houses 5001-5004, 5017, 5020-5022 rooms 57/69 -> 51/69, floor 80.2 -> 75.9 %, people 40/40 -> 37/40 (5003 5/7 -> 7/7, but 5001 7 -> 4, 5004 8 -> 6); 5005-5010 46/56 -> 48/56, people 28/30 both; seed 934 one door 7 -> 6 rooms, 4/5 -> 3/5; 0 false. Walking into every nearby unentered room between goals zigzags. Keep off."
 }
