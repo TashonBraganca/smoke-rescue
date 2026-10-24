@@ -25,7 +25,7 @@ namespace SmokeRescue.Brain
     /// sender's bid (seconds of travel to the room's nearest frontier), when it took the room, and when the claim lapses.</summary>
     /// <summary>A doorway a robot walked through into a room (door_claims): its point and the direction into the room, in the
     /// sender's frame; state 1 taken by the owner, 2 cleared.</summary>
-    [Serializable] public struct BrainDoor { public Vector2 position, inward; public string owner; public byte state; public double since; }
+    [Serializable] public struct BrainDoor { public Vector2 position, inward; public string owner; public byte state; public double since; public float cost; }
     [Serializable] public sealed class BrainRoomClaim
     { public Vector2 anchor; public float radiusM, bidS; public double since, expiresAt; }
     [Serializable] public struct BrainSurvivor
@@ -94,9 +94,9 @@ namespace SmokeRescue.Brain
         /// them, because a rejection stayed on the robot that made it). Version 6 adds Air after Rejected (seed 932: robot A
         /// held in 44 C air, remembering 20 C in the foyer from 100 s earlier, while robot B stood there in 54 C). Version 7 adds
         /// RoomClaim after Air, so code splits rooms between any number of robots (seed 932: the agents split the house in words,
-        /// "west" and "north", and nobody searched the east). Version 9 adds Doors after the team-map block: the doorways a robot
+        /// "west" and "north", and nobody searched the east). Version 10 adds each door's cost (the sender's bid in seconds, for the room board). Version 9 adds Doors after the team-map block: the doorways a robot
         /// took or cleared (owner, 24 Oct: a room one robot entered is not entered by the other).</summary>
-        public const byte Version = 9;
+        public const byte Version = 10;
         public const int MaxDoors = 32;
         public const int MaxTeamCells = 256;
         public const int MaxRejected = 16, MaxAir = 32;
@@ -166,7 +166,7 @@ namespace SmokeRescue.Brain
                 }
                 if (Doors.Length > MaxDoors) throw new InvalidDataException("Too many doors.");
                 w.Write((byte)Doors.Length);
-                foreach (var d in Doors) { Write(w, d.position); Write(w, d.inward); WriteString(w, d.owner ?? ""); w.Write(d.state); w.Write(d.since); }
+                foreach (var d in Doors) { Write(w, d.position); Write(w, d.inward); WriteString(w, d.owner ?? ""); w.Write(d.state); w.Write(d.since); w.Write(d.cost); }
                 w.Flush();
                 if (stream.Length >= MaxBytes) throw new InvalidDataException("Brain state exceeds the 40000-byte radio limit; increase compression before using this scene.");
                 return stream.ToArray();
@@ -251,9 +251,9 @@ namespace SmokeRescue.Brain
                 if (m.Doors.Length > MaxDoors) throw new InvalidDataException("Too many doors.");
                 for (int i = 0; i < m.Doors.Length; i++)
                 {
-                    m.Doors[i] = new BrainDoor { position = ReadPoint(r), inward = ReadPoint(r), owner = ReadString(r), state = r.ReadByte(), since = r.ReadDouble() };
+                    m.Doors[i] = new BrainDoor { position = ReadPoint(r), inward = ReadPoint(r), owner = ReadString(r), state = r.ReadByte(), since = r.ReadDouble(), cost = r.ReadSingle() };
                     if (!BrainMath.Finite(m.Doors[i].position.x) || !BrainMath.Finite(m.Doors[i].position.y) || !BrainMath.Finite(m.Doors[i].inward.x) ||
-                        !BrainMath.Finite(m.Doors[i].inward.y) || (m.Doors[i].state < 1 || m.Doors[i].state > 3)) throw new InvalidDataException("Invalid door.");
+                        !BrainMath.Finite(m.Doors[i].inward.y) || !BrainMath.Finite(m.Doors[i].cost) || m.Doors[i].cost < 0 || (m.Doors[i].state < 1 || m.Doors[i].state > 3)) throw new InvalidDataException("Invalid door.");
                 }
                 if (stream.Position != stream.Length) throw new InvalidDataException("Trailing brain packet bytes.");
                 return m;

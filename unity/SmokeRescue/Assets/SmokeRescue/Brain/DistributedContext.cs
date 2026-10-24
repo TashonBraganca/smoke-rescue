@@ -232,7 +232,7 @@ namespace SmokeRescue.Brain
             {
                 var turn = new BrainPose { position = Vector2.zero, yawRad = link.yawRad };
                 ReceiveDoors(Array.ConvertAll(m.Doors, d => new BrainDoor { position = link.Transform(d.position.x, d.position.y),
-                    inward = turn.Transform(d.inward.x, d.inward.y), owner = d.owner, state = d.state, since = d.since }), t);
+                    inward = turn.Transform(d.inward.x, d.inward.y), owner = d.owner, state = d.state, since = d.since, cost = d.cost }), t);
             }
             foreach (var hot in m.Hotspots)
             {
