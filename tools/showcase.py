@@ -808,10 +808,24 @@ class Radio:
                 chips += [("REFUSED", WARN)] if e.get("refusals") else []
                 self.items.append((t, side.get(who, 0), "agent", e.get("summary") or "", chips))
         for r in robots:
-            me = 'AB'[side[r]]
+            me = 'AB'[side[r]]; other = 'AB'[1 - side[r]] if len(robots) == 2 else 'its partner'
+            last_place = last_loop = -1e9
             for e in jsonl(rec / r / "decisions.jsonl"):
                 k, t = e["kind"], float(e["t"])
                 n = e.get("numbers") or {}
+                # Live visual SLAM (visual_slam_live): camera place matches between the robots, the shared-frame correction they
+                # measure, and loop closures; the matches and loops are thinned so they do not flood the feed.
+                if k == "place_recognised" and t - last_place >= 20:
+                    last_place = t
+                    self.items.append((t, side[r], "agent", f"{me}'s camera recognised a place {other} saw: {n.get('inliers', 0):.0f} OpenCV 5 "
+                                       "ORB matches, checked on its LiDAR map", [("visual SLAM", CV)]))
+                elif k == "frame_link_refined":
+                    turn = ((n.get("dyaw_deg", 0) + 180) % 360) - 180
+                    self.items.append((t, -1, "slam", f"VISUAL SLAM: {me} corrects the shared map by {turn:+.1f}° from camera matches", []))
+                elif k == "visual_loop_closure" and t - last_loop >= 30:
+                    last_loop = t
+                    self.items.append((t, side[r], "agent", f"{me} recognised a place it saw {n.get('age_s', 0):.0f} s ago: "
+                                       f"drift {100 * n.get('drift_m', 0):.0f} cm", [("loop closure", CV)]))
                 if k == "team_message_sent":
                     self.items.append((t, side[r], "radio", "“" + e["reason"] + "”", [("radio out", DIM)]))
                 elif k == "survivor_confirmed":
@@ -904,7 +918,7 @@ class Radio:
             fresh = max(0., 1 - (t - ti) / 2.5)
             fade = lambda colour: mix(colour, PANEL, keep)
             if loud:
-                colour = GOOD if kind == "good" else WARN
+                colour = GOOD if kind == "good" else CV if kind == "slam" else WARN
                 d.rounded_rectangle((x0, y + 2, x1, y + h - 4), 9, fill=fade(mix(colour, PANEL, .13 + .12 * fresh)))
                 d.rounded_rectangle((x0, y + 2, x0 + 5, y + h - 4), 2, fill=fade(colour))
                 d.text((x0 + 20, y + h // 2 - 11), clock(ti), font=F["mono"], fill=fade(mix(colour, PANEL, .8)))
@@ -988,10 +1002,10 @@ def camera_tile(k: int, rgb: np.ndarray, th, hot, state: dict | None, torch: str
     return tile
 
 
-def draw_header(d, title: str, t: float, speed: float, agents: bool):
+def draw_header(d, title: str, t: float, speed: float, agents: bool, vslam: bool = False):
     d.text((24, 14), title, font=F["title"], fill=TEXT)
     d.text((24 + d.textlength(title, font=F["title"]) + 20, 24),
-           "Two quadruped robots search a burning house  ·  OpenCV 5 perception  ·  "
+           "Two quadruped robots search a burning house  ·  OpenCV 5 " + ("perception and live visual SLAM" if vslam else "perception") + "  ·  "
            + ("LLM agents" if agents else "onboard robot brains, no LLM") + "  ·  maps shared over a lossy radio",
            font=F["sub"], fill=DIM)
     badge = f"{speed:g}x speed"
@@ -1026,6 +1040,8 @@ class Showcase:
         self.plan = HousePlan(rec, meta, robots, self.states,
                               (PLAN_BOX[2] - PLAN_BOX[0] - 380, PLAN_BOX[3] - PLAN_BOX[1] - 16), report)
         self.agents = (rec / "agent_trace.jsonl").exists()
+        # Live visual SLAM happened in this run if a robot refined the shared frame from camera place matches.
+        self.vslam = any(e["kind"] == "frame_link_refined" for r in ("robot_A", "robot_B") for e in jsonl(rec / r / "decisions.jsonl"))
         self.end = max(fr[-1][0] for fr in self.tracks.values())
         self.cache = {}
         self.corner = Image.new("L", (CAM_W, CAM_H), 0)
@@ -1048,7 +1064,7 @@ class Showcase:
     def frame(self, t: float) -> np.ndarray:
         im = Image.new("RGB", (W, H), BG)
         d = ImageDraw.Draw(im)
-        draw_header(d, self.title, t, self.speed, self.agents)
+        draw_header(d, self.title, t, self.speed, self.agents, self.vslam)
         for k, r in enumerate(self.robots):
             rgb, th, hot = self.camera(r, t)
             si = int(np.searchsorted(self.state_times[r], t, side='right')) - 1
