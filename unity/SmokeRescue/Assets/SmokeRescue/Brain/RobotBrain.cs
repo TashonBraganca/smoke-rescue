@@ -764,11 +764,15 @@ namespace SmokeRescue.Brain
         /// (168 s), and s1 was the one person of 30 never confirmed. A stop already under way is kept.</summary>
         bool StartsViewingStop(float range)
         {
-            if (range < c.survivor_stop_min_m || range > c.survivor_stop_max_m) return false;
-            if (!c.survivor_view_sight_line || inspecting) return true;
             var at = motion.Pose.position;
-            return planner.ClearView(at, active.position) ||
-                   (goal.HasValue && path.Count > 0 && Vector2.Distance(at, goal.Value) <= 2 * c.goal_tolerance_m);
+            bool atApproachEnd = goal.HasValue && path.Count > 0 && Vector2.Distance(at, goal.Value) <= 2 * c.goal_tolerance_m;
+            // survivor_close_view_min_m: the approach planned a closer view because the band had no clear spot
+            // (GridPlanner.ApproachPath); at its end the closer range is the viewing distance.
+            bool closeView = c.survivor_close_view_min_m > 0 && range >= c.survivor_close_view_min_m && range < c.survivor_stop_min_m &&
+                             (inspecting || atApproachEnd);
+            if (!closeView && (range < c.survivor_stop_min_m || range > c.survivor_stop_max_m)) return false;
+            if (!c.survivor_view_sight_line || inspecting) return true;
+            return planner.ClearView(at, active.position) || atApproachEnd;
         }
         /// <summary>Colour sightings arrive once per scan period, thermal blobs every frame, so freshness depends on the source.</summary>
         double FreshS(Track track) => track.rgb ? c.person_rgb_fresh_s : c.survivor_fresh_s;
