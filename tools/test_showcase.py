@@ -103,20 +103,6 @@ def test_video_counter_uses_evaluator_matches_at_display_time(review_recording):
     assert showcase.confirmation_label(counts, 'robot_A', 10) == 'confirmations 4; distinct people 2'
 
 
-def test_video_labels_true_floor_plan(monkeypatch):
-    from PIL import Image, ImageDraw
-    rendered = []
-    original = ImageDraw.ImageDraw.text
-    def capture(draw, xy, text, *args, **kwargs):
-        rendered.append(text)
-        return original(draw, xy, text, *args, **kwargs)
-    monkeypatch.setattr(ImageDraw.ImageDraw, 'text', capture)
-    draw = ImageDraw.Draw(Image.new('RGB', (1920, 1080)))
-    showcase.evaluator_plan_panel(draw, (672, 568, 1312, 1064), 'Shared context')
-    assert any("evaluator's view of the true floor plan" in text for text in rendered)
-    assert any('robots never see it' in text for text in rendered)
-
-
 @pytest.fixture
 def live(tmp_path):
     for robot in ('robot_A', 'robot_B'):
@@ -404,19 +390,150 @@ def test_video_counter_separates_events_from_distinct_people(placed_scored_recor
     assert showcase.confirmation_label(report, None, 9) == 'confirmations 7; distinct people 2'
 
 
-def test_video_labels_true_plan_as_evaluator_only():
+def write_team_map(path, sources, size, origin, at, occupancy, searched_mask, source_mask, confidence=None):
+    import gzip
+    import struct
+    raw = b'TMAP' + struct.pack('<BifffdB', 1, size, .2, origin[0], origin[1], at, len(sources))
+    for source in sources:
+        raw += struct.pack('<H', len(source)) + source.encode()
+    confidence = (searched_mask != 0) * .8 if confidence is None else confidence
+    arrays = [occupancy.astype('<f4'), confidence.astype('<f4'), source_mask.astype('<u4'),
+              searched_mask.astype('<u4'), np.zeros((size, size), '<f4'), np.zeros((size, size), '<f4')]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(gzip.compress(raw + b''.join(a.tobytes() for a in arrays)))
+
+
+@pytest.fixture
+def house(tmp_path):
+    """A 4 x 2 m house of two rooms; robot A's export marks x 0..1 searched by A, 1..2 by both, 2..3 by B,
+    3..4 mapped up to y 1 and unknown above; floor north of the house is searched by A but is not house floor."""
+    scenario = dict(search_area=[0, 0, 4, 2], robots=[
+        dict(id='robot_A', launch_pad=[0, 0, 0], spawn=dict(at=[2, -1], yaw=0)),
+        dict(id='robot_B', launch_pad=[0, -1, 0], spawn=dict(at=[2, -2], yaw=0))])
+    sp = tmp_path / 'scenario.json'
+    sp.write_text(json.dumps(scenario))
+    meta = dict(robots=['robot_A', 'robot_B'], scenario=str(sp))
+    (tmp_path / 'meta.json').write_text(json.dumps(meta))
+    (tmp_path / 'oracle').mkdir()
+    (tmp_path / 'oracle/floorplan_used.json').write_text(json.dumps(dict(
+        footprint=[0, 0, 4, 2], rooms=[dict(id='w', rect=[0, 0, 2, 2]), dict(id='e', rect=[2, 0, 4, 2])],
+        doors=[dict(id='d', wall='x', at=[2, 1], width=.8)])))
+    states = {}
+    for r in meta['robots']:
+        rd = tmp_path / r
+        (rd / 'brain_map').mkdir(parents=True)
+        # Brain frame: A's pad at the origin, placed at house (2, -1).
+        states[r] = [dict(t=0., x=0., y=0., yaw_rad=0., state='explore', fires=[]),
+                     dict(t=5., x=0., y=1.5, yaw_rad=0., state='explore', fires=[[-1.5, 2.0], [0., 3.3]])]
+        (rd / 'brain_state.jsonl').write_text(''.join(json.dumps(s) + '\n' for s in states[r]))
+    size = 20
+    occ, ssm, sm = np.full((size, size), .5), np.zeros((size, size), int), np.zeros((size, size), int)
+    # Grid origin (-2, 1) in A's frame is house (0, 0); cell (iy, ix) covers house x 0.2 ix, y 0.2 iy.
+    ssm[:10, 0:5], ssm[:10, 5:10], ssm[:10, 10:15] = 1, 3, 2
+    ssm[10:, 0:5] = 1
+    sm[ssm != 0] = 1
+    sm[:5, 15:] = 1
+    occ[sm != 0] = .1
+    write_team_map(tmp_path / 'robot_A/brain_map/5.000000.team.bin.gz', ('robot_A', 'robot_B'), size, (-2, 1), 5.,
+                   occ, ssm, sm)
+    return showcase.HousePlan(tmp_path, meta, meta['robots'], states, (500, 300))
+
+
+def test_plan_counts_house_floor_by_robot_from_the_raw_export(house):
+    s = house.stat(5)
+    assert house.receiver == 'robot_A' and house.floor_m2 == 8
+    assert s['a'] == pytest.approx(2) and s['both'] == pytest.approx(2) and s['b'] == pytest.approx(2)
+    assert s['union'] == pytest.approx(6) and s['mapped'] == pytest.approx(1)
+    assert house.stat(4)['union'] == 0
+
+
+def test_robot_bits_follow_each_exports_own_source_order(house, tmp_path):
+    from brain.team_map import load_team_map
+    ssm = np.array([[1, 2], [3, 0]])
+    path = tmp_path / 'b.gz'
+    write_team_map(path, ('robot_B', 'robot_A'), 2, (0, 0), 1., np.full((2, 2), .1), ssm, np.ones((2, 2)))
+    bits = showcase.robot_bits(load_team_map(path), ['robot_A', 'robot_B'])
+    # B's export lists itself first: its bit 0 is B, so it maps to robot bit 1.
+    np.testing.assert_array_equal(bits, [[2, 1], [3, 0]])
+
+
+def test_tidy_bits_only_closes_small_holes_and_never_removes_search():
+    bits = np.full((12, 12), 2, np.uint8)
+    bits[2, 2] = 0                  # one-cell hole
+    bits[6:9, 6:9] = 0              # 3 x 3 unsearched patch
+    bits[3, 9] = 1                  # one A cell inside B's floor
+    tidy = showcase.tidy_bits(bits)
+    assert np.all(tidy[bits != 0] != 0)
+    assert tidy[2, 2] != 0 and tidy[7, 7] == 0
+    assert tidy[3, 9] == 2
+
+
+def colour_distance(a, b):
+    return float(np.linalg.norm(np.asarray(a, float) - np.asarray(b, float)))
+
+
+def test_plan_tints_searched_floor_by_robot_and_lights_only_mapped_walls(house):
+    img, labels = house.render(10)
+    def at(x, y):
+        px, py = house.px([x, y])
+        return img[py, px]
+    for xy, bits in [((.5, 1.2), 1), ((1.5, 1.2), 3), ((2.6, 1.2), 2)]:
+        nearest = min(showcase.SEARCHED, key=lambda b: colour_distance(at(*xy), showcase.SEARCHED[b]))
+        assert nearest == bits
+    # North of the house is searched on the export but is not house floor: no tint there.
+    assert colour_distance(at(.5, 2.35), showcase.PLAN_BG) < 12
+    lit, dim = at(2, .3), at(4, 1.8)
+    assert colour_distance(lit, showcase.WALL_LIT) < 30
+    assert colour_distance(dim, showcase.WALL_DIM) < 30
+    assert ('A', showcase.ROBOT[0]) in [(text, colour) for _, text, colour in labels]
+
+
+def test_plan_pins_a_robot_still_outside_the_house_to_its_edge(house):
+    img, labels = house.render(0)
+    texts = [text for _, text, _ in labels]
+    assert 'A outside' in texts and 'B outside' in texts
+    for (x, y), _, _ in labels:
+        assert 0 <= x < img.shape[1] and 0 <= y < img.shape[0]
+
+
+def test_plan_draws_fire_on_house_floor_only(house):
+    # One fire cell on the house floor at house (0.5, 1.0); one in the plan's margin north of the house, (2, 2.3).
+    assert len(house.fire_cells(5)) == 2
+    with_fire, _ = house.render(5)
+    house.states['robot_A'][1]['fires'] = house.states['robot_B'][1]['fires'] = []
+    house._fire = (None, None)
+    without, _ = house.render(5)
+    changed = np.argwhere(np.any(with_fire != without, axis=-1))
+    centre = house.px([.6, 1.0])
+    assert len(changed) and np.all(np.abs(changed[:, ::-1] - centre).max(axis=1) < 40)
+
+
+def test_plan_panel_discloses_that_walls_are_the_true_plan(house, monkeypatch):
     from PIL import Image, ImageDraw
-    image = Image.new('RGB', (640, 500), showcase.BG)
-    class RecordingDraw:
-        def __init__(self):
-            self.draw = ImageDraw.Draw(image)
-            self.texts = []
-        def text(self, xy, text, **kwargs):
-            self.texts.append(text)
-            return self.draw.text(xy, text, **kwargs)
-        def __getattr__(self, name):
-            return getattr(self.draw, name)
-    for title in ['Shared context', 'SLAM map']:
-        draw = RecordingDraw()
-        showcase.evaluator_plan_panel(draw, (0, 0, 640, 500), title)
-        assert "evaluator's view of the true floor plan; robots never see it" in draw.texts
+    rendered = []
+    original = ImageDraw.ImageDraw.text
+    def capture(draw, xy, text, *args, **kwargs):
+        rendered.append(text)
+        return original(draw, xy, text, *args, **kwargs)
+    monkeypatch.setattr(ImageDraw.ImageDraw, 'text', capture)
+    image = Image.new('RGB', (1920, 1080))
+    showcase.draw_plan_panel(image, ImageDraw.Draw(image), house, 5, 'up')
+    text = ' '.join(rendered)
+    assert 'true house plan' in text and 'never see it' in text
+    assert 'SHARED MAP' in rendered and "Robot A's team map" in text
+
+
+def test_radio_keeps_link_changes_out_of_the_feed_and_bids_quiet(tmp_path):
+    for r in ('robot_A', 'robot_B'):
+        (tmp_path / r).mkdir()
+    (tmp_path / 'robot_B/decisions.jsonl').write_text(''.join(json.dumps(e) + '\n' for e in [
+        dict(t=3, kind='room_claimed', numbers=dict(bid_s=7.4)),
+        dict(t=4, kind='survivor_confirmed', numbers=dict(x_m=1, y_m=2))]))
+    (tmp_path / 'brain_radio.txt').write_text('# header\n'
+        '0 robot_A robot_B 1 100 1 sent 0.05\n2 robot_A robot_B 2 100 1 sent 2.05\n'
+        '4 robot_A robot_B 3 100 1 queued_walls -1\n')
+    radio = showcase.Radio(tmp_path, None, ['robot_A', 'robot_B'])
+    assert [i[3] for i in radio.items] == ['B claims the nearest unsearched room, 7 s away', 'SURVIVOR CONFIRMED by B']
+    assert radio.items[0][2] == 'quiet' and radio.items[1][1:3] == (-1, 'good')
+    assert radio.links == [(0., 'up'), (4., 'walls')]
+    assert radio.link(1) == 'up' and radio.link(5) == 'walls' and radio.link(-1) is None
