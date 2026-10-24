@@ -48,6 +48,7 @@ namespace SmokeRescue.Brain
             Origin = c.fixed_grid_origin ? new Vector2(c.grid_origin_x_m, c.grid_origin_z_m) :
                 new Vector2(-Size * c.cell_m / 2, -Size * c.cell_m / 2);
             odds = new float[Count]; lidarOdds = new float[Count]; heat = new float[Count]; rise = new float[Count]; heatTime = new double[Count];
+            riseBase = new float[Count]; riseBaseTime = new double[Count]; for (int k = 0; k < Count; k++) riseBaseTime[k] = double.NegativeInfinity;
             hits = new bool[Count]; frees = new bool[Count]; observed = new bool[Count]; lows = new bool[Count];
             openScans = new ushort[Count]; returnScans = new ushort[Count]; openMark = new bool[Count];
             localTime = new double[Count]; peer = new byte[Count]; roofHits = new byte[Count];
@@ -259,11 +260,26 @@ namespace SmokeRescue.Brain
                 return;
             }
             bool wasDangerous = Dangerous(i);
-            if (t > heatTime[i] && t - heatTime[i] <= c.heat_rise_memory_s)
+            if (c.heat_rise_window_s > 0) WindowRise(i, temperatureC, t);
+            else if (t > heatTime[i] && t - heatTime[i] <= c.heat_rise_memory_s)
                 rise[i] = Mathf.Max(0, (temperatureC - heat[i]) / (float)(t - heatTime[i]));
             else if (t > heatTime[i]) rise[i] = 0;
             heat[i] = Mathf.Max(heat[i], temperatureC); heatTime[i] = t; dirty |= wasDangerous != Dangerous(i);
         }
+        /// <summary>heat_rise_window_s: the rise rate is the slope from a reading at least heat_rise_window_s old, not from the
+        /// previous frame. Between two frames 67 ms apart a 15 to 25 C flicker of hot-gas radiance read as 210 to 285 C/s, and
+        /// heat + rise * heat_prediction_s marked 89 to 95 C floor as fire. Seed 934 (24 Oct 04:53 run), robot B at 212.5 to
+        /// 215 s: 0 cells measured at fire_c, 441 forecast as fire from its own frames (replayed); with partner reports, 28 of
+        /// its routes were cut by fire margins while its air stayed under 55 C, and it never reached the laundry.
+        /// A sustained rise still forecasts fire before it is measured.</summary>
+        void WindowRise(int i, float temperatureC, double t)
+        {
+            if (t - riseBaseTime[i] > c.heat_rise_memory_s) { riseBase[i] = temperatureC; riseBaseTime[i] = t; rise[i] = 0; return; }
+            if (t - riseBaseTime[i] < c.heat_rise_window_s) return;
+            rise[i] = Mathf.Max(0, (temperatureC - riseBase[i]) / (float)(t - riseBaseTime[i]));
+            riseBase[i] = temperatureC; riseBaseTime[i] = t;
+        }
+        float[] riseBase; double[] riseBaseTime;
         public void DecayTo(double t)
         {
             float dt = (float)Math.Max(0, t - time); bool changed = false;
