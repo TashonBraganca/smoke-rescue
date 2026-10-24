@@ -255,8 +255,16 @@ def good_matches(partner_desc, own_desc, ratio):
     return kept[first][:, :2].astype(int)
 
 
-def match_keyframes(partner: Keyframe, own, settings) -> dict:
-    """Match a partner keyframe against own keyframes, a list of (id, Keyframe). See the module docstring."""
+def match_keyframes(partner: Keyframe, own, settings, candidates=None) -> dict:
+    """Match a partner keyframe against own keyframes, a list of (id, Keyframe). See the module docstring.
+
+    candidates, when given, are the own keyframe ids the caller's pose prior allows (the brain's own views near where
+    the partner stood, or its own earlier views of the place it stands in now); only those are compared."""
+    if candidates is not None:
+        allowed = {int(c) for c in candidates}
+        own = [(i, kf) for i, kf in own if i in allowed]
+        if not own:
+            return {"matched": False, "reason": "no own keyframe near the pose prior"}
     if not own:
         return {"matched": False, "reason": "no own keyframes stored"}
     candidates = []
@@ -331,14 +339,14 @@ class PlaceDatabase:
         return {"ok": True, "id": ident, "database_id": self.database_id, "t": float(frame["stamps"]["rgb"]), "features": len(kf),
                 "payload_b64": encode_b64(kf.desc, kf.xyh)}
 
-    def match(self, payload_b64, robot_dir=None, t=None) -> dict:
+    def match(self, payload_b64, robot_dir=None, t=None, candidates=None) -> dict:
         if robot_dir is not None and t is not None:
             self._check_run(robot_dir, t)
         try:
             partner = decode_b64(payload_b64)
         except ValueError as exc:
             return {"matched": False, "database_id": self.database_id, "reason": f"invalid payload: {exc}"}
-        result = match_keyframes(partner, self.keyframes, self.settings)
+        result = match_keyframes(partner, self.keyframes, self.settings, candidates)
         result["database_id"] = self.database_id
         return result
 
@@ -407,9 +415,9 @@ class RobotPlace:
     def keyframe(self, robot_dir, t):
         return self._call("keyframe", str(robot_dir), float(t))
 
-    def match(self, payload_b64, robot_dir=None, t=None):
+    def match(self, payload_b64, robot_dir=None, t=None, candidates=None):
         return self._call("match", payload_b64, None if robot_dir is None else str(robot_dir),
-                          None if t is None else float(t))
+                          None if t is None else float(t), None if candidates is None else [int(c) for c in candidates])
 
     def close(self):
         with self._lock:
@@ -438,9 +446,10 @@ def keyframe(robot, robot_dir, t) -> dict:
     return _robot(robot).keyframe(robot_dir, t)
 
 
-def match(robot, payload_b64, robot_dir=None, t=None) -> dict:
-    """Match a partner's payload against this robot's keyframes. robot_dir and t drive the run reset rule."""
-    return _robot(robot).match(payload_b64, robot_dir, t)
+def match(robot, payload_b64, robot_dir=None, t=None, candidates=None) -> dict:
+    """Match a payload (a partner's, or this robot's own newest view for a loop closure) against this robot's keyframes,
+    optionally only the candidate ids. robot_dir and t drive the run reset rule."""
+    return _robot(robot).match(payload_b64, robot_dir, t, candidates)
 
 
 def close_all():

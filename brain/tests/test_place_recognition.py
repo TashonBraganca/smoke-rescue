@@ -53,6 +53,26 @@ def test_self_match_is_identity_and_far_negative_rejected():
     assert db.match(far["payload_b64"])["matched"] is False
 
 
+TONIGHT = ROOT / "data/recordings/unity_house_onedoor_seed934_brain_final_1954/robot_A"
+
+
+@pytest.mark.skipif(not TONIGHT.exists(), reason="recording missing")
+def test_candidates_limit_the_match_to_the_pose_prior():
+    # The brain passes only own views near where the partner stood (or, for a loop closure, its own older views of
+    # this place). Here view 0 is the true match: allowed, it matches; excluded, it cannot be returned; an empty
+    # candidate list reports that nothing lies near the prior. Control: no candidates searches everything.
+    db = place.PlaceDatabase()
+    first = db.keyframe(str(TONIGHT), 100.0)
+    other = db.keyframe(str(TONIGHT), 160.0)
+    assert first["ok"] and other["ok"]
+    assert db.match(first["payload_b64"])["mine_id"] == 0
+    assert db.match(first["payload_b64"], candidates=[0])["mine_id"] == 0
+    excluded = db.match(first["payload_b64"], candidates=[other["id"]])
+    assert not (excluded["matched"] and excluded["mine_id"] == 0)
+    empty = db.match(first["payload_b64"], candidates=[])
+    assert empty["matched"] is False and "pose prior" in empty["reason"]
+
+
 @needs_data
 def test_real_positive_pair_recovers_true_pose():
     # heldout_run1: robot_B t=138 seen from robot_A t=160, 0.27 m apart; found by tools/place_eval.py (41 inliers).
