@@ -38,6 +38,7 @@ namespace SmokeRescue.Brain
         readonly List<BrainEvent> events = new List<BrainEvent>();
         readonly List<Track> tracks = new List<Track>();
         readonly List<Vector2> survivors = new List<Vector2>();
+        float entryYaw;   // the launch heading: robots are placed facing the way in
         List<Vector2> path = new List<Vector2>();
         Track active;
         Vector2? goal;
@@ -57,7 +58,7 @@ namespace SmokeRescue.Brain
             if (string.IsNullOrWhiteSpace(robotId)) throw new ArgumentException("Robot ID is required.", nameof(robotId));
             id = robotId; scanSign = (seed & 1) == 0 ? 1 : -1; LinkDiagnostics = c.link_diagnostics;
             var entry = entryPose.HasValue ? entryPose.Value.pose : new BrainPose();
-            home = entry.position;
+            home = entry.position; entryYaw = entry.yawRad;
             airC = c.ambient_c; motion = new DeadReckoning(c.motion_stale_s, c.frame_max_age_s + c.frame_pair_tolerance_s, entry); grid = new OccupancyGrid(c) { SeeOverMaxM = cfg.camera.mount.height_m - c.see_over_clearance_m }; grid.TeammateAt = OnTeammate;
             if (grid.Cell(home) < 0) throw new ArgumentException("Entry door is outside the configured building grid.");
             planner = new GridPlanner(grid, c) { Home = home }; planner.RoomTaken = RoomTaken; planner.Rooms.SelfId = id; health = new CameraHealth(c); matcher = new ScanMatcher(grid, c);
@@ -364,6 +365,9 @@ namespace SmokeRescue.Brain
                 foreach (var track in tracks)
                 {
                     if (!track.candidate || track.confirmed || track.onWall || track.retryAfter > t || GoalBlacklisted(track.position, t) || t - track.lastSeen > FreshS(track)) continue;
+                    // A thermal-only shape beside a person already confirmed is her body heat or what she lies on (seed 934, 24 Oct
+                    // 19:54: robot A spent 82.6 to 97.2 s facing a warm shape 2.3 m from the kitchen person it confirmed at 73.5 s).
+                    if (!track.rgb && c.thermal_near_person_m > 0 && survivors.Exists(s => Vector2.Distance(s, track.position) <= c.thermal_near_person_m)) continue;
                     if (PartnerTakesCandidate(track.position, t)) continue;
                     if (AgentOrderHolds(t, track)) continue;
                     // A warm shape outside the ceilinged floor is beyond a window or door: not a person inside.
@@ -648,7 +652,9 @@ namespace SmokeRescue.Brain
                         {
                             if (!lastScanAt.HasValue || Vector2.Distance(lastScanAt.Value, motion.Pose.position) > c.visited_radius_m || knownCells - knownAtLastScan >= c.frontier_min_information_cells)
                             { lastScanAt = motion.Pose.position; knownAtLastScan = knownCells; }
-                            if (!c.stay_inside) BeginReturn(t, NoFrontierLeft);
+                            // leave_when_done (owner, 24 Oct: when all rooms are marked, both robots leave): an inside robot with
+                            // nothing reachable left to search after a full scan walks out the way it came in.
+                            if (!c.stay_inside || (c.leave_when_done && InSearchArea(motion.Pose.position))) BeginReturn(t, NoFrontierLeft);
                             // Holding still is for a robot that is inside. Outside (seed 930, robot B at its pad) it keeps
                             // scanning, which can bring the ceiling through the door into its camera's view.
                             else if (!searchedOut && InSearchArea(motion.Pose.position)) { searchedOut = true; Emit(t, "goal", "Nothing reachable is left to search after a full scan: hold here, inside, until new floor appears or the agent orders a move."); }
@@ -656,6 +662,15 @@ namespace SmokeRescue.Brain
                     }
                 }
                 if (forecastOnlyCut) lastPlan = double.NegativeInfinity;
+            }
+            if (!goal.HasValue && !returning && c.outside_faces_in && !InSearchArea(motion.Pose.position))
+            {
+                // outside_faces_in (owner, 24 Oct: "no robot should ever look out"): outside, with nothing to walk to, the robot
+                // faces the way in (its launch heading) and waits, instead of turning on the spot and filming the yard. Its camera
+                // then looks through the door, where the ceiling that proves floor indoors is. Seed 934 (24 Oct 19:54), robot B:
+                // 15 s of scanning at its pad.
+                float error = BrainMath.Angle(motion.Pose.yawRad, entryYaw);
+                return Command(0, Mathf.Abs(error) <= c.survivor_face_tolerance_deg ? 0 : error * c.heading_gain, dt, true);
             }
             if (!goal.HasValue && !returning) return searchedOut ? Command(0, 0, dt, true) : Command(0, scanSign * c.scan_yaw_dps, dt, true);
             searchedOut = false;
@@ -1917,7 +1932,7 @@ namespace SmokeRescue.Brain
             // Stay inside (the owner's decision, 22 Oct): a robot that has gone in never leaves by the entrance. At the
             // deadline it stops where it stands; every other reason to leave (heat, a closing way out, nothing left to search)
             // becomes a retreat to the coolest floor inside, where it can spray and wait for the air to cool.
-            if (c.stay_inside && reason != CarryingOut)
+            if (c.stay_inside && reason != CarryingOut && !(c.leave_when_done && reason == NoFrontierLeft))
             {
                 ResetStuckRecovery(); active = null; dwell = 0; ClearPath();
                 if (reason == MissionTimeUp)

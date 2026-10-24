@@ -46,7 +46,7 @@ namespace SmokeRescue.Brain
             room_ledger_split_step_m = .1f;
         public float person_rgb_strong_confidence = 1.01f, person_glance_min_confidence = .25f, person_glance_s = 2f, person_glance_repeat_s = 15f,
             person_rgb_boost_period_s = .2f;
-        public bool rgb_person_confirms = false, partner_rooms = false, no_frontier_scan_once = false, follow_through_before_leftovers = false, frontier_beyond_room = false, room_progress_dwell = false, code_sprays_fire = false, code_spray_goal_room = false, heat_marks_room = false, heat_spray_through = false, thermal_dwell_confirms = true, partner_territory = false, room_walk_in_any_coverage = false;
+        public bool rgb_person_confirms = false, partner_rooms = false, no_frontier_scan_once = false, follow_through_before_leftovers = false, frontier_beyond_room = false, room_progress_dwell = false, code_sprays_fire = false, code_spray_goal_room = false, heat_marks_room = false, heat_spray_through = false, thermal_dwell_confirms = true, outside_faces_in = false, leave_when_done = false, person_before_spray = false, partner_territory = false, room_walk_in_any_coverage = false;
         public float code_spray_margin_s = 1f, code_spray_repeat_s = 8f;
         public float room_progress_window_s = 10f, room_progress_min_rate_fraction = .2f;
         public float person_rgb_floor_max_m = .5f, person_confirm_max_range_m = 5f;
@@ -187,6 +187,7 @@ namespace SmokeRescue.Brain
         public int visual_keyframe_max = 200, visual_keyframes_per_message = 1, visual_link_min_inliers = 16;
         public float visual_keyframe_period_s = 2f;
         public bool visual_slam_live = false;
+        public float thermal_near_person_m = 0f;
         public float visual_refine_max_deg = 5f, visual_refine_max_m = .5f, visual_refine_agree_deg = 1f, visual_refine_agree_m = .15f,
             visual_prior_radius_m = 3f, visual_prior_turn_deg = 60f, visual_loop_min_age_s = 20f;
         public int link_shortlist = 5, link_max_candidates = 20, link_turn_candidates = 3, link_verifications_per_step = 4;

@@ -1204,6 +1204,18 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(Mathf.Abs(roomBearing), Is.LessThan(30f), "toward the fire ahead");
             Assert.That(heading.DrainEvents().Any(e => e.kind == "code_spray" && e.reason.StartsWith("Measured fire burns in the room")), Is.True);
             Assert.That(Heading(false).CodeSpray(0, 12, out _, out _), Is.False, "control: switch off, floor behind is open, no spray");
+            // person_before_spray: the colour detector just saw a person; the robot holds its camera on her instead of spraying.
+            // Control: the same sighting with the switch off still sprays.
+            RobotBrain Seen(bool personFirst)
+            {
+                var b = Corridor(true); b.Nozzle = nozzle;
+                var cfg = (BrainConfig)typeof(RobotBrain).GetField("c", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(b);
+                cfg.person_glance = true; cfg.person_before_spray = personFirst;
+                b.OnPersonSighting(0, 20, 3, .9f, true, .05f);
+                return b;
+            }
+            Assert.That(Seen(true).CodeSpray(0, 12, out _, out _), Is.False, "a person just seen comes first");
+            Assert.That(Seen(false).CodeSpray(0, 12, out _, out _), Is.True, "control: without person_before_spray it sprays");
             // The same model as the agent's advice (tools.py knock_down_s): 0.5 m2 at 1.6 m is 0.932 s, 4 m2 is beyond one stream.
             Assert.That(RobotBrain.KnockDownS(nozzle, .5f, 1.6f).Value, Is.EqualTo(.9324).Within(.002), "equal to tools.py knock_down_s(0.5, 1.6)");
             Assert.That(RobotBrain.KnockDownS(nozzle, 4f, 1.6f).HasValue, Is.False);
@@ -2096,6 +2108,80 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(all.Any(e => e.kind == "survivor_candidate"), Is.True, "the warm shape is still a candidate");
             Assert.That(all.Any(e => e.kind == "survivor_unconfirmed"), Is.True, "the dwell ends without a colour sighting");
             Assert.That(all.Any(e => e.kind == "survivor_confirmed"), Is.False, "only the colour detector confirms");
+        }
+
+        [Test]
+        public void OutsideWithNothingToWalkToTheRobotFacesTheWayInInsteadOfScanning()
+        {
+            // outside_faces_in (owner, 24 Oct: "no robot should ever look out"). No proven indoor floor, no frontier: the robot
+            // holds its launch heading. Control: the old behaviour turns on the spot.
+            BrainCommand Last(bool facesIn)
+            {
+                var c = Settings(); c.grid_size_m = 12; c.search_requires_ceiling = true; c.outside_faces_in = facesIn;
+                var b = new RobotBrain(Calibration(), c, "B", 0);
+                BrainCommand cmd = default; for (int i = 0; i < 10; i++) cmd = DriveTick(b, i);
+                return cmd;
+            }
+            Assert.That(Last(true).yawRateDeg, Is.EqualTo(0).Within(1e-3), "faces the way in");
+            Assert.That(Mathf.Abs(Last(false).yawRateDeg), Is.GreaterThan(1), "control: the old scan turns on the spot");
+        }
+
+        [Test]
+        public void WithNothingLeftToSearchInsideTheRobotWalksOut()
+        {
+            // leave_when_done (owner, 24 Oct: when all rooms are marked, both robots leave). A walled 4 x 4 m room, all of it
+            // searched: after the full scan the robot returns to its start. Control: staying inside, it holds.
+            List<BrainEvent> Run(bool leave)
+            {
+                var c = Settings(); c.grid_size_m = 12; c.search_requires_ceiling = false; c.stay_inside = true; c.leave_when_done = leave;
+                c.mission_time_limit_s = 1000;
+                var b = new RobotBrain(Calibration(), c, "A", 0); var g = Map(b);
+                var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+                var searched = (bool[])typeof(OccupancyGrid).GetField("observed", flags).GetValue(g);
+                for (int i = 0; i < g.Count; i++)
+                {
+                    var p = g.Centre(i);
+                    if (Mathf.Abs(p.x) <= 2 && Mathf.Abs(p.y) <= 2) { g.ObserveFree(i); searched[i] = true; }
+                    else if (Mathf.Abs(p.x) <= 2.3f && Mathf.Abs(p.y) <= 2.3f) g.ObserveOccupied(i);
+                }
+                var events = new List<BrainEvent>();
+                for (int i = 0; i <= 20 * 25; i++) { DriveTick(b, i); events.AddRange(b.DrainEvents()); }
+                return events;
+            }
+            var on = Run(true);
+            Assert.That(on.Any(e => e.kind == "goal" && e.reason.StartsWith("No reachable frontier remains after a full scan. Return")), Is.True,
+                string.Join(" | ", on.Where(e => e.kind == "goal").Select(e => e.reason).Distinct()));
+            var off = Run(false);
+            Assert.That(off.Any(e => e.kind == "goal" && e.reason.StartsWith("No reachable frontier remains after a full scan. Return")), Is.False);
+            Assert.That(off.Any(e => e.kind == "goal" && e.reason.StartsWith("Nothing reachable is left to search")), Is.True, "control: staying inside, it holds");
+        }
+
+        [Test]
+        public void AThermalShapeBesideAConfirmedPersonIsNotApproachedAgain()
+        {
+            // thermal_near_person_m. The approach scene above (a thermal-only shape at (0, 3)) with a person already confirmed
+            // 1.5 m from it: the robot does not walk up to it. Control: without that confirmation it approaches and confirms.
+            int Approaches(bool personNearby)
+            {
+                var s = Calibration(); var c = Settings(); c.thermal_near_person_m = 2.5f; var b = new RobotBrain(s, c, "A", 4);
+                if (personNearby)
+                    ((List<Vector2>)typeof(RobotBrain).GetField("survivors", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                        .GetValue(b)).Add(new Vector2(0, 4.5f));
+                var position = Vector2.zero; float yaw = 0, v = 0, w = 0; int approaches = 0;
+                for (int tick = 0; tick < 900; tick++)
+                {
+                    double t = tick / 60.0;
+                    position += new Vector2(-Mathf.Sin(yaw), Mathf.Cos(yaw)) * v / 60; yaw += w * Mathf.Deg2Rad / 60;
+                    Motion(b, t, v, w * Mathf.Deg2Rad);
+                    if (tick % 6 == 0) b.OnAirTemperature(t, 20);
+                    if (tick % 4 == 0) { var pair = SceneImages(t, position, yaw, s); b.OnRgbd(pair.Item1); b.OnThermal(pair.Item2); }
+                    var command = b.Step(t, 1f / 60); v = command.forwardMps; w = command.yawRateDeg;
+                    approaches += b.DrainEvents().Count(e => e.kind == "goal" && e.reason.StartsWith("Inspect the nearest recent survivor candidate"));
+                }
+                return approaches;
+            }
+            Assert.That(Approaches(true), Is.Zero, "beside a confirmed person: not approached");
+            Assert.That(Approaches(false), Is.GreaterThan(0), "control: alone, it is approached");
         }
 
         static Tuple<RgbdFrame, ThermalFrame> SceneImages(double t, Vector2 robot, float yaw, SensorConfig s)
