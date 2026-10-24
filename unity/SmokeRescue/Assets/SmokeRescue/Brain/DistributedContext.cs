@@ -329,6 +329,7 @@ namespace SmokeRescue.Brain
         }
         bool ClaimBlocks(Vector2 p, double t)
         {
+            if (DoorBlocksGoal(p, t)) return true;   // door_claims: a room the partner took, or any cleared room
             foreach (var pair in peers)
             {
                 var claim = pair.Value.claim;
