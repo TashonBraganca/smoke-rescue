@@ -402,6 +402,9 @@ namespace SmokeRescue.Brain
         {
             bearingDegRight = 0; seconds = 0;
             if (!c.code_sprays_fire || !Nozzle.HasValue || waterL <= 1e-6f || t < nextCodeSpray || returning || active != null) return false;
+            // A person the colour detector just saw comes first: confirm her, then spray (seed 934, 24 Oct 19:54: robot A's
+            // camera saw the living room person at 11.0 s and it left to spray at 11.0 s; she was never confirmed).
+            if (c.person_before_spray && t < glanceUntil) return false;
             // One look per replan_s, as often as the planner refreshes frontiers: the host asks after every 60 Hz brain step, and
             // a full frontier search each time took 190 s of every 10 simulated seconds (seed 934, 24 Oct 18:13, 316 s wall per 10 s).
             nextCodeSpray = t + c.replan_s;
