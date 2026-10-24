@@ -29,6 +29,9 @@ namespace SmokeRescue.Brain
             /// farthest room cell from it. A radio room claim names the room by these.</summary>
             public Vector2 anchor;
             public float radiusM;
+            /// <summary>The centre of the room's largest inscribed disc (its widest free cell) and that disc's radius: deep inside
+            /// the room, never in a doorway (Wurm et al., IROS 2008, segment the map the same way).</summary>
+            public Vector2 seat; public float seatR;
             /// <summary>partner_rooms: a partner's radioed body stood on this room's floor (partnerEntered), or stands there now
             /// (partnerInside, set at each ranking from poses no older than peer_claim_s).</summary>
             public bool partnerEntered, partnerInside;
@@ -83,16 +86,117 @@ namespace SmokeRescue.Brain
                 Rebuild(indoors ?? (p => !config.search_requires_ceiling || grid.Indoors(p)));
                 LastSegmentationAt = t; nextSegmentation = t + config.room_ledger_period_s;
                 RecordProgress(t);
+                if (config.room_memory) BindRecords(t);
             }
             if (cell >= 0 && grid.OwnOccupancy(cell) == 1 && byId.TryGetValue(labels[cell], out var current))
             {
-                current.entered = true;
+                if (!config.room_entered_near_seat || StandsInside(current, at)) current.entered = true;
                 if (!entryById.ContainsKey(current.id)) entryById[current.id] = at;   // where this robot first stood in the room
             }
             lastCell = cell >= 0 && grid.OwnOccupancy(cell) == 1 ? cell : -1; lastT = t;
         }
 
         readonly Dictionary<int, Vector2> entryById = new Dictionary<int, Vector2>();
+
+        /// <summary>room_memory: one record per room this robot has mapped, kept across re-segmentations. The ledger re-labels
+        /// its rooms every room_ledger_period_s and its ids follow cell overlap, so a room's id is no memory; a record is keyed
+        /// by its seat (the centre of the room's largest inscribed disc) in the shared launch frame and re-finds its room each
+        /// rebuild as the ledger room its seat lies on. Status only moves forward: seen, entered, done. Wurm et al. (IROS 2008)
+        /// keep segments with an assignment; Holz et al. (ECMR 2011) relabel only unassigned regions so labels stay put.</summary>
+        public sealed class RoomRecord
+        {
+            public int key, label = -1, missing;
+            public Vector2 seat; public float seatR, floorM2, coveredShare;
+            public bool corridor, entered, partnerEntered, done;
+            public double firstSeen = double.NaN, enteredAt = double.NaN, doneAt = double.NaN;
+            /// <summary>No route to the seat was found: not planned again before this time (stuck_blacklist_s).</summary>
+            public double retryAt = double.NegativeInfinity;
+            public Vector2? door;
+        }
+        readonly List<RoomRecord> records = new List<RoomRecord>();
+        int nextRecordKey;
+        float[] lastClearance;
+        public IReadOnlyList<RoomRecord> Records => records;
+
+        /// <summary>Bind every record to the ledger room its seat lies on (oldest record first; a younger record whose seat
+        /// falls in an already bound room merged into it and hands over its flags); create a record for every unbound real room.
+        /// A seat stays put while it keeps at least room_memory_seat_keep of its room's widest clearance, so records do not
+        /// wander as the map grows.</summary>
+        void BindRecords(double t)
+        {
+            var bound = new Dictionary<int, RoomRecord>();
+            var partnerInside = PartnerStoodInside();
+            foreach (var rec in records)
+            {
+                int label = RoomNear(rec.seat);
+                if (label < 0 || !byId.TryGetValue(label, out var room)) { rec.label = -1; rec.missing++; continue; }
+                // A second seat on one ledger room: the ledger merged two rooms for now (a door frame not yet mapped) or healed an
+                // over-split. The younger record sleeps with its own flags and binds again once its seat lies in a room of its own.
+                // Handing its flags to the older record moved "entered" and "done" onto the other room when the two split again
+                // (review probe, 24 Oct: the room never entered came back entered and done, the entered one as a new record).
+                if (bound.ContainsKey(label)) { rec.label = -1; continue; }
+                bound[label] = rec; rec.label = label; rec.missing = 0;
+                int cell = grid.Cell(rec.seat);
+                float here = cell >= 0 && lastClearance != null ? lastClearance[cell] : 0;
+                if (here < config.room_memory_seat_keep * room.seatR) rec.seat = room.seat;
+                rec.seatR = room.seatR; rec.floorM2 = room.indoorFloorM2; rec.coveredShare = room.coveredShare; rec.corridor = room.corridor;
+                rec.partnerEntered |= partnerInside.Contains(label);
+            }
+            foreach (var room in rooms)
+            {
+                // A room whose widest free disc is narrower than the robot can never be stepped into: no record.
+                if (bound.ContainsKey(room.id) || room.corridor || room.indoorFloorM2 < config.room_walk_in_min_m2 || room.seatR < config.robot_radius_m) continue;
+                var rec = new RoomRecord { key = nextRecordKey++, label = room.id, seat = room.seat, seatR = room.seatR, floorM2 = room.indoorFloorM2,
+                    coveredShare = room.coveredShare, corridor = room.corridor, partnerEntered = partnerInside.Contains(room.id), firstSeen = t };
+                records.Add(rec); bound[room.id] = rec;
+            }
+            foreach (var rec in records)
+            {
+                if (rec.label < 0) continue;
+                // The ledger's own flag is recomputed from scratch each rebuild and its seat moves as the room grows; the record's
+                // flag only moves forward, so a room once stepped into never ranks as unentered again.
+                if (config.room_entered_near_seat && rec.entered) byId[rec.label].entered = true;
+                if (!rec.done && (rec.entered || rec.partnerEntered) && rec.coveredShare >= config.room_ledger_covered_share)
+                { rec.done = true; rec.doneAt = t; }
+            }
+        }
+
+        /// <summary>Rooms a partner's radioed body stood inside by the same step-inside rule as this robot (StandsInside), not
+        /// merely on a floor cell: a partner in a doorway marks the cells under it, and the flood that labels the rooms splits a
+        /// doorway between the two rooms (review probe, 24 Oct: a partner 0.25 m short of the room's floor entered it).</summary>
+        HashSet<int> PartnerStoodInside()
+        {
+            var inside = new HashSet<int>();
+            if (partnerCells == null || lastClearance == null) return inside;
+            for (int i = 0; i < grid.Count; i++)
+                if (partnerCells[i] && labels[i] >= 0 && byId.TryGetValue(labels[i], out var r) && lastClearance[i] >= config.room_memory_seat_keep * r.seatR)
+                    inside.Add(r.id);
+            return inside;
+        }
+
+        /// <summary>room_memory: the record of the room this robot stands inside (StandsInside) is entered, with the doorway it
+        /// came in by.</summary>
+        public RoomRecord MarkEnteredNear(Vector2 at, double t)
+        {
+            var here = Get(RoomAt(at));
+            if (here == null || !StandsInside(here, at)) return null;
+            foreach (var rec in records)
+            {
+                if (rec.label != here.id || rec.entered) continue;
+                rec.entered = true; rec.enteredAt = t;
+                if (entryById.TryGetValue(rec.label, out var door)) rec.door = door;
+                return rec;
+            }
+            return null;
+        }
+
+        /// <summary>The room this robot stands in is still being finished (tier 0 in Rank).</summary>
+        public bool Finishing(Vector2 at)
+        {
+            int current = RoomAt(at);
+            return byId.TryGetValue(current, out var here) && here.indoorFloorM2 > 0 && !here.corridor &&
+                here.coveredShare < config.room_ledger_covered_share && (here.dwellS < DwellBudget(here) || StillGaining(here));
+        }
         public Room Get(int id) => byId.TryGetValue(id, out var room) ? room : null;
         /// <summary>A partner's radioed pose, converted into this frame: the floor under its body is floor it stood on.</summary>
         public void MarkPartner(Vector2 at, float radius)
@@ -168,7 +272,7 @@ namespace SmokeRescue.Brain
 
         void Rebuild(Func<Vector2, bool> indoors)
         {
-            var clearance = grid.KnownFreeClearance();
+            var clearance = grid.KnownFreeClearance(); lastClearance = clearance;
             var free = new bool[grid.Count]; var core = new bool[grid.Count]; var next = new int[grid.Count];
             for (int i = 0; i < grid.Count; i++)
             {
@@ -254,6 +358,28 @@ namespace SmokeRescue.Brain
             }
             labels = next;
             Shape(clearance, free, indoors);
+            // room_entered_near_seat: a room is entered once this robot stood near its seat, not anywhere on its floor. Trace
+            // analysis of headless houses 5001-5022 (24 Oct): a bedroom merged with corridor floor in one ledger room counted as
+            // entered from the corridor, and nobody walked into it.
+            if (config.room_entered_near_seat)
+            {
+                foreach (var room in rooms) room.entered = false;
+                for (int i = 0; i < grid.Count; i++)
+                    if (enteredCells[i] && labels[i] >= 0 && byId.TryGetValue(labels[i], out var r) && StandsInside(r, grid.Centre(i))) r.entered = true;
+            }
+        }
+
+        /// <summary>The step-inside rule: p is on the room's own floor and on its deep part, where the free clearance is at least
+        /// room_memory_seat_keep of the room's widest (any cell that could serve as its seat). A doorway is never that wide, so
+        /// a body centred there is past the opening; a corridor merged into a bedroom's label is narrower than the bedroom, so
+        /// walking the corridor does not enter the bedroom. Within seatR + body_half_length_m of the seat (the earlier rule)
+        /// entered a 2.0 x 2.9 m bathroom with the body straddling the threshold in two of three orientations and only 0.6 m
+        /// deep in the third (review probe, 24 Oct).</summary>
+        bool StandsInside(Room r, Vector2 p)
+        {
+            int cell = grid.Cell(p);
+            return r != null && cell >= 0 && labels != null && lastClearance != null && labels[cell] == r.id && grid.OwnOccupancy(cell) == 1 &&
+                lastClearance[cell] >= config.room_memory_seat_keep * r.seatR;
         }
 
         /// <summary>Room cores by hierarchical erosion (distance-transform room segmentation; Bormann et al., ICRA 2016, "Room
@@ -311,17 +437,28 @@ namespace SmokeRescue.Brain
         {
             var widest = new Dictionary<int, float>(); var area = new Dictionary<int, int>();
             var contact = new Dictionary<(int, int), int>(); var nearest = new Dictionary<int, float>();
-            foreach (var room in rooms) { widest[room.id] = 0; area[room.id] = 0; nearest[room.id] = float.PositiveInfinity; }
+            foreach (var room in rooms) { widest[room.id] = 0; area[room.id] = 0; nearest[room.id] = float.PositiveInfinity; room.seatR = -1; }
             for (int i = 0; i < grid.Count; i++)
             {
                 int id = labels[i]; if (id < 0 || !free[i]) continue;
                 widest[id] = Math.Max(widest[id], clearance[i]); area[id]++;
-                var room = byId[id]; float d = Vector2.Distance(grid.Centre(i), room.centre);
+                var room = byId[id];
+                if (clearance[i] > room.seatR) { room.seatR = clearance[i]; room.seat = grid.Centre(i); } float d = Vector2.Distance(grid.Centre(i), room.centre);
                 if (d < nearest[id]) { nearest[id] = d; room.anchor = grid.Centre(i); }
                 int x = i % grid.Size, y = i / grid.Size;
                 // Right and up neighbours only, so each touching pair of cells is counted once.
                 if (x + 1 < grid.Size) Touch(contact, id, i + 1, free);
                 if (y + 1 < grid.Size) Touch(contact, id, i + grid.Size, free);
+            }
+            // The seat is the cell nearest the room's centroid among those within half a cell of the widest clearance. A long room's
+            // ridge holds many equal cells, and the first in row-major order put the seat at one end of it, so the same room
+            // mirrored had its seat 1 m nearer or further from its door (review probe, 24 Oct).
+            var seatD = new Dictionary<int, float>(); foreach (var room in rooms) seatD[room.id] = float.PositiveInfinity;
+            for (int i = 0; i < grid.Count; i++)
+            {
+                int id = labels[i]; if (id < 0 || !free[i]) continue;
+                var room = byId[id]; if (clearance[i] < room.seatR - grid.CellM / 2) continue;
+                float d = Vector2.Distance(grid.Centre(i), room.centre); if (d < seatD[id]) { seatD[id] = d; room.seat = grid.Centre(i); }
             }
             foreach (var room in rooms) { room.openings = 0; room.radiusM = 0; }
             foreach (var pair in contact)

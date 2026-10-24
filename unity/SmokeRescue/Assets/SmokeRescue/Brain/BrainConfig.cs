@@ -46,7 +46,9 @@ namespace SmokeRescue.Brain
             room_ledger_split_step_m = .1f;
         public float person_rgb_strong_confidence = 1.01f, person_glance_min_confidence = .25f, person_glance_s = 2f, person_glance_repeat_s = 15f,
             person_rgb_boost_period_s = .2f;
-        public bool rgb_person_confirms = false, partner_rooms = false, no_frontier_scan_once = false, follow_through_before_leftovers = false, frontier_beyond_room = false, room_progress_dwell = false, code_sprays_fire = false, code_spray_goal_room = false, heat_marks_room = false, heat_spray_through = false, thermal_dwell_confirms = true, outside_faces_in = false, leave_when_done = false, person_before_spray = false, partner_territory = false, room_walk_in_any_coverage = false;
+        public bool rgb_person_confirms = false, partner_rooms = false, no_frontier_scan_once = false, follow_through_before_leftovers = false, frontier_beyond_room = false, room_progress_dwell = false, code_sprays_fire = false, code_spray_goal_room = false, heat_marks_room = false, heat_spray_through = false, thermal_dwell_confirms = true, outside_faces_in = false, leave_when_done = false, person_before_spray = false, partner_territory = false, room_walk_in_any_coverage = false, door_tour = false, room_entered_near_seat = false, room_memory = false;
+        public float room_memory_seat_keep = .8f, room_tour_switch_s = 12f, room_tour_breaker_s = 30f; public int room_tour_breaker_switches = 3;
+        public float door_partner_side_m = 8f;
         public float code_spray_margin_s = 1f, code_spray_repeat_s = 8f;
         public float room_progress_window_s = 10f, room_progress_min_rate_fraction = .2f;
         public float person_rgb_floor_max_m = .5f, person_confirm_max_range_m = 5f;
@@ -60,6 +62,10 @@ namespace SmokeRescue.Brain
         public bool survivor_view_sight_line = false;
         public float survivor_close_view_min_m = 0f;
         public bool turn_stall_flip = false; public float turn_stall_dps = 3f;
+        public bool return_home_at_end = false, return_home_early = false;
+        public bool door_claims = false; public float door_min_width_m = .6f, door_max_width_m = 1.3f, door_side_extra_m = .5f, door_cross_m = .8f,
+            door_match_m = .8f, door_home_clear_m = 2.5f, door_claim_lease_s = 90f, door_room_reach_m = 4f, door_frame_depth_m = .3f, door_claim_max_m2 = 48f, door_left_s = 3f;
+        public bool door_enter = false; public float door_scan_m = 6f, door_scan_step_m = .2f, door_scan_period_s = 1f, door_enter_depth_m = 1.2f, door_been_m = .8f, door_trail_step_m = .4f, door_heading_lease_s = 20f, door_room_max_s = 45f, door_done_share = .75f, door_seen_merge_m = 1.3f; public bool door_geometric_room = false; public int door_enter_max_plans = 6;
         public float room_walk_in_min_m2 = 2f, room_walk_in_max_m = 8f;
         public float pinned_yield_m = 1.2f, pinned_yield_back_s = 3f, pinned_yield_speed_mps = .15f;
         public float pinned_window_s = 8f, pinned_move_m = .15f;
