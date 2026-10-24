@@ -487,13 +487,15 @@ namespace SmokeRescue.Recording
                     // refuses it for that reason: held-out seed 914, a 22 px sliver confirmed a person 2.6 m from anyone).
                     // Replayed over seeds 932 and 934, both strong boxes within range that matched no person were such
                     // slivers. It still counts as a sighting and earns a glance, but never makes a candidate on its own.
+                    bool whole = true;
                     if (p["bbox_rgb"] is JArray box && box.Count == 4)
                     {
                         float x = box[0].Value<float>(), w = box[2].Value<float>();
                         if (x <= SideMarginPx || x + w >= cfg.camera.width - SideMarginPx)
-                            confidence = Math.Min(confidence, rig.brain.StrongSightingConfidence - .01f);
+                        { confidence = Math.Min(confidence, rig.brain.StrongSightingConfidence - .01f); whole = false; }
                     }
-                    rig.brain.OnPersonSighting(Math.Min(seen, t), p.Value<float>("bearing_deg"), p.Value<float>("range_m"), confidence);
+                    float gap = p["floor_gap_m"] == null || p["floor_gap_m"].Type == JTokenType.Null ? float.NaN : p.Value<float>("floor_gap_m");
+                    rig.brain.OnPersonSighting(Math.Min(seen, t), p.Value<float>("bearing_deg"), p.Value<float>("range_m"), confidence, whole, gap);
                 }
                 Map3d(rig, t);
             }

@@ -74,6 +74,146 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void ARoomThePartnerStandsInOrWalkedThroughIsNotSearchedAgain()
+        {
+            // partner_rooms. Seed 934 (24 Oct 04:53): A walked into the kitchen four times while B stood in it.
+            var fixture = RoomLedgerFixture(); var c = fixture.config; c.partner_rooms = true;
+            var ledger = new RoomLedger(fixture.grid, c) { SelfId = "robot_B" }; var at = new Vector2(-2, 0);
+            ledger.Update(0, at);
+            var room = ledger.Get(ledger.RoomAt(new Vector2(2, 0)));
+            room.coveredShare = c.room_ledger_covered_share - .2f; room.entered = false;
+            var choice = new GridPlanner.FrontierChoice { position = room.anchor, cost = 1 };
+            var choices = new List<GridPlanner.FrontierChoice> { choice };
+            int unentered = c.room_ledger_corridor_first ? 2 : 1;
+            ledger.Rank(choices, at);
+            Assert.That(choice.roomTier, Is.EqualTo(unentered), "control: an unentered room nobody is in ranks as unentered");
+            ledger.PartnersNow.Add(("robot_A", new Vector2(2, 0), null));
+            ledger.Rank(choices, at);
+            Assert.That(choice.roomTier, Is.EqualTo(4), "the room the partner stands in is left to it");
+            Assert.That(room.partnerInside, Is.True);
+            ledger.PartnersNow.Clear(); ledger.PartnersNow.Add(("robot_A", new Vector2(2, 0), at));
+            ledger.Rank(choices, at);
+            Assert.That(choice.roomTier, Is.EqualTo(unentered), "a partner passing through toward another room holds nothing");
+            ledger.PartnersNow.Clear(); ledger.PartnersNow.Add(("robot_A", new Vector2(2, 0), null)); room.corridor = true;
+            ledger.Rank(choices, at);
+            Assert.That(choice.roomTier, Is.EqualTo(c.room_ledger_corridor_first ? 1 : 2), "a corridor is never left to the partner");
+            room.corridor = false;
+            ledger.PartnersNow.Clear(); ledger.MarkPartner(new Vector2(2, 0), .3f); ledger.Update(c.room_ledger_period_s + 1, at);
+            room = ledger.Get(ledger.RoomAt(new Vector2(2, 0))); room.coveredShare = c.room_ledger_covered_share - .2f;
+            choice.position = room.anchor; ledger.Rank(choices, at);
+            Assert.That(room.partnerEntered, Is.True);
+            Assert.That(choice.roomTier, Is.EqualTo(3), "a room the partner walked through is entered: leftover floor, not unentered");
+            // Both in one room: the lower ID keeps it, the higher ID yields.
+            var own = ledger.Get(ledger.RoomAt(at)); own.coveredShare = c.room_ledger_covered_share - .2f;   // unfinished
+            var mine = new GridPlanner.FrontierChoice { position = own.anchor, cost = 1 };
+            ledger.PartnersNow.Add(("robot_A", at + new Vector2(.5f, 0), null));
+            ledger.Rank(new List<GridPlanner.FrontierChoice> { mine }, at);
+            Assert.That(mine.roomTier, Is.EqualTo(4), "robot_B yields the shared room to robot_A");
+            ledger.SelfId = "robot_0"; ledger.Rank(new List<GridPlanner.FrontierChoice> { mine }, at);
+            Assert.That(mine.roomTier, Is.Not.EqualTo(4), "the lower ID keeps it");
+            // A space larger than one robot finishes in room_ledger_dwell_s is shared (headless 5001: a 9 m radius space).
+            ledger.SelfId = "robot_B"; ledger.PartnersNow.Clear(); ledger.PartnersNow.Add(("robot_A", new Vector2(2, 0), null));
+            float floor = room.indoorFloorM2; room.indoorFloorM2 = 100; room.partnerEntered = false; room.entered = false;
+            choice.position = room.anchor; ledger.Rank(choices, at);
+            Assert.That(choice.roomTier, Is.EqualTo(unentered), "a 100 m2 space with the partner in it is shared, not left to it");
+            room.indoorFloorM2 = floor;
+            c.partner_rooms = false; ledger.PartnersNow.Clear(); ledger.PartnersNow.Add(("robot_A", new Vector2(2, 0), null));
+            choice.position = room.anchor; room.entered = false; ledger.Rank(choices, at);
+            Assert.That(choice.roomTier, Is.EqualTo(unentered), "switch off: partners change nothing");
+        }
+
+        [Test]
+        public void ACoveredRoomRanksLastOnlyOnceEntered()
+        {
+            CheckCoveredRoomRank(false);
+        }
+
+        [Test]
+        public void ACoveredCorridorKeepsItsTierBecauseItsFarEndIsUnknown()
+        {
+            CheckCoveredRoomRank(true);
+        }
+
+        /// <summary>A covered room ranks last once entered; an unentered room stays unentered however covered it looks from the
+        /// door (headless 24 Oct, houses 5001-5004: ranking covered rooms done before entry reached 23 or 24 of 31 rooms against
+        /// 26). A corridor keeps its tier: its far end is unknown floor.</summary>
+        static void CheckCoveredRoomRank(bool corridor)
+        {
+            var fixture = RoomLedgerFixture(); var c = fixture.config;
+            var ledger = new RoomLedger(fixture.grid, c); var at = new Vector2(-2, 0);
+            ledger.Update(0, at);
+            var room = ledger.Get(ledger.RoomAt(new Vector2(2, 0))); room.corridor = corridor;
+            var choice = new GridPlanner.FrontierChoice { position = room.anchor, cost = 1 };
+            var choices = new List<GridPlanner.FrontierChoice> { choice };
+            foreach (bool corridorFirst in new[] { false, true })
+                foreach (bool entered in new[] { false, true })
+                    foreach (bool promoted in new[] { false, true })
+                    {
+                        c.room_ledger_corridor_first = corridorFirst; room.entered = entered; room.promoted = promoted;
+                        int corridorTier = corridorFirst ? 1 : 2, unenteredTier = corridorFirst ? 2 : 1;
+                        foreach (float share in new[] { c.room_ledger_covered_share, .93f, .99f })
+                        {
+                            room.coveredShare = share; ledger.Rank(choices, at);
+                            int expected = corridor ? corridorTier : entered ? 4 : unenteredTier;
+                            Assert.That(choice.roomTier, Is.EqualTo(expected),
+                                $"covered, corridor {corridor}, promoted {promoted}, entered {entered}, corridor first {corridorFirst}");
+                        }
+                        room.coveredShare = c.room_ledger_covered_share - .01f; ledger.Rank(choices, at);
+                        int unfinished = corridor ? corridorTier : entered ? 3 : unenteredTier;
+                        Assert.That(choice.roomTier, Is.EqualTo(unfinished), "unfinished rooms keep their previous priority");
+                    }
+        }
+
+        [Test]
+        public void CeilingCoverageAloneCannotCertifyAnUnpromotedRoom()
+        {
+            var c = Settings(); c.grid_size_m = 10; c.room_ledger = c.room_indoor_promotion = true;
+            var b = new RobotBrain(Calibration(), c, "A", 0); var g = Map(b);
+            Room(b, -3, 3, -3, 3);
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var planner = (GridPlanner)typeof(RobotBrain).GetField("planner", flags).GetValue(b);
+            var certify = typeof(RobotBrain).GetMethod("CertifyRooms", flags);
+            bool CeilingPatch(Vector2 p) => p.x < -2;
+            var searched = (bool[])typeof(OccupancyGrid).GetField("observed", flags).GetValue(g);
+            void SearchOnlyCeilingPatch()
+            {
+                for (int i = 0; i < g.Count; i++) searched[i] = g.OwnOccupancy(i) == 1 && CeilingPatch(g.Centre(i));
+            }
+            SearchOnlyCeilingPatch();
+            planner.Rooms.Update(0, Vector2.zero, CeilingPatch);
+            var room = planner.Rooms.Rooms.Single(); int id = room.id;
+            Assert.That(room.promoted, Is.False);
+            Assert.That(room.coveredShare, Is.GreaterThanOrEqualTo(c.room_ledger_covered_share));
+            Assert.That(room.indoorFloorM2, Is.LessThan(room.floorM2 / 2), "only the small ceiling-proven patch counts");
+            certify.Invoke(b, new object[] { 0.0 });
+            Assert.That(b.DrainEvents().Count(e => e.kind == "room_searched"), Is.Zero,
+                "a covered ceiling patch is not a certificate for the room");
+            var certifiedRooms = (HashSet<int>)typeof(RobotBrain).GetField("certified", flags).GetValue(b);
+            Assert.That(certifiedRooms.Contains(id), Is.False);
+
+            // Sensing the enclosing walls promotes the same room and measures coverage over its whole mapped floor.
+            WalledRoom(g, 3); SearchOnlyCeilingPatch();
+            planner.Rooms.Update(c.room_ledger_period_s, Vector2.zero, CeilingPatch);
+            room = planner.Rooms.Get(id);
+            Assert.That(room.promoted, Is.True);
+            Assert.That(room.indoorFloorM2, Is.EqualTo(room.floorM2));
+            certify.Invoke(b, new object[] { (double)c.room_ledger_period_s });
+            Assert.That(b.DrainEvents().Count(e => e.kind == "room_searched"), Is.Zero,
+                "a promoted room also needs coverage of the whole floor");
+            WalledRoom(g, 3);
+            planner.Rooms.Update(2 * c.room_ledger_period_s, Vector2.zero, CeilingPatch);
+            certify.Invoke(b, new object[] { (double)(2 * c.room_ledger_period_s) });
+            var certificate = b.DrainEvents().Single(e => e.kind == "room_searched");
+            Assert.That(certificate.numbers["room_id"], Is.EqualTo(id));
+            Assert.That(certificate.numbers["promoted"], Is.EqualTo(1));
+            Assert.That(certificate.numbers["floor_m2"], Is.EqualTo(room.floorM2));
+            Assert.That(certifiedRooms.Contains(id), Is.True);
+            planner.Rooms.Update(3 * c.room_ledger_period_s, Vector2.zero, CeilingPatch);
+            certify.Invoke(b, new object[] { (double)(3 * c.room_ledger_period_s) });
+            Assert.That(b.DrainEvents().Count(e => e.kind == "room_searched"), Is.Zero, "one certificate per promoted room");
+        }
+
+        [Test]
         public void RoomLedgerUsesOnlySensedGeometryAndNeverWritesIndoorOrSearchEvidence()
         {
             var fixture = RoomLedgerFixture(.9f, false); var g = fixture.grid; var c = fixture.config;
@@ -212,7 +352,7 @@ namespace SmokeRescue.Tests.EditMode
                 if (occupancy == 255) g.ObserveOccupied(i);
                 if (occupancy != 1) continue;
                 g.ObserveFree(i);
-                searched[i] = p.x > 0 && !(p.x > 3.5f && p.y > 1.5f);
+                searched[i] = p.x > 0 && !(p.x > 3.5f && p.y > .5f);
             }
             b.RoomOptions(0); b.RoomOptions(c.room_ledger_dwell_s + 1);
             var options = b.FrontierOptions(c.room_ledger_dwell_s + 1, 1);
@@ -220,6 +360,7 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(options[0].position.x, Is.GreaterThan(0), "the small unentered room survives reservation of large-area options");
             var room = b.RoomOptions(c.room_ledger_dwell_s + 1).Single(r => r.id == options[0].roomId);
             Assert.That(room.entered, Is.False);
+            Assert.That(room.coveredShare, Is.LessThan(c.room_ledger_covered_share), "this test reserves an unfinished room, not an already covered room");
         }
 
         [Test]
@@ -1616,6 +1757,30 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void AWholeColourPersonOnTheFloorIsConfirmedWithoutTheAgent()
+        {
+            // rgb_person_confirms. Seed 934 (24 Oct 04:53), robot B: YOLO11m 0.75 at 3.5 m on the kitchen floor, never confirmed
+            // while the agent inspected thermal wall patches.
+            int Confirmed(bool whole, float gap)
+            {
+                var s = Settings(); s.rgb_person_confirms = true;
+                var b = new RobotBrain(Calibration(), s, "A", 0) { AgentConfirms = true };
+                var all = new List<BrainEvent>();
+                for (int tick = 0; tick <= 40; tick++)
+                {
+                    double t = tick / 20.0; Motion(b, t); b.OnAirTemperature(t, 20);
+                    if (tick == 1) b.OnPersonSighting(t, 10f, 3.5f, .55f, whole, gap);   // one sighting, just over 0.5
+                    b.Step(t, .05f); all.AddRange(b.DrainEvents());
+                }
+                return all.Count(e => e.kind == "survivor_confirmed");
+            }
+            Assert.That(Confirmed(true, -.2f), Is.EqualTo(1), "a whole box on the floor confirms with the agent up");
+            Assert.That(Confirmed(true, float.NaN), Is.EqualTo(1), "a box running off the bottom of the image confirms");
+            Assert.That(Confirmed(true, 1f), Is.Zero, "control: a box hanging 1 m above the floor (a picture) does not");
+            Assert.That(Confirmed(false, -.2f), Is.Zero, "control: a box cut by the image side does not");
+        }
+
+        [Test]
         public void WithAnAgentTheReflexOnlyBringsTheCamerasCloseAndNeverConfirms()
         {
             var s = Calibration(); var b = new RobotBrain(s, Settings(), "A", 4) { AgentConfirms = true };
@@ -1883,6 +2048,97 @@ namespace SmokeRescue.Tests.EditMode
             }
             Assert.That(events.Count(e => e.kind == "escape_closing"), Is.EqualTo(2), "closing, then lost");
             Assert.That(b.Snapshot().state, Is.Not.EqualTo("return"), "no standstill on a cut route");
+        }
+
+        [Test]
+        public void AForecastOnlyRouteCutReplansWithoutExcludingTheGoal()
+        {
+            CheckFireCutExclusion(false, false);
+        }
+
+        [Test]
+        public void AMeasuredRouteCutStillExcludesTheGoal()
+        {
+            CheckFireCutExclusion(true, false);
+        }
+
+        [Test]
+        public void AMeasuredCutWinsEvenWhenAForecastCellIsCloser()
+        {
+            CheckFireCutExclusion(true, true);
+        }
+
+        static void CheckFireCutExclusion(bool measured, bool mixed)
+        {
+            foreach (bool through in new[] { false, true })
+            {
+                var c = Settings(); c.grid_size_m = 12;
+                var b = new RobotBrain(Calibration(), c, "A", 0); var g = Map(b);
+                for (int i = 0; i < g.Count; i++)
+                {
+                    var p = g.Centre(i);
+                    bool pocket = Mathf.Abs(p.x) < .3f && p.y > 3f && p.y < 3.6f;
+                    bool wall = (Mathf.Abs(Mathf.Abs(p.x) - .7f) < .06f && p.y > .6f && p.y < 4.4f) ||
+                        (Mathf.Abs(p.x) < .75f && Mathf.Abs(p.y - 4.4f) < .06f);
+                    if (wall) g.ObserveOccupied(i); else if (!pocket) g.ObserveFree(i);
+                }
+                var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+                var events = new List<BrainEvent>(); bool heated = false, replanned = false; Vector2 target = Vector2.zero;
+                int hot = g.Cell(new Vector2(0, 1.6f));
+                for (int k = 0; k <= 15 * 14; k++)
+                {
+                    double t = k / 15.0;
+                    Motion(b, t); b.OnRgbd(Image(t, true, 0)); b.OnAirTemperature(t, 20);
+                    if (!heated && events.Any(e => e.kind == "goal" && e.reason.StartsWith("Reachable frontier")))
+                    {
+                        heated = true;
+                        target = (Vector2)typeof(RobotBrain).GetField("frontierCentre", flags).GetValue(b);
+                        if (through)
+                        {
+                            typeof(RobotBrain).GetField("frontierGoal", flags).SetValue(b, false);
+                            typeof(RobotBrain).GetField("throughCentre", flags).SetValue(b, (Vector2?)target);
+                        }
+                        if (!measured || mixed)
+                        {
+                            g.ObserveHeat(hot, c.fire_c - 30, t - .1);
+                            g.ObserveHeat(hot, c.fire_c - 10, t);
+                            Assert.That(g.Dangerous(hot), Is.True, "the rising cell cuts the route before reaching fire_c");
+                            // A measured fire away from the route must not turn a forecast cut into a measured cut.
+                            g.ObserveHeat(g.Cell(new Vector2(4, -3)), c.fire_c + 50, t);
+                        }
+                        if (measured) g.ObserveHeat(mixed ? g.Cell(new Vector2(.6f, 2.2f)) : hot, c.fire_c + 50, t);
+                    }
+                    b.Step(t, 1f / 15); events.AddRange(b.DrainEvents());
+                    if (heated && events.Any(e => e.reason.StartsWith("A mapped obstacle")))
+                    {
+                        var cut = events.SingleOrDefault(e => e.kind == "fire_route_cut");
+                        Assert.That(cut, Is.Not.Null, "record the evidence behind this cut");
+                        Assert.That(cut.numbers["measured"], Is.EqualTo(measured ? 1 : 0));
+                        Assert.That(cut.numbers["cut_heat_c"], measured ? Is.GreaterThanOrEqualTo(c.fire_c) : Is.LessThan(c.fire_c));
+                        Assert.That(cut.numbers.ContainsKey("cut_rise_c_per_s"), Is.True);
+                        Assert.That(cut.numbers.ContainsKey("cut_x_m") && cut.numbers.ContainsKey("cut_y_m"), Is.True);
+                        Assert.That(events.Count(e => e.kind == "goal_blacklisted" && e.reason.StartsWith("The fire margin cut")),
+                            Is.EqualTo(measured ? 1 : 0), "both frontier and follow-through exclusions require measured fire");
+                        bool Blacklisted(double when) => (bool)typeof(RobotBrain).GetMethod("GoalBlacklisted", flags)
+                            .Invoke(b, new object[] { target, when });
+                        Assert.That(Blacklisted(t), Is.EqualTo(measured));
+                        if (measured)
+                        {
+                            var exclusion = events.Single(e => e.kind == "goal_blacklisted" && e.reason.StartsWith("The fire margin cut"));
+                            Assert.That(exclusion.numbers["until_s"], Is.EqualTo(t + c.fire_cut_blacklist_s).Within(.0001));
+                        }
+                        double next = t + 1.0 / 15;
+                        if (!measured)
+                            Assert.That((bool)typeof(RobotBrain).GetMethod("NeedPlan", flags).Invoke(b, new object[] { next }),
+                                Is.True, "retry the forecast cut on the next tick");
+                        Motion(b, next); b.OnRgbd(Image(next, true, 0)); b.OnAirTemperature(next, 20); b.Step(next, 1f / 15);
+                        Assert.That(Blacklisted(next), Is.EqualTo(measured), "a forecast cut stays eligible on the next tick");
+                        replanned = true;
+                        break;
+                    }
+                }
+                Assert.That(heated && replanned, Is.True, "a chosen route was cut and replanned: " + string.Join("; ", events.Select(e => e.kind + " " + e.reason)));
+            }
         }
 
         [Test]

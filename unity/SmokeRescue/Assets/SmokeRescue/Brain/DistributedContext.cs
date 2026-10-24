@@ -214,6 +214,7 @@ namespace SmokeRescue.Brain
             var before = peer.poseKnown ? peer.pose.position : (Vector2?)null; double beforeT = peer.poseT;
             peer.pose = new BrainPose { position = link.Transform(m.Pose.position.x, m.Pose.position.y), yawRad = m.Pose.yawRad + link.yawRad };
             peer.poseKnown = true; peer.poseT = m.SentAt;
+            if (c.partner_rooms) planner.Rooms.MarkPartner(peer.pose.position, c.body_radius_m);
             double dtPose = m.SentAt - beforeT;
             peer.velocity = before.HasValue && dtPose > 0 && dtPose <= c.teammate_predict_max_s && Vector2.Distance(before.Value, peer.pose.position) <= c.teammate_track_max_m
                 ? (peer.pose.position - before.Value) / (float)dtPose : Vector2.zero;

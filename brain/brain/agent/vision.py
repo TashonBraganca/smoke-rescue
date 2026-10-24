@@ -662,9 +662,17 @@ def inspect_candidate(frame: Frame, bearing_deg: float, range_m: float, *, outpu
             # kept the negative and a real person two rooms from the fire was not confirmed. A warm object too big, on a
             # large plane or in a recess still vetoes any colour box it overlaps.
             small_only = size_negative and not too_big and not plane["large_plane"] and not window
+            # Owner's rule (24 Oct): a whole colour person on the floor is a person whatever the thermal shape says. Seed 934
+            # (24 Oct 04:53), robot B at 36.4 s: the warm component was the whole frame at 33 C ("outside the body-size bounds")
+            # and overlapped the box of the person lying on the kitchen floor, so the negative kept her unconfirmed.
             def separate(hit):
                 x,y,w,h = hit["bbox_rgb"]
-                return hit.get("range_m") is not None and (small_only or not aligned[y:y+h,x:x+w].any())
+                if hit.get("range_m") is None:
+                    return False
+                if _CONFIG.get("rgb_person_confirms"):
+                    gap = hit.get("floor_gap_m")
+                    return gap is None or gap <= float(_CONFIG["person_rgb_floor_max_m"])
+                return small_only or not aligned[y:y+h,x:x+w].any()
             whole = [h for h in whole if separate(h)]
         if whole and max(h["confidence"] for h in whole) >= 0.5:
             best = max(whole, key=lambda h: h["confidence"])
@@ -785,6 +793,8 @@ class InspectionHistory:
         return out
 
 
+# The brain settings the colour confirmation shares with the robot (rgb_person_confirms, person_rgb_floor_max_m).
+_CONFIG = json.loads((Path(__file__).resolve().parents[3] / "config" / "brain.json").read_text())
 PERSON_ONNX = Path(__file__).resolve().parents[3] / "data" / "models" / "onnx" / str(_perception().get("person_onnx", "yolo11m.onnx"))
 _net = None
 _net_lock = threading.Lock()   # one cv2.dnn.Net is not safe to run from two server threads at once
@@ -842,9 +852,22 @@ def _rgb_person(frame: Frame, box, confidence: float) -> dict:
             source = "lidar"
     if body is not None:
         source, evidence = "depth", None
+    gap = _box_floor_gap(frame, y1, rng)
     return {"confidence": _number(confidence), "bbox_rgb": [x0, y0, x1 - x0, y1 - y0],
             "bearing_deg": _number(bearing), "range_m": _number(rng) if rng is not None else None,
-            "range_source": source, "range_evidence": evidence}
+            "range_source": source, "range_evidence": evidence, "floor_gap_m": _number(gap) if gap is not None else None}
+
+
+def _box_floor_gap(frame: Frame, y1: int, rng) -> float | None:
+    """Height above the floor of a colour box's lowest row at the measured horizontal range (brain.json
+    person_rgb_floor_max_m): about 0 for a person lying or slumped on the floor, 0.8 m or more for a picture on a wall.
+    None when the box runs off the bottom of the image (the body goes on below the view) or the range is unknown."""
+    if rng is None or y1 >= frame.rgb.shape[0] - 1:
+        return None
+    m = json.loads((Path(__file__).resolve().parents[3] / "config/sensors.json").read_text())["camera"]["mount"]
+    below = math.radians(float(m["pitch_down_deg"])) + math.atan((y1 - frame.K[1, 2]) / frame.K[1, 1])
+    forward = max(float(rng) - float(m["forward_offset_m"]), 0.0)
+    return float(m["height_m"]) - forward * math.tan(below)
 
 
 def _rgb_lidar_point(frame: Frame, box):

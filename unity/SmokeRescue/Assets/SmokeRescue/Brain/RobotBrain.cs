@@ -60,7 +60,7 @@ namespace SmokeRescue.Brain
             home = entry.position;
             airC = c.ambient_c; motion = new DeadReckoning(c.motion_stale_s, c.frame_max_age_s + c.frame_pair_tolerance_s, entry); grid = new OccupancyGrid(c) { SeeOverMaxM = cfg.camera.mount.height_m - c.see_over_clearance_m }; grid.TeammateAt = OnTeammate;
             if (grid.Cell(home) < 0) throw new ArgumentException("Entry door is outside the configured building grid.");
-            planner = new GridPlanner(grid, c) { Home = home }; planner.RoomTaken = RoomTaken; health = new CameraHealth(c); matcher = new ScanMatcher(grid, c);
+            planner = new GridPlanner(grid, c) { Home = home }; planner.RoomTaken = RoomTaken; planner.Rooms.SelfId = id; health = new CameraHealth(c); matcher = new ScanMatcher(grid, c);
             grid.MarkFootprint(home);
             observedSequence = new long[SharedSize * SharedSize];
             InitializeTeamMap();
@@ -112,6 +112,11 @@ namespace SmokeRescue.Brain
             motion.Advance(t); UpdateTeamUncertainty(t); grid.DecayTo(t); ConsumeLidar(t); ConsumeImages(t); UpdateHeatBudget(previous, t);
             grid.ClearBody(motion.Pose.position, c.robot_radius_m - grid.CellM * .5f);
             InvalidatePeerGoal(t); CheckMapOverlap(t);
+            // partner_rooms: where each linked partner's body is now, from poses no older than peer_claim_s.
+            planner.Rooms.PartnersNow.Clear();
+            if (c.partner_rooms)
+                foreach (var pair in peers)
+                    if (pair.Value.poseKnown && t - pair.Value.poseT <= c.peer_claim_s) planner.Rooms.PartnersNow.Add((pair.Key, pair.Value.pose.position, pair.Value.goal));
             grid.PrepareNavigation();
             planner.Rooms.Update(t, motion.Pose.position, InSearchAreaOwn); planner.HeadingRad = motion.Pose.yawRad; CertifyRooms(t);
             int cell = grid.Cell(motion.Pose.position);
@@ -467,23 +472,25 @@ namespace SmokeRescue.Brain
             }
             if (NeedPlan(t))
             {
+                bool forecastOnlyCut = false;
                 bool blocked = path.Count > 0 && !planner.PathSafe(path, cursor);
                 if (blocked) Emit(t, nearFire ? "avoid_fire" : "replan", "A mapped obstacle or fire margin blocks the previous path; discard it.");
-                // Held-out run seed 914, robot A at 87 to 94 s: the same frontier by a burning doorway was chosen, its path cut
-                // by the fire margin 1.5 s later, chosen again as the flames flickered, three times in 4 s: no_frontier kept
-                // restarting, the scan never ended and the agent was woken each time. Leave such a frontier for a while.
-                // The whole frontier is left, not one standpoint: its standable look-out cells vary from plan to plan (in the
-                // test the next one chosen lay 1.0 m from the cut one), and every look-out for the same unsearched floor lies
-                // within frontier_peek_m of it, so frontier_peek_m plus the stall radius (or the claim, if larger) is excluded.
-                if (blocked && frontierGoal && goal.HasValue && FireCuts(path, cursor))
-                    BlacklistGoal(frontierCentre, t, 0, c.fire_cut_blacklist_s, FireCutReason,
-                        Mathf.Max(frontierRadius, c.frontier_peek_m + c.stuck_repeat_radius_m));
-                // The same for a frontier reached through the partner's floor, which is driven without a claim. One-door seed
-                // 928, robot A at 140 to 148 s: that goal was chosen, its path discarded within 1 to 3 s as heat appeared
-                // nearby, and chosen again, 7 times, while the robot stood still.
-                else if (blocked && throughCentre.HasValue && goal.HasValue && FireCuts(path, cursor))
-                    BlacklistGoal(throughCentre.Value, t, 0, c.fire_cut_blacklist_s, FireCutReasonThrough,
-                        c.frontier_peek_m + c.stuck_repeat_radius_m);
+                // A forecast is evidence for the current plan, not for a fire_cut_blacklist_s exclusion.
+                // Check the whole remaining route for measured fire before calling a cut forecast-only.
+                if (blocked && goal.HasValue && (frontierGoal || throughCentre.HasValue) && FireCuts(path, cursor, out int cuttingCell))
+                {
+                    bool measured = grid.Heat(cuttingCell) >= c.fire_c;
+                    forecastOnlyCut = !measured;
+                    var at = grid.Centre(cuttingCell);
+                    Emit(t, "fire_route_cut", measured ? "Measured fire cut the route; exclude the goal until the retry time." :
+                        "Forecast heat cut the route; replan without excluding the goal.",
+                        "measured", measured ? 1 : 0, "cut_x_m", at.x, "cut_y_m", at.y,
+                        "cut_heat_c", grid.Heat(cuttingCell), "cut_rise_c_per_s", grid.HeatRise(cuttingCell));
+                    if (measured)
+                        BlacklistGoal(frontierGoal ? frontierCentre : throughCentre.Value, t, 0, c.fire_cut_blacklist_s,
+                            frontierGoal ? FireCutReason : FireCutReasonThrough,
+                            frontierGoal ? Mathf.Max(frontierRadius, c.frontier_peek_m + c.stuck_repeat_radius_m) : c.frontier_peek_m + c.stuck_repeat_radius_m);
+                }
                 if (goal.HasValue && !blocked)
                 {
                     // Keep what the goal is: an agent go_to refreshed as a frontier sent a claim with radius 0, which the
@@ -599,7 +606,18 @@ namespace SmokeRescue.Brain
                     {
                         ClearPath(); lastPlan = t; if (double.IsNaN(scanSince))
                         {
-                            scanSince = t; noFrontierAt = t; Emit(t, "goal", "No reachable frontier is visible; scan unseen directions before returning.");
+                            scanSince = t; noFrontierAt = t;
+                            // no_frontier_scan_once: a full scan here already found nothing and the map has not grown since, so
+                            // another turn on the spot shows nothing new. Seed 934 (24 Oct 04:53), robot B: 10 no_frontier
+                            // scans, 44.7 s of turning in place, most within a metre of the last.
+                            if (c.no_frontier_scan_once && lastScanAt.HasValue && Vector2.Distance(lastScanAt.Value, motion.Pose.position) <= c.visited_radius_m &&
+                                knownCells - knownAtLastScan < c.frontier_min_information_cells)
+                            {
+                                scanSince = t - c.no_frontier_scan_s;
+                                Emit(t, "no_frontier_scan_skipped", "A full scan here already found nothing and the map has not grown since: no second turn on the spot.",
+                                    "new_cells", knownCells - knownAtLastScan);
+                            }
+                            else Emit(t, "goal", "No reachable frontier is visible; scan unseen directions before returning.");
                             // With an agent, the model hears of it during the scan and may order a way on (a door, debris).
                             Emit(t, "no_frontier", "No reachable unsearched floor in this robot's map; returning after the scan unless ordered on.",
                                 "scan_s", c.no_frontier_scan_s);
@@ -608,6 +626,8 @@ namespace SmokeRescue.Brain
                         // agent free to act (held-out seed 914 run 4, robot B).
                         if (t - scanSince >= c.no_frontier_scan_s && !cutOff)
                         {
+                            if (!lastScanAt.HasValue || Vector2.Distance(lastScanAt.Value, motion.Pose.position) > c.visited_radius_m || knownCells - knownAtLastScan >= c.frontier_min_information_cells)
+                            { lastScanAt = motion.Pose.position; knownAtLastScan = knownCells; }
                             if (!c.stay_inside) BeginReturn(t, NoFrontierLeft);
                             // Holding still is for a robot that is inside. Outside (seed 930, robot B at its pad) it keeps
                             // scanning, which can bring the ceiling through the door into its camera's view.
@@ -615,12 +635,14 @@ namespace SmokeRescue.Brain
                         }
                     }
                 }
+                if (forecastOnlyCut) lastPlan = double.NegativeInfinity;
             }
             if (!goal.HasValue && !returning) return searchedOut ? Command(0, 0, dt, true) : Command(0, scanSign * c.scan_yaw_dps, dt, true);
             searchedOut = false;
             return FollowOrHold(t, dt);
         }
 
+        Vector2? lastScanAt; int knownAtLastScan;   // no_frontier_scan_once: where the last full no-frontier scan ended
         readonly List<LidarScan> lidarQueue = new List<LidarScan>();
         double lastLidar = double.NegativeInfinity, nextLocalizationReport;
         LidarScan latestScan;
@@ -807,7 +829,10 @@ namespace SmokeRescue.Brain
         /// service on this robot's own frame at t): bearing in degrees, positive to the right; horizontal range and bearing
         /// are measured from the robot body centre by the vision service. Thermal saturates inside a fire room's hot gas layer and found no person in 161 visible views
         /// (warm_eval); the colour camera still sees them. Repeated sightings make a candidate like thermal blobs do.</summary>
-        public void OnPersonSighting(double t, float bearingDegRight, float rangeM, float confidence)
+        /// <param name="wholeBox">The box clears both image sides (a side-cut box shows part of something, never a person on its own).</param>
+        /// <param name="floorGapM">Height above the floor of the box's lowest row at the measured range; NaN when the box runs off
+        /// the bottom of the image or no height was measured.</param>
+        public void OnPersonSighting(double t, float bearingDegRight, float rangeM, float confidence, bool wholeBox = true, float floorGapM = float.NaN)
         {
             BrainMath.Time(t);
             if (!BrainMath.Finite(bearingDegRight) || !BrainMath.Finite(rangeM) || !BrainMath.Finite(confidence)) throw new ArgumentException("Nonfinite person sighting.");
@@ -842,6 +867,30 @@ namespace SmokeRescue.Brain
                 Emit(t, "survivor_candidate", "OpenCV dnn person detector (YOLO11m) saw a person in the colour image in repeated scans.",
                     "x_m", position.x, "y_m", position.y, "confidence", confidence, "range_m", rangeM, "frames", nearest.observations.Count, "rgb", 1);
             }
+            // rgb_person_confirms: one colour sighting at person_rgb_min_confidence from a whole box on the floor within
+            // person_confirm_max_range_m is a confirmed person: no second sighting, no thermal check, no agent round. The
+            // range itself is the 3D check: the vision service measures it on depth or LiDAR returns inside the box and gives
+            // none for floor-only depth, so an empty box never arrives here.
+            if (c.rgb_person_confirms && wholeBox && rangeM <= c.person_confirm_max_range_m &&
+                (float.IsNaN(floorGapM) || floorGapM <= c.person_rgb_floor_max_m))
+                ConfirmFromColour(t, nearest, confidence, rangeM, floorGapM);
+        }
+
+        /// <summary>Seed 934 (24 Oct 04:53), robot B: YOLO11m saw the person on the kitchen floor at 33.0, 54.2 and 70.0 s
+        /// (0.75, 3.5 m); each time the agent was busy with a thermal wall patch, the thermal inspection of her (the whole frame
+        /// at 33 C) said "outside the body-size bounds", and B never confirmed her. Owner's rule (24 Oct): the detector's
+        /// own measured box is the confirmation; floor contact (person_rgb_floor_max_m) keeps a picture on a wall out.</summary>
+        void ConfirmFromColour(double t, Track track, float confidence, float rangeM, float floorGapM)
+        {
+            var p = track.position;
+            foreach (var known in survivors) if (Vector2.Distance(known, p) <= c.survivor_merge_m) return;
+            foreach (var w in withdrawn) if (Vector2.Distance(w, p) <= c.survivor_merge_m) return;
+            track.confirmed = true; survivors.Add(p);
+            confirmed.Add(new BrainSurvivor { position = p, confirmedAt = t, sourceRobot = id });
+            if (active == track) { active = null; dwell = 0; inspecting = false; ClearPath(); nextSurvivorSearch = t + c.replan_s; }
+            Emit(t, "survivor_confirmed", "OpenCV dnn person detector (YOLO11m) saw a whole person on the floor: confirmed.",
+                "x_m", p.x, "y_m", p.y, "confidence", confidence, "range_m", rangeM, "floor_gap_m", float.IsNaN(floorGapM) ? -1 : floorGapM,
+                "frames", track.observations.Count, "rgb", 1);
         }
 
         void UpdateHeatBudget(double from, double t)
@@ -1000,13 +1049,21 @@ namespace SmokeRescue.Brain
             Emit(t, "fire_cut_retry", "Nothing reachable left except frontiers set aside for the fire margin: try them again on the current heat map.", "goals", n);
             return true;
         }
-        /// <summary>True when the rest of the path passes within the fire clearance of a dangerous cell (the fire margin,
-        /// not a wall, is what made it unsafe).</summary>
-        bool FireCuts(List<Vector2> route, int from)
+        /// <summary>Find the cell cutting the remaining route's fire margin. Measured fire anywhere along that route
+        /// takes precedence over forecast cells, so a transient forecast never hides a measured cut.</summary>
+        bool FireCuts(List<Vector2> route, int from, out int cuttingCell)
         {
+            cuttingCell = -1;
             float margin = grid.FireClearance + grid.CellM * .707107f;
-            for (int i = Math.Max(0, from); i < route.Count; i++) if (grid.FireDistance(grid.Cell(route[i])) <= margin) return true;
-            return false;
+            for (int i = Math.Max(0, from); i < route.Count; i++)
+            {
+                int cell = grid.Cell(route[i]);
+                if (cell < 0 || grid.FireDistance(cell) > margin) continue;
+                int measured = grid.FireCellNear(cell, margin, true);
+                if (measured >= 0) { cuttingCell = measured; return true; }
+                if (cuttingCell < 0) cuttingCell = grid.FireCellNear(cell, margin, false);
+            }
+            return cuttingCell >= 0;
         }
         bool DetectStuck(double t, double previous, float elapsed)
         {
@@ -2257,14 +2314,14 @@ namespace SmokeRescue.Brain
         }
         readonly Dictionary<int, int> roomRetries = new Dictionary<int, int>();
         readonly HashSet<int> certified = new HashSet<int>();
-        /// <summary>A room's certificate, once: its covered share reached room_ledger_covered_share on its own floor (proven, or
-        /// all of it when promoted). Audited offline by tools/eval/room_coverage.py check against the floor truly visible.</summary>
+        /// <summary>Certify a promoted room once its coverage reaches room_ledger_covered_share over all its mapped floor.
+        /// Coverage on a ceiling-proven patch alone cannot certify the surrounding room.</summary>
         void CertifyRooms(double t)
         {
             if (!c.room_ledger || planner.Rooms.LastSegmentationAt != t) return;
             foreach (var room in planner.Rooms.Rooms)
             {
-                if (room.corridor || room.indoorFloorM2 <= 0 || room.coveredShare < c.room_ledger_covered_share || !certified.Add(room.id)) continue;
+                if (!room.promoted || room.corridor || room.indoorFloorM2 <= 0 || room.coveredShare < c.room_ledger_covered_share || !certified.Add(room.id)) continue;
                 Emit(t, "room_searched", "Room covered past the ledger's threshold on its own map: marked searched.", "room_id", room.id,
                     "x_m", room.anchor.x, "y_m", room.anchor.y, "covered_share", room.coveredShare, "floor_m2", room.indoorFloorM2,
                     "promoted", room.promoted ? 1 : 0);
@@ -2282,6 +2339,8 @@ namespace SmokeRescue.Brain
             if (!c.room_ledger || active != null) return false;
             foreach (var room in planner.Rooms.Rooms)
             {
+                // partner_rooms: a room a partner's body has stood in, or stands in now, needs no second body.
+                if (c.partner_rooms && (room.partnerEntered || room.partnerInside)) continue;
                 if (room.entered || room.corridor || walkInRooms.Contains(room.id) || room.indoorFloorM2 < c.room_walk_in_min_m2 ||
                     room.coveredShare < c.room_ledger_covered_share || !InSearchArea(room.anchor) || GoalBlacklisted(room.anchor, t) || ClaimBlocks(room.anchor, t)) continue;
                 if (Vector2.Distance(room.anchor, motion.Pose.position) > best) continue;

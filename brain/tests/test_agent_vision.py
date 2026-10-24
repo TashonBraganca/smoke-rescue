@@ -243,11 +243,18 @@ def test_negative_warm_object_cannot_reject_a_separate_colour_person(tmp_path, m
     assert result['cues']['rejected_thermal_object']['verdict']=='not_person'
 
 
-def test_negative_shape_still_wins_when_colour_box_overlaps_it(tmp_path, monkeypatch):
+def test_negative_shape_wins_over_a_colour_box_hanging_on_the_wall_but_not_one_on_the_floor(tmp_path, monkeypatch):
+    # rgb_person_confirms (owner, 24 Oct): a whole colour person on the floor is a person whatever the thermal shape says
+    # (seed 934, robot B at 36.4 s: the whole frame at 33 C was "outside the body-size bounds" over the person on the
+    # kitchen floor). A box whose lowest row hangs above person_rgb_floor_max_m is a picture on the wall: the flat warm
+    # wall still wins.
     f = scene('wall')
-    hit = {'confidence':.9,'bbox_rgb':[65,25,30,70],'bearing_deg':0.,'range_m':3.}
-    monkeypatch.setattr(v,'detect_people_rgb',lambda frame:[hit])
+    hung = {'confidence':.9,'bbox_rgb':[65,25,30,70],'bearing_deg':0.,'range_m':3.,'floor_gap_m':1.0}
+    monkeypatch.setattr(v,'detect_people_rgb',lambda frame:[hung])
     assert v.inspect_candidate(f,0.,3.,output_dir=tmp_path)['verdict']=='not_person'
+    on_floor = dict(hung, floor_gap_m=0.0)
+    monkeypatch.setattr(v,'detect_people_rgb',lambda frame:[on_floor])
+    assert v.inspect_candidate(f,0.,3.,output_dir=tmp_path)['verdict']=='person'
 
 
 def test_a_whole_colour_person_away_from_the_asked_spot_is_reported_not_dropped(tmp_path, monkeypatch):

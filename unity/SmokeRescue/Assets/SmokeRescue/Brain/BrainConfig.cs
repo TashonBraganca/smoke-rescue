@@ -46,6 +46,8 @@ namespace SmokeRescue.Brain
             room_ledger_split_step_m = .1f;
         public float person_rgb_strong_confidence = 1.01f, person_glance_min_confidence = .25f, person_glance_s = 2f, person_glance_repeat_s = 15f,
             person_rgb_boost_period_s = .2f;
+        public bool rgb_person_confirms = false, partner_rooms = false, no_frontier_scan_once = false;
+        public float person_rgb_floor_max_m = .5f, person_confirm_max_range_m = 5f;
         public float entrance_lock_cost_weight = 20f;
         public bool pinned_watchdog = false;
         public bool pinned_yield = false;
