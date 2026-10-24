@@ -82,6 +82,19 @@ namespace SmokeRescue.Brain
                 if (Mathf.Abs(along) >= c.door_cross_m) { Crossed(t, doorwayAt.Value, doorwayAxis * Mathf.Sign(along)); doorwayAt = null; }
                 else if (Vector2.Distance(at, doorwayAt.Value) > c.door_cross_m * 2) doorwayAt = null;
             }
+            // The owner clears its room once it has been out of it for door_left_s, by any doorway. Headless 5002: robot A took
+            // the kitchen and left by another doorway; the room stayed taken, robot B never searched it, nor the bedroom beyond.
+            foreach (var d in doors)
+            {
+                if (d.owner != id || d.state != DoorTaken) continue;
+                if (InsideDoorRoom(d, at)) { d.heardAt = t; continue; }
+                if (t - d.heardAt >= c.door_left_s)
+                {
+                    d.state = DoorCleared; d.since = t;
+                    Emit(t, "door_cleared", "Left the room this robot searched (by another way): the room is cleared; nobody goes in again.",
+                        "x_m", d.position.x, "y_m", d.position.y);
+                }
+            }
         }
 
         void Crossed(double t, Vector2 door, Vector2 direction)
@@ -102,6 +115,9 @@ namespace SmokeRescue.Brain
             int room = planner.Rooms.RoomAt(door + direction * c.door_cross_m);
             var info = room >= 0 ? planner.Rooms.Get(room) : null;
             if (info != null && info.corridor) return;
+            // A room bigger than one robot can search in the time left stays open to both (headless 5021: robot A took a 134 m2
+            // bedroom, robot B left it, and its person s1 was not found).
+            if (info != null && info.indoorFloorM2 > c.door_claim_max_m2) return;
             doors.Add(new Door { position = door, inward = direction.normalized, owner = id, state = DoorTaken, since = t, heardAt = t });
             Emit(t, "door_taken", "Walked through a doorway into a room: this robot takes it; the partner does not go in.",
                 "x_m", door.x, "y_m", door.y, "inward_x", direction.x, "inward_y", direction.y);

@@ -319,6 +319,19 @@ namespace SmokeRescue.Brain
                         return Command(0, 0, dt, true);
                     // A deadline return cut on the way is the same: retreat and search on, never hold (held-out seed 919,
                     // robot B held 20 s in cool air when fire cut its route home after a deadline return began).
+                    if (path.Count == 0 && EndReturn)
+                    {
+                        // The walk out is the last job: no route home is no reason to search on. A confirmed person's keep-out
+                        // can close the only way out of the room (headless 5017: robot A shut in the study with s1, flipping
+                        // between return and retreat every tick); pass them at the body's half-width, hold, and plan again.
+                        if (!squeezePast && survivors.Count > 0 && c.survivor_squeeze && c.survivor_squeeze_core_m < c.survivor_keepout_core_m)
+                        {
+                            squeezePast = true; keptOut = -1;
+                            Emit(t, "squeeze_past_person", "The way out passes a confirmed person: pass them with the keep-out at the body's half-width.",
+                                "people", survivors.Count, "core_m", c.survivor_squeeze_core_m);
+                        }
+                        return Command(0, 0, dt, true);
+                    }
                     if (path.Count == 0 && (returnReason == WayOutClosing || returnReason == HeatLeave || returnReason == MissionTimeUp))
                     {
                         // Fire cut the way home while the robot was on it (agent run 12: robot A held still for the rest
