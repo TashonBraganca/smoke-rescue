@@ -413,6 +413,17 @@ namespace SmokeRescue.Brain
                         nextSurvivorSearch = t + c.replan_s;
                         return Command(0, 0, dt, true);
                     }
+                    if (dwell + 1e-6f >= c.survivor_dwell_s && !c.thermal_dwell_confirms && !active.rgb)
+                    {
+                        // Only the colour detector confirms (owner, 24 Oct: "YOLO is only supposed to do person finding").
+                        // Seed 934 (24 Oct 20:06), robot B: stood 3 s facing a warm shape in the burning living room and confirmed
+                        // it, 2.7 m from the nearest person; the colour detector never saw a person there.
+                        Emit(t, "survivor_unconfirmed", "Stopped facing a warm shape for the dwell, but the colour detector never saw a person there: not confirmed; search on.",
+                            "x_m", active.position.x, "y_m", active.position.y, "range_m", range);
+                        active.retryAfter = t + c.stuck_blacklist_s; active = null; dwell = 0; inspecting = false; ClearPath();
+                        nextSurvivorSearch = t + c.replan_s;
+                        return Command(0, 0, dt, true);
+                    }
                     if (dwell + 1e-6f >= c.survivor_dwell_s)
                     {
                         active.confirmed = true; survivors.Add(active.position);
