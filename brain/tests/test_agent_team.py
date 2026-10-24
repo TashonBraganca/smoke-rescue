@@ -114,7 +114,13 @@ def test_the_spray_option_compares_the_blocking_fire_with_the_water(tmp_path):
     assert "two robots" in opt(3.0)["assessment"]
     assert "more than two" in opt(8.0)["assessment"]
     assert "this robot alone" not in opt(4.0)["assessment"], "the old advice's one-robot 4 m2 fire"
-    assert "this robot alone" not in opt(0.3, distance=5.0)["assessment"], "from 5 m the stream spreads over about 5 m2"
+    # From 5 m the stream spreads over about 5 m2, so a 0.3 m2 fire is not one robot's job from there; it is from the spray
+    # spot 1.6 m out (seed 934, 24 Oct: 64 offers judged from 4 to 7 m, 0 sprays).
+    far = opt(0.3, distance=5.0)
+    assert far["assessment"].startswith(f"this robot alone can knock it down from {T.SPRAY_STANDOFF_M:.1f} m") and "approach_fire" in far["assessment"]
+    assert T.knock_down_s(0.3, 5.0) is None and far["knock_down_s_from_spray_spot"] < 12
+    assert "approach_fire" not in opt(0.3)["assessment"], "control: already at 1.66 m, spray from here"
+    assert "approach_fire" not in opt(3.0, distance=5.0)["assessment"], "control: a 3 m2 fire stays two robots' work"
     assert opt(0.3)["knock_down_s_one_robot"] < opt(1.5)["knock_down_s_one_robot"] < 12
     assert opt(small := 0.3)["in_camera_view"] is False and opt(small, bearing=10)["in_camera_view"] is True
     assert "no water" in opt(0.3, water=0)["assessment"]
