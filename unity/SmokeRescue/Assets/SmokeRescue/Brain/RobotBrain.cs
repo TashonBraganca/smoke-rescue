@@ -1914,9 +1914,26 @@ namespace SmokeRescue.Brain
                 speed = 0; policy = "turn";
                 // Brake before rotating, so the acceleration ramp cannot make a turn drift into a wall.
                 yaw = commandedSpeed > c.survivor_stop_speed_mps ? 0 : error * c.heading_gain;
+                float swing = error;
+                // turn_stall_flip: a turn the body does not make (measured yaw rate under turn_stall_dps for stuck_window_s
+                // while turning is commanded) is taken the other way round. Headless house 5027: the two bodies touched tail to
+                // tail in a 1.7 m corridor; robot A commanded the short left turn every tick from 30 to 240 s, the contact
+                // refused it, and the right turn the contact allowed was never tried (computed on the true poses at 37 s: 1 deg
+                // left closes the gap to -0.003 m, 1 deg right opens it to +0.003 m).
+                if (yaw != 0 && c.turn_stall_flip)
+                {
+                    if (Mathf.Abs(motion.YawRate) * Mathf.Rad2Deg >= c.turn_stall_dps) turnStallSince = double.NaN;
+                    else if (double.IsNaN(turnStallSince)) turnStallSince = t;
+                    else if (t - turnStallSince >= c.stuck_window_s)
+                    {
+                        turnDirection = turnDirection == 0 ? -Mathf.Sign(error) : -turnDirection; turnStallSince = t;
+                        Emit(t, "turn_stall", "The body did not turn as commanded: turn the other way round.", "heading_error_deg", error, "direction", turnDirection);
+                    }
+                    if (turnDirection != 0) { swing = turnDirection > 0 ? (error > 0 ? error : error + 360) : (error < 0 ? error : error - 360); yaw = swing * c.heading_gain; }
+                }
                 // A turn that would swing the nose or tail into a mapped wall backs straight off first, through the
                 // mapped free footprint, then turns (seed 920, robot B at the foyer-kitchen opening).
-                if (yaw != 0 && !SwingClear(error))
+                if (yaw != 0 && !SwingClear(swing))
                 {
                     if (!swingBlocked) { swingBlocked = true; Emit(t, "body_swing_blocked", "Turning here would swing the body into a mapped wall; back off first.", "heading_error_deg", error); }
                     float back = Mathf.Min(c.stuck_reverse_mps, c.limits.max_reverse_mps);
@@ -1956,6 +1973,7 @@ namespace SmokeRescue.Brain
                 return Command(0, SwingClear(error) ? Mathf.Clamp(error * c.heading_gain, -c.sweep_yaw_dps, c.sweep_yaw_dps) : 0, dt, true);
             }
             translationHeldSince = double.NaN;
+            if (policy != "turn") { turnDirection = 0; turnStallSince = double.NaN; }
             if (policy != motionPolicy)
             {
                 motionPolicy = policy;
@@ -1966,6 +1984,7 @@ namespace SmokeRescue.Brain
             return Command(speed, yaw, dt, false);
         }
         double blockedSince = double.NaN, lastBlocked = double.NegativeInfinity, translationHeldSince = double.NaN;
+        double turnStallSince = double.NaN; float turnDirection;
         Vector2 pinnedAnchor; double pinnedSince = double.NaN, lastPursuit = double.NegativeInfinity;
         /// <summary>pinned_watchdog (opencv-e5, branch pinned): a robot that has followed a route for pinned_window_s without
         /// its body moving pinned_move_m is pinned, whatever holds it. Its goal is set aside (stuck_blacklist_s) and it backs up,
