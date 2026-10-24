@@ -64,6 +64,22 @@
         ],
         [
           4.0,
+          3.5
+        ],
+        [
+          7.0,
+          3.5
+        ],
+        [
+          10.0,
+          3.5
+        ],
+        [
+          10.0,
+          5.0
+        ],
+        [
+          10.0,
           7.0
         ],
         [
@@ -161,7 +177,27 @@
           5.0
         ],
         [
-          16.0,
+          14.3,
+          4.5
+        ],
+        [
+          13.0,
+          3.5
+        ],
+        [
+          11.0,
+          3.5
+        ],
+        [
+          10.0,
+          3.5
+        ],
+        [
+          10.0,
+          5.0
+        ],
+        [
+          10.0,
           7.0
         ],
         [
@@ -360,5 +396,6 @@
       "yaw": 0
     }
   ],
-  "survivor_placement": "random"
+  "survivor_placement": "random",
+  "route_note": "Routes leave the living room and the kitchen by the foyer door they entered by: one door per room (24 Oct, d_living_hall and d_kitchen_hall walled)."
 }

@@ -312,8 +312,13 @@ namespace SmokeRescue.Tests.EditMode
             File.WriteAllText(livingOnly, cfg.ToString());
             var sim = FireSim.Load(plan, livingOnly, 7); sim.AdvanceTo(900);
             AssertRoomUnburnt(sim, "hallway");
+            // Positive control: with its doors open the fire leaves the living room through them. One door per room (24 Oct):
+            // the living room opens only onto the foyer, so the neighbours are read from the plan, not named.
+            var neighbours = plan.doors.Where(d => d.between.Contains("living")).SelectMany(d => d.between)
+                .Where(r => r != "living" && r != "outside").ToHashSet();
             var open = House(); open.AdvanceTo(900);
-            Assert.IsTrue(Cells(open).Any(c => c.Room == "hallway" && c.BurntFraction > 0));
+            Assert.IsTrue(Cells(open).Any(c => neighbours.Contains(c.Room) && c.BurntFraction > 0),
+                "fire spreads from the living room into a room it opens onto: " + string.Join(", ", neighbours));
         }
 
         [Test]
