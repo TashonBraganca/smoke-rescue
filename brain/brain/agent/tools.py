@@ -55,6 +55,11 @@ BURNING_KW_PER_M2 = float(_PERCEPTION["burning_kw_per_m2"])
 ONE_ROBOT_COOLS_KW = float(_NOZZLE["flow_lps"]) * float(_NOZZLE["cooling_kj_per_l"]) * float(_NOZZLE["application_efficiency"])
 BURNING_SURFACE_C, KNOCKDOWN_C = float(_PERCEPTION["burning_surface_c"]), float(_PERCEPTION["knockdown_c"])
 FUEL_KJ_PER_M2_K = float(_PERCEPTION["fuel_surface_kj_per_m2_k"])
+# Where a robot stands to spray: just outside the brain's fire clearance (fire_clearance_m plus 0.4 m), the closest spot its
+# planner admits beside a fire, where the stream's patch is smallest. Seed 934 (24 Oct 04:53 run): 64 spray offers, 0
+# sprays; from 4 to 7 m a 12 deg fog covers 3 to 10 m2, so advice judged from there called 0.3 to 0.8 m2 fires "two robots'
+# work", and the two-robot plans never met. From 1.6 m the same stream covers 0.5 m2.
+SPRAY_STANDOFF_M = float(_CONFIG["fire_clearance_m"]) + 0.4
 
 
 def knock_down_s(area_m2: float, distance_m: float, robots: int = 1) -> float | None:
@@ -114,8 +119,12 @@ def spray_option(req: dict) -> dict | None:
     else:
         distance = float(block.get("distance_m") or float(_NOZZLE["range_m"]))
         one, two = knock_down_s(area, distance, 1), knock_down_s(area, distance, 2)
+        close = knock_down_s(area, SPRAY_STANDOFF_M, 1) if distance > SPRAY_STANDOFF_M else one
         if one is not None and one <= water_s:
             assessment = f"this robot alone can knock it down with about {one:.0f} s of its {water_s:.0f} s of water"
+        elif close is not None and close <= water_s:
+            assessment = (f"this robot alone can knock it down from {SPRAY_STANDOFF_M:.1f} m with about {close:.0f} s of its "
+                          f"{water_s:.0f} s of water: approach_fire, then scan_thermal facing it and spray_water at its hot spot")
         elif two is not None and two <= water_s:
             assessment = (f"two robots spraying together can knock it down in about {two:.0f} s each; on its own this robot "
                           + ("cannot outpace it" if one is None else f"would need {one:.0f} s and has {water_s:.0f} s"))
@@ -130,6 +139,9 @@ def spray_option(req: dict) -> dict | None:
             "in_camera_view": abs(bearing) <= CAMERA_HALF_HFOV_DEG, "within_nozzle_reach": float(block.get("distance_m") or 99) <= float(_NOZZLE["range_m"]),
             "burning_m2": round(area, 2), "est_heat_release_kw": round(kw), "one_robot_stream_removes_kw": round(ONE_ROBOT_COOLS_KW),
             "water_s_left": round(water_s, 1), "assessment": assessment,
+            "spray_from_m": round(SPRAY_STANDOFF_M, 1),
+            "knock_down_s_from_spray_spot": None if area <= 0 or knock_down_s(area, SPRAY_STANDOFF_M) is None
+            else round(knock_down_s(area, SPRAY_STANDOFF_M), 1),
             "knock_down_s_one_robot": None if area <= 0 or knock_down_s(area, float(block.get("distance_m") or _NOZZLE["range_m"])) is None
             else round(knock_down_s(area, float(block.get("distance_m") or _NOZZLE["range_m"])), 1)}
 from pathlib import Path
@@ -204,6 +216,9 @@ ACTIONS = [
         f"rescue reach ({float(_RESCUE['reach_m']):.1f} m) and within {float(_RESCUE['grip_cone_deg']):.0f} deg of the "
         "heading; or cite an inspect_candidate result with verdict person taken within that reach.",
         {"evidence_id": EVIDENCE}, ["evidence_id"]),
+    _fn("approach_fire", f"Walk to about {SPRAY_STANDOFF_M:.1f} m short of the fire in spray_option (its \"at\"), on your side "
+        "of it, and face it, so the stream lands on the flames instead of spreading past them. You get agent_goal_reached on "
+        "arrival; then scan_thermal and spray_water at its hot spot.", {"reason": STR}, ["reason"]),
     _fn("spray_water", "Spray water from the robot's nozzle toward a fire to knock it down. Needs a scan_thermal result "
         "with a hot spot near that bearing and within the nozzle's range. Water is limited (context water_l); the "
         "robot holds still while spraying.", {"bearing_deg": NUM, "seconds": NUM, "evidence_id": EVIDENCE},
@@ -230,7 +245,7 @@ ALL_TOOLS = PERCEPTION + ACTIONS
 # Tools that the code refuses outright on a heat event (go_to, explore_frontier, turn_to_face: "no exploring during a heat
 # event") and tools with no use there. Offering them only draws calls that are refused; tool-calling accuracy also falls
 # with the number of tools and arguments offered (ROSBag MCP benchmark, arXiv 2511.03497, eight models).
-_NOT_ON_HEAT = {"go_to", "explore_frontier", "turn_to_face", "approach_candidate", "open_door", "clear_debris", "extract_survivor",
+_NOT_ON_HEAT = {"go_to", "approach_fire", "explore_frontier", "turn_to_face", "approach_candidate", "open_door", "clear_debris", "extract_survivor",
                 "propose_plan", "answer_proposal", "request_human_approval", "check_indoors", "measure_opening"}
 
 
@@ -262,6 +277,7 @@ class AgentContext:
     event: dict = field(default_factory=dict)                 # the brain event that woke the agent, with its numbers
     last_orders: list = field(default_factory=list)           # order_outcomes of the previous step's movement orders
     goal: list | None = None                                  # where the brain is driving now, [x, y], if anywhere
+    spray_at: list | None = None                              # the fire in this step's spray_option, [x, y], if any
 
 
 class ToolRegistry:
@@ -783,6 +799,25 @@ class ToolRegistry:
                     if refusal is None and g is not None and math.hypot(float(g[0]) - args["x"], float(g[1]) - args["y"]) <= SAME_GOAL_M:
                         return {"ok": True, "noop": True, "reason": f"the robot is already driving to this frontier (goal "
                                 f"{float(g[0]):.1f}, {float(g[1]):.1f}); no order sent, so it keeps its heading and pace"}
+        elif name == "approach_fire":
+            at = self.ctx.spray_at
+            if at is None:
+                refusal = {"refused": True, "reason": "no fire in this step's spray_option to approach"}
+            elif self.ctx.event_kind in ("avoid_fire", "retreat"):
+                refusal = {"refused": True, "reason": "no walk toward a fire during a heat event: let the reflex layer back away"}
+            elif self.ctx.water_l <= 0:
+                refusal = {"refused": True, "reason": "the water tank is empty"}
+            else:
+                dx, dy = self.ctx.x - float(at[0]), self.ctx.y - float(at[1]); d = math.hypot(dx, dy)
+                if d <= SPRAY_STANDOFF_M + 0.3:
+                    refusal = {"refused": True, "reason": f"already {d:.1f} m from the fire, within spraying distance: "
+                               "scan_thermal facing it, then spray_water at its hot spot"}
+                else:
+                    k = SPRAY_STANDOFF_M / d
+                    args = {"x": round(float(at[0]) + dx * k, 2), "y": round(float(at[1]) + dy * k, 2),
+                            "face_x": float(at[0]), "face_y": float(at[1]),
+                            "reason": f"spraying spot {SPRAY_STANDOFF_M:.1f} m from the fire at ({at[0]}, {at[1]}): " + str(args.get("reason", ""))}
+                    name = "go_to"
         elif name == "go_to":
             # No outline exists (no prior knowledge); the brain refuses targets not known to be indoors.
             if self.ctx.event_kind in ("avoid_fire", "retreat"):

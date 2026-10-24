@@ -134,9 +134,9 @@ Facts about your robot and the context:
   water left, knock_down_s_one_robot (seconds of this robot's spray that cool the burning floor below about 300 C, null
   when one stream cannot outpace the fire) and code's assessment. The stream spreads over a wider patch the further it
   travels, so closer spraying puts more of it on the flames. Spraying is expected, not optional, when spray_option
-  blocks "frontier" or "exit" and its assessment says this robot alone can knock the fire down: if it is not
-  within_nozzle_reach, go_to a standable spot about 3 m short of "at" on your side of it, then scan_thermal facing it and
-  spray_water at its hot spot. Do not walk away from a fire that cuts your way to unsearched floor while the water
+  blocks "frontier" or "exit" and its assessment says this robot alone can knock the fire down: if it says to
+  approach first, call approach_fire (it walks to spray_from_m short of "at" and faces it), then on arrival scan_thermal
+  and spray_water at its hot spot. Do not walk away from a fire that cuts your way to unsearched floor while the water
   could open it.
 
 Finish every step with one sentence saying what you decided and why: call finish in the same reply as your last action
@@ -309,6 +309,7 @@ class RobotAgent:
         spray = _tools.spray_option(req)
         if spray is not None:
             context["spray_option"] = spray
+        ctx.spray_at = spray.get("at") if spray is not None else None
         pending = tools.pending()
         if pending is not None:
             context["pending_candidate"] = pending

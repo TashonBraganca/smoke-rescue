@@ -942,3 +942,25 @@ def test_an_approach_to_a_deferred_wall_patch_does_not_hold_exploring_back(tmp_p
     assert [o["type"] for o in freed["orders"]] == ["explore_frontier"] and freed["refusals"] == [], freed
     assert T.ToolRegistry._pending.get("robot_A") is None
     assert any("long wall" in u["dropped_because"] for u in T.ToolRegistry._unfinished["robot_A"])
+
+
+def test_approach_fire_walks_to_the_spray_spot_facing_the_fire(tmp_path, monkeypatch):
+    # Seed 934 (24 Oct 04:53 run): 64 spray offers and 0 sprays; a 0.26 m2 fire 4.4 m away was judged from there, where the
+    # fog spreads over 4 m2. approach_fire walks to SPRAY_STANDOFF_M short of the fire, on the robot's side, facing it.
+    # Controls: no spray option, an empty tank and a robot already close are refused.
+    fake_vision(monkeypatch, "uncertain")
+    T.ToolRegistry._pending.clear()
+    block = {"bearing_deg": 0.0, "distance_m": 4.4, "x": 5.0, "y": 9.4, "burning_m2": 0.26}
+    def step(t, extra, x=5.0, y=5.0):
+        RobotAgent._recent.clear()
+        req = request(tmp_path) | {"t": t, "event": {"kind": "goal_blacklisted"}} | extra
+        req["pose"] = {**req["pose"], "x": x, "y": y}
+        return RobotAgent(Scripted([[ToolCall("approach_fire", {"reason": "open the way"})]]), tmp_path / f"{t}.jsonl").step(req)
+    out = step(10.0, {"fire_blocks_frontier": block, "water_l": 12.0})
+    (o,) = out["orders"]
+    assert o["type"] == "go_to" and (o["face_x"], o["face_y"]) == (5.0, 9.4)
+    assert math.hypot(o["x"] - 5.0, o["y"] - 9.4) == pytest.approx(T.SPRAY_STANDOFF_M, abs=.02) and o["y"] < 9.4
+    assert step(11.0, {"water_l": 12.0})["refusals"], "control: no spray option"
+    assert step(12.0, {"fire_blocks_frontier": block, "water_l": 0.0})["refusals"], "control: empty tank"
+    near = step(13.0, {"fire_blocks_frontier": {**block, "distance_m": 1.5}, "water_l": 12.0}, y=7.9)
+    assert near["orders"] == [] and "within spraying distance" in near["refusals"][0]["reason"]
