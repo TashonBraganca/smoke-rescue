@@ -727,6 +727,8 @@
   "door_done_share_reason": "Share of the room seen before the robot may leave for the next doorway (owner: scan 70 to 85 %).",
   "door_enter_max_plans": 6,
   "door_enter_max_plans_reason": "Most routes planned per doorway choice.",
+  "door_seen_merge_m": 1.3,
+  "door_seen_merge_m_reason": "A doorway found within this distance of a listed, taken or cleared one is the same doorway. Headless houses 5001-5021, first 15 s: 40 % of listings repeated a doorway 0.8 to 1.2 m from its first listing, and a repeat looked unvisited.",
   "room_walk_in_min_m2": 2.0,
   "room_walk_in_min_m2_reason": "Smaller spaces are alcoves or furniture gaps, not rooms to walk into.",
   "room_walk_in_max_m": 8.0,
