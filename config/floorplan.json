@@ -465,35 +465,6 @@
       "note": "archway"
     },
     {
-      "id": "d_living_hall",
-      "between": [
-        "living",
-        "hallway"
-      ],
-      "wall": "z",
-      "at": [
-        4.0,
-        6.0
-      ],
-      "width": 0.9,
-      "state": "open"
-    },
-    {
-      "id": "d_kitchen_hall",
-      "between": [
-        "kitchen",
-        "hallway"
-      ],
-      "wall": "z",
-      "at": [
-        16.0,
-        6.0
-      ],
-      "width": 0.9,
-      "state": "open",
-      "note": "robot_B route passes here, keep fully open"
-    },
-    {
       "id": "d_bed1_hall",
       "between": [
         "bedroom_1",
@@ -1893,5 +1864,5 @@
   ],
   "clear_path_rule": "Keep a 0.9 m wide clear path through every door and between every door and the room centre.",
   "extension_note": "Original south-west house retained. The former back entrance now joins the office link. New east opening joins the apartment. North corridors connect the office and workshop over 40 m. Original 0.8 m doors and 2 m hallway remain unchanged.",
-  "one_building_note": "Owner's rule (23 Oct 2026): the robots search one building through one entrance and never leave it. d_west (west exterior door), d_back (laundry to office link) and d_house_apartment (1.8 m opening from the kitchen to the apartment) are walled, so the house (0..20 x 0..14 m) is reachable only through d_front. Seed 934: robot B walked through d_house_apartment at 94 s and spent 59 % of the run in the unscored apartment. The apartment, office and workshop remain as separate buildings with their own exterior doors."
+  "one_building_note": "Owner's rule (23 Oct 2026): the robots search one building through one entrance and never leave it. d_west (west exterior door), d_back (laundry to office link) and d_house_apartment (1.8 m opening from the kitchen to the apartment) are walled, so the house (0..20 x 0..14 m) is reachable only through d_front. Seed 934: robot B walked through d_house_apartment at 94 s and spent 59 % of the run in the unscored apartment. The apartment, office and workshop remain as separate buildings with their own exterior doors. Owner's rule (24 Oct 2026): one door per room. d_living_hall and d_kitchen_hall are walled, so the living room and the kitchen open only off the foyer and every other room has one door (the walk-in closet opens off the main bedroom). Seed 934 (24 Oct 04:53): with two doors each, the kitchen was entered from both sides, A walked in through the hall door four times while B searched it from the foyer side, and the furnished room split into many ledger rooms."
 }
