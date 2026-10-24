@@ -172,7 +172,9 @@ namespace SmokeRescue.Robots
             if (!(WaterLitres > 1e-6)) return Refuse("the water tank is empty");
             if (!float.IsFinite(bearingDegRight) || !float.IsFinite(seconds) || seconds <= 0) return Refuse("invalid spray order");
             spraySeconds = Mathf.Min(seconds, nozzle.max_spray_s, (float)(WaterLitres / nozzle.flow_lps));
-            sprayHeadingDeg = robot.Driver.YawDeg + bearingDegRight;
+            // Wrapped into [0, 360): FireSim.ScheduleWater rejects a negative heading. Live seed 934 (24 Oct 16:41): a code spray
+            // 81 deg to the left of a robot heading under 81 deg stopped the recording at 10.2 s.
+            sprayHeadingDeg = Mathf.Repeat(robot.Driver.YawDeg + bearingDegRight, 360f);
             var aim = new Vector3(Mathf.Sin(sprayHeadingDeg * Mathf.Deg2Rad), 0f, Mathf.Cos(sprayHeadingDeg * Mathf.Deg2Rad));
             // The gripper holds the nozzle about a metre up, forward along the spray direction, within the arm's reach.
             contact = robot.transform.position + Vector3.up * 1.0f + aim * 0.5f;
