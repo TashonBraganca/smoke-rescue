@@ -279,6 +279,95 @@ namespace SmokeRescue.Brain
             return null;
         }
 
+        /// <summary>code_spray_goal_room (owner, 24 Oct: "use the water to turn off the fire" instead of walking into a burning
+        /// room): the measured fire nearest this robot inside the room its route ends in, or null when the route ends in no
+        /// room or this robot measured no fire there. Seed 934 (24 Oct 18:53): robot A walked into the burning living room at
+        /// 16 s, its air reached 131 C at 21.7 s, and it spent most of its heat budget.</summary>
+        BrainFireBlock? FireInGoalRoom()
+        {
+            if (!c.room_ledger || path.Count == 0) return null;
+            var ledger = planner.Rooms; var end = path[path.Count - 1]; int room = ledger.RoomNear(end);
+            if (room < 0) return null;
+            Vector2 at = motion.Pose.position; float best = float.PositiveInfinity; Vector2 fire = default;
+            for (int i = 0; i < grid.Count; i++)
+            {
+                if (!grid.MeasuredFire(i)) continue;
+                var p = grid.Centre(i); float d = Vector2.Distance(p, at);
+                if (d < best && ledger.RoomNear(p) == room) { best = d; fire = p; }
+            }
+            if (float.IsPositiveInfinity(best)) return null;
+            Vector2 v = fire - at;
+            return new BrainFireBlock { blockAt = fire, frontier = end, bearingDegRight = -BrainMath.Angle(motion.Pose.yawRad, Mathf.Atan2(-v.x, v.y)),
+                distanceM = v.magnitude, frontierPathM = Vector2.Distance(at, end), unsearchedM2 = 0, burningM2 = grid.BurningAreaNear(fire, c.burning_radius_m) };
+        }
+
+        readonly List<(Vector2 centre, float radius)> fireRooms = new List<(Vector2 centre, float radius)>();
+
+        /// <summary>heat_marks_room (owner, 24 Oct: "marks that room and area in map as with fire"): where this robot's air passed
+        /// heat_retreat_c, the room it stands in is marked on fire on its map: a circle over the room (its half-diagonal around
+        /// its centre, at least out to where the robot stood). No goal in it (same side of the walls) is taken while this robot
+        /// measures fire there; the mark lifts once that fire is out, sprayed or burned out. Seed 934 (24 Oct 18:53): robot A
+        /// walked into the burning living room at 16 s and its air reached 131 C.</summary>
+        void MarkFireRoom(double t)
+        {
+            if (!c.room_ledger) return;
+            var ledger = planner.Rooms; var at = motion.Pose.position; int id = ledger.RoomNear(at);
+            RoomLedger.Room room = null;
+            if (id >= 0) foreach (var r in ledger.Rooms) if (r.id == id) { room = r; break; }
+            Vector2 centre = room?.centre ?? at;
+            float radius = Mathf.Max(room != null ? .5f * Mathf.Sqrt(room.widthM * room.widthM + room.lengthM * room.lengthM) : c.burning_radius_m,
+                Vector2.Distance(centre, at));
+            fireRooms.Add((centre, radius));
+            Emit(t, "room_marked_fire", c.heat_spray_through ? "The air here passed the heat limit: this room is marked on fire on the map; spray its fire and search on."
+                : "The air here passed the retreat limit: this room is marked on fire on the map; no entry until the fire there is out.",
+                "x_m", centre.x, "y_m", centre.y, "radius_m", radius, "air_c", airC);
+        }
+        /// <summary>Lifts each fire mark once this robot measures no burning floor within it or burning_radius_m of its edge.</summary>
+        void UpdateFireRooms(double t)
+        {
+            for (int k = fireRooms.Count - 1; k >= 0; k--)
+            {
+                var m = fireRooms[k];
+                if (grid.BurningAreaNear(m.centre, m.radius + c.burning_radius_m) > 0) continue;
+                fireRooms.RemoveAt(k);
+                Emit(t, "room_fire_cleared", "No fire measured in the room marked on fire any more: it is open again.", "x_m", m.centre.x, "y_m", m.centre.y);
+            }
+        }
+        bool InFireRoom(Vector2 p) => !c.heat_spray_through && fireRooms.Exists(m => Vector2.Distance(p, m.centre) <= m.radius && SameSideOfWalls(p, m.centre));
+        bool hotAir;
+        /// <summary>heat_spray_through (owner, 24 Oct: "remove the heat budget ... let it just spray the fire, assume that the fire
+        /// is gone off, and just walk through, figure out if there is a person; not there: retreat"): hot air never holds a robot.
+        /// Where the air at it first passes heat_retreat_c, the room is marked on fire and its fire sprayed at once if one stream
+        /// wins; the robot then searches on and leaves the room when it has nothing left, as for any room. Fire cells keep their
+        /// margin, so it never walks onto burning floor. Seed 934 (24 Oct 19:54): the heat budget held robot A still 46 % of the
+        /// run and kept it out of the living room, where a person was missed.</summary>
+        void HotAirSprayThrough(double t)
+        {
+            bool hot = airC > c.heat_retreat_c && t - lastAir <= c.frame_max_age_s;
+            if (hot && !hotAir)
+            {
+                Emit(t, "hot_air", "The air here passed the heat limit: mark the room on fire, spray its fire and search on.", "air_c", airC);
+                if (c.heat_marks_room) MarkFireRoom(t);
+                nextCodeSpray = Math.Min(nextCodeSpray, t);
+            }
+            hotAir = hot;
+        }
+        /// <summary>The measured fire nearest this robot inside a room marked on fire (or burning_radius_m beyond its edge).</summary>
+        BrainFireBlock? FireInMarkedRoom()
+        {
+            Vector2 at = motion.Pose.position; float best = float.PositiveInfinity; Vector2 fire = default;
+            for (int i = 0; i < grid.Count; i++)
+            {
+                if (!grid.MeasuredFire(i)) continue;
+                var p = grid.Centre(i); float d = Vector2.Distance(p, at);
+                if (d < best && fireRooms.Exists(m => Vector2.Distance(p, m.centre) <= m.radius + c.burning_radius_m)) { best = d; fire = p; }
+            }
+            if (float.IsPositiveInfinity(best)) return null;
+            Vector2 v = fire - at;
+            return new BrainFireBlock { blockAt = fire, frontier = fire, bearingDegRight = -BrainMath.Angle(motion.Pose.yawRad, Mathf.Atan2(-v.x, v.y)),
+                distanceM = v.magnitude, frontierPathM = v.magnitude, unsearchedM2 = 0, burningM2 = grid.BurningAreaNear(fire, c.burning_radius_m) };
+        }
+
         /// <summary>The nozzle and burning-floor numbers code_sprays_fire judges a fire by: config/actuators.json nozzle and
         /// config/perception.json, read by the host (the same values the agent's spray advice uses, never the simulator's).</summary>
         public struct NozzleSpec
@@ -313,7 +402,27 @@ namespace SmokeRescue.Brain
         {
             bearingDegRight = 0; seconds = 0;
             if (!c.code_sprays_fire || !Nozzle.HasValue || waterL <= 1e-6f || t < nextCodeSpray || returning || active != null) return false;
-            var block = FireBlockedFrontier(t);
+            // One look per replan_s, as often as the planner refreshes frontiers: the host asks after every 60 Hz brain step, and
+            // a full frontier search each time took 190 s of every 10 simulated seconds (seed 934, 24 Oct 18:13, 316 s wall per 10 s).
+            nextCodeSpray = t + c.replan_s;
+            // Fire in the room this robot is walking into: put it out from the doorway before going in (code_spray_goal_room).
+            var block = c.code_spray_goal_room && !retreating ? FireInGoalRoom() : null;
+            string why = block.HasValue ? "Measured fire burns in the room this robot is walking into" : "Measured fire blocks the way to unsearched floor";
+            bool fromHereOnly = false;
+            if (!block.HasValue && fireRooms.Count > 0 && (block = FireInMarkedRoom()).HasValue)
+            {
+                // The room marked on fire: spray it only from where the robot stands, never walk into its hot air.
+                why = "Measured fire burns in the room marked on fire"; fromHereOnly = !c.heat_spray_through;
+            }
+            if (!block.HasValue)
+            {
+                // Otherwise only fire that blocks the way: while unsearched floor is reachable without passing fire, search it
+                // first. Seed 934 (24 Oct 18:30): both robots left the room they had claimed to spray living room fire, 1 room
+                // entered by 50 s.
+                if (planner.Frontiers(motion.Pose.position, p => ClaimBlocks(p, t) || VisitedGoal(p, t) || GoalBlacklisted(p, t) || !InSearchArea(p)).Count > 0)
+                    return false;
+                block = FireBlockedFrontier(t);
+            }
             if (!block.HasValue || !(block.Value.burningM2 > 0)) return false;
             var n = Nozzle.Value; var b = block.Value; float waterS = waterL / n.flowLps;
             double? here = b.distanceM <= n.rangeM ? KnockDownS(n, b.burningM2, b.distanceM) : null;
@@ -322,11 +431,12 @@ namespace SmokeRescue.Brain
                 bearingDegRight = b.bearingDegRight;
                 seconds = Mathf.Min(waterS, n.maxSprayS, (float)here.Value + c.code_spray_margin_s);
                 nextCodeSpray = t + seconds + c.code_spray_repeat_s;
-                Emit(t, "code_spray", "Measured fire blocks the way to unsearched floor and one stream knocks it down: spray it.",
+                Emit(t, "code_spray", why + " and one stream knocks it down: spray it.",
                     "x_m", b.blockAt.x, "y_m", b.blockAt.y, "burning_m2", b.burningM2, "distance_m", b.distanceM, "bearing_deg", b.bearingDegRight,
                     "seconds", seconds, "knock_down_s", here.Value, "water_l", waterL);
                 return true;
             }
+            if (fromHereOnly) return false;
             // Too far or too spread from here: walk to the spray spot on this robot's side, facing the fire, if one stream wins there.
             float standoff = c.fire_clearance_m + .4f;
             double? there = KnockDownS(n, b.burningM2, standoff);
@@ -335,7 +445,7 @@ namespace SmokeRescue.Brain
                 Vector2 from = motion.Pose.position, dir = (b.blockAt - from).normalized;
                 GoTo(b.blockAt - dir * standoff, t, c.code_spray_repeat_s * 2, "walk to the spray spot of the fire blocking the way", b.blockAt, false);
                 nextCodeSpray = t + c.replan_s;
-                Emit(t, "code_spray_approach", "Measured fire blocks the way; one stream knocks it down from the spray spot: walk there facing it.",
+                Emit(t, "code_spray_approach", why + "; one stream knocks it down from the spray spot: walk there facing it.",
                     "x_m", b.blockAt.x, "y_m", b.blockAt.y, "burning_m2", b.burningM2, "distance_m", b.distanceM, "standoff_m", standoff);
             }
             return false;

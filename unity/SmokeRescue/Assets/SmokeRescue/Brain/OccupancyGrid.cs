@@ -308,6 +308,8 @@ namespace SmokeRescue.Brain
         /// <summary>This robot's own LiDAR saw open ground here (wide no-return spans, MarkOpenGround).</summary>
         public bool OpenGroundAt(Vector2 p) { int i = Cell(p); return i >= 0 && openGround[i]; }
         internal float HeatRise(int i) => rise[i];
+        /// <summary>Measured at or above fire_c, never a forecast.</summary>
+        internal bool MeasuredFire(int i) => heat[i] >= c.fire_c;
         /// <summary>A fire cell within the route cell's clearance, measured between cell centres as FireDistance does.</summary>
         internal int FireCellNear(int cell, float radius, bool measuredOnly)
         {
