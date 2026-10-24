@@ -554,8 +554,14 @@ namespace SmokeRescue.Brain
                     // searched): follow through, without claiming, rather than end the search. One-door seed 922, robot B:
                     // behind A at the one door, it yielded the door frontier 120 times in 2 s, found nothing else, and
                     // declared its mission complete at 16.6 s. Beyond the partner's floor its own frontiers take over.
-                    var through = frontier == null && peers.Count > 0
+                    // follow_through_before_leftovers: when the best own option is floor left over in a room already covered past
+                    // room_ledger_covered_share (tier 4), unsearched floor past the partner's floor is worth more: at most a tenth of
+                    // a room against whole rooms. Headless seed 934, one door per room (24 Oct): robot B yielded the one hall
+                    // frontier it knew to A at 112 s and went back into its covered kitchen until 166 s.
+                    bool onlyLeftovers = frontier != null && c.follow_through_before_leftovers && c.room_ledger && frontier.roomTier >= 4;
+                    var through = (frontier == null || onlyLeftovers) && peers.Count > 0
                         ? planner.Frontier(motion.Pose.position, p => GoalBlacklisted(p, t) || VisitedGoal(p, t) || !InSearchArea(p), true) : null;
+                    if (onlyLeftovers && through != null && through.roomTier >= 4) through = null;   // nothing better beyond
                     List<Vector2> followRoute = null;
                     var follow = frontier == null && through == null && peers.Count > 0 ? FollowPartnerGoal(out followRoute) : null;
                     if (follow.HasValue)

@@ -74,6 +74,53 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void ARoomIsFinishedWhileItStillGivesFloorAndLeftWhenItStalls()
+        {
+            // room_progress_dwell. Headless house 5003 (24 Oct): robot A left the kitchen at its 40 s budget with 548 unseen
+            // cells beside its frontier and came back 49 s later.
+            var fixture = RoomLedgerFixture(); var c = fixture.config; c.room_progress_dwell = true;
+            var ledger = new RoomLedger(fixture.grid, c); var at = new Vector2(-2, 0);
+            ledger.Update(0, at);
+            var here = ledger.Get(ledger.RoomAt(at)); here.dwellS = ledger.DwellBudget(here) + 1;   // past the budget
+            var choice = new GridPlanner.FrontierChoice { position = here.anchor, cost = 1 };
+            double ratePerS = c.room_progress_min_rate_fraction * c.search_max_range_m * c.near_speed_mps;
+            int Tier(float growthTimesThreshold)
+            {
+                var l = new RoomLedger(fixture.grid, c); l.Update(0, at);
+                var h = l.Get(l.RoomAt(at)); h.dwellS = l.DwellBudget(h) + 1; h.coveredShare = .3f; l.RecordProgress(20);   // the t 0 record ages out
+                h.coveredShare = .3f + (float)(growthTimesThreshold * ratePerS * c.room_progress_window_s / h.indoorFloorM2);
+                l.RecordProgress(20 + c.room_progress_window_s);
+                var f = new GridPlanner.FrontierChoice { position = h.anchor, cost = 1 };
+                l.Rank(new List<GridPlanner.FrontierChoice> { f }, at); return f.roomTier;
+            }
+            Assert.That(Tier(2f), Is.EqualTo(0), "past the budget but still gaining floor: keep finishing the room");
+            Assert.That(Tier(.5f), Is.Not.EqualTo(0), "stalled past the budget: leave it");
+            c.room_progress_dwell = false;
+            Assert.That(Tier(2f), Is.Not.EqualTo(0), "switch off: the budget alone decides, as before");
+        }
+
+        [Test]
+        public void ADoorOutOfACoveredRoomRanksAsANewRoomButALeftoverDoesNot()
+        {
+            // frontier_beyond_room. Headless house 5003 (24 Oct): the study door, 657 unseen cells beyond it, stood in the
+            // covered kitchen's floor and ranked last.
+            var fixture = RoomLedgerFixture(); var c = fixture.config; c.frontier_beyond_room = true;
+            var ledger = new RoomLedger(fixture.grid, c); var at = new Vector2(-2, 0);
+            ledger.Update(0, at);
+            var room = ledger.Get(ledger.RoomAt(new Vector2(2, 0)));
+            room.entered = true; room.coveredShare = .95f;
+            float left = (1 - room.coveredShare) * room.indoorFloorM2 / (fixture.grid.CellM * fixture.grid.CellM);
+            int unentered = c.room_ledger_corridor_first ? 2 : 1;
+            var door = new GridPlanner.FrontierChoice { position = room.anchor, cost = 1, information = Mathf.CeilToInt(left) + c.frontier_min_information_cells + 50 };
+            var leftover = new GridPlanner.FrontierChoice { position = room.anchor, cost = 1, information = Mathf.Max(1, Mathf.FloorToInt(left)) };
+            ledger.Rank(new List<GridPlanner.FrontierChoice> { door, leftover }, at);
+            Assert.That(door.roomTier, Is.EqualTo(unentered), "a door onto unseen space out of a covered room is a new room");
+            Assert.That(leftover.roomTier, Is.EqualTo(4), "control: the room's own last pocket stays a leftover");
+            c.frontier_beyond_room = false; ledger.Rank(new List<GridPlanner.FrontierChoice> { door }, at);
+            Assert.That(door.roomTier, Is.EqualTo(4), "switch off: the door ranks with its room, as before");
+        }
+
+        [Test]
         public void ARoomThePartnerStandsInOrWalkedThroughIsNotSearchedAgain()
         {
             // partner_rooms. Seed 934 (24 Oct 04:53): A walked into the kitchen four times while B stood in it.
