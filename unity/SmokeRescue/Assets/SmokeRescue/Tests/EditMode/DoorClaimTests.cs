@@ -38,7 +38,7 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         /// <summary>door_claims. Walking through a 0.9 m doorway into a room takes it (radioed to the partner); walking back out
-        /// clears it, and from then on no route passes it. Control: switched off, nothing is taken and the route stays.</summary>
+        /// clears it, and from then on no search goal lies behind it. Control: switched off, nothing is taken and the route stays.</summary>
         [Test]
         public void WalkingIntoARoomTakesItsDoorwayAndWalkingOutClearsIt()
         {
@@ -51,12 +51,13 @@ namespace SmokeRescue.Tests.EditMode
 
             var outAgain = DoorWalk(true, 2.5f, -2.5f);
             Assert.That(outAgain.events.Count(e => e.kind == "door_cleared"), Is.EqualTo(1), "cleared on the way out");
-            var planner = new GridPlanner(outAgain.g, Settings());
-            Assert.That(planner.Plan(new Vector2(0, -2.5f), new Vector2(0, 2.5f)), Is.Empty, "a cleared room is not entered again");
+            var blocks = typeof(RobotBrain).GetMethod("ClaimBlocks", Private);
+            Assert.That(blocks.Invoke(outAgain.b, new object[] { new Vector2(0, 2.5f), 300.0 }), Is.True, "no search goal in a cleared room");
+            Assert.That(blocks.Invoke(outAgain.b, new object[] { new Vector2(0, -2.5f), 300.0 }), Is.False, "control: the floor outside it");
 
             var off = DoorWalk(false, 2.5f, -2.5f);
             Assert.That(off.events.Any(e => e.kind.StartsWith("door_")), Is.False, "control: off");
-            Assert.That(new GridPlanner(off.g, Settings()).Plan(new Vector2(0, -2.5f), new Vector2(0, 2.5f)), Is.Not.Empty, "control: the route stays");
+            Assert.That(typeof(RobotBrain).GetMethod("ClaimBlocks", Private).Invoke(off.b, new object[] { new Vector2(0, 2.5f), 300.0 }), Is.False, "control: off, the room stays a goal");
         }
 
         /// <summary>A narrow corridor is no doorway: walking 3 m down a 1.0 m corridor takes nothing.</summary>

@@ -681,23 +681,12 @@ namespace SmokeRescue.Brain
             }
             if (changed) dirty = true;
         }
+        /// <summary>Lift the entrance lock (return_home_at_end: the robot walks back out the way it came in).</summary>
+        public void ClearEntranceLock() { if (entranceLock == null) return; entranceLock = null; entranceHard = null; entranceCells = null; dirty = true; }
         public bool EntranceLocked(Vector2 p) { int i = Cell(p); return entranceLock != null && i >= 0 && entranceLock[i]; }
         bool[] entranceLock, entranceHard; int[] entranceCells; Vector2 entranceEntry; float entranceRadius;
         /// <summary>Walkable and allowed as a goal: not on the entrance lock's passage (SetEntranceLock).</summary>
         internal bool Standable(int i) => Walkable(i) && (entranceLock == null || !entranceLock[i]);
-        bool[] doorBlock;
-        /// <summary>door_claims: short walls across doorways this robot must not pass (RobotBrain.ApplyDoorBlocks), one cell
-        /// thick along each segment; they block planning like a wall but are never written into the map.</summary>
-        internal void SetDoorBlocks(List<(Vector2 a, Vector2 b)> segments)
-        {
-            doorBlock ??= new bool[Count]; System.Array.Clear(doorBlock, 0, Count);
-            foreach (var (a, b) in segments)
-            {
-                int steps = Mathf.Max(1, Mathf.CeilToInt(Vector2.Distance(a, b) / (CellM * .5f)));
-                for (int k = 0; k <= steps; k++) { int cell = Cell(Vector2.Lerp(a, b, k / (float)steps)); if (cell >= 0) doorBlock[cell] = true; }
-            }
-            dirty = true;
-        }
         internal void PrepareNavigation()
         {
             if (!dirty) return;
@@ -707,7 +696,7 @@ namespace SmokeRescue.Brain
         }
         /// <summary>A cell routes keep their clearance from: occupied, inside a confirmed person's keep-out, or on the hard part
         /// of the entrance lock.</summary>
-        bool ObstacleCell(int i) => Occupancy(i) == 255 || (keepOut != null && keepOut[i]) || (entranceHard != null && entranceHard[i]) || (doorBlock != null && doorBlock[i]);
+        bool ObstacleCell(int i) => Occupancy(i) == 255 || (keepOut != null && keepOut[i]) || (entranceHard != null && entranceHard[i]);
         /// <summary>Distance from the point p to the nearest obstacle cell (ObstacleCell), measured to the cell's square, out to
         /// maxM (returned when nothing is nearer). ObstacleDistance is a cell centre's distance to obstacle cell centres, so a point
         /// near the edge of a cell can be farther from every obstacle than its cell's value says.</summary>

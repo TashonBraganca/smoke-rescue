@@ -127,6 +127,7 @@ namespace SmokeRescue.Brain
             nearFire = fireNow;
 
             if (!completed && !returning && t >= c.mission_time_limit_s) BeginReturn(t, MissionTimeUp);
+            CheckHomeTime(t);
             RefreshSensedExits(t);
             CheckWayOut(t);
             CheckEmergencyExit(t);
@@ -1153,13 +1154,13 @@ namespace SmokeRescue.Brain
         void SetPath(List<Vector2> value, bool isFrontier = false) { frontierGoal = isFrontier && value.Count > 0; throughCentre = null; path = value; cursor = 0; goal = path.Count > 0 ? path[path.Count - 1] : (Vector2?)null; }
         void ClearPath() { frontierGoal = false; throughCentre = null; path.Clear(); cursor = 0; goal = null; lastPlan = double.NegativeInfinity; }
         Vector2? throughCentre;   // the frontier a follow-through path leads to, when the path is one
-        Vector2? entryPoint; bool entranceLocked; double nextLockRefresh;
+        Vector2? entryPoint; bool entranceLocked, lockLifted; double nextLockRefresh;
         /// <summary>Staying inside, the first point where this robot stands on floor it has proven indoors is its way in. Once
         /// it is entrance_lock_m beyond that point, the floor within entrance_lock_m of it is locked for good (OccupancyGrid
         /// .SetEntranceLock). Only the robot's own track decides; nothing about the building is given.</summary>
         void NoteEntrance(double t)
         {
-            if (!c.stay_inside || c.entrance_lock_m <= 0) return;
+            if (!c.stay_inside || c.entrance_lock_m <= 0 || lockLifted) return;
             // A passage lock follows the map: floor proven indoors after the lock becomes passage, not wall.
             if (entranceLocked)
             {
@@ -1828,7 +1829,36 @@ namespace SmokeRescue.Brain
             }
             return best;
         }
-        List<Vector2> PlanOut() => PlanOutFrom(motion.Pose.position);
+        List<Vector2> PlanOut()
+        {
+            var route = PlanOutFrom(motion.Pose.position);
+            // return_home_at_end: with stay_inside no sensed exit is kept, so the way out is the start pad itself, where the robot
+            // came in (shared gate frame). Headless 5001, 5017, 5020, 5022: the route out came back empty every tick at 240 s.
+            if (route.Count == 0 && c.return_home_at_end && returning && returnReason == MissionTimeUp)
+            {
+                // The way in is the way out now: lift the entrance lock for good (headless 5001: with it, no route home existed
+                // once the robot was 5 m inside, so the return was abandoned for a retreat every tick).
+                if (!lockLifted) { lockLifted = true; grid.ClearEntranceLock(); }
+                route = planner.Plan(motion.Pose.position, home);
+            }
+            return route;
+        }
+        double nextHomeCheck = double.NegativeInfinity;
+        /// <summary>return_home_at_end: start back while the walk to the start pad, times escape_time_factor, still fits before
+        /// mission_time_limit_s (CheckWayOut does this without stay_inside, and returns at once with it).</summary>
+        void CheckHomeTime(double t)
+        {
+            if (!c.return_home_at_end || completed || returning || t < nextHomeCheck) return;
+            nextHomeCheck = t + c.escape_check_s;
+            // The entrance lock keeps the way in out of every plan while searching; the route out is measured with it lifted.
+            bool locked = entranceLocked && !lockLifted && entryPoint.HasValue;
+            if (locked) grid.ClearEntranceLock();
+            var route = planner.Plan(motion.Pose.position, home);
+            if (locked) grid.SetEntranceLock(entryPoint.Value, c.entrance_lock_m, c.entrance_lock_passage ? InSearchArea : (System.Func<Vector2, bool>)null);
+            if (route.Count == 0) return;
+            float m = PathLength(route);
+            if (m > c.return_arrive_m && t + m / c.open_speed_mps * c.escape_time_factor + c.escape_check_s >= c.mission_time_limit_s) BeginReturn(t, MissionTimeUp);
+        }
         List<Vector2> PlanOutFrom(Vector2 from)
         {
             List<Vector2> best = new List<Vector2>();
@@ -1896,7 +1926,10 @@ namespace SmokeRescue.Brain
             // Stay inside (the owner's decision, 22 Oct): a robot that has gone in never leaves by the entrance. At the
             // deadline it stops where it stands; every other reason to leave (heat, a closing way out, nothing left to search)
             // becomes a retreat to the coolest floor inside, where it can spray and wait for the air to cool.
-            if (c.stay_inside && reason != CarryingOut)
+            // return_home_at_end (owner, 24 Oct 11:10): at the end both robots walk back out the main exit; staying inside still
+            // holds for every other reason to leave. Headless 5001, 5017, 5022 with the time limit: both robots stopped where they
+            // stood at 240 s, 7.7 to 19.5 m from the way in.
+            if (c.stay_inside && reason != CarryingOut && !(c.return_home_at_end && reason == MissionTimeUp))
             {
                 ResetStuckRecovery(); active = null; dwell = 0; ClearPath();
                 if (reason == MissionTimeUp)

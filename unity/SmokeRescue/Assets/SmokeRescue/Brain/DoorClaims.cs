@@ -6,8 +6,8 @@ namespace SmokeRescue.Brain
 {
     /// <summary>
     /// door_claims (owner, 24 Oct): a robot that walks through a doorway into a room records the doorway point and radios
-    /// "taken" by it; when it walks back out it radios "cleared". The partner never routes through a doorway the other robot
-    /// has taken, and nobody routes through a cleared one, so no room is searched twice. A doorway is found in the robot's own
+    /// "taken" by it; when it walks back out it radios "cleared". The partner takes no search goal behind a doorway the other
+    /// robot has taken, and nobody takes one behind a cleared doorway, so no room is searched twice. A doorway is found in the robot's own
     /// LiDAR map: a free gap door_min_width_m to door_max_width_m wide across the heading, with wider floor
     /// (door_side_extra_m more) on both sides, which a narrow corridor does not have. A "taken" doorway lapses door_claim_lease_s
     /// after it was last heard, so a stuck owner cannot lock a room. Seed 934 (24 Oct 04:53 run): robot A walked into the
@@ -18,8 +18,7 @@ namespace SmokeRescue.Brain
         internal const byte DoorTaken = 1, DoorCleared = 2;
         sealed class Door { public Vector2 position, inward; public string owner; public byte state; public double since, heardAt; }
         readonly List<Door> doors = new List<Door>();
-        Vector2? doorwayAt; Vector2 doorwayAxis; double nextDoorCheck = double.NegativeInfinity, nextDoorBlocks = double.NegativeInfinity;
-        readonly List<(Vector2 a, Vector2 b)> blockedDoors = new List<(Vector2, Vector2)>();
+        Vector2? doorwayAt; Vector2 doorwayAxis; double nextDoorCheck = double.NegativeInfinity;
 
         /// <summary>Free distance from p along dir to the first occupied cell, out to maxM.</summary>
         float FreeRun(Vector2 p, Vector2 dir, float maxM)
@@ -62,7 +61,6 @@ namespace SmokeRescue.Brain
                 if (Mathf.Abs(along) >= c.door_cross_m) { Crossed(t, doorwayAt.Value, doorwayAxis * Mathf.Sign(along)); doorwayAt = null; }
                 else if (Vector2.Distance(at, doorwayAt.Value) > c.door_cross_m * 2) doorwayAt = null;
             }
-            if (t >= nextDoorBlocks) { nextDoorBlocks = t + .5; ApplyDoorBlocks(t); }
         }
 
         void Crossed(double t, Vector2 door, Vector2 direction)
@@ -88,21 +86,33 @@ namespace SmokeRescue.Brain
                 "x_m", door.x, "y_m", door.y, "inward_x", direction.x, "inward_y", direction.y);
         }
 
-        /// <summary>Doorways this robot must not pass, as short walls across them: the partner's taken doorways (heard within
-        /// door_claim_lease_s) and every cleared one. A robot standing on the inward side of a doorway may always walk out.</summary>
-        void ApplyDoorBlocks(double t)
+        /// <summary>Whether a search goal at p lies in a room this robot must not search: behind a doorway the partner has taken
+        /// (heard within door_claim_lease_s) or behind any cleared doorway. Routes may still pass through such a room to reach
+        /// others; only goals inside it are dropped. Walls across the doorways cut thoroughfare rooms off in headless house 5002
+        /// (coverage 86 -> 71 %, standing 35 -> 98 s).</summary>
+        internal bool DoorBlocksGoal(Vector2 p, double t)
         {
-            var at = motion.Pose.position; var walls = new List<(Vector2, Vector2)>();
+            if (!c.door_claims) return false;
             foreach (var d in doors)
             {
                 bool block = d.state == DoorCleared || (d.owner != id && d.state == DoorTaken && t - d.heardAt <= c.door_claim_lease_s);
-                if (!block || Vector2.Dot(at - d.position, d.inward) > 0) continue;
-                var side = new Vector2(-d.inward.y, d.inward.x) * (c.door_max_width_m * .6f);
-                walls.Add((d.position - side, d.position + side));
+                if (block && InsideDoorRoom(d, p)) return true;
             }
-            if (walls.Count == blockedDoors.Count && walls.TrueForAll(w => blockedDoors.Contains(w))) return;
-            blockedDoors.Clear(); blockedDoors.AddRange(walls);
-            grid.SetDoorBlocks(blockedDoors);
+            return false;
+        }
+
+        /// <summary>Whether point p lies in the room behind doorway d: the same room of this robot's own ledger as the floor just
+        /// inside the doorway; without a ledger room, on the inward side within door_room_reach_m. A half-plane alone counted
+        /// half the house as behind every doorway.</summary>
+        bool InsideDoorRoom(Door d, Vector2 at)
+        {
+            int here = planner.Rooms.RoomAt(at), room = planner.Rooms.RoomAt(d.position + d.inward * c.door_cross_m);
+            if (here >= 0 && room >= 0) return here == room;
+            // Without ledger rooms: on the inward side, within reach, and in a clear straight line of known free floor from just
+            // inside the doorway. Headless 5021: without the line test a study through the wall from a cleared bedroom counted as
+            // behind its doorway, and its person (s5) was never found.
+            return Vector2.Dot(at - d.position, d.inward) > 0 && Vector2.Distance(at, d.position) <= c.door_room_reach_m &&
+                   grid.OwnFreeLine(d.position + d.inward * grid.CellM * 3, at);
         }
 
         internal BrainDoor[] DoorsToSend()
