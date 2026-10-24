@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using SmokeRescue.Brain;
 using SmokeRescue.Radio;
 using SmokeRescue.Robots;
 using SmokeRescue.Sensors;
@@ -128,6 +129,24 @@ namespace SmokeRescue.Recording
                         (rig.actions.FailureReason != null ? ": " + rig.actions.FailureReason : "") +
                         (rig.actions.TargetId != null ? $" (target {rig.actions.TargetId})" : ""));   // numbers only in the values
             }
+        }
+
+        /// <summary>Nozzle (config/actuators.json) and burning-floor numbers (config/perception.json) for code_sprays_fire;
+        /// null when either file lacks them.</summary>
+        static RobotBrain.NozzleSpec? LoadNozzle()
+        {
+            try
+            {
+                var a = JObject.Parse(File.ReadAllText(Path.Combine(FloorPlan.ConfigDir, "actuators.json")))["nozzle"];
+                var p = JObject.Parse(File.ReadAllText(Path.Combine(FloorPlan.ConfigDir, "perception.json")));
+                return new RobotBrain.NozzleSpec { flowLps = a.Value<float>("flow_lps"), coolingKjPerL = a.Value<float>("cooling_kj_per_l"),
+                    efficiency = a.Value<float>("application_efficiency"), halfAngleDeg = a.Value<float>("half_angle_deg"),
+                    rangeM = a.Value<float>("range_m"), maxSprayS = a.Value<float>("max_spray_s"),
+                    burningKwPerM2 = p.Value<float>("burning_kw_per_m2"), burningSurfaceC = p.Value<float>("burning_surface_c"),
+                    knockdownC = p.Value<float>("knockdown_c"), fuelKjPerM2K = p.Value<float>("fuel_surface_kj_per_m2_k") };
+            }
+            catch (Exception e) when (e is IOException || e is NullReferenceException || e is FormatException || e is JsonException)
+            { Debug.LogWarning("[SmokeRescue] code_sprays_fire off: " + e.Message); return null; }
         }
 
         static double LastT;

@@ -204,6 +204,7 @@ namespace SmokeRescue.Recording
                         ? new RobotBrain(sensorCfg, brainCfg, spec.id, scenario.seed * 1000 + i * 10 + 6, EntryFor(spec))
                         : new RobotBrain(sensorCfg, brainCfg, spec.id, scenario.seed * 1000 + i * 10 + 6);
                     rig.brain.AgentConfirms = AgentUrl != null;
+                    rig.brain.Nozzle = LoadNozzle();   // code_sprays_fire judges a fire with the same numbers as the agent's advice
                     var r0 = rig;
                     rig.robot.Driver.Command = () => (r0.command.forwardMps, -r0.command.yawRateDeg, r0.missionDone);
                 }
@@ -345,6 +346,13 @@ namespace SmokeRescue.Recording
                         float brainDt = double.IsNaN(rig.lastBrainStep) ? brainEvery / (float)ClockHz : (float)(t - rig.lastBrainStep);
                         rig.lastBrainStep = t;
                         using (perf.Time("brain_step")) rig.command = rig.brain.Step(t, brainDt);
+                        // code_sprays_fire: the robot sprays a measured fire blocking its way by itself, through the same nozzle.
+                        if (rig.actions != null && rig.brain.CodeSpray(t, (float)rig.actions.WaterLitres, out float sprayBearing, out float spraySeconds))
+                        {
+                            bool sprayed = rig.actions.BeginSpray(sprayBearing, spraySeconds);
+                            rig.brain.LogAgentAction(t, sprayed ? $"code spray at {sprayBearing:0} deg for up to {spraySeconds:0.#} s"
+                                : $"code spray refused: {rig.actions.FailureReason}", "water_l", rig.actions.WaterLitres);
+                        }
                         foreach (var e in rig.brain.DrainEvents())
                         {
                             rig.decisions.Append(JsonConvert.SerializeObject(e)).Append('\n');

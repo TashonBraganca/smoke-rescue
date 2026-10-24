@@ -1127,6 +1127,46 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void TheRobotSpraysAMeasuredFireBlockingItsWayByItself()
+        {
+            // code_sprays_fire (owner, 24 Oct). The burning corridor above: fire across the only way on at y = 2. With the
+            // nozzle of config/actuators.json the robot sprays toward it by itself; controls: no nozzle, too little water,
+            // a wall instead of fire, and no second spray inside code_spray_repeat_s.
+            var nozzle = new RobotBrain.NozzleSpec { flowLps = 1, coolingKjPerL = 2590, efficiency = .5f, halfAngleDeg = 12, rangeM = 5,
+                maxSprayS = 6, burningKwPerM2 = 324, burningSurfaceC = 600, knockdownC = 300, fuelKjPerM2K = 6.5f };
+            RobotBrain Corridor(bool fire)
+            {
+                var s = Settings(); s.code_sprays_fire = true;
+                var b = new RobotBrain(Calibration(), s, "A", 0); var g = Map(b);
+                for (float y = -1; y <= 4; y += .05f)
+                {
+                    for (float x = -.95f; x <= .95f; x += .05f) g.ObserveFree(g.Cell(new Vector2(x, y)));
+                    g.ObserveOccupied(g.Cell(new Vector2(-1.05f, y))); g.ObserveOccupied(g.Cell(new Vector2(1.05f, y)));
+                }
+                for (float x = -1; x <= 1; x += .05f) g.ObserveOccupied(g.Cell(new Vector2(x, -1.05f)));
+                for (float x = -.95f; x <= .95f; x += .1f)
+                    if (fire) g.ObserveHeat(g.Cell(new Vector2(x, 2)), 600, 0); else g.ObserveOccupied(g.Cell(new Vector2(x, 2)));
+                return b;
+            }
+            var robot = Corridor(true); robot.Nozzle = nozzle;
+            Assert.That(robot.CodeSpray(0, 12, out float bearing, out float seconds), Is.True, "measured fire across the only way on: spray it");
+            Assert.That(Mathf.Abs(bearing), Is.LessThan(30f), "toward the fire ahead");
+            var block = robot.FireBlockedFrontier(0).Value;
+            double knock = RobotBrain.KnockDownS(nozzle, block.burningM2, block.distanceM).Value;
+            Assert.That(seconds, Is.EqualTo(Mathf.Min(6f, (float)knock + 1f)).Within(1e-3f), "knock-down time plus the margin, within one spray");
+            Assert.That(robot.CodeSpray(1, 12, out _, out _), Is.False, "no second spray inside code_spray_repeat_s");
+            var dry = Corridor(true); dry.Nozzle = nozzle;
+            Assert.That(dry.CodeSpray(0, (float)knock * .5f, out _, out _), Is.False, "control: too little water to knock it down");
+            var bare = Corridor(true);
+            Assert.That(bare.CodeSpray(0, 12, out _, out _), Is.False, "control: no nozzle fitted");
+            var walled = Corridor(false); walled.Nozzle = nozzle;
+            Assert.That(walled.CodeSpray(0, 12, out _, out _), Is.False, "control: water does not open a wall");
+            // The same model as the agent's advice (tools.py knock_down_s): 0.5 m2 at 1.6 m is 0.932 s, 4 m2 is beyond one stream.
+            Assert.That(RobotBrain.KnockDownS(nozzle, .5f, 1.6f).Value, Is.EqualTo(.9324).Within(.002), "equal to tools.py knock_down_s(0.5, 1.6)");
+            Assert.That(RobotBrain.KnockDownS(nozzle, 4f, 1.6f).HasValue, Is.False);
+        }
+
+        [Test]
         public void AFireCutFrontierTheBrainBlacklistedIsStillReportedForWater()
         {
             // Seed 934 (23 Oct), robot A: when fire cut a route the brain blacklisted that frontier (6 times from 119 s), and the
