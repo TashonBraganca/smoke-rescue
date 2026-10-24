@@ -59,6 +59,9 @@ namespace SmokeRescue.Recording
         string database;
         int nextRadioId;
         (string sender, BrainVisualKeyframe keyframe) matching;
+        // visual_slam_live loop closure: the newest own view, matched against this robot's own earlier views of the place.
+        (int radioId, byte[] payload, List<int> serviceIds)? loopJob;
+        bool loopMatching; int loopRadioId;
         public bool Busy => pending != null;
         public VisualPlaceWorker(RobotBrain robotBrain, string robotId, string robotDir, VisualPlaceClient placeClient)
         { brain = robotBrain; robot = Uri.EscapeDataString(robotId); directory = robotDir; client = placeClient; }
@@ -71,7 +74,7 @@ namespace SmokeRescue.Recording
             // Use the recorder's exact index formatting (six decimals, at most 0.5 microseconds rounding). A nearest
             // older image must not inherit this capture pose, including captures between whole simulation seconds.
             captureStamp = double.Parse(RecordingSession.Fmt(t), CultureInfo.InvariantCulture);
-            capturing = true; pending = client.Post("/place/" + robot + "/keyframe", Body(captureStamp));
+            capturing = true; loopMatching = false; pending = client.Post("/place/" + robot + "/keyframe", Body(captureStamp));
             return true;
         }
         public void Step(double t)
@@ -88,18 +91,36 @@ namespace SmokeRescue.Recording
             }
             foreach (var item in brain.DrainPartnerVisualKeyframes())
             {
-                if (brain.TryPartnerLink(item.sender, out _) || queue.Exists(x => x.sender == item.sender && x.keyframe.id == item.keyframe.id)) continue;
+                if (!brain.VisualMatchWanted(item.sender) || queue.Exists(x => x.sender == item.sender && x.keyframe.id == item.keyframe.id)) continue;
                 queue.Add(item); if (queue.Count > brain.VisualKeyframeCapacity) queue.RemoveAt(0);
             }
             if (Busy || CaptureDue(t)) return;  // a due camera capture gets the next slot
             while (queue.Count > 0)
             {
                 matching = queue[0]; queue.RemoveAt(0);
-                if (brain.TryPartnerLink(matching.sender, out _)) continue;
-                capturing = false;
+                if (!brain.VisualMatchWanted(matching.sender)) continue;
+                // With a link (the operator's or a measured one) only own views near where the partner stood are compared.
+                var near = brain.VisualCandidates(matching.sender, matching.keyframe.pose);
+                var ids = near == null ? null : ServiceIds(near);
+                if (ids != null && ids.Count == 0) continue;   // no own view there yet; it is queued again with the next own view
+                capturing = false; loopMatching = false;
                 var body = Body(t); body["payload_b64"] = Convert.ToBase64String(matching.keyframe.payload);
-                pending = client.Post("/place/" + robot + "/match", body); break;
+                if (ids != null) body["candidates"] = new JArray(ids);
+                pending = client.Post("/place/" + robot + "/match", body); return;
             }
+            if (loopJob.HasValue)
+            {
+                var job = loopJob.Value; loopJob = null;
+                capturing = false; loopMatching = true; loopRadioId = job.radioId;
+                var body = Body(t); body["payload_b64"] = Convert.ToBase64String(job.payload); body["candidates"] = new JArray(job.serviceIds);
+                pending = client.Post("/place/" + robot + "/match", body);
+            }
+        }
+        List<int> ServiceIds(List<int> radioIds)
+        {
+            var ids = new List<int>();
+            foreach (var pair in serviceToRadio) if (radioIds.Contains(pair.Value)) ids.Add(pair.Key);
+            return ids;
         }
         static JToken Required(JObject reply, string field)
         {
@@ -123,7 +144,10 @@ namespace SmokeRescue.Recording
                 }
                 if (serviceToRadio.ContainsKey(serviceId)) return;
                 int radioId = nextRadioId++;
-                brain.AddVisualKeyframe(radioId, capturePose, payload); serviceToRadio[serviceId] = radioId;
+                brain.AddVisualKeyframe(radioId, capturePose, payload, captureStamp); serviceToRadio[serviceId] = radioId;
+                // Its own earlier views of this place, if any, are the loop-closure candidates (newest job replaces an unsent one).
+                var earlier = ServiceIds(brain.LoopCandidates(radioId));
+                if (earlier.Count > 0) loopJob = (radioId, payload, earlier);
                 // The service retains 300 views, the brain retains 200. Old ids may still be returned; the brain rejects
                 // them if their capture pose has expired. Bound this lookup too by the same configured capacity.
                 if (serviceToRadio.Count > brain.VisualKeyframeCapacity)
@@ -133,9 +157,17 @@ namespace SmokeRescue.Recording
                     serviceToRadio.Remove(oldest);
                 }
             }
+            else if (loopMatching)
+            {
+                if (reply.Value<bool?>("matched") != true) return;
+                if (Required(reply, "database_id").Value<string>() != database) return;
+                if (!serviceToRadio.TryGetValue(Required(reply, "mine_id").Value<int>(), out int oldRadio)) return;
+                brain.OnVisualLoopClosure(loopRadioId, oldRadio, Required(reply, "dx_m").Value<float>(), Required(reply, "dy_m").Value<float>(),
+                    Required(reply, "dyaw_deg").Value<float>(), Required(reply, "inliers").Value<int>(), t);
+            }
             else
             {
-                if (reply.Value<bool?>("matched") != true || brain.TryPartnerLink(matching.sender, out _)) return;
+                if (reply.Value<bool?>("matched") != true || !brain.VisualMatchWanted(matching.sender)) return;
                 if (Required(reply, "database_id").Value<string>() != database) { Log(t, "Place worker restarted; waiting for a fresh own keyframe."); return; }
                 if (!serviceToRadio.TryGetValue(Required(reply, "mine_id").Value<int>(), out int mineId)) return;
                 brain.OnVisualPlaceMatch(matching.sender, matching.keyframe.id, mineId, Required(reply, "dx_m").Value<float>(),

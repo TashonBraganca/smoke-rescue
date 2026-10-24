@@ -30,12 +30,14 @@ namespace SmokeRescue.Tests.EditMode
                 brain.OnVisualPlaceMatch("A", i + 1, 10 + i, offsetM, 0, 0, inliers, 1 + i);
             }
         }
-        static CameraFixture CameraScene(bool map = true, bool enabled = true, bool corridor = false, float separationM = 1.5f)
+        static CameraFixture CameraScene(bool map = true, bool enabled = true, bool corridor = false, float separationM = 1.5f,
+                                         bool padsLive = false, float padErrorDeg = 0)
         {
-            var c = Settings(); c.grid_size_m = 16; c.frames_shared_at_start = false;
+            var c = Settings(); c.grid_size_m = 16; c.frames_shared_at_start = padsLive; c.visual_slam_live = padsLive;
             c.visual_place_linking = enabled;
+            // With launch pads the partner's frame is the shared frame turned by the pads' placement error.
             var f = new CameraFixture { brain = new RobotBrain(Calibration(), c, "B", 0) { LinkDiagnostics = true }, config = c,
-                truth = new BrainPose { position = new Vector2(3, -2), yawRad = Mathf.PI / 2 },
+                truth = padsLive ? new BrainPose { yawRad = padErrorDeg * Mathf.Deg2Rad } : new BrainPose { position = new Vector2(3, -2), yawRad = Mathf.PI / 2 },
                 own = new[] { new BrainPose(), new BrainPose { position = new Vector2(0, separationM) } }, partner = new BrainPose[2] };
             var walls = corridor ? Box(-1, -20, 1, 20) : RoomOne;
             var sender = new RobotBrain(Calibration(), c, "A", 0); var message = sender.BuildMessage(0);
@@ -227,6 +229,82 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(f.brain.DrainEvents().Any(e => e.kind == "place_rejected" && e.reason.Contains("budget")), Is.True);
             f.Match(1);
             Assert.That(f.brain.TryPartnerLink("A", out _), Is.True, "control: a fresh step admits the second candidate");
+        }
+    
+        [Test]
+        public void WithLaunchPadsTwoAgreeingCameraMatchesRefineTheSharedFrame()
+        {
+            // visual_slam_live (owner, 24 Oct: visual SLAM live, not after the run). The partner's frame is the shared frame
+            // turned 2.4 deg (robot B's measured launch error in seed 934). Two verified camera matches 1.5 m apart refine
+            // the link to the measured turn. Control: one match leaves the pads' identity link.
+            var one = CameraScene(padsLive: true, padErrorDeg: 2.4f); one.Match(0);
+            Assert.That(one.brain.TryPartnerLink("A", out var identity), Is.True);
+            Assert.That(Mathf.Abs(identity.yawRad), Is.LessThan(1e-6f), "control: one match changes nothing");
+            var two = CameraScene(padsLive: true, padErrorDeg: 2.4f); two.Match(0); two.Match(1);
+            Assert.That(two.brain.TryPartnerLink("A", out var link), Is.True);
+            Assert.That(Mathf.Abs(link.yawRad * Mathf.Rad2Deg - 2.4f), Is.LessThan(.3f), "the link carries the partner frame's measured 2.4 deg turn: " + link.yawRad * Mathf.Rad2Deg);
+            Assert.That(two.brain.DrainEvents().Count(e => e.kind == "frame_link_refined"), Is.EqualTo(1));
+            Assert.That(two.brain.VisualMatchWanted("A"), Is.False, "a measured link ends the camera work for that partner");
+        }
+
+        [Test]
+        public void ACameraMatchImplyingMoreThanThePadsAllowIsIgnored()
+        {
+            var wild = CameraScene(padsLive: true, padErrorDeg: 8f); wild.Match(0); wild.Match(1);
+            Assert.That(wild.brain.TryPartnerLink("A", out var link), Is.True);
+            Assert.That(Mathf.Abs(link.yawRad), Is.LessThan(1e-6f), "8 deg is beyond visual_refine_max_deg: identity kept");
+            Assert.That(wild.brain.DrainEvents().Count(e => e.kind == "visual_link_rejected"), Is.EqualTo(2));
+            var fair = CameraScene(padsLive: true, padErrorDeg: 4f); fair.Match(0); fair.Match(1);
+            fair.brain.TryPartnerLink("A", out var fixedLink);
+            Assert.That(Mathf.Abs(fixedLink.yawRad * Mathf.Rad2Deg - 4f), Is.LessThan(.3f), "control: 4 deg is within the bound and applied");
+        }
+
+        [Test]
+        public void TwoCameraMatchesTwoDegreesApartDoNotRefineTheSharedFrame()
+        {
+            var f = CameraScene(padsLive: true, padErrorDeg: 2.4f); f.Match(0);
+            f.brain.OnVisualPlaceMatch("A", 2, 11, 0, 0, 2f, 30, 2);   // the second view's camera turn is off by 2 deg
+            Assert.That(f.brain.TryPartnerLink("A", out var link), Is.True);
+            Assert.That(Mathf.Abs(link.yawRad), Is.LessThan(1e-6f), "2 deg apart is beyond visual_refine_agree_deg: identity kept");
+            var loose = CameraScene(padsLive: true, padErrorDeg: 2.4f); loose.config.visual_refine_agree_deg = 4; loose.Match(0);
+            loose.brain.OnVisualPlaceMatch("A", 2, 11, 0, 0, 2f, 30, 2);
+            loose.brain.TryPartnerLink("A", out var looseLink);
+            Assert.That(Mathf.Abs(looseLink.yawRad), Is.GreaterThan(.01f), "control: the old 4 deg tolerance would have accepted it");
+        }
+
+        [Test]
+        public void OnlyOwnViewsNearThePartnerOrAnEarlierVisitAreCandidates()
+        {
+            var c = Settings(); c.frames_shared_at_start = true; c.visual_slam_live = true; c.visual_place_linking = true;
+            var b = new RobotBrain(Calibration(), c, "B", 0);
+            b.AddVisualKeyframe(1, new BrainPose { position = new Vector2(0, 0) }, VisualPayload(), 0);
+            b.AddVisualKeyframe(2, new BrainPose { position = new Vector2(1, 1) }, VisualPayload(), 10);
+            b.AddVisualKeyframe(3, new BrainPose { position = new Vector2(8, 0) }, VisualPayload(), 12);
+            b.AddVisualKeyframe(4, new BrainPose { position = new Vector2(0, 1), yawRad = Mathf.PI }, VisualPayload(), 14);
+            b.AddVisualKeyframe(5, new BrainPose { position = new Vector2(.5f, .5f) }, VisualPayload(), 30);
+            CollectionAssert.AreEquivalent(new[] { 1, 2, 5 }, b.VisualCandidates("A", new BrainPose { position = new Vector2(.5f, .5f) }),
+                "near and facing the same way: not the far view 3 or the opposite view 4");
+            CollectionAssert.AreEquivalent(new[] { 1, 2 }, b.LoopCandidates(5), "earlier than visual_loop_min_age_s (20 s) before view 5, near it");
+            var unlinked = Settings(); unlinked.frames_shared_at_start = false; unlinked.visual_slam_live = true;
+            Assert.That(new RobotBrain(Calibration(), unlinked, "B", 0).VisualCandidates("A", new BrainPose()), Is.Null, "control: no link, no prior");
+        }
+
+        [Test]
+        public void AVisualLoopClosureMeasuresTheDriftSinceTheEarlierView()
+        {
+            var c = Settings(); c.frames_shared_at_start = true; c.visual_slam_live = true; c.visual_place_linking = true;
+            var b = new RobotBrain(Calibration(), c, "B", 0);
+            b.AddVisualKeyframe(1, new BrainPose { position = new Vector2(0, 2) }, VisualPayload(), 0);
+            b.AddVisualKeyframe(2, new BrainPose { position = new Vector2(0, 2) }, VisualPayload(), 40);
+            b.DrainEvents();
+            // The camera says the new view stands 0.2 m right of the old one, turned 1 deg: that is the drift since.
+            b.OnVisualLoopClosure(2, 1, .2f, 0, 1f, 30, 40);
+            var e = b.DrainEvents().Single(x => x.kind == "visual_loop_closure");
+            Assert.That(e.numbers["drift_m"], Is.EqualTo(.2).Within(.01));
+            Assert.That(e.numbers["drift_deg"], Is.EqualTo(1).Within(.05));
+            Assert.That(e.numbers["age_s"], Is.EqualTo(40).Within(1e-6));
+            b.OnVisualLoopClosure(2, 1, .2f, 0, 1f, 5, 41);
+            Assert.That(b.DrainEvents().Any(x => x.kind == "visual_loop_closure"), Is.False, "control: too few inliers is not a loop closure");
         }
     }
 }

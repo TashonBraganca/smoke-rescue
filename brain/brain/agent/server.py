@@ -371,7 +371,7 @@ def _resolved_place_request(operation, robot, req):
     try:
         if operation == 'keyframe':
             return place.keyframe(robot, req['robot_dir'], float(req['t']))
-        return place.match(robot, req['payload_b64'], req['robot_dir'], float(req['t']))
+        return place.match(robot, req['payload_b64'], req['robot_dir'], float(req['t']), req.get('candidates'))
     except (ValueError, KeyError, TypeError, OSError) as exc:
         raise HTTPException(400, str(exc)) from exc
     except RuntimeError as exc:

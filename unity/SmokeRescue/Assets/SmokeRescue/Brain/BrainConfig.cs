@@ -186,6 +186,9 @@ namespace SmokeRescue.Brain
         public int visual_lidar_keyframes_per_message = 1, visual_keyframe_max_payload_bytes = 3653;
         public int visual_keyframe_max = 200, visual_keyframes_per_message = 1, visual_link_min_inliers = 16;
         public float visual_keyframe_period_s = 2f;
+        public bool visual_slam_live = false;
+        public float visual_refine_max_deg = 5f, visual_refine_max_m = .5f, visual_refine_agree_deg = 1f, visual_refine_agree_m = .15f,
+            visual_prior_radius_m = 3f, visual_prior_turn_deg = 60f, visual_loop_min_age_s = 20f;
         public int link_shortlist = 5, link_max_candidates = 20, link_turn_candidates = 3, link_verifications_per_step = 4;
         public float link_max_descriptor_distance = 0.3f, link_window_m = 0.8f, link_step_m = 0.1f, link_window_deg = 12f, link_step_deg = 2f;
         public float link_min_fit = 0.6f, link_agree_m = 0.3f, link_agree_deg = 4f, link_min_separation_m = 1.0f;
