@@ -38,6 +38,26 @@ def furniture_heights() -> dict:
     return heights
 
 
+# Lowest mounting height (model origin above the floor, config/props.json offset y) at which a landmark hangs clear of the
+# robot body and its 0.45 m LiDAR plane: the pictures, clocks and dartboard hang 1.25 to 1.75 m up the wall.
+HUNG_MIN_M = 1.0
+
+
+def hung_kinds() -> set:
+    """Landmark kinds whose every model part hangs on a wall at HUNG_MIN_M or more: no floor prism. Seed 934 with one door
+    per room (24 Oct): pictures 1.35 to 1.7 m up, modelled as 0.8 m floor prisms, narrowed the hallway beside the rubble and
+    the wood pile to 0.54 to 0.64 m and sealed four rooms off in headless only."""
+    landmarks = json.loads((CONFIG / "props.json").read_text()).get("landmarks", {})
+    out = set()
+    for kind, parts in landmarks.items():
+        if not isinstance(parts, list) or not parts:
+            continue
+        ys = [(p.get("offset") or [0, 0, 0])[1] for p in parts if isinstance(p, dict)]
+        if ys and all(isinstance(y, (int, float)) and y >= HUNG_MIN_M for y in ys):
+            out.add(kind)
+    return out
+
+
 def compile_world(scenario_path: Path, survivors: list | None = None) -> dict:
     sc = load_scenario(scenario_path)
     plan = json.loads((CONFIG / sc.get("floorplan_file", "floorplan.json")).read_text())
@@ -84,10 +104,11 @@ def compile_world(scenario_path: Path, survivors: list | None = None) -> dict:
                 segments.append(gate(e0) + gate(e1) + [0.0, wall_h])
 
     heights = furniture_heights()
+    hung = hung_kinds()
     prisms = []
     for lm in plan.get("landmarks", []) + sc.get("obstacles", []):
         kind = lm.get("kind")
-        if kind not in fire.get("furniture", {}):
+        if kind not in fire.get("furniture", {}) or kind in hung:
             continue
         w, d = fire["furniture"][kind]["size_m"]
         yaw = math.radians(lm.get("yaw", 0))
