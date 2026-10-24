@@ -82,6 +82,7 @@ namespace SmokeRescue.Brain
             {
                 Rebuild(indoors ?? (p => !config.search_requires_ceiling || grid.Indoors(p)));
                 LastSegmentationAt = t; nextSegmentation = t + config.room_ledger_period_s;
+                RecordProgress(t);
             }
             if (cell >= 0 && grid.OwnOccupancy(cell) == 1 && byId.TryGetValue(labels[cell], out var current))
             {
@@ -126,6 +127,29 @@ namespace SmokeRescue.Brain
         /// sweeps per second (search_max_range_m wide at near_speed_mps). Headless seed 5001: a 102 m2 bedroom got the same 40 s
         /// as a 7 m2 closet.</summary>
         public double DwellBudget(Room r) => Math.Max(config.room_ledger_dwell_s, r.indoorFloorM2 / (config.search_max_range_m * config.near_speed_mps));
+
+        /// <summary>room_progress_dwell: searched floor per room at each segmentation, over the last room_progress_window_s.</summary>
+        readonly Dictionary<int, List<(double t, float m2)>> searchedHistory = new Dictionary<int, List<(double, float)>>();
+        public void RecordProgress(double t)
+        {
+            foreach (var r in rooms)
+            {
+                if (!searchedHistory.TryGetValue(r.id, out var h)) searchedHistory[r.id] = h = new List<(double, float)>();
+                h.Add((t, r.coveredShare * r.indoorFloorM2));
+                h.RemoveAll(e => t - e.t > config.room_progress_window_s);
+            }
+        }
+        /// <summary>Is the room still giving new floor? Searched floor grew over the last room_progress_window_s at
+        /// room_progress_min_rate_fraction or more of the camera's sweep rate (search_max_range_m wide at near_speed_mps).
+        /// Headless house 5003 (24 Oct): robot A left the kitchen when its 40 s dwell budget ran out with 548 unseen cells
+        /// beside its frontier, and walked back 49 s later. A room is left when it stops yielding floor, not on a clock.</summary>
+        public bool StillGaining(Room r)
+        {
+            if (!config.room_progress_dwell || r == null || !searchedHistory.TryGetValue(r.id, out var h) || h.Count < 2) return false;
+            double span = h[h.Count - 1].t - h[0].t; if (span < config.room_progress_window_s / 2) return false;
+            double rate = (h[h.Count - 1].m2 - h[0].m2) / span;
+            return rate >= config.room_progress_min_rate_fraction * config.search_max_range_m * config.near_speed_mps;
+        }
 
         public int RoomAt(Vector2 at)
         {
@@ -402,7 +426,7 @@ namespace SmokeRescue.Brain
             if (!config.room_ledger || rooms.Count == 0) return;
             int current = RoomAt(at);
             bool finishing = byId.TryGetValue(current, out var here) && here.indoorFloorM2 > 0 && !here.corridor &&
-                here.coveredShare < config.room_ledger_covered_share && here.dwellS < DwellBudget(here);
+                here.coveredShare < config.room_ledger_covered_share && (here.dwellS < DwellBudget(here) || StillGaining(here));
             var order = new Dictionary<GridPlanner.FrontierChoice, int>();
             // partner_rooms: the room a partner is searching now: its body stands there and its goal, when it radioed one, lies
             // there too. A partner passing through (its goal in another room) holds nothing, and a corridor is the way to
@@ -433,6 +457,17 @@ namespace SmokeRescue.Brain
                 // by mapped walls) reached 23 and 24 of 31 rooms against 26, mean floor searched 69.2 and 74.0 % against 75.5 %.
                 f.roomTier = !known ? 5 : finishing && f.roomId == current ? 0 : room.corridor ? corridorTier : !room.entered ? unenteredTier :
                     room.coveredShare >= config.room_ledger_covered_share ? 4 : 3;
+                // frontier_beyond_room: a frontier in an entered room with far more unsearched cells beside it than the room has
+                // left (its uncovered share of its floor) looks past the room through an opening onto space no robot has seen:
+                // a new room, ranked as one. Headless house 5003 (24 Oct): robot A's frontier at the study door, 657 unseen
+                // cells beyond it, stood in the kitchen's floor; the kitchen was covered, so the door ranked last for 20 s, and
+                // A had left for another bedroom at 90 s and come back at 139 s. The study, the laundry and the bathroom past it
+                // were reached at 192 s or never.
+                if (config.frontier_beyond_room && known && !room.corridor && (f.roomTier == 3 || f.roomTier == 4))
+                {
+                    float leftCells = (1 - room.coveredShare) * room.indoorFloorM2 / (grid.CellM * grid.CellM);
+                    if (f.information > leftCells + config.frontier_min_information_cells) f.roomTier = unenteredTier;
+                }
                 // partner_rooms (owner, 24 Oct: "it knows the coordinates of the other; it won't even go near that room"). A room a
                 // partner stands in now is left to it: last tier, kept only as a fallback. A room a partner already walked
                 // through is entered, never "unentered" again. Seed 934 (24 Oct 04:53): A walked into the kitchen four times
