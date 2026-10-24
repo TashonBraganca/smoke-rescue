@@ -58,6 +58,8 @@ namespace SmokeRescue.Brain
         public bool room_walk_in = false;
         public bool step_exact_clearance = false;
         public bool survivor_view_sight_line = false;
+        public float survivor_close_view_min_m = 0f;
+        public bool turn_stall_flip = false; public float turn_stall_dps = 3f;
         public float room_walk_in_min_m2 = 2f, room_walk_in_max_m = 8f;
         public float pinned_yield_m = 1.2f, pinned_yield_back_s = 3f, pinned_yield_speed_mps = .15f;
         public float pinned_window_s = 8f, pinned_move_m = .15f;
@@ -310,7 +312,7 @@ namespace SmokeRescue.Brain
                 Math.Abs(health_corner_weight + health_contrast_weight + health_depth_weight - 1) > .001 ||
                 switch_to_thermal_s <= 0 || switch_to_rgb_s <= 0 || candidate_frames < 1 || candidate_window_s <= 0 ||
                 person_min_pixels < 3 || person_max_c <= person_min_c || person_min_area_m2 <= 0 || person_max_area_m2 < person_min_area_m2 || blob_depth_jump_m <= 0 ||
-                survivor_merge_m <= 0 || survivor_stop_min_m <= 0 || survivor_stop_min_m > survivor_standoff_m || survivor_standoff_m > survivor_stop_max_m ||
+                survivor_merge_m <= 0 || survivor_stop_min_m <= 0 || survivor_stop_min_m > survivor_standoff_m || survivor_close_view_min_m < 0 || survivor_close_view_min_m >= survivor_stop_min_m && survivor_close_view_min_m > 0 || survivor_standoff_m > survivor_stop_max_m ||
                 survivor_dwell_s <= 0 || survivor_fresh_s <= 0 || survivor_lost_s < survivor_fresh_s || survivor_stop_speed_mps < 0 || standoff_samples < 4 ||
                 survivor_face_tolerance_deg <= 0 || agent_arrival_hold_s < 0 || escape_time_factor < 0 || escape_rate_window_s <= 0 || survivor_face_tolerance_deg > 90 || replan_s <= 0 || frontier_min_distance_m <= 0 ||
                 frontier_gain_weight < 0 || frontier_information_radius_cells < 1 || frontier_information_radius_cells > 20 ||

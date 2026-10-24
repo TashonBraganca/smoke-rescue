@@ -103,11 +103,11 @@ def spray_option(req: dict) -> dict | None:
     cut off by a burning wood pile, scanned at -91 deg (outside the camera's view), saw nothing and held for 25 s before it
     turned, scanned again and sprayed.
     """
-    # "near": the fire heating the robot where it stands, not blocking any route (seed 929, robot B: air 30 to 211 C beside
-    # a fire in its own room, never offered its water).
-    which = ("exit" if req.get("fire_blocks_exit") else "frontier" if req.get("fire_blocks_frontier")
-             else "near" if req.get("fire_near_robot") else None)
-    block = req.get("fire_blocks_exit") or req.get("fire_blocks_frontier") or req.get("fire_near_robot")
+    # Owner, 24 Oct 11:00: water opens a way, it is not for fighting fires. A fire is offered only when it blocks the way out or
+    # the way to floor not yet searched; a fire beside the robot that blocks nothing is not (it was offered as "near" since
+    # seed 929). The heat rules keep the robot safe from it.
+    which = "exit" if req.get("fire_blocks_exit") else "frontier" if req.get("fire_blocks_frontier") else None
+    block = req.get("fire_blocks_exit") or req.get("fire_blocks_frontier")
     if which is None or block.get("burning_m2") is None:
         return None
     area, water_s = float(block["burning_m2"]), float(req.get("water_l") or 0.0) / float(_NOZZLE["flow_lps"])

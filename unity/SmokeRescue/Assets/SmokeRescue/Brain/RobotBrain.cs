@@ -792,11 +792,15 @@ namespace SmokeRescue.Brain
         /// (168 s), and s1 was the one person of 30 never confirmed. A stop already under way is kept.</summary>
         bool StartsViewingStop(float range)
         {
-            if (range < c.survivor_stop_min_m || range > c.survivor_stop_max_m) return false;
-            if (!c.survivor_view_sight_line || inspecting) return true;
             var at = motion.Pose.position;
-            return planner.ClearView(at, active.position) ||
-                   (goal.HasValue && path.Count > 0 && Vector2.Distance(at, goal.Value) <= 2 * c.goal_tolerance_m);
+            bool atApproachEnd = goal.HasValue && path.Count > 0 && Vector2.Distance(at, goal.Value) <= 2 * c.goal_tolerance_m;
+            // survivor_close_view_min_m: the approach planned a closer view because the band had no clear spot
+            // (GridPlanner.ApproachPath); at its end the closer range is the viewing distance.
+            bool closeView = c.survivor_close_view_min_m > 0 && range >= c.survivor_close_view_min_m && range < c.survivor_stop_min_m &&
+                             (inspecting || atApproachEnd);
+            if (!closeView && (range < c.survivor_stop_min_m || range > c.survivor_stop_max_m)) return false;
+            if (!c.survivor_view_sight_line || inspecting) return true;
+            return planner.ClearView(at, active.position) || atApproachEnd;
         }
         /// <summary>Colour sightings arrive once per scan period, thermal blobs every frame, so freshness depends on the source.</summary>
         double FreshS(Track track) => track.rgb ? c.person_rgb_fresh_s : c.survivor_fresh_s;
@@ -1973,9 +1977,26 @@ namespace SmokeRescue.Brain
                 speed = 0; policy = "turn";
                 // Brake before rotating, so the acceleration ramp cannot make a turn drift into a wall.
                 yaw = commandedSpeed > c.survivor_stop_speed_mps ? 0 : error * c.heading_gain;
+                float swing = error;
+                // turn_stall_flip: a turn the body does not make (measured yaw rate under turn_stall_dps for stuck_window_s
+                // while turning is commanded) is taken the other way round. Headless house 5027: the two bodies touched tail to
+                // tail in a 1.7 m corridor; robot A commanded the short left turn every tick from 30 to 240 s, the contact
+                // refused it, and the right turn the contact allowed was never tried (computed on the true poses at 37 s: 1 deg
+                // left closes the gap to -0.003 m, 1 deg right opens it to +0.003 m).
+                if (yaw != 0 && c.turn_stall_flip)
+                {
+                    if (Mathf.Abs(motion.YawRate) * Mathf.Rad2Deg >= c.turn_stall_dps) turnStallSince = double.NaN;
+                    else if (double.IsNaN(turnStallSince)) turnStallSince = t;
+                    else if (t - turnStallSince >= c.stuck_window_s)
+                    {
+                        turnDirection = turnDirection == 0 ? -Mathf.Sign(error) : -turnDirection; turnStallSince = t;
+                        Emit(t, "turn_stall", "The body did not turn as commanded: turn the other way round.", "heading_error_deg", error, "direction", turnDirection);
+                    }
+                    if (turnDirection != 0) { swing = turnDirection > 0 ? (error > 0 ? error : error + 360) : (error < 0 ? error : error - 360); yaw = swing * c.heading_gain; }
+                }
                 // A turn that would swing the nose or tail into a mapped wall backs straight off first, through the
                 // mapped free footprint, then turns (seed 920, robot B at the foyer-kitchen opening).
-                if (yaw != 0 && !SwingClear(error))
+                if (yaw != 0 && !SwingClear(swing))
                 {
                     if (!swingBlocked) { swingBlocked = true; Emit(t, "body_swing_blocked", "Turning here would swing the body into a mapped wall; back off first.", "heading_error_deg", error); }
                     float back = Mathf.Min(c.stuck_reverse_mps, c.limits.max_reverse_mps);
@@ -2015,6 +2036,7 @@ namespace SmokeRescue.Brain
                 return Command(0, SwingClear(error) ? Mathf.Clamp(error * c.heading_gain, -c.sweep_yaw_dps, c.sweep_yaw_dps) : 0, dt, true);
             }
             translationHeldSince = double.NaN;
+            if (policy != "turn") { turnDirection = 0; turnStallSince = double.NaN; }
             if (policy != motionPolicy)
             {
                 motionPolicy = policy;
@@ -2025,6 +2047,7 @@ namespace SmokeRescue.Brain
             return Command(speed, yaw, dt, false);
         }
         double blockedSince = double.NaN, lastBlocked = double.NegativeInfinity, translationHeldSince = double.NaN;
+        double turnStallSince = double.NaN; float turnDirection;
         Vector2 pinnedAnchor; double pinnedSince = double.NaN, lastPursuit = double.NegativeInfinity;
         /// <summary>pinned_watchdog (opencv-e5, branch pinned): a robot that has followed a route for pinned_window_s without
         /// its body moving pinned_move_m is pinned, whatever holds it. Its goal is set aside (stuck_blacklist_s) and it backs up,
