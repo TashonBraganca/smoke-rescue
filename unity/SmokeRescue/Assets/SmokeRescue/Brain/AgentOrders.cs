@@ -283,6 +283,24 @@ namespace SmokeRescue.Brain
         /// room): the measured fire nearest this robot inside the room its route ends in, or null when the route ends in no
         /// room or this robot measured no fire there. Seed 934 (24 Oct 18:53): robot A walked into the burning living room at
         /// 16 s, its air reached 131 C at 21.7 s, and it spent most of its heat budget.</summary>
+        /// <summary>walk_out_past_fire: the first measured fire within the fire margin along the way out, planned as if fire
+        /// did not close cells; null when even that plan finds no way out (a wall, not fire, closes it).</summary>
+        BrainFireBlock? FireOnWayOut()
+        {
+            float saved = grid.FireClearance; bool predicted = grid.FirePrediction; List<Vector2> exit;
+            try { grid.FireClearance = -1; grid.FirePrediction = false; exit = PlanOut(); }
+            finally { grid.FireClearance = saved; grid.FirePrediction = predicted; }
+            float margin = c.fire_clearance_m + grid.CellM * .707107f; var at = motion.Pose.position;
+            foreach (var p in exit)
+            {
+                if (grid.FireDistance(grid.Cell(p)) > margin) continue;
+                Vector2 v = p - at;
+                return new BrainFireBlock { blockAt = p, frontier = p, bearingDegRight = -BrainMath.Angle(motion.Pose.yawRad, Mathf.Atan2(-v.x, v.y)),
+                    distanceM = v.magnitude, frontierPathM = v.magnitude, unsearchedM2 = 0, burningM2 = grid.BurningAreaNear(p, c.burning_radius_m) };
+            }
+            return null;
+        }
+
         BrainFireBlock? FireInGoalRoom()
         {
             if (!c.room_ledger || path.Count == 0) return null;
@@ -401,7 +419,9 @@ namespace SmokeRescue.Brain
         public bool CodeSpray(double t, float waterL, out float bearingDegRight, out float seconds)
         {
             bearingDegRight = 0; seconds = 0;
-            if (!c.code_sprays_fire || !Nozzle.HasValue || waterL <= 1e-6f || t < nextCodeSpray || returning || active != null) return false;
+            // Walking out with the way blocked (wayOutBlockedAt), the spray opens it: the only returning case allowed.
+            bool exitBlocked = c.walk_out_past_fire && t - wayOutBlockedAt <= c.no_frontier_scan_s * 2;
+            if (!c.code_sprays_fire || !Nozzle.HasValue || waterL <= 1e-6f || t < nextCodeSpray || (returning && !exitBlocked) || active != null) return false;
             // A person the colour detector just saw comes first: confirm her, then spray (seed 934, 24 Oct 19:54: robot A's
             // camera saw the living room person at 11.0 s and it left to spray at 11.0 s; she was never confirmed).
             if (c.person_before_spray && t < glanceUntil) return false;
@@ -409,8 +429,13 @@ namespace SmokeRescue.Brain
             // a full frontier search each time took 190 s of every 10 simulated seconds (seed 934, 24 Oct 18:13, 316 s wall per 10 s).
             nextCodeSpray = t + c.replan_s;
             // Fire in the room this robot is walking into: put it out from the doorway before going in (code_spray_goal_room).
-            var block = c.code_spray_goal_room && !retreating ? FireInGoalRoom() : null;
-            string why = block.HasValue ? "Measured fire burns in the room this robot is walking into" : "Measured fire blocks the way to unsearched floor";
+            var block = exitBlocked ? FireOnWayOut() : null;
+            string why = "Measured fire blocks the way out";
+            if (!block.HasValue)
+            {
+                block = c.code_spray_goal_room && !retreating ? FireInGoalRoom() : null;
+                why = block.HasValue ? "Measured fire burns in the room this robot is walking into" : "Measured fire blocks the way to unsearched floor";
+            }
             bool fromHereOnly = false;
             if (!block.HasValue && fireRooms.Count > 0 && (block = FireInMarkedRoom()).HasValue)
             {

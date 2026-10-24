@@ -39,6 +39,7 @@ namespace SmokeRescue.Brain
         readonly List<Track> tracks = new List<Track>();
         readonly List<Vector2> survivors = new List<Vector2>();
         float entryYaw;   // the launch heading: robots are placed facing the way in
+        double leaveRetryAt = double.NegativeInfinity, wayOutBlockedAt = double.NegativeInfinity;   // walk_out_past_fire
         List<Vector2> path = new List<Vector2>();
         Track active;
         Vector2? goal;
@@ -329,16 +330,21 @@ namespace SmokeRescue.Brain
                             grid.FireClearance = margin; grid.FirePrediction = false; SetPath(PlanOut());
                             if (path.Count > 0)
                             {
+                                wayOutBlockedAt = double.NegativeInfinity;
                                 Emit(t, "replan", "The way out is blocked at the normal fire margin: walk out past the fire at a reduced margin, never through a burning cell.",
                                     "clearance_m", margin, "path_points", path.Count);
                                 break;
                             }
                         }
+                        if (path.Count == 0) wayOutBlockedAt = t;
                         if (path.Count == 0 && returnReason == NoFrontierLeft)
                         {
                             // Still no way out: search on, so code sprays can open it, and leave after the next full scan.
                             returning = false; grid.FireClearance = c.fire_clearance_m; grid.FirePrediction = true; ClearPath();
                             scanSince = double.NaN; noFrontierAt = double.NaN;
+                            // Try again after one full scan period, spraying the fire on the way out meanwhile; leaving again at
+                            // once flipped between leave and search every tick (seed 934 full mission, 25 Oct, robot B from 338 s).
+                            leaveRetryAt = t + c.no_frontier_scan_s; wayOutBlockedAt = t;
                             Emit(t, "goal", "No way out even past the fire at the last-resort margin: search on and spray the fire in the way, then try to leave again.");
                             return Command(0, 0, dt, true);
                         }
@@ -712,7 +718,7 @@ namespace SmokeRescue.Brain
                             { lastScanAt = motion.Pose.position; knownAtLastScan = knownCells; }
                             // leave_when_done (owner, 24 Oct: when all rooms are marked, both robots leave): an inside robot with
                             // nothing reachable left to search after a full scan walks out the way it came in.
-                            if (!c.stay_inside || (c.leave_when_done && InSearchArea(motion.Pose.position))) BeginReturn(t, NoFrontierLeft);
+                            if (!c.stay_inside || (c.leave_when_done && t >= leaveRetryAt && InSearchArea(motion.Pose.position))) BeginReturn(t, NoFrontierLeft);
                             // Holding still is for a robot that is inside. Outside (seed 930, robot B at its pad) it keeps
                             // scanning, which can bring the ceiling through the door into its camera's view.
                             else if (!searchedOut && InSearchArea(motion.Pose.position)) { searchedOut = true; Emit(t, "goal", "Nothing reachable is left to search after a full scan: hold here, inside, until new floor appears or the agent orders a move."); }
