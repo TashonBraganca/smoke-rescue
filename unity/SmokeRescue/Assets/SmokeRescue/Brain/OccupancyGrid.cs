@@ -683,6 +683,8 @@ namespace SmokeRescue.Brain
             }
             if (changed) dirty = true;
         }
+        /// <summary>Lift the entrance lock (return_home_at_end: the robot walks back out the way it came in).</summary>
+        public void ClearEntranceLock() { if (entranceLock == null) return; entranceLock = null; entranceHard = null; entranceCells = null; dirty = true; }
         public bool EntranceLocked(Vector2 p) { int i = Cell(p); return entranceLock != null && i >= 0 && entranceLock[i]; }
         bool[] entranceLock, entranceHard; int[] entranceCells; Vector2 entranceEntry; float entranceRadius;
         /// <summary>Walkable and allowed as a goal: not on the entrance lock's passage (SetEntranceLock).</summary>

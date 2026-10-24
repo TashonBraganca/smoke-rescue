@@ -43,7 +43,9 @@ namespace SmokeRescue.Brain
             if (sweeps.Exists(s => Vector2.Distance(s.position, motion.Pose.position) < c.sweep_spacing_m)) return;
             // sweep_once_per_room: one sweep on first entering a room of the ledger, none at later frontiers in it. Headless seed
             // 5001: sweeps took 9 to 15 s of turning and 13 to 19 s of standing per robot in 240 s.
-            if (c.room_ledger && c.sweep_once_per_room)
+            // door_enter: walking into a doorway's room always sweeps it, whatever the ledger thinks the room is.
+            bool doorEntry = doorSweep; doorSweep = false;
+            if (c.room_ledger && c.sweep_once_per_room && !doorEntry)
             {
                 int room = planner.Rooms.RoomAt(motion.Pose.position);
                 if (room < 0 || !sweptRooms.Add(room)) return;

@@ -127,6 +127,7 @@ namespace SmokeRescue.Brain
             if (searching)
                 m.Claim = new BrainClaim { centre = frontierCentre, radiusM = frontierRadius, expiresAt = t + c.peer_claim_s };
             m.RoomClaim = RoomClaimToSend(t, searching);
+            if (c.door_claims) m.Doors = DoorsToSend();
             for (int i = 0; i < grid.Count; i++)
             {
                 int shared = m.Cell(grid.Centre(i));
@@ -227,6 +228,12 @@ namespace SmokeRescue.Brain
             peer.claim = m.Claim == null ? null : new BrainClaim { centre = link.Transform(m.Claim.centre.x, m.Claim.centre.y), radiusM = m.Claim.radiusM, expiresAt = m.Claim.expiresAt };
             peer.room = m.RoomClaim == null ? null : new BrainRoomClaim { anchor = link.Transform(m.RoomClaim.anchor.x, m.RoomClaim.anchor.y),
                 radiusM = m.RoomClaim.radiusM, bidS = m.RoomClaim.bidS, since = m.RoomClaim.since, expiresAt = m.RoomClaim.expiresAt };
+            if (c.door_claims && m.Doors.Length > 0)
+            {
+                var turn = new BrainPose { position = Vector2.zero, yawRad = link.yawRad };
+                ReceiveDoors(Array.ConvertAll(m.Doors, d => new BrainDoor { position = link.Transform(d.position.x, d.position.y),
+                    inward = turn.Transform(d.inward.x, d.inward.y), owner = d.owner, state = d.state, since = d.since, cost = d.cost }), t);
+            }
             foreach (var hot in m.Hotspots)
             {
                 // Fill every local cell under the shared 20 cm cell, preserving its full hazard extent.
@@ -322,6 +329,7 @@ namespace SmokeRescue.Brain
         }
         bool ClaimBlocks(Vector2 p, double t)
         {
+            if (DoorBlocksGoal(p, t)) return true;   // door_claims: a room the partner took, or any cleared room
             foreach (var pair in peers)
             {
                 var claim = pair.Value.claim;
