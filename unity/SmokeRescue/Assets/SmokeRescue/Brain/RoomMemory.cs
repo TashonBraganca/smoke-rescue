@@ -57,6 +57,17 @@ namespace SmokeRescue.Brain
                 open.Add(r);
             }
             if (open.Count == 0) { roomTarget = null; return false; }
+            // Standing at a room's seat (its widest-clearance point, within goal_tolerance_m) is being inside it, even where the
+            // strict clearance test fails on the cells under the robot. Seed 934 live (25 Oct 01:41): robot A stood 0.16 m from
+            // a seat from 57 s to 240 s while the same walk was re-issued 10,801 times, the room never counting as entered.
+            foreach (var r in open)
+                if (Vector2.Distance(r.seat, at) <= c.goal_tolerance_m)
+                {
+                    r.entered = true; r.enteredAt = t; if (r == roomTarget) roomTarget = null;
+                    Emit(t, "room_entered", "Reached the centre of a room in this robot's memory: entered.", "room_key", r.key, "x_m", r.seat.x, "y_m", r.seat.y);
+                }
+            open.RemoveAll(r => r.entered);
+            if (open.Count == 0) { roomTarget = null; return false; }
             open.Sort((a, b) => Vector2.Distance(a.seat, at).CompareTo(Vector2.Distance(b.seat, at)));
             if (roomTarget != null && !open.Contains(roomTarget)) roomTarget = null;
             var reach = new List<(RoomLedger.RoomRecord r, List<Vector2> p, float s)>();
