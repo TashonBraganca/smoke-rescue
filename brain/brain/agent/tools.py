@@ -404,6 +404,13 @@ class ToolRegistry:
         p = self._pending.get(self.ctx.robot)
         if p is None:
             return None
+        # A person confirmed at the spot (by this robot, its partner, or the robot's own colour confirmation) ends the
+        # approach. Seed 934 (24 Oct 04:53), robot A at 107.9 s: an approach 0.49 m from a person it had confirmed 4 s
+        # earlier still refused its explore order as "finish that first".
+        if any(math.hypot(float(q[0]) - p["x"], float(q[1]) - p["y"]) <= SURVIVOR_MERGE_M for q in self.ctx.survivors) or any(
+                math.hypot(c["x"] - p["x"], c["y"] - p["y"]) <= SURVIVOR_MERGE_M for c in self._confirmed.get(self.ctx.robot, [])):
+            self._pending.pop(self.ctx.robot, None)
+            return None
         timed_out = self.ctx.t - p["t"] > float(_PERCEPTION["pending_candidate_s"])
         if self.ctx.event_kind in self.APPROACH_FAILED or timed_out or self._brain_dropped_order(p["t"]):
             self._drop_pending(p, self.ctx.event_kind if self.ctx.event_kind in self.APPROACH_FAILED else "timed out" if timed_out else "no path to it")
