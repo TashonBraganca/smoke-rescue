@@ -99,6 +99,8 @@ namespace SmokeRescue.Editor
         public static void HouseOneDoor933() => WithAgents(() => Run("scenario_house_onedoor_seed933.json", "unity_house_onedoor_seed933"));
         [MenuItem("Tools/Smoke Rescue/Record/House one-door seed 934 (brain only, no LLM agents)")]
         public static void HouseOneDoor934BrainOnly() => Run("scenario_house_onedoor_seed934.json", "unity_house_onedoor_seed934_brain");
+        [MenuItem("Tools/Smoke Rescue/Record/House one-door seed 934 full mission (brain only, ends when both are out)")]
+        public static void HouseOneDoor934Full() => Run("scenario_house_onedoor_seed934_full.json", "unity_house_onedoor_seed934_full");
         [MenuItem("Tools/Smoke Rescue/Record/House one-door seed 934, 480 s (fresh)")]
         public static void HouseOneDoor934() => WithAgents(() => Run("scenario_house_onedoor_seed934.json", "unity_house_onedoor_seed934"));
 

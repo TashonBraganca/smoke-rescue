@@ -46,7 +46,7 @@ namespace SmokeRescue.Brain
             room_ledger_split_step_m = .1f;
         public float person_rgb_strong_confidence = 1.01f, person_glance_min_confidence = .25f, person_glance_s = 2f, person_glance_repeat_s = 15f,
             person_rgb_boost_period_s = .2f;
-        public bool rgb_person_confirms = false, partner_rooms = false, no_frontier_scan_once = false, follow_through_before_leftovers = false, frontier_beyond_room = false, room_progress_dwell = false, code_sprays_fire = false, code_spray_goal_room = false, heat_marks_room = false, heat_spray_through = false, thermal_dwell_confirms = true, outside_faces_in = false, leave_when_done = false, person_before_spray = false, partner_territory = false, room_walk_in_any_coverage = false, door_tour = false, room_entered_near_seat = false, room_memory = false;
+        public bool rgb_person_confirms = false, partner_rooms = false, no_frontier_scan_once = false, follow_through_before_leftovers = false, frontier_beyond_room = false, room_progress_dwell = false, code_sprays_fire = false, code_spray_goal_room = false, heat_marks_room = false, heat_spray_through = false, thermal_dwell_confirms = true, outside_faces_in = false, leave_when_done = false, person_before_spray = false, room_memory_same_space = false, partner_territory = false, room_walk_in_any_coverage = false, door_tour = false, room_entered_near_seat = false, room_memory = false;
         public float room_memory_seat_keep = .8f, room_tour_switch_s = 12f, room_tour_breaker_s = 30f; public int room_tour_breaker_switches = 3;
         public float door_partner_side_m = 8f;
         public float code_spray_margin_s = 1f, code_spray_repeat_s = 8f;

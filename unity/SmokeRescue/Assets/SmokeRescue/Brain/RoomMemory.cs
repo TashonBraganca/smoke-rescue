@@ -24,8 +24,11 @@ namespace SmokeRescue.Brain
             if (!c.room_memory || !c.room_ledger) return;
             var rec = planner.Rooms.MarkEnteredNear(motion.Pose.position, t);
             if (rec != null)
+            {
                 Emit(t, "room_entered", "Stepped inside a room in this robot's memory (onto its deep floor): entered.", "room_key", rec.key,
                     "x_m", rec.seat.x, "y_m", rec.seat.y, "door_x_m", rec.door?.x ?? float.NaN, "door_y_m", rec.door?.y ?? float.NaN);
+                MarkSameSpaceEntered(rec, t);
+            }
             // A room walk is only re-chosen when the path runs out, so a partner that got there first or heads there from nearer
             // would otherwise be followed all the way in.
             if (roomTarget != null && roomTarget.label >= 0 && goal.HasValue && active == null && !returning && !retreating && !AgentGoalActive(t) &&
@@ -60,11 +63,12 @@ namespace SmokeRescue.Brain
             // Standing at a room's seat (its widest-clearance point, within goal_tolerance_m) is being inside it, even where the
             // strict clearance test fails on the cells under the robot. Seed 934 live (25 Oct 01:41): robot A stood 0.16 m from
             // a seat from 57 s to 240 s while the same walk was re-issued 10,801 times, the room never counting as entered.
-            foreach (var r in open)
-                if (Vector2.Distance(r.seat, at) <= c.goal_tolerance_m)
+            foreach (var r in open.ToArray())
+                if (!r.entered && Vector2.Distance(r.seat, at) <= c.goal_tolerance_m)
                 {
                     r.entered = true; r.enteredAt = t; if (r == roomTarget) roomTarget = null;
                     Emit(t, "room_entered", "Reached the centre of a room in this robot's memory: entered.", "room_key", r.key, "x_m", r.seat.x, "y_m", r.seat.y);
+                    MarkSameSpaceEntered(r, t);
                 }
             open.RemoveAll(r => r.entered);
             if (open.Count == 0) { roomTarget = null; return false; }
@@ -102,6 +106,32 @@ namespace SmokeRescue.Brain
             }
             route = best.p;
             return true;
+        }
+
+        /// <summary>room_memory_same_space: the segmentation splits a large or furnished room into several records (seed 934 live,
+        /// 25 Oct 02:36: the kitchen became 3 records, robot A spent 26 to 74 s walking between them; bedroom 2 became 3 records
+        /// for robot B). A record whose seat this robot reaches from the entered seat along a straight line of mapped floor
+        /// that never narrows to a doorway (clearance stays above half of door_max_width_m, the door board's widest doorway) is
+        /// the same space: entered with it. A doorway between two seats keeps them separate rooms.</summary>
+        void MarkSameSpaceEntered(RoomLedger.RoomRecord entered, double t)
+        {
+            if (!c.room_memory_same_space) return;
+            float narrow = c.door_max_width_m / 2;
+            foreach (var r in planner.Rooms.Records)
+            {
+                if (r == entered || r.entered || r.label < 0) continue;
+                float d = Vector2.Distance(r.seat, entered.seat); if (d < 1e-3f) continue;
+                int steps = Mathf.CeilToInt(d / (grid.CellM * .5f)); bool open = true;
+                for (int i = 0; i <= steps && open; i++)
+                {
+                    int cell = grid.Cell(Vector2.Lerp(entered.seat, r.seat, i / (float)steps));
+                    if (cell < 0 || grid.OwnOccupancy(cell) != 1 || grid.ObstacleDistance(cell) <= narrow) open = false;
+                }
+                if (!open) continue;
+                r.entered = true; r.enteredAt = t; if (r == roomTarget) roomTarget = null;
+                Emit(t, "room_entered", "Part of the room just entered (open floor, no doorway between): entered with it.", "room_key", r.key,
+                    "x_m", r.seat.x, "y_m", r.seat.y, "with_room_key", entered.key);
+            }
         }
 
         /// <summary>A linked partner stands in the record's room now.</summary>
