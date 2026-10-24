@@ -21,6 +21,9 @@ namespace SmokeRescue.World
         public float duration_s;
         // false: no mission deadline for the robots; the recording still ends at duration_s (owner toggle, 22 Oct).
         public bool time_limit = true;
+        // Seconds of search before the robots walk back out (return_home_at_end); 0: the whole duration_s. Owner, 24 Oct: search
+        // 240 s, then walk out, inside a longer recording.
+        public float search_s;
         public float sim_rate_hz = 15f;
         public float[] search_area;
         public List<string> dark_rooms = new List<string>();   // rooms whose emergency and room lights are out   // operator knowledge: building outline x_min, z_min, x_max, z_max, seen from outside
