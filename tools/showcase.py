@@ -38,6 +38,8 @@ ROBOT = [(245, 165, 36), (46, 168, 230)]        # RGB: A amber, B cyan
 GOOD, WARN, CV = (74, 222, 128), (239, 68, 68), (110, 231, 183)
 WATER = (96, 140, 255)
 NOZZLE = json.loads((Path(__file__).resolve().parents[1] / "config" / "actuators.json").read_text())["nozzle"]
+# Rooms under the brain's walk-in minimum are map slivers between walls, not rooms a viewer would recognise.
+WALK_IN_MIN_M2 = json.loads((Path(__file__).resolve().parents[1] / "config" / "brain.json").read_text())["room_walk_in_min_m2"]
 SF = "/System/Library/Fonts/SFNS.ttf"
 FRAME_NOTE = "robots link frames from LiDAR fingerprints"
 
@@ -381,6 +383,27 @@ class Radio:
                     self.items.append((t, -1, "good", f"{'AB'[side[r]]} now holds its partner's map: no double search", []))
                 elif k == "stuck":
                     self.items.append((t, side[r], "warn", "Legs not moving: backing off and replanning", []))
+                # The onboard brain's own room decisions, so a run without LLM agents still shows its reasoning.
+                elif k == "room_claimed":
+                    self.items.append((t, side[r], "agent", f"{'AB'[side[r]]} bids {e['numbers']['bid_s']:.0f} s of travel for the "
+                                       "nearest unsearched room and holds it; its partner hears the bid and takes another",
+                                       [("room auction", ROBOT[side[r]])]))
+                elif k == "room_searched" and e["numbers"].get("floor_m2", 0) >= WALK_IN_MIN_M2:
+                    n = e["numbers"]
+                    self.items.append((t, side[r], "agent", f"{'AB'[side[r]]} has seen {n['covered_share']:.0%} of a {n['floor_m2']:.0f} m² "
+                                       "room: marked searched on the shared map, never searched twice", [("room done", GOOD)]))
+                elif k == "entrance_locked":
+                    self.items.append((t, side[r], "agent", f"{'AB'[side[r]]} is inside: it marks the way in on its map and "
+                                       "keeps it clear as the exit", [("doorway marked", ROBOT[side[r]])]))
+                elif k == "room_marked_fire":
+                    self.items.append((t, side[r], "warn", f"{'AB'[side[r]]} measured {e['numbers']['air_c']:.0f} °C air: marks this room "
+                                       "on fire on its map", [("room on fire", WARN)]))
+                elif k == "room_fire_cleared":
+                    self.items.append((t, side[r], "agent", f"{'AB'[side[r]]} measures no fire left in the room it marked: open again",
+                                       [("fire out", GOOD)]))
+                elif k == "retreat":
+                    self.items.append((t, side[r], "warn", f"{'AB'[side[r]]} measures {e['numbers']['air_c']:.0f} °C air: "
+                                       "backing off to cooler floor", []))
         for e in jsonl(rec / "water.jsonl"):
             who = side.get(e["robot"], 0)
             self.items.append((e["t"], who, "agent", f"{'AB'[who]} sprays water at the fire for {e['seconds']:.0f} s "
@@ -482,7 +505,8 @@ def main() -> None:
         d = ImageDraw.Draw(im)
         d.text((24, 16), a.title.upper(), font=F["title"], fill=TEXT)
         d.text((24 + d.textlength(a.title.upper(), font=F["title"]) + 18, 26),
-               "two quadrupeds in a burning building  ·  OpenCV 5 perception  ·  LLM agents  ·  maps shared over a lossy radio",
+               "two quadrupeds in a burning building  ·  OpenCV 5 perception  ·  " + ("LLM agents" if (rec / "agent_trace.jsonl").exists()
+               else "onboard robot brains, no LLM") + "  ·  maps shared over a lossy radio",
                font=F["sub"], fill=DIM)
         clock = f"{int(t // 60):02d}:{t % 60:04.1f}"
         d.text((W - 300, 14), clock, font=F["clock"], fill=TEXT)

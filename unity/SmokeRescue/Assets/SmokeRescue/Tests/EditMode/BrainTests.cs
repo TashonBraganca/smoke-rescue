@@ -1158,16 +1158,16 @@ namespace SmokeRescue.Tests.EditMode
             // a wall instead of fire, and no second spray inside code_spray_repeat_s.
             var nozzle = new RobotBrain.NozzleSpec { flowLps = 1, coolingKjPerL = 2590, efficiency = .5f, halfAngleDeg = 12, rangeM = 5,
                 maxSprayS = 6, burningKwPerM2 = 324, burningSurfaceC = 600, knockdownC = 300, fuelKjPerM2K = 6.5f };
-            RobotBrain Corridor(bool fire)
+            RobotBrain Corridor(bool fire, bool openBehind = false, bool goalRoom = false)
             {
-                var s = Settings(); s.code_sprays_fire = true;
+                var s = Settings(); s.code_sprays_fire = true; s.code_spray_goal_room = goalRoom; if (goalRoom) s.room_ledger = true;
                 var b = new RobotBrain(Calibration(), s, "A", 0); var g = Map(b);
                 for (float y = -1; y <= 4; y += .05f)
                 {
                     for (float x = -.95f; x <= .95f; x += .05f) g.ObserveFree(g.Cell(new Vector2(x, y)));
                     g.ObserveOccupied(g.Cell(new Vector2(-1.05f, y))); g.ObserveOccupied(g.Cell(new Vector2(1.05f, y)));
                 }
-                for (float x = -1; x <= 1; x += .05f) g.ObserveOccupied(g.Cell(new Vector2(x, -1.05f)));
+                if (!openBehind) for (float x = -1; x <= 1; x += .05f) g.ObserveOccupied(g.Cell(new Vector2(x, -1.05f)));
                 for (float x = -.95f; x <= .95f; x += .1f)
                     if (fire) g.ObserveHeat(g.Cell(new Vector2(x, 2)), 600, 0); else g.ObserveOccupied(g.Cell(new Vector2(x, 2)));
                 return b;
@@ -1185,6 +1185,25 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(bare.CodeSpray(0, 12, out _, out _), Is.False, "control: no nozzle fitted");
             var walled = Corridor(false); walled.Nozzle = nozzle;
             Assert.That(walled.CodeSpray(0, 12, out _, out _), Is.False, "control: water does not open a wall");
+            var open = Corridor(true, true); open.Nozzle = nozzle;
+            Assert.That(open.FireBlockedFrontier(0).HasValue, Is.True, "the fire still blocks the floor beyond it");
+            Assert.That(open.CodeSpray(0, 12, out _, out _), Is.False, "control: unsearched floor behind is reachable without passing fire: search it first");
+            // code_spray_goal_room (owner, 24 Oct: "use the water to turn off the fire"): the same open corridor, but this robot's
+            // route ends beyond the fire, in the room it is walking into. It sprays that fire first. Control: the switch off.
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            RobotBrain Heading(bool goalRoom)
+            {
+                var b = Corridor(true, true, goalRoom); b.Nozzle = nozzle;
+                ((GridPlanner)typeof(RobotBrain).GetField("planner", flags).GetValue(b)).Rooms.Update(0, Vector2.zero);
+                var route = (List<Vector2>)typeof(RobotBrain).GetField("path", flags).GetValue(b);
+                route.Clear(); route.Add(Vector2.zero); route.Add(new Vector2(0, 3.5f));
+                return b;
+            }
+            var heading = Heading(true);
+            Assert.That(heading.CodeSpray(0, 12, out float roomBearing, out _), Is.True, "fire in the room it is walking into: spray it before going in");
+            Assert.That(Mathf.Abs(roomBearing), Is.LessThan(30f), "toward the fire ahead");
+            Assert.That(heading.DrainEvents().Any(e => e.kind == "code_spray" && e.reason.StartsWith("Measured fire burns in the room")), Is.True);
+            Assert.That(Heading(false).CodeSpray(0, 12, out _, out _), Is.False, "control: switch off, floor behind is open, no spray");
             // The same model as the agent's advice (tools.py knock_down_s): 0.5 m2 at 1.6 m is 0.932 s, 4 m2 is beyond one stream.
             Assert.That(RobotBrain.KnockDownS(nozzle, .5f, 1.6f).Value, Is.EqualTo(.9324).Within(.002), "equal to tools.py knock_down_s(0.5, 1.6)");
             Assert.That(RobotBrain.KnockDownS(nozzle, 4f, 1.6f).HasValue, Is.False);
@@ -1351,6 +1370,108 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(stay.retreated, Is.False, "no retreat: the robot keeps searching below the hard limit");
             Assert.That(stay.areaSetAside, Is.True, "the floor where the air is warming is set aside");
             Assert.That(double.IsNaN(Run(false).steeredAt), Is.True, "control: without stay_inside the rule does not run");
+        }
+
+        [Test]
+        public void ARobotBackInWarmButNotHotAirRecoversItsHeatBudgetAndSearchesAgain()
+        {
+            // heat_recover_scaled. Seed 934 (24 Oct 18:53): robot A hit 131 C, then stood on the coolest floor at about 37 C with
+            // its budget frozen at 0.20, since recovery and resuming both needed air below 35 C. Here: 4 s at 130 C, then 40 C.
+            // The robot retreats, recovers and searches again. Control: with the switch off it is still retreating at the end.
+            (bool retreated, double resumedAt) Run(bool scaled)
+            {
+                var c = Settings(); c.heat_recover_scaled = scaled; c.mission_time_limit_s = 1000;
+                var b = new RobotBrain(Calibration(), c, "B", 0); Room(b, -3, 3, -3, 3);
+                double last = 0, resumed = double.NaN; bool retreated = false;
+                for (int i = 0; i <= 15 * 80; i++)
+                {
+                    double t = i / 15.0; float air = t < 2 ? 22 : t < 6 ? 130 : 40;
+                    Motion(b, t); b.OnRgbd(Image(t, true, 0)); b.OnAirTemperature(t, air); b.Step(t, i == 0 ? .05f : (float)(t - last)); last = t;
+                    var ev = b.DrainEvents();
+                    retreated |= ev.Any(e => e.kind == "retreat");
+                    if (retreated && double.IsNaN(resumed) && ev.Any(e => e.reason.StartsWith("Cool air and a recovered heat budget"))) resumed = t;
+                }
+                return (retreated, resumed);
+            }
+            var on = Run(true);
+            Assert.That(on.retreated, Is.True, "130 C air: retreat");
+            Assert.That(on.resumedAt, Is.InRange(10.0, 60.0), "recovers in 40 C air and searches again: " + on.resumedAt);
+            var off = Run(false);
+            Assert.That(off.retreated, Is.True);
+            Assert.That(double.IsNaN(off.resumedAt), Is.True, "control: recovery only below 35 C never ends the retreat at 40 C");
+        }
+
+        [Test]
+        public void TheRoomWhereTheAirPassedTheRetreatLimitIsMarkedOnFireUntilItsFireIsOut()
+        {
+            // heat_marks_room (owner, 24 Oct: "marks that room and area in map as with fire"). 130 C air in a room with fire
+            // measured at (2, 2): the robot retreats and marks the room; a goal in it is excluded while the fire burns, and once
+            // that floor reads cool (10 s) the mark lifts. Control: with the switch off nothing is marked.
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var blacklisted = typeof(RobotBrain).GetMethod("GoalBlacklisted", flags);
+            var inRoom = new Vector2(2.5f, -2.5f);   // in the room, beyond the 3 m set aside around a fast air rise
+            (List<string> kinds, bool excludedWhileBurning, bool openAfter) Run(bool mark)
+            {
+                var c = Settings(); c.heat_marks_room = mark; c.room_ledger = true; c.mission_time_limit_s = 1000;
+                var b = new RobotBrain(Calibration(), c, "B", 0); Room(b, -3, 3, -3, 3); var g = Map(b);
+                int fireCell = g.Cell(new Vector2(2, 2)); g.ObserveHeat(fireCell, 600, 0);
+                var kinds = new List<string>(); double last = 0; bool excluded = false, open = false;
+                for (int i = 0; i <= 15 * 13; i++)
+                {
+                    double t = i / 15.0; float air = t < 1 ? 22 : t < 3 ? 130 : 40;
+                    if (i == 15 * 10) g.ObserveHeat(fireCell, 20, t);
+                    Motion(b, t); b.OnRgbd(Image(t, true, 0)); b.OnAirTemperature(t, air); b.Step(t, i == 0 ? .05f : (float)(t - last)); last = t;
+                    kinds.AddRange(b.DrainEvents().Select(e => e.kind));
+                    if (i == 15 * 8) excluded = (bool)blacklisted.Invoke(b, new object[] { inRoom, t });
+                    if (i == 15 * 12) open = !(bool)blacklisted.Invoke(b, new object[] { inRoom, t });
+                }
+                return (kinds, excluded, open);
+            }
+            var on = Run(true);
+            Assert.That(on.kinds, Has.Member("retreat"));
+            Assert.That(on.kinds, Has.Member("room_marked_fire"), "130 C air: the room is marked on fire");
+            Assert.That(on.excludedWhileBurning, Is.True, "no goal in the marked room while its fire burns");
+            Assert.That(on.kinds, Has.Member("room_fire_cleared"), "the fire is out: the mark lifts");
+            Assert.That(on.openAfter, Is.True, "the room is open again");
+            var off = Run(false);
+            Assert.That(off.kinds, Has.No.Member("room_marked_fire"), "control: switch off, nothing marked");
+            Assert.That(off.excludedWhileBurning, Is.False, "control: switch off, the room stays open");
+        }
+
+        [Test]
+        public void WithoutAHeatBudgetHotAirMarksTheRoomAndTheRobotSearchesOn()
+        {
+            // heat_spray_through (owner, 24 Oct: "remove the heat budget ... spray the fire ... walk through"). 130 C air for 2 s,
+            // then 60 C, in a room with fire measured at (2, 2): the room is marked on fire, the robot never retreats, its
+            // budget stays full and the room stays open to it. Control: with the switch off it retreats.
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var blacklisted = typeof(RobotBrain).GetMethod("GoalBlacklisted", flags);
+            var inRoom = new Vector2(2.5f, -2.5f);
+            (List<string> kinds, bool open, float budget, string state) Run(bool through)
+            {
+                var c = Settings(); c.heat_spray_through = through; c.heat_marks_room = true; c.room_ledger = true; c.stay_inside = true;
+                c.mission_time_limit_s = 1000;
+                var b = new RobotBrain(Calibration(), c, "B", 0); Room(b, -3, 3, -3, 3); var g = Map(b);
+                g.ObserveHeat(g.Cell(new Vector2(2, 2)), 600, 0);
+                var kinds = new List<string>(); double last = 0; bool open = false;
+                for (int i = 0; i <= 15 * 8; i++)
+                {
+                    double t = i / 15.0; float air = t < 1 ? 22 : t < 3 ? 130 : 60;
+                    Motion(b, t); b.OnRgbd(Image(t, true, 0)); b.OnAirTemperature(t, air); b.Step(t, i == 0 ? .05f : (float)(t - last)); last = t;
+                    kinds.AddRange(b.DrainEvents().Select(e => e.kind));
+                    if (i == 15 * 5) open = !(bool)blacklisted.Invoke(b, new object[] { inRoom, t });
+                }
+                var snap = b.Snapshot();
+                return (kinds, open, snap.heatBudget, snap.state);
+            }
+            var on = Run(true);
+            Assert.That(on.kinds, Has.Member("hot_air"));
+            Assert.That(on.kinds, Has.Member("room_marked_fire"), "the room is marked on fire");
+            Assert.That(on.kinds, Has.No.Member("retreat"), "hot air never holds the robot");
+            Assert.That(on.budget, Is.EqualTo(1f), "no heat budget");
+            Assert.That(on.state, Is.Not.EqualTo("retreat"));
+            Assert.That(on.open, Is.True, "the marked room stays open: spray and search on");
+            Assert.That(Run(false).kinds, Has.Member("retreat"), "control: switch off, the robot retreats");
         }
 
         [Test]

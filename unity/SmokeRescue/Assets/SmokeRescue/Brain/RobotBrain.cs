@@ -130,7 +130,8 @@ namespace SmokeRescue.Brain
             RefreshSensedExits(t);
             CheckWayOut(t);
             CheckEmergencyExit(t);
-            CheckHeatBuilding(t);
+            if (!c.heat_spray_through) CheckHeatBuilding(t);
+            UpdateFireRooms(t);
             // Staying inside, a fast rise in the robot's own air (the rate-of-rise detector, air_rise_c_per_min) steers the
             // search away from where it stands; it does not stop it. As a retreat it held robots still in cool air: in seed 932
             // every retreat fired at about 24 C, and the robots spent 62 s and 66 s retreating in air below 50 C (air at them
@@ -138,15 +139,17 @@ namespace SmokeRescue.Brain
             // Once seen, a rise counts for one more air_rise_window_s: at the +air_rise_min_delta_c edge, sensor noise of a few
             // tenths of a degree flipped the test each sample (seed 929, robot B at 42.5 to 44 s).
             bool rising = c.stay_inside && HeatRising(t);
-            if (rising && t >= heatRisingUntil && !retreating) SteerFromHeat(t);
+            if (rising && t >= heatRisingUntil && !retreating && !c.heat_spray_through) SteerFromHeat(t);
             if (rising) heatRisingUntil = t + c.air_rise_window_s;
             bool heatInside = c.stay_inside && t < heatRisingUntil;
-            if (!retreating && !emergencyExit && (airC > c.heat_retreat_c || budget < c.heat_retreat_fraction))
+            if (c.heat_spray_through) HotAirSprayThrough(t);
+            else if (!retreating && !emergencyExit && (airC > c.heat_retreat_c || budget < c.heat_retreat_fraction))
             {
                 ResetStuckRecovery(); retreating = true; sweeping = false; active = null; dwell = 0; ClearPath();
                 Emit(t, "retreat", "Air temperature or remaining heat budget requires a cool reachable goal.", "air_c", airC, "heat_budget", budget);
+                if (c.heat_marks_room && airC > c.heat_retreat_c) MarkFireRoom(t);
             }
-            else if (retreating && airC < c.heat_recover_below_c && t - lastAir <= c.frame_max_age_s && budget >= c.heat_resume_fraction && !heatInside)
+            else if (retreating && airC < RecoverBelowC && t - lastAir <= c.frame_max_age_s && budget >= c.heat_resume_fraction && !heatInside)
             {
                 ResetStuckRecovery(); retreating = false; ClearPath();
                 if (c.retreat_reduced_clearance) grid.FireClearance = retreatClearance = c.fire_clearance_m;
@@ -920,10 +923,17 @@ namespace SmokeRescue.Brain
         }
         void IntegrateBudget(float duration, double t)
         {
+            if (c.heat_spray_through) { budget = 1; return; }   // no heat budget: hot air never holds the robot
             if (airC > c.heat_drain_start_c) budget -= (airC - c.heat_drain_start_c) * c.heat_drain_per_degree_s * duration;
-            else if (airC < c.heat_recover_below_c && t - lastAir <= c.frame_max_age_s) budget += c.heat_recover_per_s * duration;
+            else if (airC < RecoverBelowC && t - lastAir <= c.frame_max_age_s)
+                budget += c.heat_recover_per_s * duration * (c.heat_recover_scaled
+                    ? Mathf.Clamp01((c.heat_drain_start_c - airC) / (c.heat_drain_start_c - c.heat_recover_below_c)) : 1f);
             budget = Mathf.Clamp01(budget);
         }
+        /// <summary>heat_recover_scaled: air below the drain start cools the body, slower the warmer it is (full rate at
+        /// heat_recover_below_c, none at heat_drain_start_c). A house burning for 320 s held robot A at 37 C with its budget
+        /// frozen at 0.20 for the rest of seed 934 (24 Oct 18:53), because recovery needed air below 35 C.</summary>
+        float RecoverBelowC => c.heat_recover_scaled ? c.heat_drain_start_c : c.heat_recover_below_c;
         bool NeedPlan(double t) => t - lastPlan >= c.replan_s || (path.Count > 0 && !(EmergencyRoute ? EmergencyPathOk(path, cursor) : planner.PathSafe(path, cursor)));
         bool EmergencyRoute => returning && returnReason == EmergencyExit;
         /// <summary>On an emergency exit only a burning or occupied cell on the rest of the route breaks it; the fire margin
@@ -958,7 +968,7 @@ namespace SmokeRescue.Brain
         {
             blockedGoals.RemoveAll(g => t >= g.until);
             return blockedGoals.Exists(g => Vector2.Distance(point, g.position) <= (g.radius > 0 ? g.radius : c.stuck_repeat_radius_m) &&
-                                            SameSideOfWalls(point, g.position));
+                                            SameSideOfWalls(point, g.position)) || InFireRoom(point);
         }
         /// <summary>No mapped wall cell lies on the straight line from a to b. Exclusion circles (blacklisted and visited
         /// goals, up to 2.5 m) reached through walls and hid unrelated frontiers in the next room (#27, Codex review).</summary>
@@ -1234,7 +1244,7 @@ namespace SmokeRescue.Brain
                 Emit(t, "escape_closing", closest < c.escape_fire_margin_m ? "Fire is closing on the way out; leave while it is open."
                     : "Fire is closing on the way out faster than the robot could walk it later; leave while it is open.",
                     "fire_distance_m", closest, "margin_m", c.escape_fire_margin_m, "closes_in_s", float.IsInfinity(closeS) ? -1 : closeS, "walk_out_s", walkS);
-                BeginReturn(t, WayOutClosing);
+                if (!(c.heat_spray_through && c.stay_inside)) BeginReturn(t, WayOutClosing);   // staying inside, it searches on
             }
             else CheckRouteWatch(t, route, routeM);
         }
