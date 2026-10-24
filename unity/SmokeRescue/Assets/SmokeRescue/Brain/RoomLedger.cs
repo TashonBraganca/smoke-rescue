@@ -463,10 +463,11 @@ namespace SmokeRescue.Brain
                 // cells beyond it, stood in the kitchen's floor; the kitchen was covered, so the door ranked last for 20 s, and
                 // A had left for another bedroom at 90 s and come back at 139 s. The study, the laundry and the bathroom past it
                 // were reached at 192 s or never.
+                bool beyond = false;
                 if (config.frontier_beyond_room && known && !room.corridor && (f.roomTier == 3 || f.roomTier == 4))
                 {
                     float leftCells = (1 - room.coveredShare) * room.indoorFloorM2 / (grid.CellM * grid.CellM);
-                    if (f.information > leftCells + config.frontier_min_information_cells) f.roomTier = unenteredTier;
+                    if (f.information > leftCells + config.frontier_min_information_cells) { f.roomTier = unenteredTier; beyond = true; }
                 }
                 // partner_rooms (owner, 24 Oct: "it knows the coordinates of the other; it won't even go near that room"). A room a
                 // partner stands in now is left to it: last tier, kept only as a fallback. A room a partner already walked
@@ -478,7 +479,9 @@ namespace SmokeRescue.Brain
                     else if (room.partnerEntered && !room.corridor && f.roomTier == unenteredTier && OneRobotRoom(room))
                         f.roomTier = room.coveredShare >= config.room_ledger_covered_share ? 4 : 3;
                 }
-                f.roomScore = f.cost / config.open_speed_mps + (known ? room.coveredShare * config.room_ledger_dwell_s : 0);
+                // A frontier looking past its room carries the coverage of the space beyond, none: with its room's share it
+                // lost to an unentered room 9 m away (headless seed 934 one door, 24 Oct, robot A 1.6 m from bedroom_1's door).
+                f.roomScore = f.cost / config.open_speed_mps + (known && !beyond ? room.coveredShare * config.room_ledger_dwell_s : 0);
                 // room_sweep (owner, 23 Oct): finish a room from the left side across to the right, as seen from where the robot
                 // came in, then leave on the right. Frontiers in the room being finished cost extra the further right of the line
                 // from the entry point to the room centre they lie, up to room_sweep_s; travel time still counts within a band.
