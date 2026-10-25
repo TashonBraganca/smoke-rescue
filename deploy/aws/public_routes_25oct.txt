@@ -1,0 +1,21 @@
+Public OpenCV routes on the ALB (25 Oct 2026)
+
+Why: CloudFront refused to create the distribution for storage.yaml: "Your account must be verified before
+you can add new CloudFront resources" (stack smoke-rescue-storage, ROLLBACK_COMPLETE, 24 Oct 23:06 UTC).
+An AWS Support verification case was opened by the owner. Until it clears, judges reach the agent service
+on the ALB directly.
+
+What changed: agent.yaml parameter PublicOpenCvRoutes=true adds two resources and nothing else (change set
+reviewed: Add AlbIngressOpen, Add PublicOpenCvRule):
+  - port 80 open on the ALB security group
+  - listener rule priority 2 forwards only /health, /vision/*, /perceive/people, /place/*/match
+Model routes (/robot/*/step, /commander/step, /approval*) still need the X-Origin-Verify header and return
+403 without it, so nobody outside can spend the Azure model budget. The WAF limit (2000 requests per 5 min
+per IP) still applies.
+
+Endpoint: http://smoke--LoadB-m7oFRuQ63UoE-1386562850.us-east-1.elb.amazonaws.com
+Check:    ./deploy/aws/smoke_test.sh http://smoke--LoadB-m7oFRuQ63UoE-1386562850.us-east-1.elb.amazonaws.com --direct
+Result 25 Oct 14:45 IST: PASS GET /health (opencv 5.0.0), PASS POST /vision/assess_visibility (8.6 ms);
+POST /robot/robot_A/step and /commander/step without the header: 403.
+
+Undo: aws cloudformation deploy ... --parameter-overrides PublicOpenCvRoutes=false (same tags as deploy.sh).
