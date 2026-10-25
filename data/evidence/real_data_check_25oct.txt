@@ -110,3 +110,32 @@ poses in 77 accepts). In pioneer_360 it only happened while the robot was turnin
 In the office scenes the rate was 5 of 1103. Repetitive structure is a real risk for our house too (tiles, shelving),
 and is what the brain's LiDAR verification and second-match rule must catch.
 
+
+RIGID FIT COMPARISON (tools/rigid_fit_compare.py, 2026-10-25 16:44 IST)
+Same TUM pairs, features, height filter and accept rule (min_inliers 10, max_rmse 0.06 m); only the 2D fit changes.
+cv2_ransac: cv2.estimateAffinePartial2D(method=cv2.RANSAC, ransacReprojThreshold=place_ransac_threshold_m,
+maxIters=place_ransac_iterations), pose read from the 4-DOF matrix (scale not forced to 1).
+cv2_usac: OpenCV 5.0 rejects USAC_MAGSAC in estimateAffinePartial2D ('Unknown or unsupported robust estimation
+method'), so this uses cv2.estimateAffine2D(method=cv2.USAC_MAGSAC, same threshold and iterations) for the
+inlier set and refits a rigid transform on it with place.fit_rigid. Both seed cv2.setRNGSeed(place_ransac_seed);
+inliers and RMSE are recomputed with the final transform at 0.1 m. 'ours' also applies
+place_ransac_min_baseline_m and its refit loop; the cv2 variants do not.
+Negatives = within-sequence > 4 m plus 2000 cross-sequence pairs. ms/match = place.match_keyframes wall time,
+one keyframe against one, averaged over every positive and negative call (includes kNN matching).
+  variant / subset            pos  recall (Wilson 95 % CI)  yaw med/p90 deg  trans med/p90 m  wrong/acc  false/neg maxneg  ms/match
+  ours all                    2414  62.9 % (60.9-64.8)  0.69/ 2.47  0.031/0.136    70/1518    0/6500    6    0.44
+  ours Pioneer hall            888  46.7 % (43.5-50.0)  1.30/ 6.35  0.085/0.605    65/415     0/3000    6
+  ours offices                1526  72.3 % (70.0-74.5)  0.60/ 1.55  0.025/0.053     5/1103    0/1500    6
+  cv2_usac all                2414  49.2 % (47.2-51.2)  1.04/ 4.29  0.041/0.215    96/1187    0/6500    6    0.34
+  cv2_usac Pioneer hall        888  27.0 % (24.2-30.0)  1.94/ 6.19  0.144/0.501    46/240     0/3000    5
+  cv2_usac offices            1526  62.1 % (59.6-64.5)  0.88/ 3.15  0.033/0.105    50/947     0/1500    6
+  cv2_ransac all              2414  66.0 % (64.1-67.9)  0.79/ 3.48  0.044/0.328   126/1594    3/6500   13    0.46
+  cv2_ransac Pioneer hall      888  53.8 % (50.5-57.1)  1.74/ 7.34  0.155/0.799   115/478     0/3000    7
+  cv2_ransac offices          1526  73.1 % (70.9-75.3)  0.64/ 1.66  0.034/0.081    11/1116    1/1500   13
+Timing is noisy: the same code gave 0.32 and 0.44 ms/match for 'ours' on two runs; kNN matching dominates, so the
+fit choice does not change runtime in any way that matters.
+Verdict: neither OpenCV variant passes the bar (no worse on wrong-pose accepts and false accepts, recall within 2
+points). cv2_usac loses 13.7 points of recall and has more wrong-pose accepts in the offices (50 vs 5). cv2_ransac
+gains 3.1 points of recall but has 3 false accepts on negatives (max negative inliers 13) and 126 wrong-pose
+accepts against 70. place.py keeps its own ransac_rigid; no config switch was added. The Pioneer-hall aliasing is
+not fixed by swapping the estimator: all three accept wrong poses there.
