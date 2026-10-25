@@ -5,7 +5,7 @@
 # smoke-rescue-ryor must exist first (deploy_ryor.sh). Its outputs wire the /api/mission routes.
 #   ./deploy/aws/deploy_site_lambda.sh
 #   SITE_SYNC=0 ./deploy/aws/deploy_site_lambda.sh          # code and stack only, leave the static files alone
-#   RYOR_ENABLED=0 RYOR_CAP=3 RYOR_IP_LIMIT=6 ./deploy/aws/deploy_site_lambda.sh   # mission API switches
+#   RYOR_ENABLED=0 RYOR_CAP=2 RYOR_DAILY_CAP=150 RYOR_IP_LIMIT=6 ./deploy/aws/deploy_site_lambda.sh   # mission API switches
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REGION="${AWS_REGION:-us-east-1}"; STACK=smoke-rescue-site
@@ -24,7 +24,7 @@ aws cloudformation deploy --region "$REGION" --stack-name "$STACK" --template-fi
     RyorPolicyArn="$(out smoke-rescue-ryor LambdaPolicyArn)" RyorBucket="$RB" \
     RyorTable="$(out smoke-rescue-ryor TableName)" RyorCluster="$(out smoke-rescue-ryor ClusterName)" \
     RyorSecurityGroup="$(out smoke-rescue-ryor TaskSecurityGroupId)" RyorEngine="$(out smoke-rescue-ryor ImageLabel)" \
-    RyorEnabled="${RYOR_ENABLED:-1}" RyorCap="${RYOR_CAP:-3}" RyorIpLimit="${RYOR_IP_LIMIT:-6}"
+    RyorEnabled="${RYOR_ENABLED:-1}" RyorCap="${RYOR_CAP:-2}" RyorDailyCap="${RYOR_DAILY_CAP:-150}" RyorIpLimit="${RYOR_IP_LIMIT:-6}"
 BUCKET="$(out "$STACK" SiteBucketName)"
 if [ "${SITE_SYNC:-1}" = 1 ]; then
   aws s3 sync --region "$REGION" --delete --exclude 'runs/README.txt' "$HERE/site/" "s3://$BUCKET/"

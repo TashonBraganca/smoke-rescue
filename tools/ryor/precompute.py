@@ -34,7 +34,7 @@ def register(tag):
     keep = ("name", "image", "essential", "environment", "logConfiguration", "stopTimeout", "readonlyRootFilesystem", "user")
     c = {k: v for k, v in c.items() if k in keep}
     td = ecs.register_task_definition(family=FAMILY, taskRoleArn=live["taskRoleArn"], executionRoleArn=live["executionRoleArn"],
-                                      networkMode="awsvpc", requiresCompatibilities=["FARGATE"], cpu=live["cpu"], memory=live["memory"],
+                                      networkMode="awsvpc", requiresCompatibilities=["FARGATE"], cpu="4096", memory="8192",
                                       runtimePlatform=live["runtimePlatform"], containerDefinitions=[c],
                                       tags=[{"key": "Project", "value": "smoke-rescue"}])
     return td["taskDefinition"]["taskDefinitionArn"]

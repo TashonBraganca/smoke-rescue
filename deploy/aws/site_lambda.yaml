@@ -40,12 +40,17 @@ Parameters:
     Default: "1"
     AllowedValues: ["0", "1"]
     Description: Kill switch. "0" answers every POST /api/mission with the recorded fallback (reason "disabled").
+  RyorDailyCap:
+    Type: Number
+    Default: 150
+    MinValue: 0
+    Description: Live missions started per UTC day, site-wide; beyond it POST answers the recorded fallback ("busy").
   RyorCap:
     Type: Number
-    Default: 3
+    Default: 2
     MinValue: 0
     MaxValue: 10
-    Description: Most ryor Fargate tasks running at once (counted with ecs ListTasks on the family).
+    Description: Most ryor Fargate tasks running at once (ecs ListTasks on family smoke-rescue-ryor; the precompute family is separate).
   RyorIpLimit:
     Type: Number
     Default: 6
@@ -132,6 +137,7 @@ Resources:
           RYOR_CAP: !Ref RyorCap
           RYOR_IP_LIMIT: !Ref RyorIpLimit
           RYOR_HARD_S: !Ref RyorHardLimitS
+          RYOR_DAILY_CAP: !Ref RyorDailyCap
       Tags: [{ Key: Project, Value: smoke-rescue }]
       # Source: deploy/aws/site_lambda/ (index.py + ryor_api.py), zipped and uploaded by deploy_site_lambda.sh.
       Code: { S3Bucket: !Ref CodeBucket, S3Key: !Ref CodeKey }

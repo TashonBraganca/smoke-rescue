@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Run your own rescue | Smoke Rescue</title>
+<meta name="description" content="Pick a house, send in 1 to 3 robots, and watch our robot brain search it on AWS.">
+<meta name="color-scheme" content="light dark">
+<link rel="stylesheet" href="rescue.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to the page</a>
+<header class="top">
+  <div class="brand"><span class="mark" aria-hidden="true"></span>Smoke Rescue</div>
+  <button id="theme" class="ghost small" type="button" aria-label="Colour theme: automatic">Theme: auto</button>
+</header>
+
+<main id="main">
+  <section id="choose" aria-labelledby="choose-h">
+    <div class="intro">
+      <h1 id="choose-h">Run your own rescue</h1>
+      <p class="lede">Pick a house. Send in one, two or three robots. Watch our robot brain search it through smoke, find people and walk back out.</p>
+    </div>
+
+    <div class="choose-grid">
+      <div class="gallery-wrap">
+        <div class="step-h"><span class="num">1</span><h2>Pick a house</h2><span id="gallery-count" class="muted"></span></div>
+        <div class="filters" role="group" aria-label="Show houses">
+          <button type="button" class="chip" data-filter="all" aria-pressed="true">All</button>
+          <button type="button" class="chip" data-filter="ours" aria-pressed="false">Our test houses</button>
+          <button type="button" class="chip" data-filter="HouseExpo" aria-pressed="false">Real floor plans</button>
+        </div>
+        <ul id="gallery" class="gallery" aria-label="Houses"></ul>
+        <p id="gallery-error" class="notice bad" hidden></p>
+      </div>
+
+      <aside id="setup" class="setup" aria-labelledby="setup-h">
+        <div class="step-h"><span class="num">2</span><h2 id="setup-h">Set the scene</h2></div>
+        <figure class="preview">
+          <canvas id="preview" width="400" height="260" aria-label="Floor plan of the selected house"></canvas>
+          <figcaption id="preview-cap" class="muted">Choose a house on the left.</figcaption>
+        </figure>
+
+        <fieldset>
+          <legend>Robots</legend>
+          <div class="seg" id="robots" role="group" aria-label="Number of robots">
+            <button type="button" data-n="1" aria-pressed="false"><span class="tags"><i class="tag a">A</i></span>1 robot</button>
+            <button type="button" data-n="2" aria-pressed="true"><span class="tags"><i class="tag a">A</i><i class="tag b">B</i></span>2 robots</button>
+            <button type="button" data-n="3" aria-pressed="false"><span class="tags"><i class="tag a">A</i><i class="tag b">B</i><i class="tag c">C</i></span>3 robots</button>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Difficulty</legend>
+          <div class="seg" id="difficulty" role="group" aria-label="Difficulty">
+            <button type="button" data-d="easy" aria-pressed="false">Easy</button>
+            <button type="button" data-d="medium" aria-pressed="true">Medium</button>
+            <button type="button" data-d="hard" aria-pressed="false">Hard</button>
+          </div>
+          <p id="diff-line" class="diff-line"></p>
+        </fieldset>
+
+        <button id="start" class="primary" type="button" disabled>Start the rescue</button>
+        <p class="fine">A live run takes about 3 minutes: up to 90 s to start a cloud machine, then 180 s of simulated time played back as it arrives. If the cloud is busy you get the recorded run of this exact setup, clearly labelled.</p>
+        <p id="health" class="fine" hidden></p>
+      </aside>
+    </div>
+  </section>
+
+  <section id="mission" aria-labelledby="mission-h" hidden>
+    <div class="mission-head">
+      <button id="back" class="ghost" type="button">&larr; Choose another house</button>
+      <div class="mission-title">
+        <h1 id="mission-h">House</h1>
+        <p id="mission-sub" class="muted"></p>
+      </div>
+      <p id="source-badge" class="badge live">Live run on AWS</p>
+    </div>
+    <p id="recorded-note" class="notice rec" hidden></p>
+
+    <div class="mission-grid">
+      <div class="stage-col">
+        <div id="stage" class="stage" tabindex="0" aria-label="Replay of the mission. Press space to play or pause.">
+          <canvas id="replay" aria-hidden="true"></canvas>
+          <div id="moment" class="moment" aria-hidden="true" hidden></div>
+        </div>
+
+        <div class="transport" id="transport">
+          <button id="play" class="icon" type="button" aria-label="Pause" disabled><span class="pp"></span></button>
+          <div class="scrub">
+            <div class="track" aria-hidden="true"><div id="buffered" class="buffered"></div><div id="ticks" class="ticks"></div></div>
+            <input id="scrubber" type="range" min="0" max="180" step="0.5" value="0" aria-label="Mission time" disabled>
+          </div>
+          <span id="clock" class="clock">0:00 / 3:00</span>
+          <div class="speed" role="group" aria-label="Playback speed">
+            <button type="button" data-x="1" aria-pressed="false">1x</button>
+            <button type="button" data-x="2" aria-pressed="false">2x</button>
+            <button type="button" data-x="4" aria-pressed="true">4x</button>
+          </div>
+        </div>
+        <p id="sim-state" class="sim-state" role="status"></p>
+
+        <section id="score" class="score" hidden aria-labelledby="score-h">
+          <h2 id="score-h">Result</h2>
+          <dl class="score-grid">
+            <div><dt>People found</dt><dd id="s-people">-</dd></div>
+            <div><dt>Time</dt><dd id="s-time">-</dd></div>
+            <div><dt>House searched</dt><dd id="s-cov">-</dd></div>
+            <div><dt>Robots out</dt><dd id="s-out">-</dd></div>
+          </dl>
+          <p id="s-compare" class="compare"></p>
+          <p id="s-false" class="fine" hidden></p>
+          <div class="score-actions">
+            <button id="replay-again" class="ghost" type="button">Watch again</button>
+            <button id="try-more" class="ghost" type="button">Same house, other setup</button>
+          </div>
+        </section>
+      </div>
+
+      <div class="side-col">
+        <div id="waiting" class="waiting">
+          <h2 id="wait-h">Getting the mission ready</h2>
+          <ol id="stages" class="stages">
+            <li data-s="sent">Mission request sent</li>
+            <li data-s="machine">Starting a cloud machine on AWS <span class="eta">usually 40 to 90 s</span></li>
+            <li data-s="door">Robots lined up at the door</li>
+            <li data-s="search">Searching the house</li>
+          </ol>
+          <p id="wait-clock" class="wait-clock">0 s</p>
+          <p id="wait-note" class="fine"></p>
+          <div id="wait-error" hidden>
+            <p class="notice bad" id="wait-error-text"></p>
+            <button id="retry" class="primary" type="button">Try again</button>
+          </div>
+        </div>
+        <section aria-labelledby="team-h">
+          <h2 id="team-h" class="side-h">Robots</h2>
+          <ul id="team" class="team"></ul>
+          <p class="team-total"><span>Whole team</span><span id="team-cov">0 % of floor searched</span></p>
+          <p class="team-total"><span>People found</span><span id="team-found">0</span></p>
+        </section>
+        <section aria-labelledby="log-h">
+          <h2 id="log-h" class="side-h">What happened</h2>
+          <ol id="log" class="log"></ol>
+          <p id="log-empty" class="muted small-t">Events appear here as the robots report them.</p>
+        </section>
+        <section class="legend" aria-label="Map key">
+          <h2 class="side-h">Map key</h2>
+          <ul>
+            <li><i class="k k-seen"></i>Floor one robot has searched, in its colour</li>
+            <li><i class="k k-person"></i>Person confirmed, ring shows who found them</li>
+            <li><i class="k k-fire"></i>Fire (simulator truth, the robots only see what their sensors report)</li>
+            <li><i class="k k-trail"></i>Path the robot walked</li>
+          </ul>
+        </section>
+      </div>
+    </div>
+    <div id="sr-live" class="sr" aria-live="polite"></div>
+  </section>
+</main>
+
+<footer class="foot">
+  <p><strong>What you are watching.</strong> The real robot brain, running headless on AWS. There is no rendered camera: people are detected through the simulator's sighting model (distance, line of sight and smoke). The fire and the robots' true positions come from the simulator and are drawn for you only. The coloured searched floor comes from each robot's own map, which is all the robot knows.</p>
+  <p id="citation"><strong>Real floor plans</strong> come from HouseExpo (Li et al. 2019, MIT licence, <a href="https://github.com/TeaganLi/HouseExpo">github.com/TeaganLi/HouseExpo</a>), converted to our floor plan format. People and fire are placed by our scenario generator.</p>
+</footer>
+<script src="rescue.js"></script>
+</body>
+</html>
