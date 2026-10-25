@@ -1,6 +1,6 @@
 {
   "id": "long_ranch",
-  "description": "Full mission in a new ranch. Unchanged brain, sensors and local gate pads only. Layout is world-side evaluation data.",
+  "description": "225 m2 L-shaped single-floor house with open living/kitchen/dining, family room, four bedrooms and a private suite. World data only.",
   "seed": 2511,
   "duration_s": 600,
   "duration_s_reason": "Owner, 25 Oct 03:00: demo videos end with the house searched and both robots walked out; the recording stops when both are out (one second after both finish) or at 600 s.",
@@ -11,11 +11,11 @@
     0,
     0,
     18,
-    11
+    16.5
   ],
   "dark_rooms": [
-    "lr_bed1",
-    "lr_bath1"
+    "lr_bed3",
+    "lr_ensuite"
   ],
   "sim_rate_hz": 15,
   "yaw_convention": "degrees about Unity +y. 0 faces +z (north), 90 faces +x (east).",
@@ -23,14 +23,12 @@
     "model": "fluid",
     "global_haze": 0.15,
     "rooms": {
-      "lr_kitchen": 0.35,
-      "lr_living": 0.25,
+      "lr_great": 0.25,
       "lr_bed2": 0.3,
       "default": 0.15,
-      "lr_kitchen_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
-      "lr_living_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
-      "lr_bed2_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
-      "default_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation."
+      "lr_great_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py.",
+      "lr_bed2_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py.",
+      "default_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
     },
     "ramp_per_minute": 0.0,
     "global_haze_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
@@ -42,12 +40,12 @@
       "color": "#F2A900",
       "spawn": {
         "at": [
-          2.5,
+          4,
           -1.2
         ],
         "yaw": 0,
-        "at_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
-        "yaw_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation."
+        "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py.",
+        "yaw_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
       },
       "control": "autonomous",
       "cruise_speed": 0.5,
@@ -69,12 +67,12 @@
       "color": "#2FA3E6",
       "spawn": {
         "at": [
-          2.476,
+          3.976,
           -2.402
         ],
         "yaw": 2.39,
-        "at_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
-        "yaw_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation."
+        "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py.",
+        "yaw_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
       },
       "control": "autonomous",
       "cruise_speed": 0.5,
@@ -101,63 +99,88 @@
   "survivors": [
     {
       "id": "s1",
-      "room": "lr_bed4",
+      "room": "lr_great",
       "at": [
-        11.611783027648926,
-        6.997213840484619
+        6.8,
+        2.8
       ],
-      "yaw": 124.50923156738281,
+      "yaw": 90,
       "pose": "lying_on_side",
-      "at_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
-      "yaw_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation."
+      "body_size_m": [
+        1.435951,
+        0.768879
+      ],
+      "body_size_m_reason": "Transformed posed model bounds plus 0.05 m per side. See handoff/houses_evidence/long_ranch_v2_body_bounds.json for asset hashes and method.",
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py.",
+      "yaw_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
     },
     {
       "id": "s2",
-      "room": "lr_kitchen",
+      "room": "lr_family",
       "at": [
-        5.738737106323242,
-        2.012113094329834
+        4.8,
+        5.6
       ],
-      "yaw": 348.3345947265625,
+      "yaw": 90,
       "pose": "slumped_against_wall",
-      "at_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
-      "yaw_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation."
+      "body_size_m": [
+        0.624797,
+        0.901072
+      ],
+      "body_size_m_reason": "Transformed posed model bounds plus 0.05 m per side. See handoff/houses_evidence/long_ranch_v2_body_bounds.json for asset hashes and method.",
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py.",
+      "yaw_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
     },
     {
       "id": "s3",
-      "room": "lr_utility",
+      "room": "lr_primary",
       "at": [
-        15.715902328491211,
-        2.4725921154022217
+        11.2,
+        0.8
       ],
-      "yaw": 348.2952575683594,
+      "yaw": 90,
       "pose": "collapsed_at_desk",
-      "at_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
-      "yaw_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation."
+      "body_size_m": [
+        1.051523,
+        1.855486
+      ],
+      "body_size_m_reason": "Transformed posed model bounds plus 0.05 m per side. See handoff/houses_evidence/long_ranch_v2_body_bounds.json for asset hashes and method.",
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py.",
+      "yaw_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
     },
     {
       "id": "s4",
       "room": "lr_bed2",
       "at": [
-        5.148707389831543,
-        6.2694854736328125
+        16.8,
+        8.9
       ],
-      "yaw": 2.43377685546875,
+      "yaw": 90,
       "pose": "curled_on_bed",
-      "at_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
-      "yaw_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation."
+      "body_size_m": [
+        0.955871,
+        0.820546
+      ],
+      "body_size_m_reason": "Transformed posed model bounds plus 0.05 m per side. See handoff/houses_evidence/long_ranch_v2_body_bounds.json for asset hashes and method.",
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py.",
+      "yaw_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
     },
     {
       "id": "s6",
-      "room": "lr_bed1",
+      "room": "lr_bed3",
       "at": [
-        2.063265323638916,
-        6.957858085632324
+        16.5,
+        12.1
       ],
-      "yaw": 150.24180603027344,
+      "yaw": 90,
       "pose": "slumped_against_wall",
-      "at_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
-      "yaw_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation."
+      "body_size_m": [
+        0.624797,
+        0.901072
+      ],
+      "body_size_m_reason": "Transformed posed model bounds plus 0.05 m per side. See handoff/houses_evidence/long_ranch_v2_body_bounds.json for asset hashes and method.",
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py.",
+      "yaw_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
     }
   ],
   "survivor_placement": "fixed",
@@ -193,6 +216,6 @@
   "floorplan_file": "floorplan_long_ranch.json",
   "seed_reason": "World seed 2510 for family ranch and 2511 for long ranch, chosen as adjacent reproducible seeds for the 25 October layouts. This selects furnishing and safe placement candidates, plus world and sensor randomness; the brain receives no layout ID.",
   "survivor_placement_reason": "Five explicit safe positions in different rooms, chosen by the existing conservative placement checker. Fixed placement preserves the checked rooms and furniture clearance in Unity; no position is sent to a robot.",
-  "search_area_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
+  "search_area_reason": "Bounds for world placement and evaluation, including the outdoor notch. Robots receive local sensor data only.",
   "sim_rate_hz_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation."
 }

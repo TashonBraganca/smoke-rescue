@@ -1,59 +1,45 @@
 {
   "version": 1,
   "units": "m",
-  "origin": "South-west outer corner at Unity world (0,0,0), x east and z north.",
+  "origin": "South-west corner at Unity world (0,0,0). North is +z.",
   "footprint": [
     0,
     0,
     18,
-    11
+    16.5
   ],
+  "footprint_reason": "Bounding rectangle only. The 72 m2 north-west notch is outdoor lawn.",
+  "footprint_rects": [
+    [
+      0,
+      0,
+      18,
+      7.5
+    ],
+    [
+      8,
+      7.5,
+      18,
+      16.5
+    ]
+  ],
+  "footprint_rects_reason": "Two disjoint rectangles tile the occupied 225 m2 L shape. Roof and yard use their union.",
   "wall_height": 2.8,
   "exterior_wall_thickness": 0.25,
   "interior_wall_thickness": 0.15,
   "door_height": 2.1,
   "rooms": [
     {
-      "id": "lr_hall",
-      "name": "Hallway",
-      "kind": "corridor",
-      "rect": [
-        0,
-        3.5,
-        18,
-        5.25
-      ],
-      "rect_reason": "Selected 18 by 1.75 m bay in a tiled 18 by 11 m single-floor ranch. Hallway is 1.75 m before wall deductions.",
-      "floor": "wood_oak_planks",
-      "walls": "paint_warm_grey_textured",
-      "ceiling": "plaster_white"
-    },
-    {
-      "id": "lr_living",
-      "name": "Living room",
-      "kind": "living",
-      "rect": [
-        0,
-        0,
-        5,
-        3.5
-      ],
-      "rect_reason": "Selected 5 by 3.5 m bay in a tiled 18 by 11 m single-floor ranch. Hallway is 1.75 m before wall deductions.",
-      "floor": "wood_oak_planks",
-      "walls": "paint_warm_grey_textured",
-      "ceiling": "plaster_white"
-    },
-    {
-      "id": "lr_kitchen",
-      "name": "Kitchen and dining",
+      "id": "lr_great",
+      "name": "Living, kitchen and dining",
       "kind": "kitchen",
       "rect": [
-        5,
         0,
-        10,
-        3.5
+        0,
+        8,
+        5
       ],
-      "rect_reason": "Selected 5 by 3.5 m bay in a tiled 18 by 11 m single-floor ranch. Hallway is 1.75 m before wall deductions.",
+      "rect_reason": "8 by 5 m room in a 225 m2 L-shaped house. Dimensions include walls.",
       "floor": "wood_oak_planks",
       "walls": "paint_warm_grey_textured",
       "ceiling": "plaster_white"
@@ -63,44 +49,119 @@
       "name": "Family room",
       "kind": "living",
       "rect": [
-        10,
         0,
-        15,
-        3.5
+        5,
+        8,
+        7.5
       ],
-      "rect_reason": "Selected 5 by 3.5 m bay in a tiled 18 by 11 m single-floor ranch. Hallway is 1.75 m before wall deductions.",
+      "rect_reason": "8 by 2.5 m room in a 225 m2 L-shaped house. Dimensions include walls.",
+      "floor": "wood_oak_planks",
+      "walls": "paint_warm_grey_textured",
+      "ceiling": "plaster_white"
+    },
+    {
+      "id": "lr_primary",
+      "name": "Primary bedroom",
+      "kind": "bedroom",
+      "rect": [
+        8,
+        0,
+        12.5,
+        5
+      ],
+      "rect_reason": "4.5 by 5 m room in a 225 m2 L-shaped house. Dimensions include walls.",
+      "floor": "wood_oak_planks",
+      "walls": "paint_warm_grey_textured",
+      "ceiling": "plaster_white"
+    },
+    {
+      "id": "lr_ensuite",
+      "name": "Primary bathroom",
+      "kind": "bathroom",
+      "rect": [
+        12.5,
+        0,
+        15.25,
+        3
+      ],
+      "rect_reason": "2.75 by 3 m room in a 225 m2 L-shaped house. Dimensions include walls.",
+      "floor": "ceramic_tiles_checker",
+      "walls": "ceramic_tiles_large_white",
+      "ceiling": "plaster_white"
+    },
+    {
+      "id": "lr_closet",
+      "name": "Walk-in closet",
+      "kind": "closet",
+      "rect": [
+        15.25,
+        0,
+        18,
+        3
+      ],
+      "rect_reason": "2.75 by 3 m room in a 225 m2 L-shaped house. Dimensions include walls.",
       "floor": "wood_oak_planks",
       "walls": "paint_warm_grey_textured",
       "ceiling": "plaster_white"
     },
     {
       "id": "lr_utility",
-      "name": "Utility",
+      "name": "Utility and mudroom",
       "kind": "laundry",
       "rect": [
-        15,
-        0,
+        12.5,
+        3,
         18,
-        3.5
+        5
       ],
-      "rect_reason": "Selected 3 by 3.5 m bay in a tiled 18 by 11 m single-floor ranch. Hallway is 1.75 m before wall deductions.",
+      "rect_reason": "5.5 by 2 m room in a 225 m2 L-shaped house. Dimensions include walls.",
       "floor": "ceramic_tiles_checker",
       "walls": "ceramic_tiles_large_white",
       "ceiling": "plaster_white"
     },
     {
-      "id": "lr_bed1",
-      "name": "Bedroom 1",
-      "kind": "bedroom",
+      "id": "lr_hall",
+      "name": "Main hall",
+      "kind": "corridor",
       "rect": [
-        0.0,
-        5.25,
-        3.5,
-        11
+        8,
+        5,
+        18,
+        7.5
       ],
-      "rect_reason": "Selected 3.5 by 5.75 m bay in a tiled 18 by 11 m single-floor ranch. Hallway is 1.75 m before wall deductions.",
+      "rect_reason": "10 by 2.5 m room in a 225 m2 L-shaped house. Dimensions include walls.",
       "floor": "wood_oak_planks",
       "walls": "paint_warm_grey_textured",
+      "ceiling": "plaster_white"
+    },
+    {
+      "id": "lr_sidehall",
+      "name": "Bedroom hall",
+      "kind": "corridor",
+      "rect": [
+        8,
+        7.5,
+        10.5,
+        16.5
+      ],
+      "rect_reason": "2.5 by 9 m room in a 225 m2 L-shaped house. Dimensions include walls.",
+      "floor": "wood_oak_planks",
+      "walls": "paint_warm_grey_textured",
+      "ceiling": "plaster_white"
+    },
+    {
+      "id": "lr_bath",
+      "name": "Family bathroom",
+      "kind": "bathroom",
+      "rect": [
+        10.5,
+        7.5,
+        13,
+        10.5
+      ],
+      "rect_reason": "2.5 by 3 m room in a 225 m2 L-shaped house. Dimensions include walls.",
+      "floor": "ceramic_tiles_checker",
+      "walls": "ceramic_tiles_large_white",
       "ceiling": "plaster_white"
     },
     {
@@ -108,12 +169,12 @@
       "name": "Bedroom 2",
       "kind": "bedroom",
       "rect": [
-        3.5,
-        5.25,
-        7.0,
-        11
+        13,
+        7.5,
+        18,
+        10.5
       ],
-      "rect_reason": "Selected 3.5 by 5.75 m bay in a tiled 18 by 11 m single-floor ranch. Hallway is 1.75 m before wall deductions.",
+      "rect_reason": "5 by 3 m room in a 225 m2 L-shaped house. Dimensions include walls.",
       "floor": "wood_oak_planks",
       "walls": "paint_warm_grey_textured",
       "ceiling": "plaster_white"
@@ -123,12 +184,12 @@
       "name": "Bedroom 3",
       "kind": "bedroom",
       "rect": [
-        7.0,
-        5.25,
         10.5,
-        11
+        10.5,
+        18,
+        13.5
       ],
-      "rect_reason": "Selected 3.5 by 5.75 m bay in a tiled 18 by 11 m single-floor ranch. Hallway is 1.75 m before wall deductions.",
+      "rect_reason": "7.5 by 3 m room in a 225 m2 L-shaped house. Dimensions include walls.",
       "floor": "wood_oak_planks",
       "walls": "paint_warm_grey_textured",
       "ceiling": "plaster_white"
@@ -139,367 +200,386 @@
       "kind": "bedroom",
       "rect": [
         10.5,
-        5.25,
-        14.0,
-        11
+        13.5,
+        18,
+        16.5
       ],
-      "rect_reason": "Selected 3.5 by 5.75 m bay in a tiled 18 by 11 m single-floor ranch. Hallway is 1.75 m before wall deductions.",
+      "rect_reason": "7.5 by 3 m room in a 225 m2 L-shaped house. Dimensions include walls.",
       "floor": "wood_oak_planks",
       "walls": "paint_warm_grey_textured",
-      "ceiling": "plaster_white"
-    },
-    {
-      "id": "lr_bath1",
-      "name": "Bathroom 1",
-      "kind": "bathroom",
-      "rect": [
-        14,
-        5.25,
-        16,
-        11
-      ],
-      "rect_reason": "Selected 2 by 5.75 m bay in a tiled 18 by 11 m single-floor ranch. Hallway is 1.75 m before wall deductions.",
-      "floor": "ceramic_tiles_checker",
-      "walls": "ceramic_tiles_large_white",
-      "ceiling": "plaster_white"
-    },
-    {
-      "id": "lr_bath2",
-      "name": "Bathroom 2",
-      "kind": "bathroom",
-      "rect": [
-        16,
-        5.25,
-        18,
-        11
-      ],
-      "rect_reason": "Selected 2 by 5.75 m bay in a tiled 18 by 11 m single-floor ranch. Hallway is 1.75 m before wall deductions.",
-      "floor": "ceramic_tiles_checker",
-      "walls": "ceramic_tiles_large_white",
       "ceiling": "plaster_white"
     }
   ],
   "doors": [
     {
-      "id": "d_lr_living",
+      "id": "d_front",
       "between": [
-        "lr_hall",
-        "lr_living"
+        "outside",
+        "lr_great"
       ],
       "wall": "z",
       "at": [
-        2.5,
-        3.5
+        4,
+        0
       ],
       "width": 1.6,
       "state": "removed",
-      "at_reason": "Hall opening centred in service and living bays, offset 0.8 m from the bedroom bay edge to leave a bed along the opposite wall. Door-to-centre paths stay clear.",
-      "width_reason": "A 1.6 m double front entrance, or living-to-hall cased opening, provides passing and turning room. Earlier 1 m openings passed static path checks but left one robot inside during full return tests. All other interior openings remain 1 m."
+      "at_reason": "Cased opening on the shared room boundary with a clear approach on both sides.",
+      "width_reason": "Clear opening at least 1 m. Wider shared routes allow passing and turning."
     },
     {
-      "id": "d_lr_kitchen",
+      "id": "d_family_hall",
       "between": [
-        "lr_hall",
-        "lr_kitchen"
+        "lr_family",
+        "lr_hall"
       ],
-      "wall": "z",
+      "wall": "x",
       "at": [
-        7.5,
-        3.5
+        8,
+        6.25
       ],
-      "width": 1.0,
+      "width": 1.6,
       "state": "removed",
-      "at_reason": "Hall opening centred in service and living bays, offset 0.8 m from the bedroom bay edge to leave a bed along the opposite wall. Door-to-centre paths stay clear.",
-      "width_reason": "1 m clear opening exceeds the requested 0.9 m and avoids an open leaf narrowing the approach."
+      "at_reason": "Cased opening on the shared room boundary with a clear approach on both sides.",
+      "width_reason": "Clear opening at least 1 m. Wider shared routes allow passing and turning."
     },
     {
-      "id": "d_lr_family",
+      "id": "d_family",
       "between": [
-        "lr_hall",
+        "lr_great",
         "lr_family"
       ],
       "wall": "z",
       "at": [
+        6.5,
+        5
+      ],
+      "width": 1.8,
+      "state": "removed",
+      "at_reason": "Cased opening on the shared room boundary with a clear approach on both sides.",
+      "width_reason": "Clear opening at least 1 m. Wider shared routes allow passing and turning."
+    },
+    {
+      "id": "d_primary",
+      "between": [
+        "lr_hall",
+        "lr_primary"
+      ],
+      "wall": "z",
+      "at": [
+        10.75,
+        5
+      ],
+      "width": 1.2,
+      "state": "removed",
+      "at_reason": "Cased opening on the shared room boundary with a clear approach on both sides.",
+      "width_reason": "Clear opening at least 1 m. Wider shared routes allow passing and turning."
+    },
+    {
+      "id": "d_ensuite",
+      "between": [
+        "lr_primary",
+        "lr_ensuite"
+      ],
+      "wall": "x",
+      "at": [
         12.5,
-        3.5
+        2.25
       ],
       "width": 1.0,
       "state": "removed",
-      "at_reason": "Hall opening centred in service and living bays, offset 0.8 m from the bedroom bay edge to leave a bed along the opposite wall. Door-to-centre paths stay clear.",
-      "width_reason": "1 m clear opening exceeds the requested 0.9 m and avoids an open leaf narrowing the approach."
+      "at_reason": "Cased opening on the shared room boundary with a clear approach on both sides.",
+      "width_reason": "Clear opening at least 1 m. Wider shared routes allow passing and turning."
     },
     {
-      "id": "d_lr_utility",
+      "id": "d_closet",
+      "between": [
+        "lr_ensuite",
+        "lr_closet"
+      ],
+      "wall": "x",
+      "at": [
+        15.25,
+        2.25
+      ],
+      "width": 1.0,
+      "state": "removed",
+      "at_reason": "Cased opening on the shared room boundary with a clear approach on both sides.",
+      "width_reason": "Clear opening at least 1 m. Wider shared routes allow passing and turning."
+    },
+    {
+      "id": "d_utility",
       "between": [
         "lr_hall",
         "lr_utility"
       ],
       "wall": "z",
       "at": [
-        16.5,
-        3.5
+        15.5,
+        5
       ],
-      "width": 1.0,
+      "width": 1.2,
       "state": "removed",
-      "at_reason": "Hall opening centred in service and living bays, offset 0.8 m from the bedroom bay edge to leave a bed along the opposite wall. Door-to-centre paths stay clear.",
-      "width_reason": "1 m clear opening exceeds the requested 0.9 m and avoids an open leaf narrowing the approach."
+      "at_reason": "Cased opening on the shared room boundary with a clear approach on both sides.",
+      "width_reason": "Clear opening at least 1 m. Wider shared routes allow passing and turning."
     },
     {
-      "id": "d_lr_bed1",
+      "id": "d_turn",
       "between": [
         "lr_hall",
-        "lr_bed1"
+        "lr_sidehall"
       ],
       "wall": "z",
       "at": [
-        0.8,
-        5.25
+        9.25,
+        7.5
+      ],
+      "width": 1.8,
+      "state": "removed",
+      "at_reason": "Cased opening on the shared room boundary with a clear approach on both sides.",
+      "width_reason": "Clear opening at least 1 m. Wider shared routes allow passing and turning."
+    },
+    {
+      "id": "d_bath",
+      "between": [
+        "lr_sidehall",
+        "lr_bath"
+      ],
+      "wall": "x",
+      "at": [
+        10.5,
+        9.75
       ],
       "width": 1.0,
       "state": "removed",
-      "at_reason": "Hall opening centred in service and living bays, offset 0.8 m from the bedroom bay edge to leave a bed along the opposite wall. Door-to-centre paths stay clear.",
-      "width_reason": "1 m clear opening exceeds the requested 0.9 m and avoids an open leaf narrowing the approach."
+      "at_reason": "Cased opening on the shared room boundary with a clear approach on both sides.",
+      "width_reason": "Clear opening at least 1 m. Wider shared routes allow passing and turning."
     },
     {
-      "id": "d_lr_bed2",
+      "id": "d_bed2",
       "between": [
         "lr_hall",
         "lr_bed2"
       ],
       "wall": "z",
       "at": [
-        4.3,
-        5.25
+        15.5,
+        7.5
       ],
-      "width": 1.0,
+      "width": 1.2,
       "state": "removed",
-      "at_reason": "Hall opening centred in service and living bays, offset 0.8 m from the bedroom bay edge to leave a bed along the opposite wall. Door-to-centre paths stay clear.",
-      "width_reason": "1 m clear opening exceeds the requested 0.9 m and avoids an open leaf narrowing the approach."
+      "at_reason": "Cased opening on the shared room boundary with a clear approach on both sides.",
+      "width_reason": "Clear opening at least 1 m. Wider shared routes allow passing and turning."
     },
     {
-      "id": "d_lr_bed3",
+      "id": "d_bed3",
       "between": [
-        "lr_hall",
+        "lr_sidehall",
         "lr_bed3"
       ],
-      "wall": "z",
+      "wall": "x",
       "at": [
-        7.8,
-        5.25
+        10.5,
+        12
       ],
-      "width": 1.0,
+      "width": 1.2,
       "state": "removed",
-      "at_reason": "Hall opening centred in service and living bays, offset 0.8 m from the bedroom bay edge to leave a bed along the opposite wall. Door-to-centre paths stay clear.",
-      "width_reason": "1 m clear opening exceeds the requested 0.9 m and avoids an open leaf narrowing the approach."
+      "at_reason": "Cased opening on the shared room boundary with a clear approach on both sides.",
+      "width_reason": "Clear opening at least 1 m. Wider shared routes allow passing and turning."
     },
     {
-      "id": "d_lr_bed4",
+      "id": "d_bed4",
       "between": [
-        "lr_hall",
+        "lr_sidehall",
         "lr_bed4"
       ],
-      "wall": "z",
+      "wall": "x",
       "at": [
-        11.3,
-        5.25
+        10.5,
+        15
       ],
-      "width": 1.0,
+      "width": 1.2,
       "state": "removed",
-      "at_reason": "Hall opening centred in service and living bays, offset 0.8 m from the bedroom bay edge to leave a bed along the opposite wall. Door-to-centre paths stay clear.",
-      "width_reason": "1 m clear opening exceeds the requested 0.9 m and avoids an open leaf narrowing the approach."
-    },
-    {
-      "id": "d_lr_bath1",
-      "between": [
-        "lr_hall",
-        "lr_bath1"
-      ],
-      "wall": "z",
-      "at": [
-        15.0,
-        5.25
-      ],
-      "width": 1.0,
-      "state": "removed",
-      "at_reason": "Hall opening centred in service and living bays, offset 0.8 m from the bedroom bay edge to leave a bed along the opposite wall. Door-to-centre paths stay clear.",
-      "width_reason": "1 m clear opening exceeds the requested 0.9 m and avoids an open leaf narrowing the approach."
-    },
-    {
-      "id": "d_lr_bath2",
-      "between": [
-        "lr_hall",
-        "lr_bath2"
-      ],
-      "wall": "z",
-      "at": [
-        17.0,
-        5.25
-      ],
-      "width": 1.0,
-      "state": "removed",
-      "at_reason": "Hall opening centred in service and living bays, offset 0.8 m from the bedroom bay edge to leave a bed along the opposite wall. Door-to-centre paths stay clear.",
-      "width_reason": "1 m clear opening exceeds the requested 0.9 m and avoids an open leaf narrowing the approach."
-    },
-    {
-      "id": "d_front",
-      "between": [
-        "outside",
-        "lr_living"
-      ],
-      "wall": "z",
-      "at": [
-        2.5,
-        0
-      ],
-      "width": 1.6,
-      "state": "removed",
-      "at_reason": "Only entrance, on the south living-room wall.",
-      "width_reason": "A 1.6 m double front entrance, or living-to-hall cased opening, provides passing and turning room. Earlier 1 m openings passed static path checks but left one robot inside during full return tests. All other interior openings remain 1 m."
+      "at_reason": "Cased opening on the shared room boundary with a clear approach on both sides.",
+      "width_reason": "Clear opening at least 1 m. Wider shared routes allow passing and turning."
     }
   ],
   "landmarks": [
     {
-      "room": "lr_living",
-      "kind": "apartment_modern_sofa",
+      "room": "lr_great",
+      "kind": "apartment_counter",
       "at": [
-        4.03,
-        1.85
-      ],
-      "yaw": 270,
-      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
-      "yaw_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
-    },
-    {
-      "room": "lr_living",
-      "kind": "console_table_with_vase",
-      "at": [
-        0.7147,
-        1.2285
+        1.3424,
+        3.08
       ],
       "yaw": 90,
-      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
-      "yaw_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py.",
+      "yaw_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
     },
     {
-      "room": "lr_kitchen",
+      "room": "lr_great",
       "kind": "stove_and_hood",
       "at": [
-        8.55,
+        0.87,
         0.77
       ],
       "yaw": 0,
-      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
-      "yaw_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py.",
+      "yaw_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
     },
     {
-      "room": "lr_kitchen",
+      "room": "lr_great",
       "kind": "tall_steel_fridge",
       "at": [
-        9.18,
-        1.9882
+        2.1082,
+        0.82
       ],
-      "yaw": 270,
-      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
-      "yaw_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+      "yaw": 0,
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py.",
+      "yaw_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
+    },
+    {
+      "room": "lr_great",
+      "kind": "dining_table_six_chairs",
+      "at": [
+        3.77,
+        3.68
+      ],
+      "yaw": 0,
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py.",
+      "yaw_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
+    },
+    {
+      "room": "lr_great",
+      "kind": "apartment_modern_sofa",
+      "at": [
+        5.77,
+        0.97
+      ],
+      "yaw": 0,
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py.",
+      "yaw_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
     },
     {
       "room": "lr_family",
       "kind": "apartment_modern_sofa",
       "at": [
-        10.97,
-        1.65
+        1.57,
+        5.97
       ],
-      "yaw": 90,
-      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
-      "yaw_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+      "yaw": 0,
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py.",
+      "yaw_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
     },
     {
-      "room": "lr_family",
-      "kind": "console_table_with_vase",
+      "room": "lr_primary",
+      "kind": "apartment_bed",
       "at": [
-        14.2853,
-        2.2715
+        9.17,
+        1.42
       ],
-      "yaw": 270,
-      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
-      "yaw_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+      "yaw": 0,
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py.",
+      "yaw_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
+    },
+    {
+      "room": "lr_primary",
+      "kind": "tall_wardrobe",
+      "at": [
+        9.2796,
+        4.0217
+      ],
+      "yaw": 0,
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py.",
+      "yaw_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
+    },
+    {
+      "room": "lr_ensuite",
+      "kind": "clawfoot_bathtub",
+      "at": [
+        13.82,
+        0.82
+      ],
+      "yaw": 0,
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py.",
+      "yaw_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
+    },
+    {
+      "room": "lr_closet",
+      "kind": "tall_wardrobe",
+      "at": [
+        16.5296,
+        0.9783
+      ],
+      "yaw": 0,
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py.",
+      "yaw_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
     },
     {
       "room": "lr_utility",
       "kind": "utility_washer",
       "at": [
-        16.5,
-        0.795
+        13.32,
+        3.795
       ],
       "yaw": 0,
-      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
-      "yaw_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py.",
+      "yaw_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
     },
     {
-      "room": "lr_bed1",
-      "kind": "blue_double_bed",
+      "room": "lr_utility",
+      "kind": "supply_boxes",
       "at": [
-        2.03,
-        9.65
+        16.82,
+        3.77
       ],
-      "yaw": 270,
-      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
-      "yaw_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+      "yaw": 0,
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py.",
+      "yaw_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
+    },
+    {
+      "room": "lr_bath",
+      "kind": "sink_with_mirror",
+      "at": [
+        11.295,
+        8.3122
+      ],
+      "yaw": 0,
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py.",
+      "yaw_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
     },
     {
       "room": "lr_bed2",
-      "kind": "blue_double_bed",
+      "kind": "apartment_bed",
       "at": [
-        5.53,
-        9.65
+        14.17,
+        8.92
       ],
-      "yaw": 270,
-      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
-      "yaw_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+      "yaw": 0,
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py.",
+      "yaw_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
     },
     {
       "room": "lr_bed3",
       "kind": "blue_double_bed",
       "at": [
-        9.03,
-        9.65
+        14.22,
+        11.97
       ],
-      "yaw": 270,
-      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
-      "yaw_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+      "yaw": 0,
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py.",
+      "yaw_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
     },
     {
       "room": "lr_bed4",
       "kind": "blue_double_bed",
       "at": [
-        12.53,
-        9.65
+        14.22,
+        14.97
       ],
-      "yaw": 270,
-      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
-      "yaw_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
-    },
-    {
-      "room": "lr_bath1",
-      "kind": "clawfoot_bathtub",
-      "at": [
-        15.18,
-        9.65
-      ],
-      "yaw": 270,
-      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
-      "yaw_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
-    },
-    {
-      "room": "lr_bath2",
-      "kind": "clawfoot_bathtub",
-      "at": [
-        17.18,
-        9.65
-      ],
-      "yaw": 270,
-      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
-      "yaw_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+      "yaw": 0,
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py.",
+      "yaw_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
     }
   ],
   "fires": [
@@ -507,112 +587,120 @@
       "id": "f1",
       "room": "lr_bed4",
       "at": [
-        12.53,
-        9.65
+        14.22,
+        14.97
       ],
       "intensity": 1,
-      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
-      "intensity_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py.",
+      "intensity_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
     }
   ],
   "emergency_lights": [
     {
       "at": [
-        9.0,
-        4.375
+        4.0,
+        2.5
       ],
-      "note": "lr_hall",
-      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+      "note": "lr_great",
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
     },
     {
       "at": [
-        2.5,
-        1.75
-      ],
-      "note": "lr_living",
-      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
-    },
-    {
-      "at": [
-        7.5,
-        1.75
-      ],
-      "note": "lr_kitchen",
-      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
-    },
-    {
-      "at": [
-        12.5,
-        1.75
+        4.0,
+        6.25
       ],
       "note": "lr_family",
-      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
     },
     {
       "at": [
-        16.5,
-        1.75
+        10.25,
+        2.5
+      ],
+      "note": "lr_primary",
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
+    },
+    {
+      "at": [
+        13.875,
+        1.5
+      ],
+      "note": "lr_ensuite",
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
+    },
+    {
+      "at": [
+        16.625,
+        1.5
+      ],
+      "note": "lr_closet",
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
+    },
+    {
+      "at": [
+        15.25,
+        4.0
       ],
       "note": "lr_utility",
-      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
     },
     {
       "at": [
-        1.75,
-        8.125
+        13.0,
+        6.25
       ],
-      "note": "lr_bed1",
-      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+      "note": "lr_hall",
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
     },
     {
       "at": [
-        5.25,
-        8.125
+        9.25,
+        12.0
+      ],
+      "note": "lr_sidehall",
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
+    },
+    {
+      "at": [
+        11.75,
+        9.0
+      ],
+      "note": "lr_bath",
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
+    },
+    {
+      "at": [
+        15.5,
+        9.0
       ],
       "note": "lr_bed2",
-      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
     },
     {
       "at": [
-        8.75,
-        8.125
+        14.25,
+        12.0
       ],
       "note": "lr_bed3",
-      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
     },
     {
       "at": [
-        12.25,
-        8.125
+        14.25,
+        15.0
       ],
       "note": "lr_bed4",
-      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
-    },
-    {
-      "at": [
-        15.0,
-        8.125
-      ],
-      "note": "lr_bath1",
-      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
-    },
-    {
-      "at": [
-        17.0,
-        8.125
-      ],
-      "note": "lr_bath2",
-      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
     }
   ],
-  "clear_path_rule": "0.9 m door-to-centre path and 1.2 m door keepout, checked with conservative furniture mesh bounds.",
-  "footprint_reason": "198 m2 gross area chosen within the brief range; walls are inside this rectangle.",
+  "clear_path_rule": "0.9 m paths between all room doors and clear interior floor, with furniture and people as obstacles.",
   "generator_notes": [
-    "lr_hall (corridor) has no furniture: none fits clear of its doors"
+    "lr_ensuite: sink_with_mirror omitted to preserve the checked 0.9 m paths.",
+    "lr_bath: clawfoot_bathtub omitted to preserve the checked 0.9 m paths."
   ],
-  "version_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
-  "wall_height_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
-  "exterior_wall_thickness_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
-  "interior_wall_thickness_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
-  "door_height_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+  "version_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py.",
+  "wall_height_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py.",
+  "exterior_wall_thickness_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py.",
+  "interior_wall_thickness_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py.",
+  "door_height_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
 }
