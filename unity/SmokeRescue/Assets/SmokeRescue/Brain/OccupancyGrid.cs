@@ -728,7 +728,7 @@ namespace SmokeRescue.Brain
         float? fireClearance;
         /// <summary>Why a target cell cannot be planned to, as a code and name: 1 outside the grid, 2 wall, 3 not known free, 4 inside a
         /// confirmed person's keep-out, 5 inside the obstacle margin, 6 inside the fire margin, 7 the cell is fine but no route reaches it.</summary>
-        internal (int code, string name) WhyNotWalkable(Vector2 p)
+        public (int code, string name) WhyNotWalkable(Vector2 p)
         {
             int i = Cell(p); PrepareNavigation();
             if (i < 0) return (1, "outside the grid");
