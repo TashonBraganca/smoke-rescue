@@ -26,6 +26,7 @@ __pycache__/
 data/recordings/
 data/runs/
 data/public/
+data/real/
 !data/fixtures/
 
 # Inbox for manual downloads
