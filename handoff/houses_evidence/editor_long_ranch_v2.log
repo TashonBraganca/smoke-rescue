@@ -1,0 +1,9 @@
+CSSM_ModuleLoad(): One or more parameters passed to a function were not valid.
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:25.24
+PASS L-shaped wall thickness, wall offsets and courtyard windows
+PASS roof triangle area, cutout, ceiling clearance and lawn exclusion

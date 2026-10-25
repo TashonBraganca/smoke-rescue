@@ -8,14 +8,14 @@
     {
       "room": "lr_bed4",
       "at": [
-        12.53,
-        9.65
+        14.22,
+        14.97
       ],
       "time_s": 0,
       "radius_m": 0.3,
-      "at_reason": "Origin inside the rear-bedroom bed fuel envelope, separated from the entrance by the hall; the initial front living-room fire test left one returning robot inside each house.",
-      "time_s_reason": "Unchanged baseline fire.json parameter, or layout-specific rear-bedroom bed ignition at time zero with 0.3 m radius. Material and numerical assumptions retain the baseline sources.",
-      "radius_m_reason": "Unchanged baseline fire.json parameter, or layout-specific rear-bedroom bed ignition at time zero with 0.3 m radius. Material and numerical assumptions retain the baseline sources."
+      "at_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py.",
+      "time_s_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py.",
+      "radius_m_reason": "World construction choice for the 225 m2 L-shaped long ranch. Existing mission, fire and sensor settings are inherited unchanged; room positions and furniture are checked by validate_ranches.py."
     }
   ],
   "materials": {
@@ -742,5 +742,5 @@
   "step_s_reason": "Existing 0.1 s fixed integration step. FireSim.ValidateConfig checks the explicit surface-exchange stability bound. Source: unity/SmokeRescue/Assets/SmokeRescue/World/FireSim.cs.",
   "ambient_c_reason": "Scenario ambient air at 20 C. This is a selected initial condition. Temperature convention and heat transfer basis: https://www.nist.gov/el/fire-research-division-73300/firegov-fire-service/fire-dynamics",
   "flashover_threshold_c_reason": "Existing 600 C upper-gas flashover trigger. NIST describes gases above 600 C at flashover. This is a temperature criterion, not a scheduled flashover time. https://www.nist.gov/el/fire-research-division-73300/firegov-fire-service/fire-dynamics",
-  "ignitions_reason": "One rear-bedroom bed origin, away from the only entrance. Every later ignition must follow the unchanged fire solver."
+  "ignitions_reason": "One bedroom bed fire. Baseline fire parameters and the 320 s head start remain unchanged."
 }

@@ -4,9 +4,48 @@ from collections import deque
 import json
 import math
 from pathlib import Path
-from validate_building import inside, overlap, footprint, boundary_side, room_paths
+from validate_building import inside, overlap, footprint, boundary_side
 
 ROOT = Path(__file__).resolve().parents[1]
+
+def room_paths(room, doors, obstacles, fire, targets=(), require_all=False):
+    """Connect all door approaches to free interior floor on a 0.1 m grid.
+
+    A fixture may occupy the mathematical centre. Choose the closest free
+    sample instead. Walls retain the original conservative 0.75 m inset.
+    """
+    x0,z0,x1,z1=room['rect']
+    step,inset,radius=.1,.75,.45
+    nx,nz=round((x1-x0-2*inset)/step),round((z1-z0-2*inset)/step)
+    if nx<0 or nz<0: return ['Room too narrow for a 0.9 m path']
+    boxes=[footprint(o,fire) for o in obstacles]
+    def point(k): return x0+inset+k[0]*step,z0+inset+k[1]*step
+    def free(k):
+        x,z=point(k)
+        return all(max(a-x,0,x-c)**2+max(b-z,0,z-d)**2 >= radius**2-1e-6 for a,b,c,d in boxes)
+    keys={(i,j) for i in range(nx+1) for j in range(nz+1) if free((i,j))}
+    if not keys: return ['No 0.9 m clear interior floor']
+    anchor=min(keys,key=lambda k:((k[0]-nx/2)**2+(k[1]-nz/2)**2,k))
+    seen={anchor}; queue=deque(seen)
+    while queue:
+        i,j=queue.popleft()
+        for k in ((i-1,j),(i+1,j),(i,j-1),(i,j+1)):
+            if k in keys and k not in seen: seen.add(k);queue.append(k)
+    failures=[]
+    for door in doors:
+        side=boundary_side(door,room['rect'])
+        if side is None:
+            failures.append(door['id']+' has no boundary approach');continue
+        dx,dz=dict(south=(0,inset),north=(0,-inset),west=(inset,0),east=(-inset,0))[side]
+        k=(max(0,min(nx,round((door['at'][0]+dx-x0-inset)/step))),max(0,min(nz,round((door['at'][1]+dz-z0-inset)/step))))
+        if k not in seen: failures.append(door['id']+' has no 0.9 m path to clear interior floor')
+    if require_all and seen!=keys:
+        failures.append('Furniture or a body divides the 0.9 m clear floor')
+    for target in targets:
+        a,b,c,d=footprint(target,fire)
+        if not any(max(a-point(k)[0],0,point(k)[0]-c)**2+max(b-point(k)[1],0,point(k)[1]-d)**2<=.95**2 for k in seen):
+            failures.append('No 0.9 m path to within 0.95 m of a person body')
+    return failures
 
 def furniture_clear(lm, room, plan, fire, previous):
     box = footprint(lm,fire)
@@ -20,7 +59,7 @@ def furniture_clear(lm, room, plan, fire, previous):
         keep={'south':[x-.45,z,x+.45,z+1.2],'north':[x-.45,z-1.2,x+.45,z],
               'west':[x,z-.45,x+1.2,z+.45],'east':[x-1.2,z-.45,x,z+.45]}[side]
         if overlap(box,keep): return False
-    return not room_paths(room,[d for d in plan['doors'] if room['id'] in d['between']],previous+[lm],fire)
+    return not room_paths(room,[d for d in plan['doors'] if room['id'] in d['between']],previous+[lm],fire,require_all='footprint_rects' in plan)
 
 def validate(plan,fire,sc):
     rooms={r['id']:r for r in plan['rooms']}; fp=plan['footprint']
@@ -31,7 +70,11 @@ def validate(plan,fire,sc):
         assert a<c and b<d and inside([a,b],fp) and inside([c,d],fp)
         assert not any(overlap(r['rect'],t['rect']) for t in plan['rooms'][i+1:]), 'Overlapping rooms'
         area+=(c-a)*(d-b)
-    assert abs(area-(fp[2]-fp[0])*(fp[3]-fp[1]))<1e-6, 'Untiled footprint'
+    tiles=plan.get('footprint_rects',[fp])
+    assert all(inside(t[:2],fp) and inside(t[2:],fp) and t[0]<t[2] and t[1]<t[3] for t in tiles), 'Invalid footprint tile'
+    assert all(not overlap(t,u) for i,t in enumerate(tiles) for u in tiles[i+1:]), 'Overlapping footprint tiles'
+    assert all(abs(sum(max(0,min(r['rect'][2],t[2])-max(r['rect'][0],t[0]))*max(0,min(r['rect'][3],t[3])-max(r['rect'][1],t[1])) for t in tiles)-(r['rect'][2]-r['rect'][0])*(r['rect'][3]-r['rect'][1]))<1e-6 for r in rooms.values()), 'Room outside footprint tiles'
+    assert abs(area-sum((t[2]-t[0])*(t[3]-t[1]) for t in tiles))<1e-6, 'Untiled footprint'
     graph={rid:set() for rid in ['outside',*rooms]}
     assert sum('outside' in d['between'] for d in plan['doors'])==1
     for d in plan['doors']:
@@ -50,12 +93,25 @@ def validate(plan,fire,sc):
     for r in plan['rooms']:
         furniture=[l for l in plan['landmarks'] if l['room']==r['id']]
         for i,lm in enumerate(furniture): assert furniture_clear(lm,r,plan,fire,furniture[:i]), f'Furniture blocks {r["id"]}'
-        assert not room_paths(r,[d for d in plan['doors'] if r['id'] in d['between']],furniture,fire)
+        assert not room_paths(r,[d for d in plan['doors'] if r['id'] in d['between']],furniture,fire,require_all='footprint_rects' in plan)
     assert 4<=len(sc['survivors'])<=5 and len({s['room'] for s in sc['survivors']})==len(sc['survivors'])
     for s in sc['survivors']:
         assert inside(s['at'],rooms[s['room']]['rect'],.6), 'Person near a wall'
         assert all(not inside(s['at'],[a-.9,b-.9,c+.9,d+.9]) for a,b,c,d in [footprint(l,fire) for l in plan['landmarks']]), 'Person intersects furniture envelope'
         assert all(math.dist(s['at'],d['at'])>=1.2 for d in plan['doors']), 'Person at door'
+    body_fire=dict(fire,furniture=dict(fire['furniture'],person_body={'size_m':[.9,.9]}))
+    for room in plan['rooms'] if 'footprint_rects' in plan else []:
+        furniture=[l for l in plan['landmarks'] if l['room']==room['id']]
+        bodies=[]
+        for person in (s for s in sc['survivors'] if s['room']==room['id']):
+            kind='person_'+person['id']
+            body_fire['furniture'][kind]={'size_m':person['body_size_m']}
+            body=dict(kind=kind,at=person['at'],yaw=person['yaw'])
+            box=footprint(body,body_fire)
+            assert inside(box[:2],room['rect'],.25) and inside(box[2:],room['rect'],.25), 'Person body crosses wall'
+            assert all(not overlap(box,footprint(l,fire)) for l in furniture), 'Person body intersects furniture'
+            bodies.append(body)
+        assert not room_paths(room,[d for d in plan['doors'] if room['id'] in d['between']],furniture+bodies,body_fire,targets=bodies,require_all=True), 'Person blocks a 0.9 m room path'
     assert all(not inside(r['spawn']['at'],fp) for r in sc['robots'])
     assert sc['search_area']==fp and sc['duration_s']==600 and sc['search_s']==480 and sc['time_limit']
     assert all(r['control']=='autonomous' and r['route']==[] for r in sc['robots'])

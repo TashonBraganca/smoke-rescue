@@ -1,0 +1,15 @@
+Brief: redesign the long ranch (Codex, 25 Oct, due 18:30 IST). Work only in /Volumes/Tashon/opencv/wt_longranch.
+The owner likes the family ranch; keep it unchanged. The long ranch (config/floorplan_long_ranch.json, fire_long_ranch.json,
+scenario_long_ranch_full.json) must become a clearly different, realistic one-floor house, not a straight hallway with rooms on
+both sides. Ideas: an L-shaped plan with a bend in the corridor, an open-plan living/kitchen/dining great room, a family room off
+it, a primary suite with its own bath and walk-in closet, a utility/mudroom link, a side hall to three more bedrooms. 10 to 12
+rooms, 190 to 230 m2, one front door, robot pads outside it as before (B 1.2 m behind A), 5 people in different rooms, one
+bedroom fire. Interior openings >= 0.9 m, 0.9 m clear paths, no room reachable only through a person or furniture.
+Make it good for the robots to show what they do: some rooms only visible after a turn, one room reached through another,
+long sight lines where the two robots see the same place (visual SLAM needs shared views).
+Use your own tools from the first job (tools/build_ranch_configs.py, validate_ranches.py, test_ranches.py, score_ranches.py,
+check_ranch_editor.py) and the Unity editor code you wrote (it builds any floorplan; exterior must follow an L shape: roof,
+eaves, porch, driveway, lawn). Brain code and config/brain.json are off limits. Do not launch Unity (busy recording).
+Verify: validator passes, logic tests pass (tools/headless/test.sh), one headless full mission on the new house with the
+current brain: report rooms entered, floor %, people, false, both robots out (score_ranches.py). Fix the house, never the brain.
+Write handoff/longranch_v2_report.txt with an ASCII plan and the numbers. You cannot commit (sandbox); leave files in place.

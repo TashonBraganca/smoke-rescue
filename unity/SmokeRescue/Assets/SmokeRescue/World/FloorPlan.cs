@@ -13,6 +13,14 @@ namespace SmokeRescue.World
         public int version;
         public string units;
         public float[] footprint;                  // x_min, z_min, x_max, z_max
+        // Optional disjoint occupied rectangles. footprint remains the world bounds.
+        public float[][] footprint_rects;
+        [JsonIgnore] public IEnumerable<Rect> BuildingRects {
+            get {
+                foreach (var r in footprint_rects ?? new[] { footprint })
+                    yield return Rect.MinMaxRect(r[0],r[1],r[2],r[3]);
+            }
+        }
         public float wall_height;
         public float exterior_wall_thickness;
         public float interior_wall_thickness;
