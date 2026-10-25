@@ -110,14 +110,43 @@ namespace SmokeRescue.World
                 var (alongX, at) = kv.Key;
                 foreach (var (a, b) in Union(kv.Value))
                 {
-                    bool exterior = alongX ? (Near(at, fp.yMin) || Near(at, fp.yMax)) : (Near(at, fp.xMin) || Near(at, fp.xMax));
-                    float t = exterior ? plan.exterior_wall_thickness : plan.interior_wall_thickness;
-                    float lo = alongX ? fp.yMin : fp.xMin;
-                    float centre = !exterior ? at : (Near(at, lo) ? at + t / 2 : at - t / 2);
-                    lines.Add(new WallLine { alongX = alongX, at = at, a = a, b = b, thickness = t, centre = centre });
+                    if (plan.footprint_rects==null) {
+                        bool exterior=alongX ? Near(at,fp.yMin)||Near(at,fp.yMax) : Near(at,fp.xMin)||Near(at,fp.xMax);
+                        float t=exterior ? plan.exterior_wall_thickness : plan.interior_wall_thickness;
+                        float low=alongX ? fp.yMin : fp.xMin;
+                        lines.Add(new WallLine { alongX=alongX,at=at,a=a,b=b,thickness=t,
+                            centre=exterior ? at+(Near(at,low) ? t/2 : -t/2) : at });
+                        continue;
+                    }
+                    var points = new SortedSet<float> { a,b };
+                    foreach (var room in plan.rooms)
+                            foreach (float p in alongX ? new[] { room.rect[0],room.rect[2] } : new[] { room.rect[1],room.rect[3] })
+                                if (p>a && p<b) points.Add(p);
+                    var stops=points.ToArray();
+                    for (int i=0;i<stops.Length-1;i++) {
+                        float start=stops[i],end=stops[i+1];
+                        Vector3 inward=ExteriorInward(plan,alongX,at,(start+end)/2);
+                        bool exterior=inward.sqrMagnitude>0;
+                        float t=exterior ? plan.exterior_wall_thickness : plan.interior_wall_thickness;
+                        float centre=at+(alongX ? inward.z : inward.x)*t/2;
+                        if (lines.Count>0 && lines[^1].alongX==alongX && Near(lines[^1].at,at) && Near(lines[^1].b,start)
+                            && Near(lines[^1].thickness,t) && Near(lines[^1].centre,centre)) {
+                            var previous=lines[^1];previous.b=end;lines[^1]=previous;
+                        } else lines.Add(new WallLine { alongX=alongX,at=at,a=start,b=end,thickness=t,centre=centre });
+                    }
                 }
             }
             return lines;
+        }
+
+        // A facade has occupied floor on exactly one side, including a concave corner.
+        public static Vector3 ExteriorInward(FloorPlan plan,bool alongX,float at,float pos)
+        {
+            bool Side(float across) => plan.rooms.Any(r => alongX
+                ? pos>=r.rect[0] && pos<=r.rect[2] && across>r.rect[1] && across<r.rect[3]
+                : across>r.rect[0] && across<r.rect[2] && pos>=r.rect[1] && pos<=r.rect[3]);
+            bool low=Side(at-.01f), high=Side(at+.01f);
+            return low==high ? Vector3.zero : (alongX ? Vector3.forward : Vector3.right)*(high ? 1 : -1);
         }
 
         static void BuildWalls(FloorPlan plan, Rect fp, GameObject parent, Material mat, int layer)
@@ -184,9 +213,11 @@ namespace SmokeRescue.World
             };
             foreach (var (alongX, at, a0, b0, n, side) in edges)
             {
-                float t = T(alongX, at);
+                bool exterior=ExteriorInward(plan,alongX,at,(a0+b0)/2).sqrMagnitude>0;
+                float t=exterior ? 2*plan.exterior_wall_thickness : plan.interior_wall_thickness;
                 // Shorten by the half thickness of the perpendicular walls at each end.
                 float a = a0 + T(!alongX, a0) / 2, b = b0 - T(!alongX, b0) / 2;
+                if (plan.footprint_rects==null) t=T(alongX,at);
                 float plane = at + (alongX ? n.z : n.x) * (t / 2 + SkinOffset);
                 var cuts = DoorCuts(plan, alongX, at, a0, b0);
                 var wins = WindowCuts(plan, fp, alongX, at, a0, b0);
@@ -294,6 +325,8 @@ namespace SmokeRescue.World
                 foreach (var (alongX, at, a, b, n) in edges)
                 {
                     bool exterior = alongX ? (Near(at, fp.yMin) || Near(at, fp.yMax)) : (Near(at, fp.xMin) || Near(at, fp.xMax));
+                    if (plan.footprint_rects != null)
+                        exterior=ExteriorInward(plan,alongX,at,(a+b)/2).sqrMagnitude>0;
                     if (!exterior || b - a < 2.2f) continue;
                     float mid = (a + b) / 2;
                     foreach (var pos in new[] { mid, mid - 1.2f, mid + 1.2f, mid - 2.2f, mid + 2.2f })

@@ -1,0 +1,70 @@
+{
+  "method": "Transformed glTF POSITION accessor bounds from local posed models. Horizontal dimensions include 0.05 m padding on each side. Unity centres these bounds at scenario.at and applies scenario.yaw. No Unity runtime bounds measurement is claimed.",
+  "people": {
+    "s1": {
+      "model": "models/survivors/s1.glb",
+      "sha256": "c85ca572a80b669b493ccdbe072970ee86979c60fcd23a6875f63fcc48a2d95d",
+      "size_m": [
+        1.3359507322311401,
+        0.43943876028060913,
+        0.6688786745071411
+      ],
+      "body_size_m": [
+        1.435951,
+        0.768879
+      ]
+    },
+    "s2": {
+      "model": "models/survivors/s2.glb",
+      "sha256": "522e2d5385b7b2c642268cd7fb3332f1c125ccaa2ecef376dab9da751d7f90d7",
+      "size_m": [
+        0.5247967839241028,
+        0.9625937938690186,
+        0.801072359085083
+      ],
+      "body_size_m": [
+        0.624797,
+        0.901072
+      ]
+    },
+    "s3": {
+      "model": "models/survivors/s3.glb",
+      "sha256": "9a54dc09be7d80c15599a183e24a86ff8ca655086322f40b8deae8e13130bb0d",
+      "size_m": [
+        0.95152348279953,
+        0.635666012763977,
+        1.7554858326911926
+      ],
+      "body_size_m": [
+        1.051523,
+        1.855486
+      ]
+    },
+    "s4": {
+      "model": "models/survivors/s4.glb",
+      "sha256": "d669ed21ed9fc3467baa0977cbc5c99cdca478486c3bdc162ce5e18fa86718b0",
+      "size_m": [
+        0.8558711409568787,
+        0.5137765407562256,
+        0.7205464839935303
+      ],
+      "body_size_m": [
+        0.955871,
+        0.820546
+      ]
+    },
+    "s6": {
+      "model": "models/survivors/s2.glb",
+      "sha256": "522e2d5385b7b2c642268cd7fb3332f1c125ccaa2ecef376dab9da751d7f90d7",
+      "size_m": [
+        0.5247967839241028,
+        0.9625937938690186,
+        0.801072359085083
+      ],
+      "body_size_m": [
+        0.624797,
+        0.901072
+      ]
+    }
+  }
+}

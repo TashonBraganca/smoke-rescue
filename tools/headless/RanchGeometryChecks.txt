@@ -1,0 +1,43 @@
+using System;
+using System.IO;
+using System.Linq;
+using SmokeRescue.World;
+using SmokeRescue.Editor;
+using Newtonsoft.Json;
+using UnityEngine;
+static class RanchGeometryChecks {
+    static void Require(bool ok,string message) { if (!ok) throw new Exception(message); }
+    static int Main(string[] args) {
+        var plan=JsonConvert.DeserializeObject<FloorPlan>(File.ReadAllText(Path.Combine(args[0],"config/floorplan_long_ranch.json")));
+        var fp=Rect.MinMaxRect(plan.footprint[0],plan.footprint[1],plan.footprint[2],plan.footprint[3]);
+        var lines=HouseBuilder.WallLines(plan,fp);
+        var notch=lines.Single(l=>l.alongX && Math.Abs(l.at-7.5f)<.001f && l.a<4 && l.b>4);
+        Require(Math.Abs(notch.thickness-.25f)<.001f,"Notch facade must use exterior wall thickness");
+        Require(Math.Abs(notch.centre-7.375f)<.001f,"Notch facade must sit inside occupied floor");
+        Require(lines.Any(l=>!l.alongX && Math.Abs(l.at-8)<.001f && l.a>=7.5f && Math.Abs(l.thickness-.25f)<.001f),"Bedroom wing needs an exterior west facade");
+        Require(HouseBuilder.WindowSpans(plan,fp).Any(w=>w.alongX && Math.Abs(w.at-7.5f)<.001f && w.pos<8),"Family room needs a courtyard window");
+        foreach (var d in plan.doors) {
+            bool horizontal=d.wall=="z";
+            float at=horizontal ? d.at[1] : d.at[0],pos=horizontal ? d.at[0] : d.at[1];
+            Require(lines.Any(l=>l.alongX==horizontal && Math.Abs(l.at-at)<.001f && l.a<=pos-d.width/2 && l.b>=pos+d.width/2),"Wall segmentation clips door "+d.id);
+        }
+        Console.WriteLine("PASS L-shaped wall thickness, wall offsets and courtyard windows");
+        var triangles=RanchExteriorBuilder.RoofTriangles(plan);
+        double area=0;
+        for (int i=0;i<triangles.Count;i+=3) {
+            var a=triangles[i];var b=triangles[i+1];var c=triangles[i+2];
+            var mid=(a+b+c)/3;
+            Require(!(mid.x<7.55f-.001f && mid.z>7.95f+.001f),"Roof covers the outdoor notch");
+            Require(a.y>=plan.wall_height && b.y>=plan.wall_height && c.y>=plan.wall_height,"Roof intersects room ceilings");
+            area+=Math.Abs((b.x-a.x)*(c.z-a.z)-(b.z-a.z)*(c.x-a.x))/2;
+        }
+        Require(Math.Abs(area-256.86)<.01,"Roof must cover both wings and 0.45 m eaves exactly once");
+        var yard=RanchExteriorBuilder.LawnRects(plan);
+        Require(yard.Any(r=>r.Contains(new Vector2(4,12))),"Outdoor notch must have lawn");
+        Require(!yard.Any(r=>r.Contains(new Vector2(9,12))),"Bedroom wing must have no indoor lawn");
+        foreach (var r in yard)
+            Require(!plan.BuildingRects.Any(b=>r.Overlaps(b)),"Lawn overlaps occupied floor");
+        Console.WriteLine("PASS roof triangle area, cutout, ceiling clearance and lawn exclusion");
+        return 0;
+    }
+}

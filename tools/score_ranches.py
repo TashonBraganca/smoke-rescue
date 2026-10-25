@@ -63,10 +63,19 @@ def score(name, suffix=""):
     return {'run':str(run.relative_to(ROOT)),'house':name,'duration_s':result['duration_s'],'rooms_entered':len(entered),'rooms_total':len(world['rooms']),'usable_floor_coverage_pct':round(100*free_hit/max(1,free_total),2),'gross_floor_coverage_pct':round(100*gross_hit/max(1,gross_total),2),'usable_samples_searched':free_hit,'usable_samples':free_total,'people_confirmed':len(found),'people_total':len(world['people']),'confirmed_ids':found,'false_confirmation_events':false,'both_walked_out':all(r['walked_out'] for r in robots.values()),'robots':robots,'rooms':per_room}
 
 if __name__=='__main__':
-    for name in ('family_ranch','long_ranch'):
-        import sys
-        suffix = sys.argv[1] if len(sys.argv)>1 else ''
-        if suffix == '_final': suffix = '_wide' if name == 'family_ranch' else '_front_living'
-        output=score(name, suffix)
-        (ROOT/f'handoff/houses_evidence/metrics_{name}{sys.argv[2] if len(sys.argv)>2 else ""}.json').write_text(json.dumps(output,indent=2)+'\n')
+    import argparse
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('suffix',nargs='?',default='')
+    parser.add_argument('metric_tag',nargs='?',default='')
+    parser.add_argument('--house',choices=['family_ranch','long_ranch'])
+    parser.add_argument('--output',type=Path)
+    args=parser.parse_args()
+    if args.output and not args.house:
+        parser.error('--output requires --house')
+    for name in (args.house,) if args.house else ('family_ranch','long_ranch'):
+        suffix=args.suffix
+        if suffix=='_final': suffix='_wide' if name=='family_ranch' else '_front_living'
+        output=score(name,suffix)
+        path=args.output or ROOT/f'handoff/houses_evidence/metrics_{name}{args.metric_tag}.json'
+        path.write_text(json.dumps(output,indent=2)+'\n')
         print(json.dumps(output,indent=2))
