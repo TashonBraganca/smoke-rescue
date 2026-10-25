@@ -220,6 +220,7 @@ namespace SmokeRescue.Brain
         public int frontier_information_radius_cells = 3;
         public float lookahead_m = 0.45f;
         public float goal_tolerance_m = 0.18f, return_arrive_m = 0.5f;
+        public float end_clear_way_out_m = 0f, end_clear_way_side_m = 0f;   // see config/brain.json
         public float escape_check_s = 2f, escape_fire_margin_m = 2f, escape_ignore_m = 2f, escape_recheck_s = 10f;
         // Off unless brain.json turns it on, so the existing reflex tests keep their exact behaviour.
         public bool route_watch = false;
