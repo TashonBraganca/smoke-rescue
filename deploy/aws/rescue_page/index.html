@@ -11,7 +11,7 @@
 <body>
 <a class="skip" href="#main">Skip to the page</a>
 <header class="top">
-  <div class="brand"><span class="mark" aria-hidden="true"></span>Smoke Rescue</div>
+  <a class="brand" href="https://main.dyhvyjxo1bz4g.amplifyapp.com/"><span class="mark" aria-hidden="true"></span>Smoke Rescue</a>
   <button id="theme" class="ghost small" type="button" aria-label="Colour theme: automatic">Theme: auto</button>
 </header>
 
@@ -28,7 +28,7 @@
         <div class="filters" role="group" aria-label="Show houses">
           <button type="button" class="chip" data-filter="all" aria-pressed="true">All</button>
           <button type="button" class="chip" data-filter="ours" aria-pressed="false">Our test houses</button>
-          <button type="button" class="chip" data-filter="HouseExpo" aria-pressed="false">Real floor plans</button>
+          <button type="button" class="chip" data-filter="HouseExpo" aria-pressed="false">Dataset plans</button>
         </div>
         <ul id="gallery" class="gallery" aria-label="Houses"></ul>
         <p id="gallery-error" class="notice bad" hidden></p>
@@ -40,6 +40,11 @@
           <canvas id="preview" width="400" height="260" aria-label="Floor plan of the selected house"></canvas>
           <figcaption id="preview-cap" class="muted">Choose a house on the left.</figcaption>
         </figure>
+        <div class="scene-actions">
+          <button id="edit-scene" class="ghost small" type="button">Place people and fire</button>
+          <button id="random-scene" class="ghost small" type="button">Random</button>
+        </div>
+        <p id="scene-summary" class="fine">People and fire follow this house's fixed generator seed.</p>
 
         <fieldset>
           <legend>Robots</legend>
@@ -60,8 +65,10 @@
           <p id="diff-line" class="diff-line"></p>
         </fieldset>
 
+        <label class="terra-toggle"><input id="terra" type="checkbox" checked> Ask Terra to choose search targets</label>
+        <p class="fine">Terra uses the robots' reports. The brain keeps moving while it answers.</p>
         <button id="start" class="primary" type="button" disabled>Start the rescue</button>
-        <p class="fine">A live run takes about 3 minutes: up to 90 s to start a cloud machine, then 180 s of simulated time played back as it arrives. If the cloud is busy you get the recorded run of this exact setup, clearly labelled.</p>
+        <p class="fine">A live mission usually takes 3 to 5 minutes. Playback starts as the first frames arrive. If a live slot is unavailable, watch the recorded brain-only run of this exact scene.</p>
         <p id="health" class="fine" hidden></p>
       </aside>
     </div>
@@ -159,9 +166,25 @@
   </section>
 </main>
 
+<dialog id="scene-editor" aria-labelledby="editor-heading">
+  <div class="editor-top"><h2 id="editor-heading">Place the scene</h2><button id="close-editor" class="ghost" type="button">Back to setup</button></div>
+  <p>Choose a tool, then click or tap the plan. Keep people and fire on clear floor. The server checks door paths before preparing the scene.</p>
+  <div class="scene-actions" role="group" aria-label="Placement tools">
+    <button class="chip" data-tool="person" aria-pressed="true" type="button">Person</button>
+    <button class="chip" data-tool="fire" aria-pressed="false" type="button">Fire origin</button>
+    <button class="chip" data-tool="erase" aria-pressed="false" type="button">Remove</button>
+    <button id="clear-scene" class="ghost small" type="button">Clear scene</button>
+  </div>
+  <canvas id="placement" aria-label="House plan for placing people and fire. The coordinate controls below provide keyboard placement."></canvas>
+  <div class="coordinate-controls"><label>Right, metres <input id="place-x" type="number" step="0.25" value="0"></label><label>Forward, metres <input id="place-y" type="number" step="0.25" value="3"></label><button id="place-point" class="ghost" type="button">Place at these coordinates</button></div>
+  <p id="placement-message" role="status">Place up to five people and one fire origin.</p>
+  <p class="fine">New scenes need a recorded fallback before they can run live. Preparing runs the real brain once, usually 2 to 4 minutes. Your placement is kept while you wait.</p>
+  <div class="scene-actions"><button id="prepare-scene" class="primary" type="button">Prepare this scene</button><button id="watch-prepared" class="ghost" type="button" hidden>Watch the prepared run</button></div>
+</dialog>
+
 <footer class="foot">
   <p><strong>What you are watching.</strong> The real robot brain, running headless on AWS. There is no rendered camera: people are detected through the simulator's sighting model (distance, line of sight and smoke). The fire and the robots' true positions come from the simulator and are drawn for you only. The coloured searched floor comes from each robot's own map, which is all the robot knows.</p>
-  <p id="citation"><strong>Real floor plans</strong> come from HouseExpo (Li et al. 2019, MIT licence, <a href="https://github.com/TeaganLi/HouseExpo">github.com/TeaganLi/HouseExpo</a>), converted to our floor plan format. People and fire are placed by our scenario generator.</p>
+  <p id="citation">Residential dataset plans come from HouseExpo, Li et al., IROS 2020, <a href="https://github.com/TeaganLi/HouseExpo">source</a>. These are synthetic SUNCG-derived layouts converted to our floor plan format. <a href="houseexpo-license.txt">MIT licence and copyright notice</a>.</p>
 </footer>
 <script src="rescue.js"></script>
 </body>

@@ -103,6 +103,20 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 .preview canvas { width: 100%; aspect-ratio: 400 / 260; display: block; background: var(--bg); border-radius: 6px; }
 .preview figcaption { margin-top: .45rem; font-size: .88rem; }
 .preview figcaption b { color: var(--ink); }
+/* The plan remains the main material while tools and coordinates change its actual scene. */
+.scene-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.terra-toggle { display: flex; align-items: center; gap: 10px; font-size: .9rem; }
+.terra-toggle input { width: 20px; height: 20px; accent-color: var(--accent); }
+dialog { width: min(1000px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow: auto; padding: 20px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); color: var(--ink); }
+dialog::backdrop { background: rgb(0 0 0 / .7); }
+dialog > * + * { margin-top: 12px; }
+.editor-top { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+#placement { display: block; width: 100%; height: min(48dvh, 470px); background: var(--bg); cursor: crosshair; touch-action: manipulation; }
+.coordinate-controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+.coordinate-controls label { display: grid; font-size: .85rem; gap: 3px; }
+.coordinate-controls input { width: 120px; min-height: 44px; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; padding: 7px; font: inherit; }
+#placement-message { min-height: 3em; }
+#placement-message.bad { color: var(--bad); }
 fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 legend { font-weight: 650; font-size: .9rem; margin-bottom: .4rem; padding: 0; }
 .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }

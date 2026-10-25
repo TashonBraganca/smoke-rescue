@@ -3,16 +3,17 @@
 (function () {
   "use strict";
 
-  var API = "/api/mission";
+  var API = document.currentScript.getAttribute('data-api') || "/api/mission";
   var GALLERY_URL = "gallery.json";
-  var MISSION_S = 180;
-  var DT = 0.5;
-  var CELL = 0.1, ORIGIN = -25, GRID_W = 500;
-  var POLL_MS = 2000;
+  var MISSION_S = 180; // The bounded engine mission, in simulated seconds.
+  var DT = 0.5; // Match the inclusive replay frame cadence.
+  var CELL = 0.1, ORIGIN = -25, GRID_W = 500; // The brain's fixed gate-frame map grid.
+  var POLL_MS = 2000; // Keep idle browser polling below one request per second.
   var LIMIT_STARTING_S = 150;   // still "starting" after this: give up and show the recorded run
   var LIMIT_STALL_S = 150;      // running but no new data for this long
   var LIMIT_TOTAL_S = 660;      // contract hard limit is 600 s wall on the server
-  var MAX_NET_FAILS = 6;
+  var MAX_NET_FAILS = 6; // Retry temporary network failures before loading the recording.
+  var scene = null, preparedSceneKey = null, preparing = false, placementTool = 'person', prepGeneration = 0;
   if (/[?&]devlimits=1/.test(location.search)) { LIMIT_STARTING_S = 15; LIMIT_STALL_S = 15; LIMIT_TOTAL_S = 60; } // dev server tests only
   var IDS = ["robot_A", "robot_B", "robot_C"];
   var LETTER = { robot_A: "A", robot_B: "B", robot_C: "C" };
@@ -22,6 +23,7 @@
   var REASONS = {
     busy: "All live slots on AWS are in use right now.",
     rate_limited: "Several runs were started from your network in a short time, so this one was not started live.",
+    daily_limited: 'The daily live-mission budget has been used.',
     disabled: "Live runs are switched off at the moment.",
     network: "The live service did not answer.",
     stuck: "The cloud machine took too long to start.",
@@ -139,8 +141,9 @@
     });
   }
   function sizeCanvas(c, cssW, cssH) {
-    var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-    c.style.width = cssW + "px"; c.style.height = cssH + "px";
+    var dpr = Math.min(window.devicePixelRatio || 1, 2.5); // Bound pixel work while preserving readable phone plans.
+    // Responsive plan canvases keep CSS sizing. Fixed inline widths otherwise survive a desktop-to-phone resize.
+    if (c.id === 'replay') { c.style.width = cssW + "px"; c.style.height = cssH + "px"; }
     c.width = Math.round(cssW * dpr); c.height = Math.round(cssH * dpr);
     var ctx = c.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     return ctx;
@@ -204,15 +207,17 @@
     var xf = makeXf(viewBox(h), w, hh, 8);
     drawPlan(ctx, h, xf, { labels: true });
     drawPads(ctx, h, xf, sel.robots);
+    if (scene) drawPlacementMarks(ctx, xf, scene);
   }
   function pickHouse(id, scroll) {
     var h = houseById(id); if (!h) return;
     sel.house = id;
+    resetScene();
     Array.prototype.forEach.call(document.querySelectorAll(".card"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.id === id)); });
     var cap = $("preview-cap"); cap.textContent = "";
     var nm = el("b", null, h.name || h.id); cap.appendChild(nm);
     var txt = ": " + h.rooms + " rooms, " + Math.round(h.floor_m2) + " m², " + h.people + " people inside. ";
-    txt += h.source === "HouseExpo" ? "Real floor plan from HouseExpo" + (h.source_id ? " (" + h.source_id + ")" : "") + "." : "One of our own test houses.";
+    txt += h.source === "HouseExpo" ? "Synthetic residential layout from HouseExpo" + (h.source_id ? " (" + h.source_id + ")" : "") + "." : "One of our own test houses.";
     cap.appendChild(document.createTextNode(txt));
     $("start").disabled = false;
     drawPreview();
@@ -224,10 +229,12 @@
   }
   $("robots").addEventListener("click", function (e) {
     var b = e.target.closest("button"); if (!b) return;
+    invalidateScene();
     sel.robots = +b.dataset.n; setSeg("robots", "n", sel.robots); drawPreview(); saveHash();
   });
   $("difficulty").addEventListener("click", function (e) {
     var b = e.target.closest("button"); if (!b) return;
+    invalidateScene();
     sel.difficulty = b.dataset.d; setSeg("difficulty", "d", sel.difficulty); renderDiffLine(); saveHash();
   });
   function renderDiffLine() {
@@ -275,7 +282,7 @@
       houses = g.houses.filter(function (h) { return h && h.id && Array.isArray(h.walls) && Array.isArray(h.bounds); });
       houses.sort(function (a, b) { return (a.source === "HouseExpo") - (b.source === "HouseExpo") || (a.floor_m2 || 0) - (b.floor_m2 || 0); });
       if (!houses.some(function (h) { return h.source === "HouseExpo"; })) document.querySelector(".filters").hidden = true;
-      if (g.citation) setCitation(g.citation);
+      // The static attribution includes the full licence link and the SUNCG-derived origin.
       var want = readHash();
       setSeg("robots", "n", sel.robots); setSeg("difficulty", "d", sel.difficulty); renderDiffLine();
       renderGallery();
@@ -300,10 +307,136 @@
     opts.cache = "no-store";
     return fetch(url, opts).then(function (r) {
       if (timer) clearTimeout(timer);
-      if (!r.ok) { var e = new Error("HTTP " + r.status); e.status = r.status; throw e; }
+      if (!r.ok) return r.json().catch(function () { return {}; }).then(function (body) {
+        var e = new Error(body.error || ("HTTP " + r.status)); e.status = r.status; e.body = body; throw e;
+      });
       return r.json();
     }, function (e) { if (timer) clearTimeout(timer); throw new Error(e && e.name === "AbortError" ? "timed out" : "network error"); });
   }
+
+  /* Placement is world-side configuration. It is never sent to a robot or to Terra. */
+  function placementMessage(text, bad) { $('placement-message').textContent = text; $('placement-message').className = bad ? 'bad' : ''; }
+  function invalidateScene() {
+    preparedSceneKey = null; prepGeneration++; preparing = false;
+    if (scene) $('start').textContent = 'Prepare my scene';
+    $('prepare-scene').disabled = false; $('watch-prepared').hidden = true;
+  }
+  function resetScene() {
+    scene = null; invalidateScene();
+    $('start').textContent = 'Start the rescue';
+    $('scene-summary').textContent = "People and fire follow this house's fixed generator seed.";
+  }
+  function openEditor() {
+    if (!scene) { scene = { people: [], fire: null }; invalidateScene(); }
+    if (!$('scene-editor').open) $('scene-editor').showModal();
+    drawEditor();
+  }
+  $('edit-scene').addEventListener('click', openEditor);
+  $('close-editor').addEventListener('click', function () { $('scene-editor').close(); drawPreview(); });
+  $('random-scene').addEventListener('click', function () { resetScene(); drawPreview(); });
+  $('clear-scene').addEventListener('click', function () { scene = { people: [], fire: null }; invalidateScene(); drawEditor(); placementMessage('Place up to five people and one fire origin.'); });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-tool]'), function (button) {
+    button.addEventListener('click', function () {
+      placementTool = button.dataset.tool;
+      Array.prototype.forEach.call(document.querySelectorAll('[data-tool]'), function (b) { b.setAttribute('aria-pressed', String(b === button)); });
+    });
+  });
+  function drawPlacementMarks(ctx, xf, value) {
+    ctx.font = '700 12px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    value.people.forEach(function (p, i) {
+      var x = xf.x(p[0]), y = xf.y(p[1]);
+      ctx.fillStyle = colors.person; ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = colors.paper; ctx.fillText(String(i + 1), x, y);
+    });
+    if (value.fire) {
+      ctx.fillStyle = colors.fire; ctx.beginPath(); ctx.arc(xf.x(value.fire[0]), xf.y(value.fire[1]), 11, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = colors.ink; ctx.fillText('Fire', xf.x(value.fire[0]), xf.y(value.fire[1]) - 19);
+    }
+  }
+  function drawEditor() {
+    var h = houseById(sel.house), c = $('placement'); if (!h || !c || !scene) return;
+    var w = c.clientWidth || 700, height = c.clientHeight || 420, ctx = sizeCanvas(c, w, height);
+    ctx.clearRect(0, 0, w, height);
+    var transform = makeXf(viewBox(h), w, height, 20);
+    drawPlan(ctx, h, transform, { labels: true }); drawPads(ctx, h, transform, sel.robots);
+    drawPlacementMarks(ctx, transform, scene);
+  }
+  function pointInRect(p, r, inset) { return p[0] >= r[0] + inset && p[0] <= r[2] - inset && p[1] >= r[1] + inset && p[1] <= r[3] - inset; }
+  function tryPlacement(p) {
+    if (preparing) return placementMessage('This scene is preparing. Close the editor to keep waiting, or clear it to make another scene.', true);
+    // Match the server's 0.25 m fire grid, 0.6 m wall margin, 0.9 m furniture envelope and 1.2 m door margin.
+    p = p.map(function (v) { return Math.round(v * 4) / 4; });
+    if (!p.every(num)) return placementMessage('Enter two finite coordinates.', true);
+    var h = houseById(sel.house), geometry = h.placement_geometry;
+    if (placementTool === 'erase') {
+      var nearest = -1, distance = 1; // A one-metre touch target works on small phone plans.
+      scene.people.forEach(function (q, i) { var d = Math.hypot(p[0] - q[0], p[1] - q[1]); if (d < distance) { nearest = i; distance = d; } });
+      if (nearest >= 0) scene.people.splice(nearest, 1);
+      else if (scene.fire && Math.hypot(p[0] - scene.fire[0], p[1] - scene.fire[1]) < 1) scene.fire = null;
+      else return placementMessage('Tap close to a placed person or the fire to remove it.');
+    } else {
+      var room = geometry.rooms.find(function (r) { return pointInRect(p, r.rect, .6); });
+      if (!room) return placementMessage('Place this inside a room, at least 0.6 m from its walls.', true);
+      var blocked = geometry.furniture.some(function (f) {
+        var size = geometry.footprints.furniture[f.kind].size_m;
+        return pointInRect(p, [f.at[0] - size[0] / 2, f.at[1] - size[1] / 2, f.at[0] + size[0] / 2, f.at[1] + size[1] / 2], -.9);
+      });
+      if (blocked) return placementMessage('That point is too close to furniture. Choose clear floor.', true);
+      if (geometry.doors.some(function (d) { return Math.hypot(p[0] - d.at[0], p[1] - d.at[1]) < 1.2; })) return placementMessage('Keep 1.2 m clear around every doorway.', true);
+      if (scene.people.some(function (q) { return Math.hypot(p[0] - q[0], p[1] - q[1]) < 1.2; })) return placementMessage('Keep people and fire at least 1.2 m apart.', true);
+      if (placementTool === 'person') {
+        if (scene.people.length >= 5) return placementMessage('Five people are already placed. Remove one to move them.', true);
+        if (scene.fire && Math.hypot(p[0] - scene.fire[0], p[1] - scene.fire[1]) < 1.2) return placementMessage('Keep a person at least 1.2 m from the fire.', true);
+        scene.people.push(p);
+      } else {
+        if (geometry.combustible_rooms.indexOf(room.id) < 0) return placementMessage('The fire needs combustible floor. Choose a bedroom or living room.', true);
+        scene.fire = p;
+      }
+    }
+    invalidateScene(); drawEditor(); drawPreview();
+    $('scene-summary').textContent = scene.people.length + ' people placed. ' + (scene.fire ? 'Fire placed. Prepare this scene before starting.' : 'Place the fire next.');
+    placementMessage(scene.people.length + ' of 5 people placed. ' + (scene.fire ? 'Fire origin placed. Ready to validate and prepare.' : 'Choose Fire origin and place it on clear floor.'));
+  }
+  $('place-point').addEventListener('click', function () { tryPlacement([Number($('place-x').value), Number($('place-y').value)]); });
+  $('placement').addEventListener('click', function (event) {
+    var c = $('placement'), rect = c.getBoundingClientRect(), h = houseById(sel.house), vb = viewBox(h);
+    var transform = makeXf(vb, rect.width, rect.height, 20);
+    var x = (event.clientX - rect.left - transform.x(0)) / transform.s;
+    var y = (transform.y(0) - (event.clientY - rect.top)) / transform.s;
+    $('place-x').value = Math.round(x * 4) / 4; $('place-y').value = Math.round(y * 4) / 4;
+    tryPlacement([x, y]);
+  });
+  $('prepare-scene').addEventListener('click', function () {
+    if (!scene || !scene.fire) return placementMessage('Place one fire origin before preparing the scene.', true);
+    var my = ++prepGeneration, started = performance.now(); preparing = true; $('prepare-scene').disabled = true;
+    placementMessage('Checking the scene and starting its recorded fallback on AWS.');
+    var body = { house: sel.house, robots: sel.robots, difficulty: sel.difficulty, placement: scene, prepare: true, terra: false };
+    fetchJSON(API, 30000, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(function (result) {
+      if (my !== prepGeneration) return;
+      function ready() {
+        preparing = false; preparedSceneKey = result.setup; $('prepare-scene').disabled = false;
+        $('start').textContent = 'Start the rescue'; $('watch-prepared').hidden = false;
+        $('scene-summary').textContent = scene.people.length + ' people placed. Exact recorded fallback ready.';
+        placementMessage('Your scene is ready. Start a live mission, or watch the prepared brain-only run.');
+      }
+      function check() {
+        if (my !== prepGeneration) return;
+        fetchJSON(API + '/' + result.mission + '?from=19', 20000).then(function (reply) {
+          if (my !== prepGeneration) return;
+          if (reply.status.state === 'done') return ready();
+          if (reply.status.state === 'failed') throw new Error('Preparation stopped early. Your scene is kept. Press Prepare to retry.');
+          placementMessage('Preparing your exact scene, ' + Math.round(reply.status.sim_t || 0) + ' of 180 simulated seconds complete. ' + Math.round((performance.now() - started) / 1000) + ' seconds elapsed.');
+          setTimeout(check, POLL_MS);
+        }).catch(failed);
+      }
+      if (result.prepared) ready(); else check();
+    }).catch(failed);
+    function failed(error) { if (my !== prepGeneration) return; preparing = false; $('prepare-scene').disabled = false; placementMessage(error.message, true); }
+  });
+  $('watch-prepared').addEventListener('click', function () {
+    if (!preparedSceneKey) return;
+    $('scene-editor').close(); startMission(houseById(sel.house), sel.robots, sel.difficulty, true);
+  });
 
   /* ---------- mission state ---------- */
   var M = null; // current mission
@@ -322,6 +455,7 @@
 
   $("start").addEventListener("click", function () {
     var h = houseById(sel.house); if (!h) return;
+    if (scene && !preparedSceneKey) { openEditor(); return; }
     startMission(h, sel.robots, sel.difficulty);
   });
   $("back").addEventListener("click", function () { stopMission(); showChoose(); });
@@ -336,10 +470,14 @@
   }
   function stopMission() { gen++; M = null; }
 
-  function startMission(h, robots, difficulty) {
+  function startMission(h, robots, difficulty, recordedOnly) {
     gen++;
     var my = gen;
+    if (scene) h = Object.assign({}, h, { people: scene.people.length, people_truth: scene.people.map(function (p, i) { return { id: 'p' + (i + 1), x: p[0], y: p[1] }; }) });
     M = newMission(h, robots, difficulty);
+    M.scene = scene ? JSON.parse(JSON.stringify(scene)) : null;
+    M.key = preparedSceneKey || M.key;
+    M.terra = $('terra').checked;
     $("choose").hidden = true; $("mission").hidden = false;
     window.scrollTo(0, 0);
     $("mission-h").textContent = h.name || h.id;
@@ -353,11 +491,13 @@
     setStage("sent", "now");
     setSpeedButtons(4);
     renderTeam(); layoutStage(); draw();
+    if (recordedOnly) { M.id = 'cache:' + M.key; setSource('recorded', 'This is the scene you prepared.'); poll(my); tick(); return; }
     fetchJSON(API, 30000, { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ house: h.id, robots: robots, difficulty: difficulty }) })
+      body: JSON.stringify({ house: h.id, robots: robots, difficulty: difficulty, placement: M.scene, terra: M.terra }) })
       .then(function (r) {
         if (my !== gen) return;
         if (!r || !r.mission) throw new Error("no mission id");
+        M.key = r.setup || M.key;
         if (r.source === "recorded" || String(r.mission).indexOf("cache:") === 0) {
           M.id = r.mission; setSource("recorded", REASONS[r.reason] || ("The live run was not started (" + (r.reason || "no reason given") + ")."));
           setStage("sent", "done"); setStage("machine", "skip");
@@ -368,7 +508,7 @@
       })
       .catch(function (e) {
         if (my !== gen) return;
-        if (e.status === 400) return showError("The service rejected this setup (" + e.message + "). Pick another house or setup.");
+        if (e.status === 400 || e.status === 409 || e.status === 429) return showError(e.message);
         fallback(my, "The live service did not answer (" + e.message + ").");
       });
     fetchCompare(my);
@@ -381,7 +521,7 @@
     if (src === "recorded") {
       b.className = "badge rec"; b.textContent = "Recorded run of this exact setup";
       note.hidden = false;
-      note.textContent = (reason ? reason + " " : "") + "You are watching the recorded run of this exact house, robot count and difficulty. The brain runs on fixed seeds with no LLM: the same setup always produces the same mission.";
+      note.textContent = (reason ? reason + " " : "") + "This recorded brain-only run uses the same house, people, fire, robot count and difficulty. Live Terra decisions can change the search path.";
     } else {
       b.className = "badge live"; b.textContent = "Live run on AWS"; note.hidden = true;
     }
@@ -390,9 +530,10 @@
   function fallback(my, reason) {
     if (my !== gen || !M) return;
     if (M.source === "recorded") return showError("Neither the live run nor the recorded run could be loaded. " + reason);
-    var keep = { house: M.house, robots: M.robots, difficulty: M.difficulty, compare: M.compare, t: M.ready >= 0 ? M.t : 0, speed: M.speed };
+    var keep = { house: M.house, robots: M.robots, difficulty: M.difficulty, key: M.key, scene: M.scene, compare: M.compare, t: M.ready >= 0 ? M.t : 0, speed: M.speed };
     gen++; my = gen;
     M = newMission(keep.house, keep.robots, keep.difficulty);
+    M.key = keep.key; M.scene = keep.scene;
     M.compare = keep.compare; M.resumeAt = keep.t; M.speed = keep.speed;
     M.id = "cache:" + M.key;
     $("log").textContent = ""; $("log-empty").hidden = false; $("ticks").textContent = ""; $("score").hidden = true;
@@ -527,6 +668,7 @@
 
   /* ---------- comparison (cached 1-robot run) ---------- */
   function fetchCompare(my) {
+    if (M.scene) return; // A different placement would be an invalid one-robot comparison.
     var other = M.robots === 1 ? 3 : 1;
     var key = M.house.id + "__r" + other + "__" + M.difficulty;
     fetchJSON(API + "/cache:" + key + "?from=999", 15000).then(function (r) {
@@ -716,7 +858,7 @@
     cx = sizeCanvas(cv, cssW, cssH);
     xf = makeXf(vb, cssW, cssH, 14);
   }
-  window.addEventListener("resize", function () { if (M && !$("mission").hidden) { layoutStage(); draw(); } else { drawThumbs(); drawPreview(); } });
+  window.addEventListener("resize", function () { if (M && !$("mission").hidden) { layoutStage(); draw(); } else { drawThumbs(); drawPreview(); } if ($('scene-editor').open) drawEditor(); });
 
   function frameAt() { return M && M.lastIdx >= 0 ? M.frames[M.lastIdx] : null; }
   function draw() {
@@ -782,18 +924,7 @@
       ctx.fillStyle = colors.ink; ctx.font = "700 12px system-ui, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
       ctx.fillText("maps joined", mx, my - 6); ctx.restore();
     });
-    // end of mission: show the people nobody found (simulator truth, shown only once the mission is over)
-    if (M.scoreShown && Array.isArray(h.people_truth)) h.people_truth.forEach(function (p) {
-      if (!num(p.x)) return;
-      var hit = M.found.some(function (q) { return Math.hypot(q.x - p.x, q.y - p.y) < 1.5; });
-      if (hit) return;
-      var r = Math.max(5, xf.s * 0.22), x = xf.x(p.x), y = xf.y(p.y);
-      ctx.strokeStyle = colors.fire; ctx.lineWidth = 2.5; ctx.setLineDash([3, 3]);
-      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
-      ctx.fillStyle = colors.ink; ctx.font = "600 11px system-ui, sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
-      var mt = xf.s > 34 ? "not found" : "missed"; if (x + r + 4 + ctx.measureText(mt).width > cssW - 4) { ctx.textAlign = "right"; ctx.fillText(mt, x - r - 4, y); } else ctx.fillText(mt, x + r + 4, y);
-    });
-    // people
+    // Only confirmed people become replay markers, including at the final frame.
     var now = performance.now();
     M.found.forEach(function (p) {
       if (!num(p.x)) return;
@@ -879,7 +1010,7 @@
     var s = $("sim-state");
     if (M.done) s.textContent = M.source === "recorded" ? "Recorded run, all " + MISSION_S + " s loaded." : "Simulation finished on AWS. All " + MISSION_S + " s are here.";
     else if (M.playing && M.t >= edge - 0.01) s.innerHTML = "<b>Waiting for the simulator.</b> " + Math.floor(Math.max(simT, edge)) + " s of " + MISSION_S + " s ready; the replay catches up as each 10 s arrives.";
-    else s.innerHTML = "<b>Simulating on AWS,</b> " + Math.floor(Math.max(simT, edge)) + " s of " + MISSION_S + " s ready.";
+    else s.textContent = (M.source === 'recorded' ? 'Loading recorded replay, ' : 'Simulating on AWS, ') + Math.floor(Math.max(simT, edge)) + " s of " + MISSION_S + " s ready.";
   }
   function syncPlay() {
     var b = $("play"), paused = !M || !M.playing;
@@ -922,7 +1053,7 @@
     var missed = s.people_total - s.people_found;
     var fc = $("s-false");
     var notes = [];
-    if (missed > 0 && Array.isArray(M.house.people_truth)) notes.push("Dashed red rings on the map show where the " + (missed === 1 ? "person nobody found was" : missed + " people nobody found were") + ".");
+    if (missed > 0) notes.push(missed + (missed === 1 ? ' person was not found.' : ' people were not found.'));
     if (s.false_confirmations) notes.push(s.false_confirmations + " false confirmation" + (s.false_confirmations > 1 ? "s" : "") + ": a robot marked a person where there was none.");
     if (num(s.first_person_s)) notes.push("First person found at " + fmt(s.first_person_s) + ".");
     fc.hidden = !notes.length; fc.textContent = notes.join(" ");

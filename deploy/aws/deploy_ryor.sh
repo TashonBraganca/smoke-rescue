@@ -16,6 +16,7 @@ fi
 aws cloudformation deploy --region "$REGION" --stack-name smoke-rescue-ryor --template-file "$HERE/ryor.yaml" \
   --capabilities CAPABILITY_IAM --tags Project=smoke-rescue Environment=demo --no-fail-on-empty-changeset \
   --parameter-overrides ImageTag="${IMAGE_TAG:-latest}" ImageUri="$IMG" StandInScript="$SCRIPT" \
-    StandInSleep="${STANDIN_SLEEP:-4}" Cpu="${CPU:-4096}" MemoryMb="${MEMORY_MB:-8192}"
+    StandInSleep="${STANDIN_SLEEP:-4}" Cpu="${CPU:-2048}" MemoryMb="${MEMORY_MB:-4096}"
+# Two vCPUs let two live missions fit beside the inherited five four-vCPU precompute tasks under this account's quota.
 aws cloudformation describe-stacks --region "$REGION" --stack-name smoke-rescue-ryor --query 'Stacks[0].Outputs' --output text
 SITE_SYNC="${SITE_SYNC:-0}" "$HERE/deploy_site_lambda.sh"

@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'tools/ryor')]
 from placement import validate, setup_key
 from terra import Worker
+from replay import Builder
 
 
 @pytest.fixture
@@ -51,6 +52,16 @@ def test_cache_identity_covers_content_engine_and_setup(scene):
     assert key != setup_key('family_ranch__r2__medium', dict(scene, fire=[0, 3]), 'engine-A')
 
 
+def test_one_confirmation_cannot_score_two_nearby_people(house):
+    gallery = json.loads((ROOT / 'data/runs/ryor/gallery.json').read_text())
+    builder = Builder(gallery, 'family_ranch__r1__easy', 180)
+    builder.house['people_truth'] = [{'id': 'p1', 'x': 0, 'y': 3}, {'id': 'p2', 'x': 1.2, 'y': 3}]
+    builder.found = [{'id': 'c1', 'x': .6, 'y': 3}]
+    assert builder.score()['people_found'] == 1
+    builder.found.append({'id': 'c2', 'x': 1.3, 'y': 3})
+    assert builder.score()['people_found'] == 2
+
+
 @pytest.fixture
 def api(monkeypatch, house):
     import boto3
@@ -81,7 +92,8 @@ def replay():
 def test_replay_validation_catches_corruption(api, monkeypatch):
     data = replay()
     monkeypatch.setattr(api, 'chunks', lambda *a: data)
-    rec, status = {'setup': 'family_ranch__r1__easy'}, {'sim_t': 180, 'chunks': 19}
+    rec, status = {'setup': 'family_ranch__r1__easy'}, {'sim_t': 180, 'chunks': 19, 'score': {
+        'people_found': 0, 'people_total': 5, 'robots_out': 1, 'false_confirmations': 0, 'time_s': 180, 'coverage_pct': 50}}
     assert api.validate(rec, status, '') is None
     data[0]['frames'].pop(2)
     assert 'missing' in api.validate(rec, status, '')

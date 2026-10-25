@@ -299,7 +299,7 @@ def post(event, validate_only=False):
         if n_day > DAILY:
             print('RYOR_DAILY_CAP %d > %d' % (n_day, DAILY))
             release_slot(slot, mid)
-            return fallback('busy')
+            return fallback('daily_limited')
         prefix = 'ryor/missions/%s/' % mid
         if placement:
             # The task revalidates these bytes before using them. No user-controlled path or URL enters its request.
@@ -463,12 +463,30 @@ def validate(rec, st, prefix):
                 if ev.get('kind') == 'survivor_confirmed':
                     confirmations.add((ev.get('robot'), float(ev.get('t', f['t']))))
             for p in f.get('found', []):
-                if not any(rid == p.get('by') and t <= p.get('t', -1) <= f['t'] for rid, t in confirmations):
+                if (p.get('by'), p.get('t')) not in confirmations or p.get('t', -1) > f['t']:
                     return 'person marker appears before confirmation'
+            for rid, cells in f.get('seen', {}).items():
+                if rid not in ids or any(type(cell) is not int or not 0 <= cell < 250000 for cell in cells):
+                    return 'invalid searched map cells'
+            for fire in f.get('fire', []):
+                if len(fire) != 3 or any(not math.isfinite(v) for v in fire) or fire[2] < 0:
+                    return 'invalid fire marker'
     if halves != list(range(int(mission_s * 2) + 1)):
         return 'frames missing or out of order (%d frames)' % len(halves)
     if halves[-1] != int(sim_t * 2):
         return 'last frame t=%.1f before sim_t %.1f' % (halves[-1] / 2, sim_t)
+    score = st.get('score')
+    if not isinstance(score, dict):
+        return 'score is missing'
+    for field in ('people_found', 'people_total', 'robots_out', 'false_confirmations'):
+        if type(score.get(field)) is not int or score[field] < 0:
+            return 'invalid score ' + field
+    if score['people_found'] > score['people_total'] or score['robots_out'] > len(ids):
+        return 'score exceeds the people or robots in the scene'
+    for field, maximum in [('coverage_pct', 100), ('time_s', mission_s)]:
+        value = score.get(field)
+        if type(value) not in (int, float) or not math.isfinite(value) or not 0 <= value <= maximum:
+            return 'invalid score ' + field
     return None
 
 
@@ -476,12 +494,15 @@ def health():
     try:
         running = len(running_tasks())
         ok = gallery() is not None
-        n = cache_setups()
+        manifest = s3_json('ryor/cache_manifest.json') or {}
+        n = int(manifest.get('ready', 0))
     except Exception as e:
         fail_line('-', 'health %s: %s' % (type(e).__name__, e))
         return j(503, {'ok': False, 'cap': CAP, 'engine': ENGINE})
     return j(200, {'ok': ok, 'running': running, 'cap': CAP, 'cache_setups': n, 'engine': ENGINE,
-                   'enabled': ENABLED, 'ip_limit_per_hour': IP_LIMIT, 'daily_cap': DAILY, 'hard_limit_s': HARD_S})
+                   'cache_expected': int(manifest.get('total', 0)),
+                   'enabled': ENABLED, 'ip_limit_per_hour': IP_LIMIT, 'daily_cap': DAILY, 'hard_limit_s': HARD_S,
+                   'terra_steps_per_mission': 20, 'terra_steps_per_utc_day': 100})
 
 
 def sweep():

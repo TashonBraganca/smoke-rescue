@@ -32,10 +32,12 @@ Parameters:
     Description: Seconds the stand-in waits between chunks.
   Cpu:
     Type: String
-    Default: "4096"
+    Default: "2048"
+    Description: Two robot sensing threads fit on two vCPUs; two live slots fit beside precompute within the account quota.
   MemoryMb:
     Type: String
-    Default: "8192"
+    Default: "4096"
+    Description: Fargate's supported two-vCPU memory size, with room for three detached brain grids and replay buffers.
   SiteLogGroup:
     Type: String
     Default: /aws/lambda/smoke-rescue-site
