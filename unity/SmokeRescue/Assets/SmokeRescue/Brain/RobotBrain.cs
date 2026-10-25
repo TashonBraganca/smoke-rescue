@@ -647,6 +647,12 @@ namespace SmokeRescue.Brain
                     Emit(t, "goal", "This room was searched from outside but never entered: walk into it, then search on.",
                         "room_id", walkRoom, "x_m", walkIn[walkIn.Count - 1].x, "y_m", walkIn[walkIn.Count - 1].y);
                 }
+                else if (fallback && c.person_threshold_look && PersonThresholdLook(t, out var personRoute, out var personBeyond))
+                {
+                    SetPath(personRoute, false); scanSince = double.NaN; noFrontierAt = double.NaN; lastPlan = t;
+                    Emit(t, "goal", "A confirmed person lies on floor not yet proven indoors: stand at the edge of proven floor and look in for a ceiling.",
+                        "x_m", goal.Value.x, "y_m", goal.Value.y, "beyond_x_m", personBeyond.x, "beyond_y_m", personBeyond.y);
+                }
                 else if (fallback)
                 {
                     System.Func<Vector2, bool> excluded = p => ClaimBlocks(p, t) || GoalBlacklisted(p, t) || VisitedGoal(p, t) || !InSearchArea(p);
@@ -1969,6 +1975,31 @@ namespace SmokeRescue.Brain
             return false;
         }
         readonly List<Vector2> lookedAt = new List<Vector2>(), lookedFrom = new List<Vector2>();
+        readonly HashSet<int> peopleLooked = new HashSet<int>();
+        /// <summary>person_threshold_look: a route to the last proven point on the way to a confirmed person whose floor is mapped but not
+        /// proven indoors, ending headed through the threshold like ThresholdLook. Each person once, never from near a known way out.</summary>
+        bool PersonThresholdLook(double t, out List<Vector2> route, out Vector2 beyond)
+        {
+            route = null; beyond = default;
+            if (!c.search_requires_ceiling) return false;
+            for (int k = 0; k < survivors.Count; k++)
+            {
+                if (peopleLooked.Contains(k)) continue;
+                var person = survivors[k]; int cell = grid.Cell(person);
+                if (cell < 0 || grid.OwnOccupancy(cell) != 1 || InSearchArea(person)) continue;
+                peopleLooked.Add(k);
+                var path = planner.ApproachPath(motion.Pose.position, person);
+                int j = path.FindIndex(p => InSearchArea(p));
+                int i = j < 0 ? -1 : path.FindIndex(j, p => !InSearchArea(p));
+                if (i <= 0) continue;
+                var at = path[i - 1]; bool nearExit = false;
+                foreach (var e in Exits()) nearExit |= Vector2.Distance(e, at) <= c.threshold_exit_clear_m;
+                if (nearExit || lookedFrom.Exists(q => Vector2.Distance(q, at) <= c.stuck_repeat_radius_m)) continue;
+                lookedFrom.Add(at); route = path.GetRange(0, i); beyond = path[i];
+                return true;
+            }
+            return false;
+        }
         List<Vector2> sensedExits = new List<Vector2>(); double nextExitScan;
         void RefreshSensedExits(double t)
         {

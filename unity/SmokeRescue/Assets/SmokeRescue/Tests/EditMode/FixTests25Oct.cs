@@ -345,5 +345,45 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(Closing(true), Does.Contain("The way out was closing. Return to the estimated start."));
             Assert.That(Closing(false), Is.Empty, "control: switch off, nothing is watched");
         }
+
+        [Test]
+        public void ARobotThatConfirmedAPersonOnUnprovenFloorWalksToTheDoorwayToLookIn()
+        {
+            // F7. Seed 934 (25 Oct), robot A: s2 confirmed at 422.3 s from the hall, inside bedroom_1 whose floor was mapped but never proven
+            // indoors; for 60 s A worked tier-4 hall frontiers and follow-through goals within 3 m of the door and never went in. A walled
+            // room proven indoors with one pocket left to search, a 1 m doorway north, and a second room beyond mapped free but unproven
+            // with a confirmed person in it. Control: with the switch off the pocket frontier is chosen, as before.
+            string Choice(bool on, bool person)
+            {
+                var c = Settings(); c.grid_size_m = 16; c.robot_radius_m = .25f; c.search_requires_ceiling = true; c.person_threshold_look = on; c.frontier_local_evidence = false;
+                var b = new RobotBrain(Calibration(), c, "A", 0);
+                var g = Map(b); Room(b, -2, 2, -1, 6);
+                for (int i = 0; i < g.Count; i++)
+                {
+                    var p = g.Centre(i);
+                    bool side = Mathf.Abs(p.x) > 2 && Mathf.Abs(p.x) < 2.3f && p.y > -1.3f && p.y < 3.2f;
+                    bool south = p.y < -1 && p.y > -1.3f && Mathf.Abs(p.x) < 2.3f;
+                    bool north = p.y > 3 && p.y < 3.2f && Mathf.Abs(p.x) > .5f && Mathf.Abs(p.x) < 2.3f;
+                    if (side || south || north) g.ObserveOccupied(i);
+                }
+                var indoors = (bool[])typeof(OccupancyGrid).GetField("sightIndoors", NP).GetValue(g);
+                var searched = (bool[])typeof(OccupancyGrid).GetField("observed", NP).GetValue(g);
+                for (int i = 0; i < g.Count; i++)
+                {
+                    var p = g.Centre(i);
+                    if (Mathf.Abs(p.x) < 2 && p.y > -1 && p.y < 3) indoors[i] = true;
+                    searched[i] = Mathf.Abs(p.x) < 2 && p.y >= -1 && p.y < 3 && !(p.x < -1.2f && p.y < 0);   // one pocket left in the proven room
+                }
+                typeof(OccupancyGrid).GetField("roofDirty", NP).SetValue(g, true);
+                if (person) ((List<Vector2>)typeof(RobotBrain).GetField("survivors", NP).GetValue(b)).Add(new Vector2(0, 4.6f));
+                Motion(b, 0); b.OnRgbd(Image(0, true, 0)); b.OnAirTemperature(0, 20); b.Step(0, .05f);
+                var goal = b.DrainEvents().LastOrDefault(e => e.kind == "goal");
+                return goal?.reason + " @ " + b.Snapshot().goal;
+            }
+            string look = Choice(true, true);
+            Assert.That(look, Does.StartWith("A confirmed person lies on floor not yet proven indoors"), look);
+            Assert.That(Choice(false, true), Does.Not.StartWith("A confirmed person lies"), "control: switch off");
+            Assert.That(Choice(true, false), Does.Not.StartWith("A confirmed person lies"), "control: no confirmed person");
+        }
     }
 }
