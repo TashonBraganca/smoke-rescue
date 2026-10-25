@@ -142,13 +142,13 @@ Resources:
       # Source: deploy/aws/site_lambda/ (index.py + ryor_api.py), zipped and uploaded by deploy_site_lambda.sh.
       Code: { S3Bucket: !Ref CodeBucket, S3Key: !Ref CodeKey }
 
-  # Backstop for the hard limit when nobody polls: stop ryor tasks older than RyorHardLimitS every 5 minutes.
+  # One-minute backstop bounds abandoned task cost independently of browser polling.
   SweepRule:
     Type: AWS::Events::Rule
     Condition: HasRyor
     Properties:
       Description: smoke-rescue ryor hard-limit sweep
-      ScheduleExpression: rate(5 minutes)
+      ScheduleExpression: rate(1 minute)
       Targets: [{ Arn: !GetAtt SiteFunction.Arn, Id: sweep, Input: '{"ryor": "sweep"}' }]
 
   SweepPermission:

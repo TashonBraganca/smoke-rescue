@@ -11,6 +11,7 @@ Env:  SETUP      setup key, e.g. hx_035feb0125__r2__medium (must exist in data/r
 Every failure prints one line "RYOR_FAIL <mission> <reason>" (a CloudWatch metric filter counts them) and exits 1.
 """
 import json
+import math
 import os
 import signal
 import subprocess
@@ -33,6 +34,8 @@ DOTNET = os.environ.get("DOTNET", "dotnet")
 ENGINE = os.environ.get("ENGINE_DLL", str(HERE / "engine/bin/RyorRunner.dll"))
 ENGINE_TAG = os.environ.get("ENGINE_TAG", "local")
 GIT = os.environ.get("ENGINE_GIT", "unknown")
+PREPARE = os.environ.get('PREPARE') == '1'  # Prepare the exact deterministic fallback before enabling a custom run.
+TERRA = os.environ.get('TERRA_ENABLED') == '1' and not PREPARE  # Recorded fallback always runs brain-only.
 
 s3 = None
 if BUCKET:
@@ -55,7 +58,7 @@ def log(msg):
 
 status = {"v": 1, "mission": MISSION, "setup": SETUP, "state": "starting", "source": "recorded" if MISSION == "cache" else "live",
           "chunks": 0, "sim_t": 0.0, "updated": None, "error": None, "score": None, "engine": {"git": GIT, "image": ENGINE_TAG},
-          "wall": {"started": time.time(), "first_frame_s": None, "total_s": None}}
+          "wall": {"started": time.time(), "first_frame_s": None, "total_s": None}, 'terra': TERRA}
 
 
 def write_status(**kw):
@@ -73,7 +76,8 @@ def fail(reason, proc=None):
 
 
 def main():
-    req_path = ROOT / "data/runs/ryor/setups" / f"{SETUP}.json"
+    base = SETUP.split('__p', 1)[0]
+    req_path = ROOT / "data/runs/ryor/setups" / f"{base}.json"
     if not req_path.exists():
         fail(f"unknown setup {SETUP}")
     gallery = json.loads((ROOT / "data/runs/ryor/gallery.json").read_text())
@@ -83,9 +87,41 @@ def main():
     for f in ("trace.jsonl", "result.json", "running.marker"):
         (run_dir / f).unlink(missing_ok=True)
     req["runs"][0]["out"] = str(run_dir)
+    req['runs'][0]['terra'] = TERRA
+    if '__p' in SETUP:
+        from placement import validate, setup_key
+        if not s3:
+            scene = json.loads(Path(os.environ['PLACEMENT_FILE']).read_text())
+        else:
+            scene = json.loads(s3.get_object(Bucket=BUCKET, Key='ryor/requests/' + SETUP + '.json')['Body'].read())
+        house = next(h for h in gallery['houses'] if h['id'] == base.split('__')[0])
+        placement = validate(house, scene['placement'])
+        if setup_key(base, placement, ENGINE_TAG) != SETUP:
+            fail('placement key does not match its content and engine')
+        world = json.loads((ROOT / req['runs'][0]['world']).read_text())
+        world['people'] = [{'id': 'p%d' % (i + 1), 'at': p} for i, p in enumerate(placement['people'])]
+        fire = json.loads((ROOT / 'config' / world['fire']['config']).resolve().read_text())
+        from validate_building import inside
+        room = next(r for r in house['placement_geometry']['rooms'] if inside(placement['fire'], r['rect']))
+        # Placement uses the gate frame; FireSim uses the house frame. This conversion stays world-side.
+        a = math.radians(world['gate']['yaw_deg']); ca, sa = math.cos(a), math.sin(a)
+        x, y = placement['fire']; gx, gy = world['gate']['origin']
+        fire['ignitions'] = [dict(room=room['id'], at=[gx + ca * x + sa * y, gy - sa * x + ca * y], time_s=0, radius_m=.3)]
+        # 0.3 m is the unchanged generator ignition radius. Difficulty supplies the head-start time.
+        fire_path = run_dir / 'fire.json'; fire_path.write_text(json.dumps(fire))
+        world['fire']['config'] = str(fire_path)
+        world_path = run_dir / 'world.json'; world_path.write_text(json.dumps(world))
+        req['runs'][0]['world'] = str(world_path)
+        house['people_truth'] = [{'id': p['id'], 'x': p['at'][0], 'y': p['at'][1]} for p in world['people']]
+        house['people'] = len(world['people'])
+        status['placement'] = placement
     (run_dir / "request.json").write_text(json.dumps(req))
     write_status(state="starting")
     builder = Builder(gallery, SETUP, req["runs"][0]["duration_s"])
+    worker = None
+    if TERRA:
+        from terra import Worker
+        worker = Worker(run_dir, MISSION, os.environ['RYOR_TABLE'], boto3.client('dynamodb'), boto3.client('secretsmanager'))
     env = dict(os.environ, SMOKE_REPO=str(ROOT), DOTNET_NOLOGO="1", DOTNET_CLI_TELEMETRY_OPTOUT="1")
     t0 = time.time()
     proc = subprocess.Popen([DOTNET, ENGINE, str(run_dir / "request.json")], env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -109,7 +145,10 @@ def main():
                 for line in lines:
                     if not line:
                         continue
-                    for chunk in builder.feed(json.loads(line)):
+                    event = json.loads(line)
+                    if worker and event.get('kind') == 'agent_observation':
+                        worker.submit(event)
+                    for chunk in builder.feed(event):
                         put(f"chunk_{chunk['chunk']:04d}.json", chunk)
                         if status["wall"]["first_frame_s"] is None:
                             status["wall"]["first_frame_s"] = round(time.time() - status["wall"]["started"], 1)
@@ -137,7 +176,13 @@ def main():
     if bad:
         fail("validation: " + "; ".join(bad))
     status["wall"]["total_s"] = round(time.time() - status["wall"]["started"], 1)
-    write_status(state="done", score=builder.score())
+    if worker:
+        worker.closed = True
+        audit = run_dir / 'terra_audit.jsonl'
+        if audit.exists():
+            # Public replay contains captions only. Full sensor-only observations stay in the private run bucket.
+            put('terra_audit.json', [json.loads(line) for line in audit.read_text().splitlines()])
+    write_status(state="done", score=builder.score(), validated=True)
     log(f"done: {json.dumps(status['score'])} wall {status['wall']}")
 
 

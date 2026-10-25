@@ -4,10 +4,12 @@
 #   GET  /api/mission/cache:<key>  the precomputed replay of one setup (ryor/cache/<key>/)
 #   GET  /api/mission/health
 # Every failure prints "RYOR_FAIL <mission> <reason>" (CloudWatch metric filter + alarm in deploy/aws/ryor.yaml).
-import json, os, re, secrets, time
+import hashlib, json, math, os, re, secrets, time
 from concurrent.futures import ThreadPoolExecutor
 import boto3
 from botocore.exceptions import ClientError
+from botocore.config import Config
+from placement import validate as validate_placement, setup_key
 
 E = os.environ
 RB, TABLE, CLUSTER, FAMILY = E['RYOR_BUCKET'], E['RYOR_TABLE'], E['RYOR_CLUSTER'], E['RYOR_FAMILY']
@@ -16,10 +18,12 @@ ENABLED = E.get('RYOR_ENABLED', '1') == '1'
 CAP, IP_LIMIT, HARD_S = int(E.get('RYOR_CAP', '2')), int(E.get('RYOR_IP_LIMIT', '6')), int(E.get('RYOR_HARD_S', '600'))
 ENGINE = E.get('RYOR_ENGINE', '')
 DAILY = int(E.get('RYOR_DAILY_CAP', '150'))  # live missions per UTC day, site-wide
-PAGE = 6
-s3, ecs, ddb = boto3.client('s3'), boto3.client('ecs'), boto3.client('dynamodb')
+PAGE = 6  # Bound each public response below Lambda's 6 MB payload limit.
+# The launch lease must outlive the entire Lambda invocation, including AWS retries.
+AWS_CONFIG = Config(connect_timeout=3, read_timeout=15, retries={'total_max_attempts': 2})
+s3, ecs, ddb = [boto3.client(name, config=AWS_CONFIG) for name in ('s3', 'ecs', 'dynamodb')]
 MID = re.compile(r'[a-z0-9]{8,40}\Z')
-KEY = re.compile(r'([a-z0-9_]{1,40})__r([123])__(easy|medium|hard)\Z')
+KEY = re.compile(r'([a-z0-9_]{1,40})__r([123])__(easy|medium|hard)(?:__p([a-f0-9]{20}))?\Z')
 _memo = {}
 
 
@@ -56,7 +60,7 @@ def gallery():
             return None
         return {'houses': {h['id']: h for h in g.get('houses', [])}, 'difficulties': set(g.get('difficulties', {})),
                 'mission_s': float(g.get('mission_s', 180))}
-    return memo('gallery', 300, load)
+    return memo('gallery', 60, load)  # Publish gallery and ready-cache manifest together.
 
 
 def cache_setups():
@@ -124,7 +128,7 @@ def lock(token):
     now = int(time.time())
     for _ in range(25):
         try:
-            ddb.put_item(TableName=TABLE, Item={'pk': {'S': 'lock'}, 'owner': {'S': token}, 'exp': {'N': str(now + 15)},
+            ddb.put_item(TableName=TABLE, Item={'pk': {'S': 'lock'}, 'owner': {'S': token}, 'exp': {'N': str(now + 90)},
                                                  'ttl': {'N': str(now + 3600)}},
                          ConditionExpression='attribute_not_exists(pk) OR #e < :now',
                          ExpressionAttributeNames={'#e': 'exp'}, ExpressionAttributeValues={':now': {'N': str(now)}})
@@ -161,11 +165,40 @@ def set_state(mid, state, reason=None):
         ddb.update_item(TableName=TABLE, Key={'pk': {'S': 'm#' + mid}}, UpdateExpression=expr,
                         ConditionExpression='attribute_exists(pk) AND #s <> :f AND #s <> :d',
                         ExpressionAttributeNames=names, ExpressionAttributeValues=vals)
+        rec = record(mid)
+        if rec and rec.get('slot'):
+            release_slot(rec['slot'], mid)
         return True
     except ClientError as e:
         if e.response['Error']['Code'] == 'ConditionalCheckFailedException':
             return False
         raise
+
+
+def take_slot(mid):
+    # DynamoDB conditional writes include pending launches. ECS ListTasks is eventually consistent.
+    now = int(time.time())
+    for i in range(CAP):
+        key = 'slot#%d' % i
+        try:
+            ddb.put_item(TableName=TABLE, Item={'pk': {'S': key}, 'owner': {'S': mid},
+                         'exp': {'N': str(now + HARD_S + 120)}, 'ttl': {'N': str(now + 86400)}},
+                         ConditionExpression='attribute_not_exists(pk) OR #e < :now',
+                         ExpressionAttributeNames={'#e': 'exp'}, ExpressionAttributeValues={':now': {'N': str(now)}})
+            return key
+        except ClientError as e:
+            if e.response['Error']['Code'] != 'ConditionalCheckFailedException':
+                raise
+    return None
+
+
+def release_slot(slot, mid):
+    try:
+        ddb.delete_item(TableName=TABLE, Key={'pk': {'S': slot}}, ConditionExpression='#o = :m',
+                        ExpressionAttributeNames={'#o': 'owner'}, ExpressionAttributeValues={':m': {'S': mid}})
+    except ClientError as e:
+        if e.response['Error']['Code'] != 'ConditionalCheckFailedException':
+            raise
 
 
 def fail(mid, rec, reason, stop=True):
@@ -183,6 +216,8 @@ def route(method, path, event):
     try:
         if method == 'POST' and path == '/api/mission':
             return post(event)
+        if method == 'POST' and path == '/api/mission/validate':
+            return post(event, validate_only=True)
         if method == 'GET' and path == '/api/mission/health':
             return health()
         if method == 'GET' and path.startswith('/api/mission/'):
@@ -195,15 +230,17 @@ def route(method, path, event):
         return j(405 if path == '/api/mission' else 404, {'error': 'not a mission route'})
     except Exception as e:  # never a stack trace to the page
         fail_line('-', 'api error %s %s %s: %s' % (method, path, type(e).__name__, e))
-        return j(500, {'error': 'mission API error'})
+        return j(503, {'error': 'The mission service is unavailable. Your scene has not changed.'})
 
 
-def post(event):
+def post(event, validate_only=False):
     raw = event.get('body') or ''
     if event.get('isBase64Encoded'):
         import base64
         raw = base64.b64decode(raw).decode('utf-8', 'replace')
     try:
+        if len(raw) > 8192:  # Five points and one origin require far less than this.
+            return j(400, {'error': 'The scene request is too large.'})
         body = json.loads(raw)
         house, robots, diff = body.get('house'), body.get('robots'), body.get('difficulty')
     except Exception:
@@ -216,12 +253,31 @@ def post(event):
         return j(400, {'error': 'unknown house'})
     if type(robots) is not int or robots not in (1, 2, 3):
         return j(400, {'error': 'robots must be 1, 2 or 3'})
-    if diff not in g['difficulties']:
+    if not isinstance(diff, str) or diff not in g['difficulties']:
         return j(400, {'error': 'unknown difficulty'})
     key = '%s__r%d__%s' % (house, robots, diff)
+    base = key
+    placement = None
+    prepare = body.get('prepare') is True
+    if body.get('placement') is not None:
+        try:
+            placement = validate_placement(g['houses'][house], body['placement'])
+        except (ValueError, KeyError) as e:
+            return j(400, {'error': str(e)})
+        key = setup_key(base, placement, ENGINE)
+    if validate_only:
+        return j(200, {'valid': True, 'placement': placement, 'setup': key})
+    cached = ready_cache(key)
+    if prepare and cached:
+        return j(200, {'mission': 'cache:' + key, 'setup': key, 'source': 'recorded', 'prepared': True})
+    if not prepare and not cached:
+        return j(409, {'error': 'Prepare this scene first so its exact recorded fallback is ready.', 'setup': key,
+                       'needs_prepare': True})
 
     def fallback(reason):
-        return j(200, {'mission': 'cache:' + key, 'source': 'recorded', 'reason': reason})
+        if not cached:
+            return j(429, {'error': 'Live slots are full. Your scene is kept. Try preparing it shortly.', 'reason': reason})
+        return j(200, {'mission': 'cache:' + key, 'setup': key, 'source': 'recorded', 'reason': reason})
 
     ip = event['requestContext']['http'].get('sourceIp', '?')
     if count_ip(ip) > IP_LIMIT:
@@ -236,15 +292,27 @@ def post(event):
     try:
         if len(running_tasks()) >= CAP:
             return fallback('busy')
+        slot = take_slot(mid)
+        if not slot:
+            return fallback('busy')
         n_day = count_day()
         if n_day > DAILY:
             print('RYOR_DAILY_CAP %d > %d' % (n_day, DAILY))
+            release_slot(slot, mid)
             return fallback('busy')
         prefix = 'ryor/missions/%s/' % mid
+        if placement:
+            # The task revalidates these bytes before using them. No user-controlled path or URL enters its request.
+            s3.put_object(Bucket=RB, Key='ryor/requests/' + key + '.json',
+                          Body=json.dumps({'base': base, 'setup': key, 'placement': placement, 'engine': ENGINE}).encode(),
+                          ContentType='application/json')
         env = [{'name': 'MISSION_ID', 'value': mid}, {'name': 'SETUP', 'value': key},
-               {'name': 'BUCKET', 'value': RB}, {'name': 'PREFIX', 'value': prefix}]
+               {'name': 'BUCKET', 'value': RB}, {'name': 'PREFIX', 'value': prefix},
+               {'name': 'PREPARE', 'value': '1' if prepare else '0'},
+               {'name': 'TERRA_ENABLED', 'value': '1' if body.get('terra', True) is True and not prepare else '0'}]
         try:
             r = ecs.run_task(cluster=CLUSTER, taskDefinition=FAMILY, launchType='FARGATE', count=1,
+                             clientToken=mid,
                              startedBy='ryor-' + mid,
                              networkConfiguration={'awsvpcConfiguration': {
                                  'subnets': SUBNETS, 'securityGroups': [SG], 'assignPublicIp': 'ENABLED'}},
@@ -253,15 +321,32 @@ def post(event):
                 raise RuntimeError(str(r.get('failures'))[:200])
         except Exception as e:
             fail_line(mid, 'run_task failed %s: %s' % (type(e).__name__, e))
+            release_slot(slot, mid)
             return fallback('busy')
         now = int(time.time())
         ddb.put_item(TableName=TABLE, Item={
             'pk': {'S': 'm#' + mid}, 'setup': {'S': key}, 'task': {'S': r['tasks'][0]['taskArn']},
-            'ip': {'S': ip}, 'started': {'N': str(now)}, 'state': {'S': 'starting'}, 'ttl': {'N': str(now + 7 * 86400)}})
+            'slot': {'S': slot},
+            'ip': {'S': ip}, 'started': {'N': str(now)}, 'state': {'S': 'starting'},
+            'prepare': {'S': '1' if prepare else '0'}, 'ttl': {'N': str(now + 7 * 86400)}})
     finally:
         unlock(token)
     print('RYOR_START %s %s %s' % (mid, key, r['tasks'][0]['taskArn'].rsplit('/', 1)[-1]))
-    return j(200, {'mission': mid, 'source': 'live', 'poll': '/api/mission/' + mid})
+    return j(200, {'mission': mid, 'setup': key, 'source': 'live', 'preparing': prepare, 'poll': '/api/mission/' + mid})
+
+
+def ready_cache(key):
+    """Only validated, completed recordings may be promised as a fallback."""
+    def read():
+        st = s3_json(cache_prefix(key) + 'status.json')
+        if not st or st.get('state') != 'done' or not st.get('validated'):
+            return None
+        return st
+    return memo('cache:' + key, 10, read)  # Brief negative caching lets a prepared scene become ready promptly.
+
+
+def cache_prefix(key):
+    return ('ryor/cache-custom/' if '__p' in key else 'ryor/cache/') + key + '/'
 
 
 def get(mid, frm):
@@ -269,12 +354,12 @@ def get(mid, frm):
         key = mid[6:]
         if not KEY.match(key):
             return j(404, {'error': 'unknown setup'})
-        st = s3_json('ryor/cache/%s/status.json' % key)
+        st = ready_cache(key)
         if st is None:
             fail_line(mid, 'no recorded run for this setup')
             return j(404, {'error': 'no recorded run for this setup'})
         st['source'] = 'recorded'
-        return j(200, {'status': st, 'chunks': chunks('ryor/cache/%s/' % key, frm, min(int(st.get('chunks', 0)), frm + PAGE))})
+        return j(200, {'status': st, 'chunks': chunks(cache_prefix(key), frm, min(int(st.get('chunks', 0)), frm + PAGE))})
     if not MID.match(mid):
         return j(404, {'error': 'unknown mission'})
     rec = record(mid)
@@ -289,9 +374,12 @@ def get(mid, frm):
         rec = record(mid)
     if rec['state'] == 'failed':
         st = st or synth(mid, rec)
-        st.update(state='failed', error=rec.get('reason', 'failed'), fallback='cache:' + rec['setup'])
+        st.update(state='failed', error=rec.get('reason', 'failed'))
+        if ready_cache(rec['setup']):
+            st['fallback'] = 'cache:' + rec['setup']
         return j(200, {'status': st, 'chunks': []})
     st = st or synth(mid, rec)
+    st['preparing'] = rec.get('prepare') == '1'
     return j(200, {'status': st, 'chunks': chunks(prefix, frm, min(int(st.get('chunks', 0)), frm + PAGE))})
 
 
@@ -308,6 +396,17 @@ def check(mid, rec, st, prefix):
         why = validate(rec, st, prefix)
         if why:
             return 'validation: ' + why
+        if rec.get('prepare') == '1':
+            # Publish status last. Readers cannot see a ready recording with missing chunks.
+            for n in range(int(st['chunks'])):
+                name = 'chunk_%04d.json' % n
+                s3.copy_object(Bucket=RB, Key=cache_prefix(rec['setup']) + name,
+                               CopySource={'Bucket': RB, 'Key': prefix + name}, CacheControl='no-store',
+                               MetadataDirective='REPLACE', ContentType='application/json')
+            cache_st = dict(st, mission='cache', source='recorded', validated=True)
+            s3.put_object(Bucket=RB, Key=cache_prefix(rec['setup']) + 'status.json',
+                          Body=json.dumps(cache_st).encode(), ContentType='application/json', CacheControl='no-store')
+            _memo.pop('cache:' + rec['setup'], None)
         set_state(mid, 'done')
         print('RYOR_DONE %s %s wall %ds' % (mid, rec['setup'], int(time.time()) - int(rec['started'])))
         return None
@@ -334,8 +433,10 @@ def validate(rec, st, prefix):
     mission_s = g['mission_s']
     n = int(st.get('chunks', 0))
     sim_t = float(st.get('sim_t') or 0)
-    if sim_t < mission_s:
+    if not math.isfinite(sim_t) or sim_t != mission_s:
         return 'sim_t %.1f < %.0f' % (sim_t, mission_s)
+    if not 1 <= n <= 19:  # 180 s, 10 s chunks, inclusive final frame.
+        return 'invalid chunk count'
     got = chunks(prefix, 0, n)
     if len(got) != n or n == 0:
         return 'chunks: %d of %d readable' % (len(got), n)
@@ -343,21 +444,30 @@ def validate(rec, st, prefix):
     x0, y0, x1, y1 = house['bounds']
     x0, y0, x1, y1 = x0 - 3, y0 - 3, x1 + 3, y1 + 3
     halves = []
-    for c in got:
+    confirmations = set()
+    for index, c in enumerate(got):
+        if c.get('chunk') != index or c.get('t0') != index * 10:
+            return 'chunk index does not match its contents'
         for f in c.get('frames', []):
             h = float(f['t']) * 2
-            if h != int(h):
+            if not math.isfinite(h) or h != int(h):
                 return 'frame time %s not on the 0.5 s grid' % f['t']
             halves.append(int(h))
             seen = {r['id'] for r in f.get('robots', [])}
-            if seen != ids:
+            if seen != ids or len(f.get('robots', [])) != len(ids):
                 return 'robots at t=%s are %s, setup has %s' % (f['t'], sorted(seen), sorted(ids))
             for r in f['robots']:
                 if not (x0 <= r['x'] <= x1 and y0 <= r['y'] <= y1):
                     return '%s at (%.1f, %.1f) outside house bounds + 3 m at t=%s' % (r['id'], r['x'], r['y'], f['t'])
-    if not halves or halves[0] > 1 or halves != list(range(halves[0], halves[0] + len(halves))):
+            for ev in f.get('events', []):
+                if ev.get('kind') == 'survivor_confirmed':
+                    confirmations.add((ev.get('robot'), float(ev.get('t', f['t']))))
+            for p in f.get('found', []):
+                if not any(rid == p.get('by') and t <= p.get('t', -1) <= f['t'] for rid, t in confirmations):
+                    return 'person marker appears before confirmation'
+    if halves != list(range(int(mission_s * 2) + 1)):
         return 'frames missing or out of order (%d frames)' % len(halves)
-    if halves[-1] < int(sim_t * 2) - 1:
+    if halves[-1] != int(sim_t * 2):
         return 'last frame t=%.1f before sim_t %.1f' % (halves[-1] / 2, sim_t)
     return None
 
@@ -376,6 +486,19 @@ def health():
 
 def sweep():
     """Stop every ryor task older than the hard limit and mark its mission failed. Runs on each POST and every 5 min."""
+    # Reconcile completed or failed owners even after ECS removes them from ListTasks.
+    for i in range(CAP):
+        item = ddb.get_item(TableName=TABLE, Key={'pk': {'S': 'slot#%d' % i}}, ConsistentRead=True).get('Item')
+        if item:
+            mid = item['owner']['S']
+            rec = record(mid)
+            if rec and rec['state'] not in ('done', 'failed'):
+                prefix = 'ryor/missions/%s/' % mid
+                why = check(mid, rec, s3_json(prefix + 'status.json'), prefix)
+                if why:
+                    fail(mid, rec, why)
+            elif rec:
+                release_slot('slot#%d' % i, mid)
     arns = running_tasks()
     stopped = 0
     for i in range(0, len(arns), 100):

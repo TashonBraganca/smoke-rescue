@@ -1,7 +1,7 @@
 # Run-your-own-rescue engine: the headless simulator with the real brain (tools/ryor/engine) and the replay streamer.
 # Built by tools/ryor/build_image.sh from a staged context (only the files below), linux/arm64 for Fargate Graviton.
 FROM mcr.microsoft.com/dotnet/runtime:8.0-bookworm-slim
-RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-boto3 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-boto3 python3-httpx && rm -rf /var/lib/apt/lists/*
 RUN useradd -m -u 1000 ryor
 WORKDIR /app
 COPY --chown=ryor ctx/ /app/

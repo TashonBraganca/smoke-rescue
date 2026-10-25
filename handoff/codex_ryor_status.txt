@@ -1,0 +1,8 @@
+Audit at 26 Oct 2026 01:28 IST. Branch ryor-26oct, inherited commit 7a29b233.
+Part 1 exists in code: 27-house gallery, 243 deterministic setups, patched headless engine, chunked replay builder, Fargate stack, private S3, DynamoDB mission API, canvas page. Public health returned ok=true, running=0, cache_setups=31, engine=58dc33c3, cap=2, IP=6/hour, daily=150, hard limit=600 s. Inherited precompute is still active. This is not end-to-end verification.
+Part 1 risks: fallback availability not checked, incomplete precompute, launch lease shorter than AWS request timeout, cache replays not revalidated, possible score/confirmation and frame-boundary errors. Need public requests, actual frames, kill test, cap/rate tests and browser evidence.
+Part 2 is absent: no custom people/fire placement controls or endpoint; no live Terra decisions or feedback path in cloud engine; no daily Terra-step budget.
+Part 3 is absent and remains behind parts 1 and 2.
+Site integration is absent. Main site remains owner-deployed; scripts/deploy.sh must not run.
+Named the project notes and requirement file are absent in this worktree. Read their originals in smoke-rescue without editing that checkout. No RunPod, Unity or ports 8080/8081 used.
+Next: fix API lifecycle and exact cache guarantees, complete and validate cache, implement placement and bounded asynchronous agent feedback, deploy feature and test public HTTPS, integrate site route and run next build, commit and push ryor-26oct.

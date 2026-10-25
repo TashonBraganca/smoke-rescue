@@ -1,0 +1,5 @@
+Work in progress at 26 Oct 2026 01:28 IST.
+Public API base https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission . Public page not yet verified.
+Current evidence: public curl health returns ok=true, 31 cache prefixes, cap=2, IP limit=6/hour, daily cap=150, engine=58dc33c3, hard limit=600 s. This only proves health.
+Parts 1 and 2 are not yet complete. Part 3 has not started. Costs and end-to-end timings are not yet established.
+Status and outstanding work are in handoff/codex_ryor_status.txt.

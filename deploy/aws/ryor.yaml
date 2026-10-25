@@ -43,6 +43,10 @@ Parameters:
     Type: String
     Default: arn:aws:sns:us-east-1:968000946565:smoke-rescue-alarms
     Description: SNS topic from stack smoke-rescue-budget. Empty for no notification.
+  TerraSecretArn:
+    Type: String
+    Default: arn:aws:secretsmanager:us-east-1:968000946565:secret:smoke-rescue/azure-mUTy2N
+    Description: Existing Azure agent credential. Only the mission task reads it, never the public Lambda.
 
 Conditions:
   HasImageUri: !Not [!Equals [!Ref ImageUri, ""]]
@@ -75,6 +79,14 @@ Resources:
           - Id: abort-multipart
             Status: Enabled
             AbortIncompleteMultipartUpload: { DaysAfterInitiation: 1 }
+          - Id: expire-custom-recordings
+            Status: Enabled
+            Prefix: ryor/cache-custom/
+            ExpirationInDays: 7
+          - Id: expire-placement-requests
+            Status: Enabled
+            Prefix: ryor/requests/
+            ExpirationInDays: 7
       Tags: [{ Key: Project, Value: smoke-rescue }]
 
   EngineRepo:
@@ -120,7 +132,7 @@ Resources:
                 Action: [logs:CreateLogStream, logs:PutLogEvents]
                 Resource: !Sub "${TaskLogs.Arn}"
 
-  # The engine writes its own mission files and nothing else. No read, list or delete.
+  # Each engine writes mission files, reads submitted scene bytes and reserves bounded Terra steps.
   TaskRole:
     Type: AWS::IAM::Role
     Properties:
@@ -140,6 +152,17 @@ Resources:
               - Effect: Allow
                 Action: s3:PutObject
                 Resource: !Sub "${RunsBucket.Arn}/ryor/missions/*"
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub "${RunsBucket.Arn}/ryor/requests/*"
+              - Effect: Allow
+                Action: [dynamodb:TransactWriteItems, dynamodb:UpdateItem]
+                Resource: !GetAtt Table.Arn
+                Condition:
+                  ForAllValues:StringLike: { "dynamodb:LeadingKeys": ["terra#*"] }
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Ref TerraSecretArn
 
   TaskSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -178,6 +201,8 @@ Resources:
             - { Name: HARD_LIMIT_S, Value: "540" }
             - { Name: IMAGE_TAG, Value: !If [HasImageUri, !Ref ImageUri, !Ref ImageTag] }
             - { Name: STANDIN_SLEEP, Value: !Ref StandInSleep }
+            - { Name: RYOR_TABLE, Value: !Ref Table }
+            - { Name: TERRA_SECRET_ARN, Value: !Ref TerraSecretArn }
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -230,6 +255,9 @@ Resources:
           - Effect: Allow
             Action: s3:GetObject
             Resource: !Sub "${RunsBucket.Arn}/ryor/*"
+          - Effect: Allow
+            Action: s3:PutObject
+            Resource: [!Sub "${RunsBucket.Arn}/ryor/requests/*", !Sub "${RunsBucket.Arn}/ryor/cache/*", !Sub "${RunsBucket.Arn}/ryor/cache-custom/*"]
           - Effect: Allow
             Action: s3:ListBucket
             Resource: !GetAtt RunsBucket.Arn

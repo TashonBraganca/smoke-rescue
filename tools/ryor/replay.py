@@ -13,12 +13,12 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-FRAME_S = 0.5
-CHUNK_S = 10.0
+FRAME_S = 0.5  # Match the headless pose cadence and keep phone replay payloads small.
+CHUNK_S = 10.0  # Start playback before the full mission finishes.
 MATCH_M = 1.5          # a confirmation within this of a true person counts as finding that person
 MATCH_M_REASON = "The brain's confirmed spot is its own estimate; 1.5 m is about one body length plus a pose error of 0.5 m."
-SAME_PERSON_M = 1.0    # two robots' confirmations closer than this are the same person
-BOUNDS_MARGIN_M = 3.0
+SAME_PERSON_M = 1.0    # Two robots' estimates within one body length are the same confirmation marker.
+BOUNDS_MARGIN_M = 3.0  # Include the three launch pads queued outside the entrance.
 EVENT_TEXT = {
     "map_shared": lambda e: f"{name(e['robot'])} linked its map with {name(e['reason'].rsplit(' ', 1)[-1].rstrip('.'))}.",
     "survivor_confirmed": lambda e: f"{name(e['robot'])} confirmed a person.",
@@ -27,6 +27,9 @@ EVENT_TEXT = {
     "mission_complete": lambda e: f"{name(e['robot'])} is walking out.",
     "room_searched": lambda e: f"{name(e['robot'])} finished searching a room.",
     "door_taken": lambda e: f"{name(e['robot'])} took a doorway; the others leave that room to it.",
+    'agent_decision': lambda e: 'Terra, ' + name(e['robot']) + ': ' + e['reason'],
+    'agent_unavailable': lambda e: e['reason'],
+    'agent_order': lambda e: name(e['robot']) + ': ' + e['reason'],
 }
 
 
@@ -59,7 +62,7 @@ class Builder:
     """Feed trace events in order; finished chunks come back from feed() and finish()."""
 
     def __init__(self, gallery, setup, mission_s):
-        hid, r, diff = setup.split("__")
+        hid, r, diff = setup.split("__")[:3]
         self.house = next(h for h in gallery["houses"] if h["id"] == hid)
         self.grid, self.mission_s, self.setup = gallery["grid"], mission_s, setup
         self.robot_ids = ["robot_A", "robot_B", "robot_C"][:int(r[1:])]
@@ -142,14 +145,29 @@ class Builder:
 
     def score(self):
         truth = self.house["people_truth"]
-        found = {p["id"] for p in truth if any(math.dist((p["x"], p["y"]), (c[0], c[1])) <= MATCH_M for c in self.confirms)}
-        false = [f for f in self.found if all(math.dist((p["x"], p["y"]), (f["x"], f["y"])) > MATCH_M for p in truth)]
+        # One marker can match one person. Two nearby people must never both score from one confirmation.
+        edges = [[j for j, p in enumerate(truth) if math.dist((p['x'], p['y']), (f['x'], f['y'])) <= MATCH_M]
+                 for f in self.found]
+        matched = {}
+        def assign(i, visited):
+            for j in edges[i]:
+                if j in visited:
+                    continue
+                visited.add(j)
+                if j not in matched or assign(matched[j], visited):
+                    matched[j] = i
+                    return True
+            return False
+        for i in range(len(edges)):
+            assign(i, set())
+        found = len(matched)
+        false = len(self.found) - found
         out = [r for r in self.robot_ids if r in self.out_at]
         all_out = len(out) == len(self.robot_ids)
-        return {"people_found": len(found), "people_total": len(truth),
+        return {"people_found": found, "people_total": len(truth),
                 "time_s": round(max(self.out_at.values()), 1) if all_out and out else round(self.sim_t, 1),
                 "all_out": all_out, "coverage_pct": round(100 * len(self.union & self.floor) / max(1, len(self.floor)), 1),
-                "robots_out": len(out), "robots": len(self.robot_ids), "false_confirmations": len(false),
+                "robots_out": len(out), "robots": len(self.robot_ids), "false_confirmations": false,
                 "first_person_s": min((c[3] for c in self.confirms), default=None)}
 
     def validate(self):
