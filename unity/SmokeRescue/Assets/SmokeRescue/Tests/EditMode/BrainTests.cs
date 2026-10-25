@@ -1245,10 +1245,10 @@ namespace SmokeRescue.Tests.EditMode
             // Where the hose must aim: inside the corridor, between the robot and the fire (not sideways or behind). With
             // frontiers that look past tight strips, the best frontier beyond the fire may sit beside a corridor wall, so
             // the route can meet the margin up to the corridor's half width off the centre line.
-            Assert.That(blocked.Value.blockAt.y, Is.InRange(0f, 2f), "ahead, before the fire");
+            Assert.That(blocked.Value.blockAt.y, Is.InRange(1.9f, 2.2f), "the burning cell itself, 2 m ahead (owner, 25 Oct: sprays measured to the margin landed short)");
             Assert.That(Mathf.Abs(blocked.Value.blockAt.x), Is.LessThan(1f), "inside the corridor");
             Assert.That(Mathf.Abs(blocked.Value.bearingDegRight), Is.LessThan(Mathf.Atan2(1f, blocked.Value.distanceM) * Mathf.Rad2Deg), "within the corridor's angle from here");
-            Assert.That(blocked.Value.distanceM, Is.InRange(.3f, 1.2f), "where the route meets the 1.2 m margin before the fire at 2 m");
+            Assert.That(blocked.Value.distanceM, Is.InRange(1.9f, 2.2f), "to the fire at 2 m, not to where the route meets its 1.2 m margin");
             var walled = Check(false, out int withWall);
             Assert.That(withWall, Is.Zero, "control: the wall cuts it too");
             Assert.That(walled.HasValue, Is.False, "control: water does not open a wall");
@@ -1320,6 +1320,12 @@ namespace SmokeRescue.Tests.EditMode
             }
             Assert.That(Seen(true).CodeSpray(0, 12, out _, out _), Is.False, "a person just seen comes first");
             Assert.That(Seen(false).CodeSpray(0, 12, out _, out _), Is.True, "control: without person_before_spray it sprays");
+            // code_spray_reach_m (owner, 25 Oct: a spray from 3.4 m landed short). Fire 2 m ahead with a 1 m reach: no spray from
+            // here; the robot walks to its spray spot first. Control: the default reach sprays from here.
+            var near = Corridor(true); near.Nozzle = nozzle;
+            ((BrainConfig)typeof(RobotBrain).GetField("c", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(near)).code_spray_reach_m = 1f;
+            Assert.That(near.CodeSpray(0, 12, out _, out _), Is.False, "beyond the reach: walk closer first");
+            Assert.That(near.DrainEvents().Any(e => e.kind == "code_spray_approach"), Is.True, "and it walks to the spray spot");
             // The same model as the agent's advice (tools.py knock_down_s): 0.5 m2 at 1.6 m is 0.932 s, 4 m2 is beyond one stream.
             Assert.That(RobotBrain.KnockDownS(nozzle, .5f, 1.6f).Value, Is.EqualTo(.9324).Within(.002), "equal to tools.py knock_down_s(0.5, 1.6)");
             Assert.That(RobotBrain.KnockDownS(nozzle, 4f, 1.6f).HasValue, Is.False);
@@ -1344,7 +1350,7 @@ namespace SmokeRescue.Tests.EditMode
                 "The fire margin cut the path to this frontier; leave it until the retry time.", 3f });
             var blocked = b.FireBlockedFrontier(1);
             Assert.That(blocked.HasValue, Is.True, "a fire-cut frontier the brain set aside is still a fire water could open");
-            Assert.That(blocked.Value.blockAt.y, Is.InRange(0f, 2f));
+            Assert.That(blocked.Value.blockAt.y, Is.InRange(1.9f, 2.2f), "the burning cell itself");
         }
 
         [Test]
