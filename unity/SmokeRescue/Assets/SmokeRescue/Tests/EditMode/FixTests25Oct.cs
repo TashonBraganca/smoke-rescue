@@ -213,6 +213,34 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void ASecondPersonWhoLaterSealsTheWayAlsoGetsTheSmallCore()
+        {
+            // F3 regression found in the headless family ranch run (25 Oct): robot A squeezed past s2 at 63 s, later stood 1.55 m from s6 in a
+            // doorway sealed by s6's full core, and with per-person squeeze the second squeeze never came: "no route at any fire margin" for 20 s
+            // at the deadline with no fire near. The person in the open room is squeezed first (set {0}); the corridor person (index 1) seals the floor.
+            var s = Settings(); s.grid_size_m = 16; s.survivor_squeeze = true; s.squeeze_per_person = true; s.robot_radius_m = .25f; s.search_requires_ceiling = false;
+            var b = new RobotBrain(Calibration(), s, "A", 0); var g = Map(b);
+            for (float y = -3; y <= 0; y += .05f) for (float x = -4; x <= 5; x += .05f) g.ObserveFree(g.Cell(new Vector2(x, y)));
+            for (float y = 0; y <= 5; y += .05f)
+            {
+                for (float x = -.9f; x <= .9f; x += .05f) g.ObserveFree(g.Cell(new Vector2(x, y)));
+                g.ObserveOccupied(g.Cell(new Vector2(-1f, y))); g.ObserveOccupied(g.Cell(new Vector2(1f, y)));
+            }
+            var searched = (bool[])typeof(OccupancyGrid).GetField("observed", NP).GetValue(g);
+            for (int i = 0; i < g.Count; i++) searched[i] = g.Centre(i).y < 1.5f;
+            var people = (List<Vector2>)typeof(RobotBrain).GetField("survivors", NP).GetValue(b);
+            people.Add(new Vector2(3, -1.5f)); people.Add(new Vector2(0, 1.5f));
+            typeof(RobotBrain).GetField("squeezePast", NP).SetValue(b, true);
+            typeof(RobotBrain).GetField("squeezeSet", NP).SetValue(b, new List<int> { 0 });
+            typeof(RobotBrain).GetMethod("ApplyKeepOut", NP).Invoke(b, null);
+            bool Keep(Vector2 at) => ((bool[])typeof(OccupancyGrid).GetField("keepOut", NP).GetValue(Map(b)))[Map(b).Cell(at)];
+            Assert.That(Keep(new Vector2(0, 1.8f)), Is.True, "fixture: the corridor person still has the full core and seals it");
+            Assert.That((bool)typeof(RobotBrain).GetMethod("SqueezePastPerson", NP).Invoke(b, new object[] { 0.0 }), Is.True, "a second squeeze is allowed");
+            typeof(RobotBrain).GetMethod("ApplyKeepOut", NP).Invoke(b, null);
+            Assert.That(Keep(new Vector2(0, 1.8f)), Is.False, "the corridor person's core shrinks");
+        }
+
+        [Test]
         public void OnlyThePersonWhoSealsTheFloorGetsTheSmallKeepOutCore()
         {
             // F3. Seed 934 (25 Oct): robot A squeezed past the kitchen person s4 at 50.2 s; the flag stayed on for every person, and at

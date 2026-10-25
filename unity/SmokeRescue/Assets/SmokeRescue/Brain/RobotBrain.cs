@@ -364,7 +364,9 @@ namespace SmokeRescue.Brain
                             lastReturnBlockedLog = t; int here = grid.Cell(motion.Pose.position);
                             Emit(t, "return_blocked", "The walk out finds no route at any fire margin: hold and look again.", "blocked_s", t - returnBlockedSince,
                                 "nearest_fire_m", here >= 0 ? grid.FireDistance(here) : -1, "fire_clearance_m", grid.FireClearance, "last_resort_m", c.last_resort_fire_clearance_m,
-                                "water_l", lastWaterL, "x_m", motion.Pose.position.x, "y_m", motion.Pose.position.y);
+                                "water_l", lastWaterL, "x_m", motion.Pose.position.x, "y_m", motion.Pose.position.y,
+                                "start_cause_code", grid.WhyNotWalkable(motion.Pose.position).code, "home_cause_code", grid.WhyNotWalkable(home).code,
+                                "squeezed_people", squeezeSet == null ? (squeezePast ? survivors.Count : 0) : squeezeSet.Count, "people", survivors.Count);
                         }
                         if (c.end_return_blocked_resume_s > 0 && t - returnBlockedSince >= c.end_return_blocked_resume_s)
                         {
@@ -378,7 +380,7 @@ namespace SmokeRescue.Brain
                         // The walk out is the last job: no route home is no reason to search on. A confirmed person's keep-out
                         // can close the only way out of the room (headless 5017: robot A shut in the study with s1, flipping
                         // between return and retreat every tick); pass them at the body's half-width, hold, and plan again.
-                        if (!squeezePast && survivors.Count > 0 && c.survivor_squeeze && c.survivor_squeeze_core_m < c.survivor_keepout_core_m)
+                        if ((!squeezePast || squeezeSet != null) && survivors.Count > 0 && c.survivor_squeeze && c.survivor_squeeze_core_m < c.survivor_keepout_core_m)
                         {
                             squeezeSet = null; squeezePast = true; keptOut = -1;
                             Emit(t, "squeeze_past_person", "The way out passes a confirmed person: pass them with the keep-out at the body's half-width.",
@@ -2626,19 +2628,21 @@ namespace SmokeRescue.Brain
             return double.IsNaN(track.candidateSince) || t - track.candidateSince < c.agent_candidate_grace_s;
         }
         float retreatClearance = float.NaN;   // retreat_reduced_clearance: the fire clearance the current retreat route needs
-        /// <summary>squeeze_per_person: the one person whose small core alone reopens the cut-off floor, or null (all of them) when
-        /// no single person does or there is only one.</summary>
+        /// <summary>squeeze_per_person: the one person, not yet squeezed, whose small core alone reopens the cut-off floor, or null (all of
+        /// them) when no single person does or there is only one.</summary>
         List<int> BlockingPerson()
         {
             if (survivors.Count < 2) return null;
             bool had = squeezePast; var hadSet = squeezeSet; List<int> found = null;
+            var baseline = had && hadSet != null ? new List<int>(hadSet) : new List<int>();
             try
             {
                 squeezePast = true;
                 for (int i = 0; i < survivors.Count && found == null; i++)
                 {
-                    squeezeSet = new List<int> { i }; ApplyKeepOut();
-                    if (planner.NearestBlocked(motion.Pose.position, InSearchArea) == null) found = new List<int> { i };
+                    if (baseline.Contains(i)) continue;
+                    squeezeSet = new List<int>(baseline) { i }; ApplyKeepOut();
+                    if (planner.NearestBlocked(motion.Pose.position, InSearchArea) == null) found = new List<int>(baseline) { i };
                 }
             }
             finally { squeezePast = had; squeezeSet = hadSet; ApplyKeepOut(); }
@@ -2646,7 +2650,8 @@ namespace SmokeRescue.Brain
         }
         bool SqueezePastPerson(double t)
         {
-            if (!c.survivor_squeeze || squeezePast || survivors.Count == 0 || c.survivor_squeeze_core_m >= c.survivor_keepout_core_m) return false;
+            // squeeze_per_person: a second person who later seals other floor gets the small core too, one person at a time.
+            if (!c.survivor_squeeze || (squeezePast && squeezeSet == null) || survivors.Count == 0 || c.survivor_squeeze_core_m >= c.survivor_keepout_core_m) return false;
             if (planner.NearestBlocked(motion.Pose.position, InSearchArea) == null) return false;
             squeezeSet = c.squeeze_per_person ? BlockingPerson() : null;
             squeezePast = true; keptOut = -1;
