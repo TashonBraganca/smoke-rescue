@@ -1,4 +1,4 @@
-Headless benchmark: generator, runner and scorer (25 Oct 2026, a coding agent from opencv-a2; brief handoff/brief_bench_25oct.txt)
+Headless benchmark: generator, runner and scorer (25 Oct 2026, from opencv-a2; brief handoff/brief_bench_25oct.txt)
 
 Files
   tools/bench/make_requests.py   writes worlds, fire files and one request JSON per run, plus manifest.json
