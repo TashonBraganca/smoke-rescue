@@ -627,7 +627,7 @@ namespace SmokeRescue.Brain
                 else if (fallback)
                 {
                     System.Func<Vector2, bool> excluded = p => ClaimBlocks(p, t) || GoalBlacklisted(p, t) || VisitedGoal(p, t) || !InSearchArea(p);
-                    var frontier = planner.Frontier(motion.Pose.position, excluded);
+                    var frontier = CommittedFrontier(planner.Frontiers(motion.Pose.position, excluded), t);
                     lastPlan = t;
                     // Only leftovers (or nothing) are reachable while unsearched floor lies cut off: a confirmed person may be
                     // sealing a corridor. The shrunk keep-out applies from the next step.
@@ -662,6 +662,8 @@ namespace SmokeRescue.Brain
                     {
                         SetPath(frontier.path, true); frontierCentre = frontier.claimCentre; frontierRadius = frontier.claimRadius;
                         scanSince = double.NaN; noFrontierAt = double.NaN; ClaimRoom(t, frontier.position, PathLength(frontier.path));
+                        if (!committedAt.HasValue || Vector2.Distance(committedAt.Value, frontier.position) > c.stuck_repeat_radius_m) committedSince = t;
+                        committedAt = frontier.position;
                         if (c.room_ledger)
                             Emit(t, "goal", "Room ledger ranks admitted frontiers by room completion, entry history, coverage and travel time.",
                                 "x_m", frontier.position.x, "y_m", frontier.position.y, "path_cost", frontier.cost, "information_cells", frontier.information, "score", frontier.score,
@@ -741,6 +743,21 @@ namespace SmokeRescue.Brain
             return FollowOrHold(t, dt);
         }
 
+        Vector2? committedAt; double committedSince;   // goal_commitment: the frontier last chosen and when it was first chosen
+        /// <summary>goal_commitment: the best admitted frontier, unless the one chosen earlier is still admitted and the best is
+        /// neither in a better room tier nor ahead by room_tour_switch_s. Seed 934 (25 Oct), robot A: the goal flipped 7 times
+        /// between a near kitchen frontier and a far hall frontier between 55.8 and 134.0 s.</summary>
+        GridPlanner.FrontierChoice CommittedFrontier(List<GridPlanner.FrontierChoice> all, double t)
+        {
+            var best = all.Count > 0 ? all[0] : null;
+            if (best == null || !c.goal_commitment || !committedAt.HasValue || t - committedSince > c.goal_commit_max_s) return best;
+            var kept = all.Find(f => Vector2.Distance(f.position, committedAt.Value) <= c.stuck_repeat_radius_m);
+            if (kept == null || kept == best) return best;
+            if (best.roomTier < kept.roomTier || best.roomScore + c.room_tour_switch_s < kept.roomScore) return best;
+            Emit(t, "goal_kept", "A frontier chosen earlier is still admitted and the new best is not clearly better: keep walking to it.",
+                "x_m", kept.position.x, "y_m", kept.position.y, "kept_score_s", kept.roomScore, "best_score_s", best.roomScore, "best_x_m", best.position.x, "best_y_m", best.position.y);
+            return kept;
+        }
         Vector2? lastScanAt; int knownAtLastScan;   // no_frontier_scan_once: where the last full no-frontier scan ended
         readonly List<LidarScan> lidarQueue = new List<LidarScan>();
         double lastLidar = double.NegativeInfinity, nextLocalizationReport;
