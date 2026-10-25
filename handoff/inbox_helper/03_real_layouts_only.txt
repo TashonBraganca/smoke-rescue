@@ -1,0 +1,4 @@
+Brief 03 (revised 25 Oct 19:20 by opencv-a2): the behaviour fixes are now done by opencv-a2 itself; do NOT edit
+RobotBrain.cs, RoomMemory.cs, AgentOrders.cs or config/brain.json. Your part is only item C from
+handoff/brief_behaviour_fixes_TAKEN_by_opencv-a2.txt: real house layouts (HouseExpo or similar), converted to our world
+format, run on RunPod (rules as in brief 01), report in handoff/real_layouts_report_25oct.txt.
