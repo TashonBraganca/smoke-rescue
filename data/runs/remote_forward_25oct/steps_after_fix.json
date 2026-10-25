@@ -1,0 +1,153 @@
+{
+ "summary": {
+  "step": {
+   "n": 2,
+   "remote_ok": 2,
+   "local_ok": 2,
+   "equal": 0,
+   "diffs": [
+    {
+     "t": 97.866667,
+     "robot": "robot_B",
+     "aws": {
+      "orders": [],
+      "evidence_ids": [
+       "28b0ab084eaeaf92"
+      ],
+      "rounds": 2,
+      "latency_s": 6.61,
+      "summary": "I will let the robot complete its short no-frontier scan/return behavior: both known survivors are already confirmed, and the only new thermal feature is a high, narrow hot component inconsistent with a person."
+     },
+     "local": {
+      "orders": [],
+      "evidence_ids": [
+       "551d7e19f5fb7cf1"
+      ],
+      "rounds": 1,
+      "latency_s": 6.366,
+      "summary": "I will allow the robot\u2019s autonomous short scan/return behavior to continue because no reachable unsearched frontier or credible new person candidate is present, while both confirmed survivors remain recorded."
+     }
+    },
+    {
+     "t": 102.0,
+     "robot": "robot_A",
+     "aws": {
+      "orders": [],
+      "evidence_ids": [
+       "300151287a27ff69",
+       "d4e445c5c99f6bf4"
+      ],
+      "rounds": 3,
+      "latency_s": 10.323,
+      "summary": "I inspected the only plausible warm region; it is inconclusive with no colour-person evidence or fire, so I will let the ranked search/scan continue rather than misreport a survivor."
+     },
+     "local": {
+      "orders": [],
+      "evidence_ids": [
+       "bb91be3eaf966761"
+      ],
+      "rounds": 1,
+      "latency_s": 8.335,
+      "summary": "No reachable unsearched frontier or credible new person candidate is present; the two confirmed survivors remain reported, so I will allow the robot\u2019s return/short-scan behavior rather than duplicate searches."
+     }
+    }
+   ],
+   "remote_median_s": 10.585,
+   "remote_p90_s": 10.046,
+   "remote_max_s": 11.125,
+   "local_median_s": 7.367,
+   "local_p90_s": 6.396,
+   "local_max_s": 8.337
+  },
+  "forwarder_stats": {
+   "remote": "http://smoke--LoadB-m7oFRuQ63UoE-1386562850.us-east-1.elb.amazonaws.com",
+   "routes": {
+    "robot_step": {
+     "n": 2,
+     "errors": 0,
+     "fallbacks": 0,
+     "bytes_up": 2119750,
+     "median_s": 11.123,
+     "max_s": 11.123
+    }
+   }
+  }
+ },
+ "calls": [
+  {
+   "t": 97.866667,
+   "robot": "robot_B",
+   "route": "step",
+   "remote": {
+    "status": 200,
+    "s": 10.046,
+    "served_by": "aws",
+    "json": {
+     "step": "robot_B@97.867",
+     "orders": [],
+     "refusals": [],
+     "summary": "I will let the robot complete its short no-frontier scan/return behavior: both known survivors are already confirmed, and the only new thermal feature is a high, narrow hot component inconsistent with a person.",
+     "rounds": 2,
+     "evidence_ids": [
+      "28b0ab084eaeaf92"
+     ],
+     "latency_s": 6.61
+    }
+   },
+   "local": {
+    "status": 200,
+    "s": 6.396,
+    "served_by": null,
+    "json": {
+     "step": "robot_B@97.867",
+     "orders": [],
+     "refusals": [],
+     "summary": "I will allow the robot\u2019s autonomous short scan/return behavior to continue because no reachable unsearched frontier or credible new person candidate is present, while both confirmed survivors remain recorded.",
+     "rounds": 1,
+     "evidence_ids": [
+      "551d7e19f5fb7cf1"
+     ],
+     "latency_s": 6.366
+    }
+   }
+  },
+  {
+   "t": 102.0,
+   "robot": "robot_A",
+   "route": "step",
+   "remote": {
+    "status": 200,
+    "s": 11.125,
+    "served_by": "aws",
+    "json": {
+     "step": "robot_A@102.000",
+     "orders": [],
+     "refusals": [],
+     "summary": "I inspected the only plausible warm region; it is inconclusive with no colour-person evidence or fire, so I will let the ranked search/scan continue rather than misreport a survivor.",
+     "rounds": 3,
+     "evidence_ids": [
+      "300151287a27ff69",
+      "d4e445c5c99f6bf4"
+     ],
+     "latency_s": 10.323
+    }
+   },
+   "local": {
+    "status": 200,
+    "s": 8.337,
+    "served_by": null,
+    "json": {
+     "step": "robot_A@102.000",
+     "orders": [],
+     "refusals": [],
+     "summary": "No reachable unsearched frontier or credible new person candidate is present; the two confirmed survivors remain reported, so I will allow the robot\u2019s return/short-scan behavior rather than duplicate searches.",
+     "rounds": 1,
+     "evidence_ids": [
+      "bb91be3eaf966761"
+     ],
+     "latency_s": 8.335
+    }
+   }
+  }
+ ]
+}
