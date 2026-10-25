@@ -1,4 +1,5 @@
 """AWS chat contracts without network calls or workstation credentials."""
+import json
 import base64
 from unittest.mock import Mock
 
@@ -106,4 +107,26 @@ def test_azure_uses_configured_deployment_and_aws_retry_bound(monkeypatch):
     with pytest.raises(httpx.HTTPStatusError):
         backend.chat([{"role": "user", "content": "Hello"}], [])
     assert len(requests) == 1
+    backend.client.close()
+
+
+def test_azure_reasoning_effort_refusal_is_resent_even_with_one_attempt(monkeypatch):
+    """The AWS task sets AZURE_OPENAI_MAX_ATTEMPTS=1. gpt-5.6-terra answers 400 to function tools with reasoning_effort;
+    the resend without it must still happen (25 Oct: every AWS agent and commander step ended in model_error)."""
+    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "https://example.invalid")
+    monkeypatch.setenv("AZURE_OPENAI_API_KEY", "fake")
+    monkeypatch.setenv("AZURE_OPENAI_MAX_ATTEMPTS", "1")
+    backend = llm.make_backend("azure", model="test-deployment")
+    backend.client.close()
+    bodies = []
+    def respond(request):
+        body = json.loads(request.content)
+        bodies.append(body)
+        if "reasoning_effort" in body:
+            return httpx.Response(400, json={"error": {"message": "Function tools with reasoning_effort are not supported",
+                                                       "param": "reasoning_effort"}})
+        return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}]})
+    backend.client = httpx.Client(transport=httpx.MockTransport(respond))
+    assert backend.chat([{"role": "user", "content": "Hello"}], [{"type": "function", "function": {"name": "finish"}}]).text == "ok"
+    assert len(bodies) == 2 and "reasoning_effort" not in bodies[1]
     backend.client.close()

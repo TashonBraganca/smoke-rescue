@@ -1,0 +1,102 @@
+Remote mode: a live recording that uses the AWS agent service (25 Oct 2026)
+
+What it is
+brain/brain/agent/remote_forward.py is a local forwarder. Unity's recorder calls it exactly as it calls the local
+agent server. For each call it uploads the robot's own sensor files that the remote route reads (PUT /runs ZIP batches;
+pull-v1 for agent steps), forwards the call to the ALB with the X-Origin-Verify header and returns the AWS answer.
+No Unity change is needed: the recorder already reads SMOKE_AGENT_URL.
+
+How to start it
+  cd /Volumes/Tashon/opencv/smoke-rescue/brain
+  SMOKE_FORWARD_LOG=../data/runs/remote_forward_25oct/live.jsonl \
+    .venv/bin/uvicorn brain.agent.remote_forward:app --host 127.0.0.1 --port 8095
+Optional: SMOKE_FALLBACK_URL=http://127.0.0.1:8080 (a local agent server used when AWS fails, see below).
+The header value is read once from Secrets Manager smoke-rescue/origin-verify with the local aws cli (or from
+SMOKE_ORIGIN_HEADER_FILE / SMOKE_ORIGIN_VERIFY). It is never printed.
+Check: curl -s http://127.0.0.1:8095/health  (AWS /health plus a "forwarder" block; 503 if AWS is unreachable)
+Live counts and latencies: curl -s http://127.0.0.1:8095/forwarder/stats
+
+Pointing Unity at it
+Unity reads SMOKE_AGENT_URL when a recording starts (RecorderMenu.cs). The editor must be launched with
+SMOKE_AGENT_URL=http://127.0.0.1:8095 in its environment (for example from Unity Hub started in a shell that exports it).
+Do not use port 8090: the Unity editor itself listens on [::1]:8090 (mcp-unity). Use 127.0.0.1, not localhost: the
+forwarder binds IPv4 only.
+
+What was verified, with numbers (replay of data/recordings/unity_house_onedoor_seed934_full_BEST_0318)
+tools/replay_remote_forward.py sent the calls Unity makes (bodies copied from RecordingSession.Agents.cs and
+VisualPlaceClient.cs) to the forwarder (AWS) and, at the same moment, to a separate local server on port 8091 with the
+same code. Times: every survivor_candidate / person_glance time plus a 30 s grid; poses from brain_state.jsonl.
+Evidence: data/runs/remote_forward_25oct/replay1.json and replay1.log (git-ignored), forwarder log in the same run.
+
+  route                     n    AWS ok  equal to local       AWS median / p90 / max      local median
+  POST /perceive/people     89   89      89 of 89 identical   2.88 / 3.11 / 3.36 s        1.56 s
+                                         (19 lists non-empty, 23 people; bbox, range, bearing byte-equal)
+  POST /map3d/*/integrate   89   89      89 ok                0.42 / 0.47 / 1.38 s        0.14 s
+  POST /map3d/*/layers      17   17      17 byte-identical    0.37 / 0.72 / 0.76 s        0.12 s
+  POST /place/*/keyframe    38   38      38 identical payload 0.52 / 0.73 / 2.57 s        0.04 s
+  POST /place/*/match       38   38      38 identical         0.22 / 0.23 / 1.17 s        0.005 s
+                                         (all 38 were "no match" on both sides: no positive match was exercised)
+  POST /map3d/*/export      2    2       PLY downloaded       0.39 to 0.63 s, then 14.8 MB and 11.7 MB in background
+  POST /robot/*/step        6    0       see below            1.2 to 2.8 s (pull-v1 itself worked)
+  POST /commander/step      2    0       see below            0.2 to 0.6 s
+  GET  /health                   yes                          0.42 s new connection
+  POST /vision/assess_visibility yes                          8 ms server time (smoke_test.sh --direct PASS)
+
+Upload bytes: about 0.93 MB per new frame triple (RGB 560 kB, depth 367 kB, thermal 49 kB, plus index rows). A person
+scan at the same stamp as a keyframe reuses that upload (51 of 89 scans uploaded). An agent step uploads about 1.0 MB
+(decision-time triple, decisions.jsonl, index rows); its history frames come only when the agent asks (pull-v1).
+AWS task: 1 vCPU ARM64, 2 GB. After the replay: memory 39 % (state is kept per robot), CPU peak 81 %.
+
+Agent steps on AWS do not work today (measured, root cause found)
+Every AWS robot and commander step returned HTTP 200 with summary null, no orders and no evidence. The AWS trace shows
+model_error: Azure HTTP 400 "Function tools with reasoning_effort are not supported for this model". The backend
+resends without reasoning_effort, but that resend counted as an attempt, and the task definition sets
+AZURE_OPENAI_MAX_ATTEMPTS=1 (agent.yaml line 406), so the resend never happened. Locally the default is 4, which is why
+local steps work. Reproduced locally with AZURE_OPENAI_MAX_ATTEMPTS=1: same 400.
+Fixed in code: brain/brain/agent/llm.py no longer counts that resend (test_aws_backends.py, fails on the old code).
+The running image still has the old code. To make AWS agent steps work, one of:
+  a) rebuild and push the agent image and redeploy (deploy/aws/deploy.sh; needs docker, loads the machine), or
+  b) a stack update setting AZURE_OPENAI_MAX_ATTEMPTS to 2 in agent.yaml (no rebuild; a CloudFormation change).
+Neither was done here: both were outside what this task allowed.
+Pull-v1 itself works on AWS: the 6 steps completed their pull job (about 1.0 MB each) and the model call was the only
+failure. Steps were not compared with local answers because AWS produced none; the model is not deterministic anyway,
+and remote steps skip the local code-run pre-scan by design (commit d587520d), so even working steps will differ.
+Known difference in evidence ids: track_fire_spread on the pull path loads depth+thermal only, so its frame id differs
+from a local run; its measurements are equal (test_pull_transport.py, test_remote_forward.py). Latest-frame tools keep
+the local evidence id because the forwarder sends X-Recording-Source with the local robot folder.
+
+Failure behaviour
+- AWS unreachable, timeout, or 5xx: never an empty answer. Without SMOKE_FALLBACK_URL the forwarder returns HTTP 502 with
+  the reason (Unity logs "agent ...: HTTP 502" and treats the call as failed). With a fallback, the original request goes
+  to the fallback and the response carries X-Smoke-Served-By: fallback, with a WARNING in the forwarder log.
+- A remote step the model never answered (the case above) is also a 502 or a fallback, not an empty 200. That matters:
+  Unity counts failed agent calls and after 3 in a row lets the robot confirm people itself; an empty 200 would keep it
+  waiting on a dead agent.
+- A 4xx from AWS (e.g. a missing frame) is returned unchanged; it means a forwarder or request bug and is not hidden.
+- /health returns 503 when AWS is down and no fallback is healthy, so Unity starts with the colour detector off and says
+  so in its console ("vision service ... not reachable").
+- Mixed state with a fallback: place databases and 3D maps live on whichever server answered. A place keyframe served by
+  the fallback has another database_id, so Unity resets its keyframe table (existing behaviour).
+
+Cost to a 550 s mission (estimate from the measurements above, directional)
+The person scan and the integrate after it are synchronous in the recorder. Per robot scan AWS costs about 3.3 s against
+about 1.7 s locally (replay, measured under the same load), so about +1.6 s per scan. At one scan per sim second per robot
+(more while a person is in view) that adds about 550 x 2 x 1.6 = 1760 s, about 30 minutes, to a mission whose local wall
+time in perf.txt was about 95 s per 10 sim seconds (about 87 minutes). Simulation outcomes do not change: the recorder is
+offline and pauses while it waits. Agent steps would add about 1 to 3 s of transport each, once they work.
+
+Not verified
+- No live Unity run through the forwarder (Unity was busy with another recording; C# was frozen today).
+- Place keyframes every 2 s with a concurrent person scan on the 1 vCPU task (the replay sent keyframes every 30 s).
+  One keyframe in 38 took 2.57 s, above Unity's 2 s place_http_timeout_s; the recorder then logs a place_service error
+  and captures the next keyframe. If that becomes frequent, raise place_http_timeout_s in config/perception.json for
+  remote runs (the place worker is asynchronous, so a longer timeout does not pause the simulation).
+- A positive place match through AWS (none occurred on either side in the replay).
+- Memory over a full mission (39 % of 2 GB after the replay).
+- The agent trace of remote steps stays on the AWS task (run folder agent_trace.jsonl); it is not copied back into the
+  recording, and GET /trace only shows the commander's global trace.
+- Approvals (/approval) pass through unchanged; not exercised.
+
+Tests: brain/tests/test_remote_forward.py (9 tests against the real server app behind an ALB-like header rule). Each
+of these deliberate breaks fails at least one test: wrong RGB frame uploaded, origin header missing, an empty 200 on
+failure, pull demands ignored, steps sent without pull-v1.
