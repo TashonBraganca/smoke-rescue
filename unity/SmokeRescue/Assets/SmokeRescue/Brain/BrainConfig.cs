@@ -254,6 +254,9 @@ namespace SmokeRescue.Brain
         public float survivor_stop_yaw_dps = 5.0f;
         public float retreat_start_weight = 0.1f;
         public float retreat_path_weight = 0.01f;
+        public bool stall_near_person_blacklists = false;
+        public float stall_near_person_extra_m = 0.8f;
+        public bool squeeze_per_person = false;
         public float code_spray_retry_s = 0f;
         public bool code_spray_ignores_leave_refusal = false;
         public float leave_wait_cap_s = 0f;

@@ -160,7 +160,7 @@ namespace SmokeRescue.Brain
             }
             NoteBodyTrack();
             NoteEntrance(t);
-            if (survivors.Count != keptOut) { keptOut = survivors.Count; grid.SetKeepOut(survivors, squeezePast ? c.survivor_squeeze_core_m : c.survivor_keepout_core_m, c.survivor_keepout_m + c.robot_radius_m); }   // the ring is for the robot's centre
+            if (survivors.Count != keptOut) { keptOut = survivors.Count; ApplyKeepOut(); }
             CheckReenter(t);
             if (doorwayProbeGoal.HasValue && (returning || retreating || completed || nearFire || active != null ||
                 (AgentGoalActive(t) && !(c.frontier_doorway_looks && agentGoalIsFrontier)) || recoveryPhase != 0 || t - doorwayProbeStarted >= c.sweep_max_s))
@@ -362,7 +362,7 @@ namespace SmokeRescue.Brain
                         // between return and retreat every tick); pass them at the body's half-width, hold, and plan again.
                         if (!squeezePast && survivors.Count > 0 && c.survivor_squeeze && c.survivor_squeeze_core_m < c.survivor_keepout_core_m)
                         {
-                            squeezePast = true; keptOut = -1;
+                            squeezeSet = null; squeezePast = true; keptOut = -1;
                             Emit(t, "squeeze_past_person", "The way out passes a confirmed person: pass them with the keep-out at the body's half-width.",
                                 "people", survivors.Count, "core_m", c.survivor_squeeze_core_m);
                         }
@@ -1247,8 +1247,13 @@ namespace SmokeRescue.Brain
                 "commanded_speed_mps", commandedSpeed, "measured_speed_mps", motion.ForwardSpeed,
                 "duration_s", stalledFor, "marked_cells", marked, "repeats", place.repeats,
                 "x_m", contactPose.position.x, "y_m", contactPose.position.y);
-            if (place.repeats >= c.stuck_repeat_count && !returning && !retreating)
+            // stall_near_person_blacklists: a stall beside a confirmed person is the body, which is below the LiDAR plane; one stall is enough.
+            bool besidePerson = c.stall_near_person_blacklists && survivors.Exists(s => Vector2.Distance(s, contactPose.position) <=
+                c.survivor_keepout_m + c.robot_radius_m + c.stall_near_person_extra_m);
+            if ((place.repeats >= c.stuck_repeat_count || besidePerson) && !returning && !retreating)
             {
+                if (besidePerson && place.repeats < c.stuck_repeat_count)
+                    Emit(t, "stall_near_person", "Stalled within reach of a confirmed person's body, which the map does not show: set this goal aside at once.", "repeats", place.repeats);
                 if (recoveryGoal.HasValue) BlacklistGoal(recoveryGoal.Value, t, place.repeats);
                 if (active != null)
                 {
@@ -1906,6 +1911,13 @@ namespace SmokeRescue.Brain
         readonly List<Vector2> walkedIn = new List<Vector2>();
         int keptOut;   // how many confirmed people the planner's keep-out discs cover
         bool squeezePast;   // the keep-out core is down to survivor_squeeze_core_m (see SqueezePastPerson)
+        List<int> squeezeSet;   // squeeze_per_person: whose core it is; null means everyone's
+        float CoreOf(int person) => squeezePast && (squeezeSet == null || squeezeSet.Contains(person)) ? c.survivor_squeeze_core_m : c.survivor_keepout_core_m;
+        void ApplyKeepOut()
+        {
+            var cores = new float[survivors.Count]; for (int i = 0; i < cores.Length; i++) cores[i] = CoreOf(i);
+            grid.SetKeepOut(survivors, cores, c.survivor_keepout_m + c.robot_radius_m);   // the ring is for the robot's centre
+        }
         bool searchedOut;   // stay_inside: a full scan found nothing reachable; hold still instead of turning
         /// <summary>A route to the last proven-indoor floor on the way to an unproven frontier, when no proven one is left.
         /// Floor seen through an interior doorway is mapped free but not proven indoors until the camera sees its ceiling,
@@ -2519,10 +2531,29 @@ namespace SmokeRescue.Brain
             return double.IsNaN(track.candidateSince) || t - track.candidateSince < c.agent_candidate_grace_s;
         }
         float retreatClearance = float.NaN;   // retreat_reduced_clearance: the fire clearance the current retreat route needs
+        /// <summary>squeeze_per_person: the one person whose small core alone reopens the cut-off floor, or null (all of them) when
+        /// no single person does or there is only one.</summary>
+        List<int> BlockingPerson()
+        {
+            if (survivors.Count < 2) return null;
+            bool had = squeezePast; var hadSet = squeezeSet; List<int> found = null;
+            try
+            {
+                squeezePast = true;
+                for (int i = 0; i < survivors.Count && found == null; i++)
+                {
+                    squeezeSet = new List<int> { i }; ApplyKeepOut();
+                    if (planner.NearestBlocked(motion.Pose.position, InSearchArea) == null) found = new List<int> { i };
+                }
+            }
+            finally { squeezePast = had; squeezeSet = hadSet; ApplyKeepOut(); }
+            return found;
+        }
         bool SqueezePastPerson(double t)
         {
             if (!c.survivor_squeeze || squeezePast || survivors.Count == 0 || c.survivor_squeeze_core_m >= c.survivor_keepout_core_m) return false;
             if (planner.NearestBlocked(motion.Pose.position, InSearchArea) == null) return false;
+            squeezeSet = c.squeeze_per_person ? BlockingPerson() : null;
             squeezePast = true; keptOut = -1;
             Emit(t, "squeeze_past_person", "Unsearched floor lies beyond a confirmed person's keep-out: pass them with the keep-out at the body's half-width.",
                 "people", survivors.Count, "core_m", c.survivor_squeeze_core_m);

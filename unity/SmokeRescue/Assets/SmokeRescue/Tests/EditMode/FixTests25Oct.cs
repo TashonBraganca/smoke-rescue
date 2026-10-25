@@ -187,5 +187,65 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(Ordered(true), Is.True, "the reflex walks to its spray spot");
             Assert.That(Ordered(false), Is.False, "control: with the switch off it is refused as 'the robot is leaving'");
         }
+
+        [Test]
+        public void AStallBesideAConfirmedPersonBlacklistsTheGoalAtOnce()
+        {
+            // F3. Seed 934 (25 Oct), robot A: stalls at 238.3, 243.3 and 248.6 s at (8.8, 13.1), 0.80 to 0.92 m from person s1's body
+            // (a lying body reaches 0.85 m, below the LiDAR plane), 1.7 m from the believed position; the goal was blacklisted only at
+            // the third stall, 13 s later (stuck_repeat_count 3). Control: the same stall with the person 6 m away needs three.
+            int FirstBlacklistRepeats(Vector2 person, bool on)
+            {
+                var b = BlockedBrain(out var c); c.stall_near_person_blacklists = on;
+                ((List<Vector2>)typeof(RobotBrain).GetField("survivors", NP).GetValue(b)).Add(person);
+                var command = new BrainCommand();
+                for (int tick = 0; tick < 1000; tick++)
+                {
+                    command = DriveTick(b, tick, command.forwardMps < 0 ? command.forwardMps : 0, command.yawRateDeg);
+                    var e = b.DrainEvents().FirstOrDefault(x => x.kind == "goal_blacklisted");
+                    if (e != null) return (int)e.numbers["repeats"];
+                }
+                return -1;
+            }
+            Assert.That(FirstBlacklistRepeats(new Vector2(1.5f, 1.2f), true), Is.EqualTo(1), "a stall beside a confirmed person blacklists at the first stall");
+            Assert.That(FirstBlacklistRepeats(new Vector2(1.5f, 1.2f), false), Is.EqualTo(3), "control: switch off, three stalls");
+            Assert.That(FirstBlacklistRepeats(new Vector2(0, 5.5f), true), Is.EqualTo(3), "control: a person 5.5 m away changes nothing");
+        }
+
+        [Test]
+        public void OnlyThePersonWhoSealsTheFloorGetsTheSmallKeepOutCore()
+        {
+            // F3. Seed 934 (25 Oct): robot A squeezed past the kitchen person s4 at 50.2 s; the flag stayed on for every person, and at
+            // 238 to 249 s A drove into the lying body of s1 (core 0.45 m shrunk to 0.23 m).
+            RobotBrain Brain(bool perPerson)
+            {
+                var s = Settings(); s.grid_size_m = 16; s.survivor_squeeze = true; s.squeeze_per_person = perPerson; s.robot_radius_m = .25f; s.search_requires_ceiling = false;
+                var b = new RobotBrain(Calibration(), s, "A", 0); var g = Map(b);
+                for (float y = -3; y <= 0; y += .05f) for (float x = -4; x <= 5; x += .05f) g.ObserveFree(g.Cell(new Vector2(x, y)));
+                for (float y = 0; y <= 5; y += .05f)
+                {
+                    for (float x = -.9f; x <= .9f; x += .05f) g.ObserveFree(g.Cell(new Vector2(x, y)));
+                    g.ObserveOccupied(g.Cell(new Vector2(-1f, y))); g.ObserveOccupied(g.Cell(new Vector2(1f, y)));
+                }
+                var searched = (bool[])typeof(OccupancyGrid).GetField("observed", NP).GetValue(g);
+                for (int i = 0; i < g.Count; i++) searched[i] = g.Centre(i).y < 1.5f;   // the corridor beyond the person is unsearched
+                var people = (List<Vector2>)typeof(RobotBrain).GetField("survivors", NP).GetValue(b);
+                people.Add(new Vector2(3, -1.5f));    // in the open room
+                people.Add(new Vector2(0, 1.5f));     // lying across the 1.8 m corridor: seals it with the full core
+                typeof(RobotBrain).GetField("keptOut", NP).SetValue(b, -1);
+                typeof(RobotBrain).GetMethod("ApplyKeepOut", NP).Invoke(b, null);
+                return b;
+            }
+            bool Keep(RobotBrain b, Vector2 at) => ((bool[])typeof(OccupancyGrid).GetField("keepOut", NP).GetValue(Map(b)))[Map(b).Cell(at)];
+            foreach (bool per in new[] { true, false })
+            {
+                var b = Brain(per);
+                Assert.That(Keep(b, new Vector2(0, 1.8f)), Is.True, "fixture: the full core 0.3 m from the corridor person is an obstacle");
+                Assert.That((bool)typeof(RobotBrain).GetMethod("SqueezePastPerson", NP).Invoke(b, new object[] { 0.0 }), Is.True, "fixture: floor is cut off, squeeze");
+                typeof(RobotBrain).GetMethod("ApplyKeepOut", NP).Invoke(b, null);
+                Assert.That(Keep(b, new Vector2(0, 1.8f)), Is.False, "the sealing person's core shrinks");
+                Assert.That(Keep(b, new Vector2(3.3f, -1.5f)), Is.EqualTo(per), per ? "the person in the open room keeps the full core" : "control: without squeeze_per_person it shrinks too");
+            }
+        }
     }
 }

@@ -633,10 +633,17 @@ namespace SmokeRescue.Brain
         /// confirmed 2.4 m inside the one door, with the whole 1.05 m disc an obstacle, closed the entrance to both robots.</summary>
         public void SetKeepOut(IReadOnlyList<Vector2> centres, float coreRadius, float radius)
         {
+            var cores = new float[centres.Count]; for (int k = 0; k < cores.Length; k++) cores[k] = coreRadius;
+            SetKeepOut(centres, cores, radius);
+        }
+        /// <summary>The same with a hard core per person (squeeze_per_person: only the person who seals floor gets the small core).</summary>
+        public void SetKeepOut(IReadOnlyList<Vector2> centres, IReadOnlyList<float> cores, float radius)
+        {
             keepOut ??= new bool[Count]; System.Array.Clear(keepOut, 0, Count);
             keepSoft ??= new float[Count]; System.Array.Clear(keepSoft, 0, Count);
-            foreach (var p in centres)
+            for (int k = 0; k < centres.Count; k++)
             {
+                var p = centres[k]; float coreRadius = cores[k];
                 int c0 = Cell(p); if (c0 < 0) continue;
                 int r = Mathf.CeilToInt(radius / CellM), cx = c0 % Size, cy = c0 / Size;
                 for (int dy = -r; dy <= r; dy++) for (int dx = -r; dx <= r; dx++)
