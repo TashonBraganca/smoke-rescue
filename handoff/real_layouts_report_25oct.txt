@@ -148,3 +148,27 @@ Not verified
   - The SUNCG terms question above.
   - Whether HouseExpo's paper has reusable frontier numbers.
   - I opened 3 of the 39 plans. The other 36 passed the same validate checks but I did not look at them.
+
+RESULTS ON RUNPOD (26 Oct 2026, 02:55 IST)
+78 missions (39 HouseExpo houses x full and one_robot, seed 0, 600 s) ran on RunPod; 78 of 78 finished and were
+scored with tools/bench/score_bench.py. All 39 houses count as unseen. Evidence: data/evidence/real_layouts_25oct_score.{txt,json}.
+
+  variant    rooms %            floor cover %      people found %     time to confirm s   T90 s (proxy)        both out
+  full        99.2 [97.9,100]   96.9 [95.2,98.1]   99.0 [97.4,100]    67.2 [56.8,79.1]    291.6 [260.2,323.1]  0.6 [0.5,0.8]
+  one_robot   93.9 [89.4,97.4]  90.2 [86.5,93.1]   92.3 [86.7,96.4]   94.5 [78.0,111.8]   244.5 [204.9,290.2]  0.9 [0.8,1.0]
+
+Paired, full minus one_robot (mean [95 % CI], Wilcoxon p): rooms +5.3 [+2.3,+8.8] p=0.002; cover +6.7 [+4.5,+9.2]
+p<0.001; people +6.7 points [+3.1,+11.3] p=0.002; time to confirm -27.3 s [-41.8,-10.8] p<0.001; T90 +47 s (the
+proxy uses full's ceiling, so one robot reaches its own lower 90 % mark sooner); both out -0.3 p=0.003. No false
+confirmations in either variant. Team overlap 65.6 %.
+
+Verdict: on real house layouts, two robots that share context find more people than one, not only sooner: 99.0 % against
+92.3 %, a difference the seeded houses did not show. They also enter more rooms and cover more floor. The cost is the
+same as in the main benchmark: both robots get out in 60 % of team missions against 90 % for one robot.
+
+Limits:
+  * The 39 houses are the rectangular-room part of HouseExpo, not a random sample, and open-plan openings were
+    narrowed to 1 m doors.
+  * There is one seed per house.
+  * Headless has no rendered camera.
+  * Nothing here is a like-for-like comparison with published exploration numbers (see above).
