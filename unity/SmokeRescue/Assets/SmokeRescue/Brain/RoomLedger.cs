@@ -24,7 +24,7 @@ namespace SmokeRescue.Brain
             public bool corridor;
             /// <summary>Enclosed by mapped walls and partly proven indoors: all its floor counts as search area.</summary>
             public bool promoted;
-            public float floorM2, wallShare;
+            public float floorM2, wallShare; public int provenCells;
             /// <summary>The room's own cell nearest its centroid (the centroid of an L-shaped room can lie in a wall), and the
             /// farthest room cell from it. A radio room claim names the room by these.</summary>
             public Vector2 anchor;
@@ -492,6 +492,7 @@ namespace SmokeRescue.Brain
             {
                 room.floorM2 = area[room.id] * grid.CellM * grid.CellM;
                 room.wallShare = wall[room.id] + open[room.id] > 0 ? wall[room.id] / (float)(wall[room.id] + open[room.id]) : 0;
+                room.provenCells = proven[room.id];
                 room.promoted = config.room_indoor_promotion && proven[room.id] >= config.frontier_min_information_cells &&
                     room.wallShare >= config.enclosure_min_closed_share;
             }

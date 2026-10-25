@@ -385,5 +385,42 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(Choice(false, true), Does.Not.StartWith("A confirmed person lies"), "control: switch off");
             Assert.That(Choice(true, false), Does.Not.StartWith("A confirmed person lies"), "control: no confirmed person");
         }
+
+        [Test]
+        public void ARouteThatCannotBePlannedIsLoggedWithItsCause()
+        {
+            // Logging. Seed 934 (25 Oct): robot B logged 22 "Agent goal has no known free path" for one spray spot and 41 more refusals, and the
+            // log could not say whether a wall, a fire margin or a closed route was the cause.
+            var b = BurningCorridor(c => { });
+            var g = Map(b);
+            Assert.That(g.WhyNotWalkable(new Vector2(0, 2.3f)).code, Is.EqualTo(6), "0.3 m from the fire: the fire margin");
+            Assert.That(g.WhyNotWalkable(new Vector2(1.05f, 1f)).code, Is.EqualTo(2), "a wall");
+            Assert.That(g.WhyNotWalkable(new Vector2(3f, 1f)).code, Is.EqualTo(3), "unknown floor");
+            Assert.That(g.WhyNotWalkable(new Vector2(0, .5f)).code, Is.EqualTo(7), "free floor in the clear: no cause in the cell itself");
+            var spot = new Vector2(0, 3.4f);   // beyond the fire across the only way on
+            typeof(RobotBrain).GetField("agentGoal", NP).SetValue(b, (Vector2?)spot);
+            typeof(RobotBrain).GetField("agentGoalUntil", NP).SetValue(b, 60.0);
+            var events = new List<BrainEvent>();
+            for (int i = 0; i < 40; i++) { DriveTick(b, i); events.AddRange(b.DrainEvents()); }
+            var failed = events.Where(e => e.kind == "plan_failed").ToList();
+            Assert.That(failed.Count, Is.EqualTo(1), "one line per site per 5 s: " + string.Join(",", events.Select(e => e.kind).Distinct()));
+            Assert.That(failed[0].numbers["cause_code"], Is.EqualTo(7));
+            Assert.That(failed[0].reason, Does.Contain("agent goal"));
+        }
+
+        [Test]
+        public void TheRoomUnderAConfirmedPersonIsLoggedWithWhyItIsOrIsNotSearchArea()
+        {
+            // Logging. Seed 934 (25 Oct): after s2 was confirmed at 422.3 s the log held no sign of whether bedroom_1 was promoted, how many of
+            // its cells were proven indoors, or why robot A never went in.
+            var c = Settings(); c.grid_size_m = 14; c.room_ledger = true; c.search_requires_ceiling = false;
+            var b = new RobotBrain(Calibration(), c, "A", 0); Room(b, -2, 2, -2, 2);
+            ((GridPlanner)typeof(RobotBrain).GetField("planner", NP).GetValue(b)).Rooms.Update(0, Vector2.zero);
+            typeof(RobotBrain).GetMethod("LogSurvivorRoom", NP).Invoke(b, new object[] { 1.0, new Vector2(1, 1) });
+            var e = b.DrainEvents().Single(x => x.kind == "survivor_room");
+            foreach (var key in new[] { "on_free_floor", "in_search_area", "room_id", "promoted", "proven_cells", "wall_share", "covered_share", "floor_m2" })
+                Assert.That(e.numbers.ContainsKey(key), Is.True, key);
+            Assert.That(e.numbers["on_free_floor"], Is.EqualTo(1)); Assert.That(e.numbers["room_id"], Is.GreaterThanOrEqualTo(0)); Assert.That(e.numbers["floor_m2"], Is.GreaterThan(10));
+        }
     }
 }

@@ -726,6 +726,20 @@ namespace SmokeRescue.Brain
         /// emergency exit (RobotBrain.CheckEmergencyExit).</summary>
         internal float FireClearance { get => fireClearance ?? c.fire_clearance_m; set => fireClearance = value; }
         float? fireClearance;
+        /// <summary>Why a target cell cannot be planned to, as a code and name: 1 outside the grid, 2 wall, 3 not known free, 4 inside a
+        /// confirmed person's keep-out, 5 inside the obstacle margin, 6 inside the fire margin, 7 the cell is fine but no route reaches it.</summary>
+        internal (int code, string name) WhyNotWalkable(Vector2 p)
+        {
+            int i = Cell(p); PrepareNavigation();
+            if (i < 0) return (1, "outside the grid");
+            if (Occupancy(i) == 255) return (2, "a wall");
+            if (Occupancy(i) != 1) return (3, "not known free");
+            if (keepOut != null && keepOut[i]) return (4, "a confirmed person's keep-out");
+            float padding = CellM * .707107f;
+            if (obstacleDistance[i] <= c.robot_radius_m + padding) return (5, "inside the obstacle margin");
+            if (fireDistance[i] <= FireClearance + padding) return (6, "inside the fire margin");
+            return (7, "free, but no route reaches it");
+        }
         internal bool Walkable(int i)
         {
             if (i < 0 || i >= Count || Occupancy(i) != 1) return false;
