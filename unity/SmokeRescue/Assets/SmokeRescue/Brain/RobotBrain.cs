@@ -499,6 +499,7 @@ namespace SmokeRescue.Brain
                     {
                         active.confirmed = true; survivors.Add(active.position);
                         confirmed.Add(new BrainSurvivor { position = active.position, confirmedAt = t, sourceRobot = id });
+                        LogSurvivorRoom(t, active.position);
                         Emit(t, "survivor_confirmed", "Stopped facing a recently observed person for the required dwell.",
                             "x_m", active.position.x, "y_m", active.position.y, "range_m", range, "dwell_s", dwell);
                         active = null; dwell = 0; ClearPath(); nextSurvivorSearch = t + c.replan_s;
@@ -580,7 +581,9 @@ namespace SmokeRescue.Brain
                 {
                     // Keep what the goal is: an agent go_to refreshed as a frontier sent a claim with radius 0, which the
                     // partner rejected (slow-fire run, 7 s: the recording stopped on "Invalid peer claim").
-                    var keepThrough = throughCentre; SetPath(planner.Plan(motion.Pose.position, goal.Value), frontierGoal); throughCentre = keepThrough; lastPlan = t;
+                    var keepThrough = throughCentre; var refreshed = planner.Plan(motion.Pose.position, goal.Value);
+                    if (refreshed.Count == 0) NotePlanFailure(t, "goal_refresh", goal.Value);
+                    SetPath(refreshed, frontierGoal); throughCentre = keepThrough; lastPlan = t;
                     Emit(t, "replan", "Periodic refresh through current free space and heat costs.", "path_points", path.Count);
                 }
                 if ((path.Count == 0 || blocked) && AgentGoalActive(t))
@@ -618,6 +621,7 @@ namespace SmokeRescue.Brain
                     else
                     {
                         Emit(t, "replan", "Agent goal has no known free path; back to exploring.", "x_m", agentGoal.Value.x, "y_m", agentGoal.Value.y);
+                        NotePlanFailure(t, "agent_goal", agentGoal.Value);
                         if (spraySpotGoal.HasValue && Vector2.Distance(spraySpotGoal.Value, agentGoal.Value) < .2f) { NoteSpraySpotFailed(agentGoal.Value, t); spraySpotGoal = null; }
                         agentGoal = null;
                     }
@@ -755,7 +759,14 @@ namespace SmokeRescue.Brain
                             if (!c.stay_inside || (c.leave_when_done && t >= leaveRetryAt && InSearchArea(motion.Pose.position) && !teamWait)) BeginReturn(t, NoFrontierLeft);
                             // Holding still is for a robot that is inside. Outside (seed 930, robot B at its pad) it keeps
                             // scanning, which can bring the ceiling through the door into its camera's view.
-                            else if (!searchedOut && InSearchArea(motion.Pose.position)) { searchedOut = true; Emit(t, "goal", "Nothing reachable is left to search after a full scan: hold here, inside, until new floor appears or the agent orders a move."); }
+                            else if (!searchedOut && InSearchArea(motion.Pose.position))
+                            {
+                                searchedOut = true;
+                                RoomLedger.RoomRecord veto = null; bool vetoed = c.leave_waits_for_team && TeamHasUnenteredRoom(out veto);
+                                if (vetoed) Emit(t, "goal", "Nothing reachable is left to search after a full scan: hold here, inside, until new floor appears or the agent orders a move.",
+                                    "veto_room_key", veto.key, "veto_x_m", veto.seat.x, "veto_y_m", veto.seat.y, "veto_floor_m2", veto.floorM2, "veto_retry_in_s", Math.Max(0, veto.retryAt - t));
+                                else Emit(t, "goal", "Nothing reachable is left to search after a full scan: hold here, inside, until new floor appears or the agent orders a move.");
+                            }
                         }
                     }
                 }
@@ -775,6 +786,33 @@ namespace SmokeRescue.Brain
             return FollowOrHold(t, dt);
         }
 
+        readonly Dictionary<string, double> planFailureLogged = new Dictionary<string, double>();
+        /// <summary>Log why no route reaches a target (the first cause found: wall, keep-out, obstacle margin, fire margin, or no connection),
+        /// at most once per site per 5 s. Seed 934 (25 Oct): 22 "no known free path" for one spray spot, and no way to tell what blocked it.</summary>
+        void NotePlanFailure(double t, string site, Vector2 target, int key = -1)
+        {
+            if (planFailureLogged.TryGetValue(site, out double last) && t - last < 5) return;
+            planFailureLogged[site] = t; var why = grid.WhyNotWalkable(target);
+            Emit(t, "plan_failed", $"No route to the {site.Replace('_', ' ')} target: {why.name}.", "cause_code", why.code, "x_m", target.x, "y_m", target.y, "key", key,
+                "partner_near_m", PartnerNearestM(target));
+        }
+        float PartnerNearestM(Vector2 p)
+        {
+            float best = -1;
+            foreach (var (pid, at, goal) in planner.Rooms.PartnersNow) { float d = Vector2.Distance(at, p); if (best < 0 || d < best) best = d; }
+            return best;
+        }
+        /// <summary>Why the floor under a confirmed person is or is not search area, at the moment of confirmation (seed 934, 25 Oct: the log could
+        /// not say why robot A never went into bedroom_1 after confirming s2 there).</summary>
+        void LogSurvivorRoom(double t, Vector2 p)
+        {
+            if (!c.room_ledger) return;
+            int cell = grid.Cell(p); var ledger = planner.Rooms; var room = ledger.Get(ledger.RoomNear(p));
+            Emit(t, "survivor_room", "The room under a confirmed person: whether its floor is search area, proven indoors, and why not promoted.",
+                "x_m", p.x, "y_m", p.y, "on_free_floor", cell >= 0 && grid.OwnOccupancy(cell) == 1 ? 1 : 0, "in_search_area", InSearchArea(p) ? 1 : 0,
+                "room_id", room?.id ?? -1, "promoted", room != null && room.promoted ? 1 : 0, "proven_cells", room?.provenCells ?? -1,
+                "wall_share", room?.wallShare ?? -1, "covered_share", room?.coveredShare ?? -1, "floor_m2", room?.floorM2 ?? -1);
+        }
         Vector2? committedAt; double committedSince;   // goal_commitment: the frontier last chosen and when it was first chosen
         /// <summary>goal_commitment: the best admitted frontier, unless the one chosen earlier is still admitted and the best is
         /// neither in a better room tier nor ahead by room_tour_switch_s. Seed 934 (25 Oct), robot A: the goal flipped 7 times
@@ -1039,6 +1077,7 @@ namespace SmokeRescue.Brain
             foreach (var w in withdrawn) if (Vector2.Distance(w, p) <= c.survivor_merge_m) return;
             track.confirmed = true; survivors.Add(p);
             confirmed.Add(new BrainSurvivor { position = p, confirmedAt = t, sourceRobot = id });
+            LogSurvivorRoom(t, p);
             if (active == track) { active = null; dwell = 0; inspecting = false; ClearPath(); nextSurvivorSearch = t + c.replan_s; }
             Emit(t, "survivor_confirmed", "OpenCV dnn person detector (YOLO11m) saw a whole person on the floor: confirmed.",
                 "x_m", p.x, "y_m", p.y, "confidence", confidence, "range_m", rangeM, "floor_gap_m", float.IsNaN(floorGapM) ? -1 : floorGapM,

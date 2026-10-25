@@ -42,12 +42,15 @@ namespace SmokeRescue.Brain
         }
 
         /// <summary>leave_waits_for_team: a remembered room that neither robot has entered or finished, whoever claims it.</summary>
-        bool TeamHasUnenteredRoom()
+        bool TeamHasUnenteredRoom() => TeamHasUnenteredRoom(out _);
+        /// <summary>The record that holds the leave veto, for the log: seed 934 (25 Oct) held robot B 48 s and the log could not say which room.</summary>
+        bool TeamHasUnenteredRoom(out RoomLedger.RoomRecord veto)
         {
+            veto = null;
             if (!c.room_memory || !c.room_ledger) return false;
             foreach (var r in planner.Rooms.Records)
                 if (r.label >= 0 && !r.entered && !r.partnerEntered && !r.done && !r.corridor && r.floorM2 >= c.room_walk_in_min_m2 && InSearchArea(r.seat))
-                    return true;
+                { veto = r; return true; }
             return false;
         }
 
@@ -92,7 +95,7 @@ namespace SmokeRescue.Brain
                 var p = planner.Plan(at, r.seat);
                 // No route: set this seat aside for stuck_blacklist_s, or the same unreachable nearest seats take every plan
                 // slot at each call and rooms further away are never considered.
-                if (p.Count > 0) reach.Add((r, p, PathLength(p) / c.open_speed_mps)); else r.retryAt = t + c.stuck_blacklist_s;
+                if (p.Count > 0) reach.Add((r, p, PathLength(p) / c.open_speed_mps)); else { r.retryAt = t + c.stuck_blacklist_s; NotePlanFailure(t, "room_seat", r.seat, r.key); }
             }
             if (reach.Count == 0) { roomTarget = null; return false; }
             var seats = reach.ConvertAll(x => x.r.seat);

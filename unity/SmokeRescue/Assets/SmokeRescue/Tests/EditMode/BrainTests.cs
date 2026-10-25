@@ -2298,6 +2298,9 @@ namespace SmokeRescue.Tests.EditMode
             var waiting = Run(true, out var roomsWaiting);
             Assert.That(Left(waiting), Is.False, roomsWaiting + " || " + string.Join(" | ", waiting.Where(e => e.kind == "goal").Select(e => e.reason).Distinct()));
             Assert.That(waiting.Any(e => e.kind == "goal" && e.reason.StartsWith("Nothing reachable is left to search")), Is.True, "holds inside: " + roomsWaiting);
+            // The hold names the record that vetoes the leave (seed 934, 25 Oct: robot B held 48 s and the log could not say for which room).
+            var hold = waiting.First(e => e.kind == "goal" && e.reason.StartsWith("Nothing reachable is left to search"));
+            Assert.That(hold.numbers.ContainsKey("veto_room_key") && hold.numbers.ContainsKey("veto_x_m") && hold.numbers["veto_x_m"] > 2, Is.True, "the hold names the unentered room east of the start");
             var control = Run(false, out var roomsControl);
             Assert.That(Left(control), Is.True, "control: with every room entered it walks out: " + roomsControl);
             // leave_wait_cap_s (25 Oct, seed 934 full mission, robot B): 48 s standing in a bathroom (245.9 to 294.0 s) because a room only
