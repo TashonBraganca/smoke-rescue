@@ -105,6 +105,10 @@ namespace SmokeRescue.Editor
         public static void FamilyRanchFull() => Run("scenario_family_ranch_full.json", "unity_family_ranch_full", brainOnly: true);
         [MenuItem("Tools/Smoke Rescue/Record/House long ranch full mission (brain only, ends when both are out)")]
         public static void LongRanchFull() => Run("scenario_long_ranch_full.json", "unity_long_ranch_full", brainOnly: true);
+        [MenuItem("Tools/Smoke Rescue/Record/House family ranch full mission (Terra agents, ends when both are out)")]
+        public static void FamilyRanchFullAgents() => WithAgents(() => Run("scenario_family_ranch_full.json", "unity_family_ranch_agents"));
+        [MenuItem("Tools/Smoke Rescue/Record/House long ranch full mission (Terra agents, ends when both are out)")]
+        public static void LongRanchFullAgents() => WithAgents(() => Run("scenario_long_ranch_full.json", "unity_long_ranch_agents"));
 
         [MenuItem("Tools/Smoke Rescue/Record/House one-door seed 934, 480 s (fresh)")]
         public static void HouseOneDoor934() => WithAgents(() => Run("scenario_house_onedoor_seed934.json", "unity_house_onedoor_seed934"));
