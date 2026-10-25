@@ -1,0 +1,49 @@
+Fence fix report, 25 Oct 2026 (brief: handoff/brief_fence_fix_25oct.txt, from opencv-a2)
+
+Verdict: the OpenCV fit with uniqueness and spread gates does not beat ours on held-out data, so place.py and
+config/perception.json are unchanged.
+
+What was built: tools/fence_fix_compare.py. The new fit (cv2_unique) takes a hypothesis from
+cv2.estimateAffinePartial2D(RANSAC), refits it as a strict rigid transform on its inliers with place.fit_rigid, then
+applies two gates. Uniqueness: remove the winner's inliers, fit the rest the same way, and reject when runner-up
+inliers / winner inliers exceeds a ratio. Spread: the convex hull area (cv2.convexHull + cv2.contourArea) of the
+inliers must reach a minimum. I measured spread on the inliers' planar body-frame points, not image points, because
+the radio payload carries no image coordinates. Every variant runs on the same match sets with the same accept rule
+(10 inliers, RMSE 0.06 m). The harness halts unless 'ours' reproduces the committed 1518/2414, 70 wrong, 0/6500 false
+and cv2_ransac reproduces 1594, 126, 3. Both checks passed.
+
+Thresholds were picked on the tuning split only (fr2_pioneer_slam + fr1_room): ratio 0.65, area 0 m^2. The area
+gate never helped on tuning, because any area cut that removed wrong poses removed more right ones. Results on the
+held-out split (fr2_pioneer_360 + fr3_long_office_household), then pooled:
+
+  variant      split     recall (Wilson 95 % CI)   yaw med/p90 deg  trans med/p90 m  wrong/acc  false/neg  maxneg  ms
+  ours         held-out  75.1 % (73.0-77.2)         0.60/1.79        0.028/0.082      46/1203    0/3394     6       0.44
+  cv2_ransac   held-out  78.3 % (76.2-80.3)         0.68/2.52        0.038/0.239      82/1254    1/3394     13      0.36
+  cv2_unique   held-out  74.4 % (72.2-76.5)         0.62/1.92        0.028/0.088      43/1191    0/3394     6       0.42
+  ours         pooled    62.9 % (60.9-64.8)         0.69/2.47        0.031/0.136      70/1518    0/6500     6       0.42
+  cv2_ransac   pooled    66.0 % (64.1-67.9)         0.79/3.48        0.044/0.328      126/1594   3/6500     13      0.36
+  cv2_unique   pooled    62.5 % (60.5-64.4)         0.72/2.55        0.031/0.150      65/1508    0/6500     6       0.41
+
+The ship rule fails on recall. On held-out data, cv2_unique accepts 1191 pairs where ours accepts 1203. It makes 3
+fewer wrong-pose accepts (43 vs 46) and has 0 false accepts. Both differences sit inside the noise, so this is a
+measured null, not a small win. Pairs share frames, which makes the printed intervals too narrow.
+
+What the gates did on held-out data: the rigid refit alone took cv2_ransac from 82 wrong poses to 55. The uniqueness
+gate then took 55 to 43, at a cost of 20 accepts. The spread gate at its tuned value of 0 did nothing. In the Pioneer
+hall, which has the fence, wrong poses went from 45 to 42 on pioneer_360 (held-out) and from 20 to 17 on pioneer_slam
+(tuning).
+
+Why it does not work: on tuning positives, right and wrong poses look alike to both gates. Runner-up ratio median is
+0.10 for right poses and 0.21 for wrong ones, but p90 for right poses is 0.44, so a cut that catches the fence also
+drops real revisits. Hull area median is 0.36 m^2 for right and 0.27 m^2 for wrong, with the same overlap. One-to-one
+matching with a ratio test already removes most rival panel matches, so the second hypothesis is rarely there to be
+found. One signal did separate on tuning data: the inliers of wrong poses lie far away (median range 4.9 m against
+1.8 m for right ones). That points at long-range depth on the fence. It is a lead for the next attempt, not
+something I tested on held-out data.
+
+Not done because the fit did not win: no place.py change, no place_rigid_fit switch, no new pytest. I did not run
+tests/test_place.py or tests/test_place_recognition.py, since no production code changed.
+
+Evidence: data/evidence/real_data_check_25oct.txt, section "FENCE FIX". Rerun with
+nice -n 10 brain/.venv/bin/python -I tools/fence_fix_compare.py (22 s; deterministic, two runs gave identical counts).
+Commit: 20c12128 (tool and evidence). This report is committed on top of it.
