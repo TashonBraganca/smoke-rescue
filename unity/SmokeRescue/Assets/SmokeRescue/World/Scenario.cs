@@ -15,6 +15,18 @@ namespace SmokeRescue.World
     {
         public string id;
         public string description;
+        // World setup only. RobotBrain never receives this file name or the plan.
+        public string floorplan_file = "floorplan.json";
+        [JsonIgnore] public string FloorPlanPath
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(floorplan_file) || Path.GetFileName(floorplan_file) != floorplan_file ||
+                    floorplan_file.Contains("\\") || !floorplan_file.StartsWith("floorplan") || !floorplan_file.EndsWith(".json"))
+                    throw new InvalidDataException("floorplan_file must be a floorplan*.json basename in config");
+                return Path.Combine(FloorPlan.ConfigDir, floorplan_file);
+            }
+        }
         /// <summary>World-side hinge overrides applied by DoorRuntime after the house is built.</summary>
         [UnityEngine.SerializeField] public Dictionary<string, string> door_states = new Dictionary<string, string>();   // read from JSON; the attribute only silences Unity's serializer check
         public int seed;
@@ -129,10 +141,22 @@ namespace SmokeRescue.World
             public int budget_bytes_per_s = 2048;
         }
 
+        /// <summary>Read the world selection without placing survivors against stale scene furniture.</summary>
+        public static string ReadFloorPlanFile(string fileName)
+        {
+            string path = Path.IsPathRooted(fileName) ? fileName : Path.Combine(FloorPlan.ConfigDir, fileName);
+            return (string)LoadMerged(path)["floorplan_file"] ?? "floorplan.json";
+        }
+
         public static Scenario Load(string fileName)
         {
             string path = Path.IsPathRooted(fileName) ? fileName : Path.Combine(FloorPlan.ConfigDir, fileName);
             var merged = LoadMerged(path);
+            // The density map contains floats. Sibling reasons document the scenario,
+            // but are annotations rather than room names and cannot become floats.
+            if (merged["smoke"]?["rooms"] is JObject densities)
+                foreach (var annotation in densities.Properties().Where(p => p.Name.EndsWith("_reason", StringComparison.Ordinal)).ToList())
+                    annotation.Remove();
             var scenario = merged.ToObject<Scenario>();
             if (scenario.robots.Count == 0) throw new InvalidDataException($"scenario has no robots: {path}");
             if (scenario.survivor_placement == "random")
@@ -147,7 +171,7 @@ namespace SmokeRescue.World
                     { scenario.survivors[i].room = placed[i].room; scenario.survivors[i].at = (float[])placed[i].at.Clone(); scenario.survivors[i].yaw = placed[i].yaw; }
                 else
                 {
-                    scenario.PlaceSurvivorsRandomly(FloorPlan.Load());
+                    scenario.PlaceSurvivorsRandomly(FloorPlan.Load(scenario.FloorPlanPath));
                     RandomPlacements[key] = scenario.survivors.Select(s => (s.room, (float[])s.at.Clone(), s.yaw)).ToList();
                 }
             }

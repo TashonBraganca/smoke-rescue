@@ -1,0 +1,264 @@
+{
+  "house": "family_ranch",
+  "duration_s": 600.0,
+  "rooms_entered": 9,
+  "rooms_total": 9,
+  "usable_floor_coverage_pct": 98.19,
+  "gross_floor_coverage_pct": 97.25,
+  "usable_samples_searched": 12013,
+  "usable_samples": 12235,
+  "people_confirmed": 5,
+  "people_total": 5,
+  "confirmed_ids": [
+    "s1",
+    "s2",
+    "s3",
+    "s4",
+    "s6"
+  ],
+  "false_confirmation_events": 0,
+  "both_walked_out": false,
+  "robots": {
+    "robot_A": {
+      "rooms_entered": [
+        "fr_bath1",
+        "fr_bath2",
+        "fr_bed2",
+        "fr_bed3",
+        "fr_hall",
+        "fr_kitchen",
+        "fr_laundry",
+        "fr_living"
+      ],
+      "final_pose_gate": [
+        0.009006493,
+        0.43692008
+      ],
+      "final_state": "complete",
+      "outside_at_end": true,
+      "walked_out": true
+    },
+    "robot_B": {
+      "rooms_entered": [
+        "fr_bath1",
+        "fr_bed1",
+        "fr_bed2",
+        "fr_hall",
+        "fr_kitchen",
+        "fr_laundry",
+        "fr_living"
+      ],
+      "final_pose_gate": [
+        0.5863303,
+        5.5508556
+      ],
+      "final_state": "return",
+      "outside_at_end": false,
+      "walked_out": false
+    }
+  },
+  "rooms": {
+    "fr_hall": {
+      "entered": true,
+      "gross_floor_pct": 100.0,
+      "usable_floor_pct": 100.0,
+      "usable_samples_searched": 2286,
+      "usable_samples": 2286
+    },
+    "fr_living": {
+      "entered": true,
+      "gross_floor_pct": 99.0,
+      "usable_floor_pct": 98.57,
+      "usable_samples_searched": 1448,
+      "usable_samples": 1469
+    },
+    "fr_kitchen": {
+      "entered": true,
+      "gross_floor_pct": 95.71,
+      "usable_floor_pct": 98.88,
+      "usable_samples_searched": 1684,
+      "usable_samples": 1703
+    },
+    "fr_laundry": {
+      "entered": true,
+      "gross_floor_pct": 91.05,
+      "usable_floor_pct": 97.84,
+      "usable_samples_searched": 814,
+      "usable_samples": 832
+    },
+    "fr_bed1": {
+      "entered": true,
+      "gross_floor_pct": 96.31,
+      "usable_floor_pct": 95.26,
+      "usable_samples_searched": 1306,
+      "usable_samples": 1371
+    },
+    "fr_bed2": {
+      "entered": true,
+      "gross_floor_pct": 97.04,
+      "usable_floor_pct": 97.08,
+      "usable_samples_searched": 1331,
+      "usable_samples": 1371
+    },
+    "fr_bed3": {
+      "entered": true,
+      "gross_floor_pct": 97.88,
+      "usable_floor_pct": 98.4,
+      "usable_samples_searched": 1349,
+      "usable_samples": 1371
+    },
+    "fr_bath1": {
+      "entered": true,
+      "gross_floor_pct": 98.28,
+      "usable_floor_pct": 98.91,
+      "usable_samples_searched": 906,
+      "usable_samples": 916
+    },
+    "fr_bath2": {
+      "entered": true,
+      "gross_floor_pct": 96.4,
+      "usable_floor_pct": 97.05,
+      "usable_samples_searched": 889,
+      "usable_samples": 916
+    }
+  }
+}
+{
+  "house": "long_ranch",
+  "duration_s": 600.0,
+  "rooms_entered": 11,
+  "rooms_total": 11,
+  "usable_floor_coverage_pct": 97.31,
+  "gross_floor_coverage_pct": 96.06,
+  "usable_samples_searched": 14055,
+  "usable_samples": 14443,
+  "people_confirmed": 5,
+  "people_total": 5,
+  "confirmed_ids": [
+    "s1",
+    "s2",
+    "s3",
+    "s4",
+    "s6"
+  ],
+  "false_confirmation_events": 0,
+  "both_walked_out": false,
+  "robots": {
+    "robot_A": {
+      "rooms_entered": [
+        "lr_bath1",
+        "lr_bath2",
+        "lr_bed2",
+        "lr_bed3",
+        "lr_family",
+        "lr_hall",
+        "lr_kitchen",
+        "lr_living",
+        "lr_utility"
+      ],
+      "final_pose_gate": [
+        -0.041407835,
+        10.423359
+      ],
+      "final_state": "return",
+      "outside_at_end": false,
+      "walked_out": false
+    },
+    "robot_B": {
+      "rooms_entered": [
+        "lr_bath2",
+        "lr_bed1",
+        "lr_bed3",
+        "lr_bed4",
+        "lr_hall",
+        "lr_living"
+      ],
+      "final_pose_gate": [
+        -0.0057763113,
+        -0.56720924
+      ],
+      "final_state": "complete",
+      "outside_at_end": true,
+      "walked_out": true
+    }
+  },
+  "rooms": {
+    "lr_hall": {
+      "entered": true,
+      "gross_floor_pct": 100.0,
+      "usable_floor_pct": 100.0,
+      "usable_samples_searched": 2936,
+      "usable_samples": 2936
+    },
+    "lr_living": {
+      "entered": true,
+      "gross_floor_pct": 93.54,
+      "usable_floor_pct": 91.42,
+      "usable_samples_searched": 1034,
+      "usable_samples": 1131
+    },
+    "lr_kitchen": {
+      "entered": true,
+      "gross_floor_pct": 86.63,
+      "usable_floor_pct": 91.84,
+      "usable_samples_searched": 1261,
+      "usable_samples": 1373
+    },
+    "lr_family": {
+      "entered": true,
+      "gross_floor_pct": 98.63,
+      "usable_floor_pct": 98.22,
+      "usable_samples_searched": 1103,
+      "usable_samples": 1123
+    },
+    "lr_utility": {
+      "entered": true,
+      "gross_floor_pct": 91.05,
+      "usable_floor_pct": 97.48,
+      "usable_samples_searched": 811,
+      "usable_samples": 832
+    },
+    "lr_bed1": {
+      "entered": true,
+      "gross_floor_pct": 98.05,
+      "usable_floor_pct": 100.0,
+      "usable_samples_searched": 1363,
+      "usable_samples": 1363
+    },
+    "lr_bed2": {
+      "entered": true,
+      "gross_floor_pct": 96.79,
+      "usable_floor_pct": 96.99,
+      "usable_samples_searched": 1322,
+      "usable_samples": 1363
+    },
+    "lr_bed3": {
+      "entered": true,
+      "gross_floor_pct": 98.4,
+      "usable_floor_pct": 99.71,
+      "usable_samples_searched": 1359,
+      "usable_samples": 1363
+    },
+    "lr_bed4": {
+      "entered": true,
+      "gross_floor_pct": 95.29,
+      "usable_floor_pct": 97.07,
+      "usable_samples_searched": 1323,
+      "usable_samples": 1363
+    },
+    "lr_bath1": {
+      "entered": true,
+      "gross_floor_pct": 96.05,
+      "usable_floor_pct": 95.86,
+      "usable_samples_searched": 765,
+      "usable_samples": 798
+    },
+    "lr_bath2": {
+      "entered": true,
+      "gross_floor_pct": 96.32,
+      "usable_floor_pct": 97.49,
+      "usable_samples_searched": 778,
+      "usable_samples": 798
+    }
+  }
+}

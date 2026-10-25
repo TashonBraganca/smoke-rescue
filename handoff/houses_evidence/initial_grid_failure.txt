@@ -1,0 +1,41 @@
+CSSM_ModuleLoad(): One or more parameters passed to a function were not valid.
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:21.97
+Unhandled exception. System.AggregateException: One or more errors occurred. (Room edge does not align to grid.) (Room edge does not align to grid.)
+ ---> System.IO.InvalidDataException: Room edge does not align to grid.
+   at SmokeRescue.World.FireSim.GridOffset(Double value, Double origin) in /Volumes/Tashon/opencv/wt_houses/unity/SmokeRescue/Assets/SmokeRescue/World/FireSim.cs:line 937
+   at SmokeRescue.World.FireSim.ValidatePlan(FloorPlan plan) in /Volumes/Tashon/opencv/wt_houses/unity/SmokeRescue/Assets/SmokeRescue/World/FireSim.cs:line 1023
+   at SmokeRescue.World.FireSim..ctor(FloorPlan plan, Configuration cfg, Int32 seed) in /Volumes/Tashon/opencv/wt_houses/unity/SmokeRescue/Assets/SmokeRescue/World/FireSim.cs:line 222
+   at SmokeRescue.World.FireSim.Load(FloorPlan plan, String firePath, Int32 seed) in /Volumes/Tashon/opencv/wt_houses/unity/SmokeRescue/Assets/SmokeRescue/World/FireSim.cs:line 216
+   at SmokeRescue.World.FireSimHeat..ctor(FloorPlan plan, Int32 seed, Single headStart, String firePath) in /Volumes/Tashon/opencv/wt_houses/unity/SmokeRescue/Assets/SmokeRescue/World/FireSimHeat.cs:line 65
+   at SmokeRescue.Tests.EditMode.HeadlessSim.Run(String root, JObject run) in /Volumes/Tashon/opencv/wt_houses/unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/HeadlessSim.cs:line 290
+   at SmokeRescue.Tests.EditMode.HeadlessSim.<>c__DisplayClass35_0.<RunRequest>b__0(Int32 i) in /Volumes/Tashon/opencv/wt_houses/unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/HeadlessSim.cs:line 249
+   at System.Threading.Tasks.Parallel.<>c__DisplayClass19_0`2.<ForWorker>b__1(RangeWorker& currentWorker, Int64 timeout, Boolean& replicationDelegateYieldedBeforeCompletion)
+--- End of stack trace from previous location ---
+   at System.Threading.Tasks.Parallel.<>c__DisplayClass19_0`2.<ForWorker>b__1(RangeWorker& currentWorker, Int64 timeout, Boolean& replicationDelegateYieldedBeforeCompletion)
+   at System.Threading.Tasks.TaskReplicator.Replica.Execute()
+   --- End of inner exception stack trace ---
+   at System.Threading.Tasks.TaskReplicator.Run[TState](ReplicatableUserAction`1 action, ParallelOptions options, Boolean stopOnFirstFailure)
+   at System.Threading.Tasks.Parallel.ForWorker[TLocal,TInt](TInt fromInclusive, TInt toExclusive, ParallelOptions parallelOptions, Action`1 body, Action`2 bodyWithState, Func`4 bodyWithLocal, Func`1 localInit, Action`1 localFinally)
+--- End of stack trace from previous location ---
+   at System.Threading.Tasks.Parallel.ForWorker[TLocal,TInt](TInt fromInclusive, TInt toExclusive, ParallelOptions parallelOptions, Action`1 body, Action`2 bodyWithState, Func`4 bodyWithLocal, Func`1 localInit, Action`1 localFinally)
+   at System.Threading.Tasks.Parallel.For(Int32 fromInclusive, Int32 toExclusive, Action`1 body)
+   at SmokeRescue.Tests.EditMode.HeadlessSim.RunRequest(String root, String requestPath) in /Volumes/Tashon/opencv/wt_houses/unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/HeadlessSim.cs:line 249
+   at Program.Main(String[] args) in /Volumes/Tashon/opencv/wt_houses/tools/headless/Program.cs:line 11
+ ---> (Inner Exception #1) System.IO.InvalidDataException: Room edge does not align to grid.
+   at SmokeRescue.World.FireSim.GridOffset(Double value, Double origin) in /Volumes/Tashon/opencv/wt_houses/unity/SmokeRescue/Assets/SmokeRescue/World/FireSim.cs:line 937
+   at SmokeRescue.World.FireSim.ValidatePlan(FloorPlan plan) in /Volumes/Tashon/opencv/wt_houses/unity/SmokeRescue/Assets/SmokeRescue/World/FireSim.cs:line 1023
+   at SmokeRescue.World.FireSim..ctor(FloorPlan plan, Configuration cfg, Int32 seed) in /Volumes/Tashon/opencv/wt_houses/unity/SmokeRescue/Assets/SmokeRescue/World/FireSim.cs:line 222
+   at SmokeRescue.World.FireSim.Load(FloorPlan plan, String firePath, Int32 seed) in /Volumes/Tashon/opencv/wt_houses/unity/SmokeRescue/Assets/SmokeRescue/World/FireSim.cs:line 216
+   at SmokeRescue.World.FireSimHeat..ctor(FloorPlan plan, Int32 seed, Single headStart, String firePath) in /Volumes/Tashon/opencv/wt_houses/unity/SmokeRescue/Assets/SmokeRescue/World/FireSimHeat.cs:line 65
+   at SmokeRescue.Tests.EditMode.HeadlessSim.Run(String root, JObject run) in /Volumes/Tashon/opencv/wt_houses/unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/HeadlessSim.cs:line 290
+   at SmokeRescue.Tests.EditMode.HeadlessSim.<>c__DisplayClass35_0.<RunRequest>b__0(Int32 i) in /Volumes/Tashon/opencv/wt_houses/unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/HeadlessSim.cs:line 249
+   at System.Threading.Tasks.Parallel.<>c__DisplayClass19_0`2.<ForWorker>b__1(RangeWorker& currentWorker, Int64 timeout, Boolean& replicationDelegateYieldedBeforeCompletion)
+--- End of stack trace from previous location ---
+   at System.Threading.Tasks.Parallel.<>c__DisplayClass19_0`2.<ForWorker>b__1(RangeWorker& currentWorker, Int64 timeout, Boolean& replicationDelegateYieldedBeforeCompletion)
+   at System.Threading.Tasks.TaskReplicator.Replica.Execute()<---
+

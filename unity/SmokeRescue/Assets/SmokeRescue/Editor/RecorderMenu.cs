@@ -101,6 +101,11 @@ namespace SmokeRescue.Editor
         public static void HouseOneDoor934BrainOnly() => Run("scenario_house_onedoor_seed934.json", "unity_house_onedoor_seed934_brain");
         [MenuItem("Tools/Smoke Rescue/Record/House one-door seed 934 full mission (brain only, ends when both are out)")]
         public static void HouseOneDoor934Full() => Run("scenario_house_onedoor_seed934_full.json", "unity_house_onedoor_seed934_full");
+        [MenuItem("Tools/Smoke Rescue/Record/House family ranch full mission (brain only, ends when both are out)")]
+        public static void FamilyRanchFull() => Run("scenario_family_ranch_full.json", "unity_family_ranch_full", brainOnly: true);
+        [MenuItem("Tools/Smoke Rescue/Record/House long ranch full mission (brain only, ends when both are out)")]
+        public static void LongRanchFull() => Run("scenario_long_ranch_full.json", "unity_long_ranch_full", brainOnly: true);
+
         [MenuItem("Tools/Smoke Rescue/Record/House one-door seed 934, 480 s (fresh)")]
         public static void HouseOneDoor934() => WithAgents(() => Run("scenario_house_onedoor_seed934.json", "unity_house_onedoor_seed934"));
 
@@ -137,7 +142,27 @@ namespace SmokeRescue.Editor
             try { run(); } catch { RecordingSession.AgentUrl = null; throw; }
         }
 
-        static void Run(string scenario, string runId, float maxSeconds = float.PositiveInfinity, bool noise = true)
+        static void Run(string scenario, string runId, float maxSeconds = float.PositiveInfinity, bool noise = true, bool brainOnly = false)
+        {
+            if (running != null) throw new System.InvalidOperationException("A recording is already running.");
+            // Load without placement first. Furniture must exist before random survivors are checked.
+            string planFile = Scenario.ReadFloorPlanFile(scenario);
+            bool restoreDefault = planFile != "floorplan.json";
+            if (brainOnly) RecordingSession.AgentUrl = null;
+            try
+            {
+                if (restoreDefault || HouseMenu.ActiveFloorplanFile != planFile) HouseMenu.Rebuild(false, planFile);
+                StartRecording(scenario, runId, maxSeconds, noise, restoreDefault);
+            }
+            catch
+            {
+                RecordingSession.AgentUrl = null;
+                if (restoreDefault) HouseMenu.BuildTextured();
+                throw;
+            }
+        }
+
+        static void StartRecording(string scenario, string runId, float maxSeconds, bool noise, bool restoreDefault)
         {
             // The live colour person detector runs in the vision service; without it robots rely on thermal alone.
             string vision = System.Environment.GetEnvironmentVariable("SMOKE_AGENT_URL") ?? "http://localhost:8080";
@@ -178,12 +203,18 @@ namespace SmokeRescue.Editor
                 try { more = steps.MoveNext(); done = more ? steps.Current : null; }
                 catch (System.Exception e) { Debug.LogException(e); more = false; }
                 if (more && done == null) return;
-                UnityEditor.EditorApplication.update -= running; running = null; RecordingSession.AgentUrl = null; steps.Dispose();
-                UnityEditor.EditorApplication.UnlockReloadAssemblies(); UnityEditor.AssetDatabase.AllowAutoRefresh();
+                UnityEditor.EditorApplication.update -= running; running = null; RecordingSession.AgentUrl = null;
+                try { steps.Dispose(); }
+                finally
+                {
+                    UnityEditor.EditorApplication.UnlockReloadAssemblies(); UnityEditor.AssetDatabase.AllowAutoRefresh();
+                    if (restoreDefault) HouseMenu.BuildTextured();
+                }
                 Debug.Log(done != null ? $"[SmokeRescue] Recording done: {done.dir}" : $"[SmokeRescue] Recording {runId} stopped without a result");
             };
             UnityEditor.EditorApplication.update += running;
         }
+        public static bool IsRecording => running != null;
         static UnityEditor.EditorApplication.CallbackFunction running;
     }
 }

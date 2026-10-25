@@ -173,7 +173,7 @@ namespace SmokeRescue.World
             if (scenario.fire != null && scenario.fire.spread)
             {
                 // The fire sees this run's obstacles as fuel too (burning wood piles in the hallway).
-                var firePlan = FloorPlan.Load();     // a fresh copy, so the shared plan keeps only the house
+                var firePlan = FloorPlan.Load(scenario.FloorPlanPath); // fresh copy of this house; obstacles belong only to this run
                 if (scenario.obstacles != null) firePlan.landmarks.AddRange(scenario.obstacles);
                 var spread = new FireSimHeat(firePlan, scenario.seed, scenario.fire.head_start_s, scenario.fire.ConfigPath);
                 a.fireSim = spread;
