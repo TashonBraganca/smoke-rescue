@@ -4,10 +4,12 @@ This uses the same API validator as live missions. Keep the per-setup verdict an
 content digest in handoff/ryor_evidence/cache_audit.json. Run again after precompute.
 """
 import hashlib
+import inspect
 import importlib.util
 import json
 import os
 import sys
+from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -25,6 +27,9 @@ gallery = json.loads((ROOT / 'data/runs/ryor/gallery.json').read_text())
 api.gallery = lambda: {'houses': {h['id']: h for h in gallery['houses']},
                        'difficulties': set(gallery['difficulties']), 'mission_s': gallery['mission_s']}
 BUCKET = os.environ['RYOR_BUCKET']
+REPORT = ROOT / 'handoff/ryor_evidence/cache_audit.json'
+PREVIOUS = json.loads(REPORT.read_text()) if REPORT.exists() else {}
+VALIDATOR_SIGNATURE = hashlib.sha256(inspect.getsource(api.validate).encode()).hexdigest()
 
 
 def audit(key):
@@ -32,9 +37,13 @@ def audit(key):
     status = api.s3_json(prefix + 'status.json')
     if not status or status.get('state') != 'done':
         return key, {'valid': False, 'error': 'not ready'}
+    status_digest = hashlib.sha256(json.dumps({k: v for k, v in status.items() if k != 'validated'},
+                                             sort_keys=True).encode()).hexdigest()
+    old = PREVIOUS.get(key, {})
+    if old.get('valid') and old.get('status_digest') == status_digest and old.get('validator') == VALIDATOR_SIGNATURE:
+        return key, old  # Immutable finished recordings need one full audit per published status, not repeated downloads.
     chunks = api.chunks(prefix, 0, int(status['chunks']))
     # Avoid downloading a second time during the complete validation pass.
-    old = api.chunks
     # Each worker calls a private validator module so its chunk reader cannot race another setup.
     namespace = dict(api.validate.__globals__, chunks=lambda *args: chunks)
     import types
@@ -50,6 +59,8 @@ def audit(key):
                           ContentType='application/json', CacheControl='no-store')
     return key, {'valid': True, 'frames': len(frames), 'first_t': frames[0]['t'], 'last_t': frames[-1]['t'],
                  'markers': sum(len(f.get('found', [])) for f in frames), 'sha256': digest,
+                 'status_digest': status_digest,
+                 'validator': VALIDATOR_SIGNATURE,
                  'wall': status.get('wall'), 'engine': status.get('engine')}
 
 
@@ -57,10 +68,11 @@ if __name__ == '__main__':
     keys = sorted(p.stem for p in (ROOT / 'data/runs/ryor/setups').glob('*.json'))
     with ThreadPoolExecutor(max_workers=4) as pool:  # Bound S3 pressure while inherited precompute continues.
         results = dict(pool.map(audit, keys))
-    path = ROOT / 'handoff/ryor_evidence/cache_audit.json'
+    path = REPORT
     path.write_text(json.dumps(results, indent=1))
     passed = sum(r['valid'] for r in results.values())
-    manifest = {'ready': passed, 'total': len(keys), 'setups': [k for k, r in results.items() if r['valid']]}
+    manifest = {'ready': passed, 'total': len(keys), 'setups': [k for k, r in results.items() if r['valid']],
+                'checked_at': datetime.now(timezone.utc).isoformat()}
     api.s3.put_object(Bucket=BUCKET, Key='ryor/cache_manifest.json', Body=json.dumps(manifest).encode(),
                       ContentType='application/json', CacheControl='no-store')
     print('%d/%d complete replays validated; %s' % (passed, len(keys), path))

@@ -287,6 +287,16 @@
       setSeg("robots", "n", sel.robots); setSeg("difficulty", "d", sel.difficulty); renderDiffLine();
       renderGallery();
       pickHouse(houseById(want) ? want : houses[0].id, false);
+      var shared = new URL(location.href).searchParams.get('mission');
+      if (shared && /^[a-z0-9_:]{8,120}$/.test(shared)) fetchJSON(API + '/' + shared + '?from=19', 20000).then(function (reply) {
+        var status = reply.status, parts = status.setup.split('__'), h = houseById(parts[0]);
+        if (!h || M) return;
+        pickHouse(h.id, false); sel.robots = +parts[1].slice(1); sel.difficulty = parts[2];
+        setSeg('robots', 'n', sel.robots); setSeg('difficulty', 'd', sel.difficulty); renderDiffLine();
+        scene = status.placement || null; preparedSceneKey = status.setup;
+        $('terra').checked = !!status.terra;
+        startMission(h, +parts[1].slice(1), parts[2], false, shared, status.state === 'done');
+      }).catch(function (error) { $('gallery-error').hidden = false; $('gallery-error').textContent = 'This replay could not be loaded. ' + error.message; });
     }).catch(function (err) {
       var p = $("gallery-error"); p.hidden = false;
       p.textContent = "The list of houses did not load (" + err.message + "). Reload the page to try again.";
@@ -466,11 +476,12 @@
   function showChoose() {
     $("mission").hidden = true; $("choose").hidden = false;
     document.title = "Run your own rescue | Smoke Rescue";
+    var url = new URL(location.href); url.searchParams.delete('mission'); history.replaceState(null, '', url);
     drawThumbs(); drawPreview();
   }
   function stopMission() { gen++; M = null; }
 
-  function startMission(h, robots, difficulty, recordedOnly) {
+  function startMission(h, robots, difficulty, recordedOnly, resumeId, saved) {
     gen++;
     var my = gen;
     if (scene) h = Object.assign({}, h, { people: scene.people.length, people_truth: scene.people.map(function (p, i) { return { id: 'p' + (i + 1), x: p[0], y: p[1] }; }) });
@@ -484,6 +495,7 @@
     $("mission-sub").textContent = robots + (robots === 1 ? " robot" : " robots") + ", " + difficulty + ". " + diffSentence(difficulty);
     document.title = (h.name || h.id) + " | Run your own rescue";
     setSource("live", null);
+    $('mission-link').hidden = true;
     $("score").hidden = true; $("log").textContent = ""; $("log-empty").hidden = false; $("ticks").textContent = "";
     $("wait-error").hidden = true; $("waiting").hidden = false; $("stages").hidden = false; $("wait-clock").hidden = false;
     $("wait-h").textContent = "Getting the mission ready";
@@ -491,13 +503,20 @@
     setStage("sent", "now");
     setSpeedButtons(4);
     renderTeam(); layoutStage(); draw();
-    if (recordedOnly) { M.id = 'cache:' + M.key; setSource('recorded', 'This is the scene you prepared.'); poll(my); tick(); return; }
+    if (resumeId) {
+      M.id = resumeId; updateMissionLink();
+      if (resumeId.indexOf('cache:') === 0) setSource('recorded', 'This is a saved recording.');
+      else if (saved) setSource('saved', 'This mission finished earlier. These are its recorded decisions and paths.');
+      poll(my); fetchCompare(my); tick(); return;
+    }
+    if (recordedOnly) { M.id = 'cache:' + M.key; updateMissionLink(); setSource('recorded', 'This is the scene you prepared.'); poll(my); tick(); return; }
     fetchJSON(API, 30000, { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ house: h.id, robots: robots, difficulty: difficulty, placement: M.scene, terra: M.terra }) })
       .then(function (r) {
         if (my !== gen) return;
         if (!r || !r.mission) throw new Error("no mission id");
         M.key = r.setup || M.key;
+        M.id = r.mission; updateMissionLink();
         if (r.source === "recorded" || String(r.mission).indexOf("cache:") === 0) {
           M.id = r.mission; setSource("recorded", REASONS[r.reason] || ("The live run was not started (" + (r.reason || "no reason given") + ")."));
           setStage("sent", "done"); setStage("machine", "skip");
@@ -522,9 +541,14 @@
       b.className = "badge rec"; b.textContent = "Recorded run of this exact setup";
       note.hidden = false;
       note.textContent = (reason ? reason + " " : "") + "This recorded brain-only run uses the same house, people, fire, robot count and difficulty. Live Terra decisions can change the search path.";
+    } else if (src === 'saved') {
+      b.className = 'badge rec'; b.textContent = 'Saved live run'; note.hidden = false; note.textContent = reason;
     } else {
       b.className = "badge live"; b.textContent = "Live run on AWS"; note.hidden = true;
     }
+  }
+  function updateMissionLink() {
+    var link = $('mission-link'); link.href = '?mission=' + encodeURIComponent(M.id); link.hidden = false;
   }
 
   function fallback(my, reason) {
@@ -536,6 +560,7 @@
     M.key = keep.key; M.scene = keep.scene;
     M.compare = keep.compare; M.resumeAt = keep.t; M.speed = keep.speed;
     M.id = "cache:" + M.key;
+    updateMissionLink();
     $("log").textContent = ""; $("log-empty").hidden = false; $("ticks").textContent = ""; $("score").hidden = true;
     setSource("recorded", reason + (keep.t > 1 ? " The replay carries on from " + fmt(keep.t) + "." : ""));
     $("waiting").hidden = false; $("wait-h").textContent = "Loading the recorded run";
@@ -562,6 +587,10 @@
       var st = r && r.status;
       if (!st) throw new Error("answer had no status");
       M.status = st;
+      if (st.setup) M.key = st.setup;
+      if (st.placement && !M.scene) {
+        M.scene = st.placement; M.house = Object.assign({}, M.house, { people: st.placement.people.length });
+      }
       var got = ingest(r.chunks || []);
       if (got) M.lastData = performance.now();
       if (st.state === "failed") {
@@ -596,7 +625,7 @@
       setTimeout(function () { poll(my); }, Math.min(8000, POLL_MS * M.netFails));
     });
   }
-  function plainError(s) { return String(s).replace(/_/g, " ").replace(/\s*\(([^)]*)\)/g, ", $1").slice(0, 160); }
+  function plainError(s) { return String(s).replace(/_/g, " ").replace(/[\u2018\u2019]/g, "'").replace(/[\u201c\u201d]/g, '"').replace(/\u2014/g, ',').replace(/\s*\(([^)]*)\)/g, ", $1").slice(0, 160); }
 
   function ingest(chunks) {
     var got = 0;
@@ -793,6 +822,7 @@
   }
   function plainText(e) {
     var t = e.text || e.kind;
+    if (e.kind === 'agent_order') t = t.replace(' applied an agent order.', ' reported an agent order.');
     return t.replace(/robot_([ABC])/g, "$1");
   }
   var srTimer = null;
@@ -803,7 +833,7 @@
     var m = $("moment"); m.textContent = "";
     var head = { map_shared: "Maps joined", survivor_confirmed: "Person found", robot_out: "Out of the house", mission_complete: "Heading out" }[e.kind] || "";
     if (e.robot) m.appendChild(tagEl(e.robot));
-    m.appendChild(document.createTextNode(head + ": " + plainText(e)));
+    m.appendChild(document.createTextNode(head + ". " + plainText(e)));
     m.hidden = false; m.style.opacity = "1";
     clearTimeout(momentTimer);
     momentTimer = setTimeout(function () { m.style.opacity = "0"; setTimeout(function () { m.hidden = true; }, 300); }, e.kind === "map_shared" ? 4200 : 2800);
@@ -980,7 +1010,7 @@
     var dt = Math.min(0.25, (ts - lastTs) / 1000); lastTs = ts;
     if (M.ready >= 0 && !M.failed) {
       var edge = M.ready * DT;
-      // after a switch to the recorded run, carry on from where the viewer was (same deterministic mission)
+      // Resume at the same simulated time in the exact-scene brain-only fallback.
       if (M.resumeAt) { if (edge >= M.resumeAt || M.done) { seek(M.resumeAt); M.resumeAt = 0; } else edge = -1; }
       if (edge < 0) { requestAnimationFrame(loop); return; }
       if (M.playing && M.t < edge) seek(Math.min(edge, M.t + dt * M.speed));
@@ -995,7 +1025,7 @@
       if (M.failed) ss.textContent = "";
       else if (st && st.state === "running" && num(st.sim_t)) ss.innerHTML = "<b>Simulating on AWS,</b> " + Math.floor(st.sim_t) + " s of " + MISSION_S + " s ready. The first 10 s arrive as one piece.";
       else if (st && st.state === "starting") ss.textContent = "Waiting for AWS to start the cloud machine.";
-      else ss.textContent = M.source === "recorded" ? "Loading the recorded run." : "Sending the mission to AWS.";
+      else ss.textContent = M.source === "recorded" || M.source === 'saved' ? "Loading the recorded run." : "Sending the mission to AWS.";
     }
     draw();
     requestAnimationFrame(loop);

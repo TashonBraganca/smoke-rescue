@@ -87,7 +87,7 @@ def test_missing_cache_cannot_be_promised(api, monkeypatch):
 
 def replay():
     return [{'chunk': n, 't0': n * 10, 'frames': [
-        {'t': i / 2, 'robots': [{'id': 'robot_A', 'x': 0, 'y': 2}], 'events': [], 'found': []}
+        {'t': i / 2, 'robots': [{'id': 'robot_A', 'x': 0, 'y': 2, 'out': True}], 'events': [], 'found': []}
         for i in range(n * 20, min(n * 20 + 20, 361))]} for n in range(19)]
 
 

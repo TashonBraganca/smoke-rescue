@@ -101,6 +101,11 @@ def chunks(prefix, start, end):
     for c in got:  # stop at the first chunk not written yet
         if c is None:
             break
+        for frame in c.get('frames', []):
+            for event in frame.get('events', []):
+                if event.get('kind') == 'agent_order':
+                    # The brain log contains acceptances and refusals. Older captions said "applied" for both.
+                    event['text'] = event.get('text', '').replace(' applied an agent order.', ' reported an agent order.')
         out.append(c)
     return out
 
@@ -483,6 +488,14 @@ def validate(rec, st, prefix):
             return 'invalid score ' + field
     if score['people_found'] > score['people_total'] or score['robots_out'] > len(ids):
         return 'score exceeds the people or robots in the scene'
+    placement = st.get('placement')
+    if m.group(4) and not isinstance(placement, dict):
+        return 'custom placement is missing'
+    expected_people = len(placement['people']) if m.group(4) else int(house['people'])
+    if score['people_total'] != expected_people:
+        return 'score has the wrong number of people'
+    if score['robots_out'] != sum(bool(robot.get('out')) for robot in got[-1]['frames'][-1]['robots']):
+        return 'score has the wrong number of robots outside'
     for field, maximum in [('coverage_pct', 100), ('time_s', mission_s)]:
         value = score.get(field)
         if type(value) not in (int, float) or not math.isfinite(value) or not 0 <= value <= maximum:

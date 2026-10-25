@@ -29,7 +29,7 @@ EVENT_TEXT = {
     "door_taken": lambda e: f"{name(e['robot'])} took a doorway; the others leave that room to it.",
     'agent_decision': lambda e: 'Terra for ' + name(e['robot']) + '. ' + e['reason'],
     'agent_unavailable': lambda e: e['reason'],
-    'agent_order': lambda e: name(e['robot']) + ' applied an agent order. ' + e['reason'].replace('go_to: explore: ', ''),
+    'agent_order': lambda e: name(e['robot']) + ' reported an agent order. ' + e['reason'].replace('go_to: explore: ', ''),
 }
 
 
