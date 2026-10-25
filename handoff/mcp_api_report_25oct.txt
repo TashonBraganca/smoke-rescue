@@ -192,3 +192,10 @@ Not done or not verified
 - The fire hotspot's 9.45 m floor upper bound was not compared with ground truth.
 - Detector times here (1.8 to 7 s) were measured while other jobs shared the machine; perception.json gives 1.3 s idle.
 - Not tested from a real ROS node or from an MCP desktop client itself.
+
+Full brain suite (added after the first commit)
+-----------------------------------------------
+cd brain && .venv/bin/python -m pytest tests -q --ignore=tests/test_mcp_server.py, run with the server.py change in the
+tree: 490 passed, 52 skipped in 221.07s. With the 8 MCP tests above: 498 passed. The skips are tests whose local
+recordings or image frames are absent on this machine (existing skip conditions, not new ones).
+Own test servers (FastAPI on 8095, MCP HTTP on 8096) were stopped by PID; 8080 and 8081 kept running untouched.
