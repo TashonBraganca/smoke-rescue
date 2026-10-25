@@ -21,18 +21,36 @@ namespace SmokeRescue.Brain
         /// then tell the agent it arrived (the camera sees about 37 degrees either side, the arm grips within 60).</summary>
         public void AgentGoTo(Vector2 target, double t, double holdS, string reason, Vector2? face = null) => GoTo(target, t, holdS, reason, face, false);
 
-        void GoTo(Vector2 target, double t, double holdS, string reason, Vector2? face, bool exploring)
+        bool GoTo(Vector2 target, double t, double holdS, string reason, Vector2? face, bool exploring, bool ownReflex = false)
         {
             // Turning where the robot stands (turn_to_face) goes nowhere new, so it needs no indoor evidence (Codex review:
             // near an entrance the robot's own cell may not be known to be inside yet).
             bool turnInPlace = face.HasValue && Vector2.Distance(target, motion.Pose.position) <= c.goal_tolerance_m;
-            if (!turnInPlace && !InSearchArea(target)) { Emit(t, "agent_order", "Refused go_to: no ceiling has been seen over that point, so it is not known to be inside.", "x_m", target.x, "y_m", target.y); return; }
-            string busy = AgentMoveRefusal(t);
-            if (busy != null) { Emit(t, "agent_order", "Refused go_to: " + busy + ".", "x_m", target.x, "y_m", target.y); return; }
+            if (!turnInPlace && !InSearchArea(target)) { Emit(t, "agent_order", "Refused go_to: no ceiling has been seen over that point, so it is not known to be inside.", "x_m", target.x, "y_m", target.y); return false; }
+            // code_spray_ignores_leave_refusal: the refusals below protect an agent from ordering a robot that is leaving; a code spray
+            // approach is the robot's own reflex and the robot is not returning.
+            string busy = ownReflex && c.code_spray_ignores_leave_refusal && !returning ? null : AgentMoveRefusal(t);
+            if (busy != null) { Emit(t, "agent_order", "Refused go_to: " + busy + ".", "x_m", target.x, "y_m", target.y); return false; }
             agentGoal = target; agentGoalUntil = t + holdS; agentGoalReason = reason ?? ""; agentGoalIsFrontier = false;
             agentFace = face; facing = null; agentHoldUntil = double.NegativeInfinity;
             if (active == null && !KeepEvidenceLook(exploring)) ClearPath();
             Emit(t, "agent_order", "go_to: " + agentGoalReason, "x_m", target.x, "y_m", target.y, "hold_s", holdS);
+            return true;
+        }
+
+        /// <summary>code_spray_retry_s: spray spots the robot could not reach, with the time they may be tried again.</summary>
+        readonly List<(Vector2 spot, double until)> unreachableSpraySpots = new List<(Vector2, double)>();
+        Vector2? spraySpotGoal;   // the spot of the code spray approach now driving as the agent goal
+        void NoteSpraySpotFailed(Vector2 spot, double t)
+        {
+            if (c.code_spray_retry_s <= 0) return;
+            unreachableSpraySpots.Add((spot, t + c.code_spray_retry_s));
+            Emit(t, "code_spray_spot_unreachable", "No route to the spray spot: not tried again for code_spray_retry_s.", "x_m", spot.x, "y_m", spot.y, "retry_s", c.code_spray_retry_s);
+        }
+        bool SpraySpotUnreachable(Vector2 spot, double t)
+        {
+            unreachableSpraySpots.RemoveAll(u => t >= u.until);
+            return unreachableSpraySpots.Exists(u => Vector2.Distance(u.spot, spot) <= 1f);
         }
 
         bool agentGoalIsFrontier;
@@ -489,9 +507,14 @@ namespace SmokeRescue.Brain
             double? there = KnockDownS(n, b.burningM2, standoff);
             if (there.HasValue && there.Value <= waterS && !AgentGoalActive(t) && b.distanceM > standoff + c.goal_tolerance_m)
             {
-                Vector2 from = motion.Pose.position, dir = (b.blockAt - from).normalized;
-                GoTo(b.blockAt - dir * standoff, t, c.code_spray_repeat_s * 2, "walk to the spray spot of the fire blocking the way", b.blockAt, false);
+                Vector2 from = motion.Pose.position, dir = (b.blockAt - from).normalized, spot = b.blockAt - dir * standoff;
                 nextCodeSpray = t + c.replan_s;
+                if (SpraySpotUnreachable(spot, t)) return false;
+                if (!GoTo(spot, t, c.code_spray_repeat_s * 2, "walk to the spray spot of the fire blocking the way", b.blockAt, false, true))
+                {
+                    NoteSpraySpotFailed(spot, t); return false;
+                }
+                spraySpotGoal = spot;
                 Emit(t, "code_spray_approach", why + "; one stream knocks it down from the spray spot: walk there facing it.",
                     "x_m", b.blockAt.x, "y_m", b.blockAt.y, "burning_m2", b.burningM2, "distance_m", b.distanceM, "standoff_m", standoff);
             }

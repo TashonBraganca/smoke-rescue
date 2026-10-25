@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
@@ -100,6 +101,91 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(Retry(true, 46, out int left), Is.True, "a 46 s old circle over the only frontier is dropped"); Assert.That(left, Is.Zero);
             Assert.That(Retry(true, 5, out left), Is.False, "a circle 5 s old stays: the spot was just seen"); Assert.That(left, Is.EqualTo(1));
             Assert.That(Retry(false, 46, out left), Is.False, "control: switch off"); Assert.That(left, Is.EqualTo(1));
+        }
+
+        static readonly RobotBrain.NozzleSpec TestNozzle = new RobotBrain.NozzleSpec { flowLps = 1, coolingKjPerL = 2590, efficiency = .5f, halfAngleDeg = 12, rangeM = 5,
+            maxSprayS = 6, burningKwPerM2 = 324, burningSurfaceC = 600, knockdownC = 300, fuelKjPerM2K = 6.5f };
+        // The burning corridor of TheRobotSpraysAMeasuredFireBlockingItsWayByItself: fire across the only way on at y = 2, walled behind.
+        static RobotBrain BurningCorridor(Action<BrainConfig> tweak)
+        {
+            var s = Settings(); s.code_sprays_fire = true; s.code_spray_reach_m = 1f; tweak(s);
+            var b = new RobotBrain(Calibration(), s, "A", 0); var g = Map(b);
+            for (float y = -1; y <= 4; y += .05f)
+            {
+                for (float x = -.95f; x <= .95f; x += .05f) g.ObserveFree(g.Cell(new Vector2(x, y)));
+                g.ObserveOccupied(g.Cell(new Vector2(-1.05f, y))); g.ObserveOccupied(g.Cell(new Vector2(1.05f, y)));
+            }
+            for (float x = -1; x <= 1; x += .05f) g.ObserveOccupied(g.Cell(new Vector2(x, -1.05f)));
+            for (float x = -.95f; x <= .95f; x += .1f) g.ObserveHeat(g.Cell(new Vector2(x, 2)), 600, 0);
+            b.Nozzle = TestNozzle; return b;
+        }
+
+        static void Hot(RobotBrain b, double now = 0)
+        {
+            typeof(RobotBrain).GetField("noFrontierAt", NP).SetValue(b, 0.0);
+            typeof(RobotBrain).GetField("airC", NP).SetValue(b, 45f); typeof(RobotBrain).GetField("lastAir", NP).SetValue(b, now);
+        }
+
+        [Test]
+        public void ASpraySpotTheRobotCannotWalkToIsNotOrderedAgainEverySecond()
+        {
+            // F4. Seed 934 (25 Oct), robot B in the bathroom 396 to 464 s: 112 code_spray_approach events, 49 go_to orders to the door
+            // cell, every one clearing its path, 22 "no known free path", 41 refusals, still 404 to 457 s. The corridor fire is 2 m
+            // ahead with a 1 m reach, so the robot must walk to its spray spot; here every order is refused (the heat refusal meant for
+            // agents, kept on by the switch off), the robot's own air reads 45 C. Control: retry 0 orders it every replan_s as before.
+            (int refusals, int noted) Run(float retry)
+            {
+                var b = BurningCorridor(c => { c.code_spray_ignores_leave_refusal = false; c.code_spray_retry_s = retry; });
+                Hot(b);
+                int refusals = 0, noted = 0;
+                for (int t = 0; t <= 61; t++)
+                {
+                    Hot(b, t); b.CodeSpray(t, 12, out _, out _);
+                    foreach (var e in b.DrainEvents())
+                    {
+                        if (e.kind == "agent_order" && e.reason.StartsWith("Refused go_to")) refusals++;
+                        if (e.kind == "code_spray_spot_unreachable") noted++;
+                    }
+                }
+                return (refusals, noted);
+            }
+            var withMemory = Run(30);
+            Assert.That(withMemory.refusals, Is.InRange(1, 3), "a refused spot is retried after 30 s, not every second");
+            Assert.That(withMemory.noted, Is.InRange(1, 3));
+            Assert.That(Run(0).refusals, Is.GreaterThan(30), "control: before the fix it was ordered about once a second");
+        }
+
+        [Test]
+        public void ASpraySpotWithNoFreePathIsRememberedAsUnreachable()
+        {
+            // F4. Seed 934 (25 Oct), robot B: 22 "Agent goal has no known free path; back to exploring." for the same spray spot.
+            var b = BurningCorridor(c => { c.code_spray_retry_s = 30; });
+            var spot = new Vector2(0, 3.4f);   // beyond the fire across the only way on: no route inside the fire margin
+            typeof(RobotBrain).GetField("agentGoal", NP).SetValue(b, (Vector2?)spot);
+            typeof(RobotBrain).GetField("agentGoalUntil", NP).SetValue(b, 60.0);
+            typeof(RobotBrain).GetField("spraySpotGoal", NP).SetValue(b, (Vector2?)spot);
+            var events = new List<BrainEvent>();
+            for (int i = 0; i < 60; i++) { DriveTick(b, i); events.AddRange(b.DrainEvents()); }
+            Assert.That(events.Any(e => e.kind == "replan" && e.reason.StartsWith("Agent goal has no known free path")), Is.True, "fixture: the spot has no path");
+            Assert.That(events.Count(e => e.kind == "code_spray_spot_unreachable"), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void ACodeSprayApproachIsNotRefusedBecauseTheRobotIsSaidToBeLeaving()
+        {
+            // F4. Seed 934 (25 Oct), robot B: 41 "Refused go_to: no reachable frontier is left and the air is heating ...; the robot is
+            // leaving" for spray approaches (411 to 464 s) although B was not returning and could not leave.
+            bool Ordered(bool ignore)
+            {
+                var b = BurningCorridor(c => { c.code_spray_ignores_leave_refusal = ignore; });
+                Hot(b);
+                b.CodeSpray(0, 12, out _, out _);
+                var events = b.DrainEvents();
+                Assert.That(events.Any(e => e.kind == "agent_order"), Is.True, "an order or a refusal is logged");
+                return events.Any(e => e.kind == "agent_order" && e.reason.StartsWith("go_to: walk to the spray spot"));
+            }
+            Assert.That(Ordered(true), Is.True, "the reflex walks to its spray spot");
+            Assert.That(Ordered(false), Is.False, "control: with the switch off it is refused as 'the robot is leaving'");
         }
     }
 }
