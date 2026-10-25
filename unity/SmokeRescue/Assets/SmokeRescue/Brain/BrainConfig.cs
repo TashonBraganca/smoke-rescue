@@ -254,6 +254,9 @@ namespace SmokeRescue.Brain
         public float survivor_stop_yaw_dps = 5.0f;
         public float retreat_start_weight = 0.1f;
         public float retreat_path_weight = 0.01f;
+        public bool progress_route_shrink = false;
+        public bool goal_commitment = false;
+        public float goal_commit_max_s = 60.0f;
 
         // Load reads only the limits block, so the brain never depends on the simulator driver.
         [Serializable] public sealed class MotionLimits
