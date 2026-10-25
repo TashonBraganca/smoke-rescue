@@ -29,12 +29,14 @@ def http(method, path, body=None):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--live', action='store_true')
+    parser.add_argument('--robots', type=int, choices=(1, 2, 3), default=2)
+    parser.add_argument('--terra', action='store_true')
     args = parser.parse_args()
     code, health = http('GET', '/api/mission/health')
     assert code == 200 and health['ok']
-    print('PASS public health', json.dumps(health))
-    setup = {'house': 'family_ranch', 'robots': 2, 'difficulty': 'medium', 'terra': False}
-    key = 'family_ranch__r2__medium'
+    print('PASS public health', json.dumps({k: v for k, v in health.items() if k != 'ready_setups'}))
+    setup = {'house': 'family_ranch', 'robots': args.robots, 'difficulty': 'medium', 'terra': args.terra}
+    key = 'family_ranch__r%d__medium' % args.robots
     code, first = http('GET', '/api/mission/cache:' + key)
     assert code == 200 and first['status']['state'] == 'done' and first['status']['validated']
     chunks = list(first['chunks'])

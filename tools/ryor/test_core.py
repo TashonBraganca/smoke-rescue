@@ -5,6 +5,7 @@ import os
 import sys
 from pathlib import Path
 from types import SimpleNamespace
+from datetime import datetime, timezone, timedelta
 
 import pytest
 
@@ -129,3 +130,27 @@ def test_terra_budget_refusal_never_calls_model(tmp_path, monkeypatch):
     worker.decide({'robot': 'robot_A', 't': 15, 'frontiers': []})
     answer = json.loads((tmp_path / 'robot_A.order.json').read_text())
     assert answer['type'] == 'unavailable' and 'budget' in answer['reason']
+
+
+@pytest.mark.parametrize('terminal', ['done', 'failed'])
+def test_sweep_stops_stale_containers_even_after_terminal_state(api, monkeypatch, terminal):
+    stopped = []
+    monkeypatch.setattr(api, 'running_tasks', lambda: ['arn:test'])
+    monkeypatch.setattr(api, 'record', lambda mid: {'state': terminal})
+    monkeypatch.setattr(api, 'fail', lambda *a, **kw: pytest.fail('Do not invalidate a completed replay'))
+    api.ddb.get_item = lambda **kw: {}
+    api.ecs.describe_tasks = lambda **kw: {'tasks': [{'taskArn': 'arn:test', 'startedBy': 'ryor-abcd1234',
+        'createdAt': datetime.now(timezone.utc) - timedelta(seconds=701)}]}
+    api.ecs.stop_task = lambda **kw: stopped.append(kw['task'])
+    result = api.sweep()
+    assert result['stopped'] == 1 and stopped == ['arn:test']
+
+
+def test_sweep_counts_a_stop_from_the_reserved_slot_pass(api, monkeypatch):
+    api.ddb.get_item = lambda **kw: {'Item': {'owner': {'S': 'abcd1234'}}} if kw['Key']['pk']['S'] == 'slot#0' else {}
+    monkeypatch.setattr(api, 'record', lambda mid: {'state': 'starting', 'task': 'arn:test'})
+    monkeypatch.setattr(api, 's3_json', lambda key: None)
+    monkeypatch.setattr(api, 'check', lambda *a: 'hard time limit')
+    monkeypatch.setattr(api, 'fail', lambda *a: True)
+    monkeypatch.setattr(api, 'running_tasks', lambda: [])
+    assert api.sweep()['stopped'] == 1

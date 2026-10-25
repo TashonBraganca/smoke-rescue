@@ -212,8 +212,10 @@ def fail(mid, rec, reason, stop=True):
         if stop and rec.get('task'):
             try:
                 ecs.stop_task(cluster=CLUSTER, task=rec['task'], reason=('ryor: ' + reason)[:255])
+                return True
             except ClientError as e:
                 print('stop_task', mid, e)
+    return False
 
 
 # ------------------------------------------------------------------ routes
@@ -315,13 +317,16 @@ def post(event, validate_only=False):
                {'name': 'BUCKET', 'value': RB}, {'name': 'PREFIX', 'value': prefix},
                {'name': 'PREPARE', 'value': '1' if prepare else '0'},
                {'name': 'TERRA_ENABLED', 'value': '1' if body.get('terra', True) is True and not prepare else '0'}]
+        # Fargate offers two or four vCPUs here. Three independent sensing threads need the four-vCPU size.
+        task_cpu, task_memory = ('4096', '8192') if robots == 3 else ('2048', '4096')
         try:
             r = ecs.run_task(cluster=CLUSTER, taskDefinition=FAMILY, launchType='FARGATE', count=1,
                              clientToken=mid,
                              startedBy='ryor-' + mid,
                              networkConfiguration={'awsvpcConfiguration': {
                                  'subnets': SUBNETS, 'securityGroups': [SG], 'assignPublicIp': 'ENABLED'}},
-                             overrides={'containerOverrides': [{'name': 'engine', 'environment': env}]})
+                             overrides={'cpu': task_cpu, 'memory': task_memory,
+                                        'containerOverrides': [{'name': 'engine', 'environment': env}]})
             if r.get('failures') or not r.get('tasks'):
                 raise RuntimeError(str(r.get('failures'))[:200])
         except Exception as e:
@@ -514,12 +519,15 @@ def health():
         return j(503, {'ok': False, 'cap': CAP, 'engine': ENGINE})
     return j(200, {'ok': ok, 'running': running, 'cap': CAP, 'cache_setups': n, 'engine': ENGINE,
                    'cache_expected': int(manifest.get('total', 0)),
+                   'ready_setups': manifest.get('setups', []),
                    'enabled': ENABLED, 'ip_limit_per_hour': IP_LIMIT, 'daily_cap': DAILY, 'hard_limit_s': HARD_S,
-                   'terra_steps_per_mission': 20, 'terra_steps_per_utc_day': 100})
+                   'terra_steps_per_mission': 20, 'terra_steps_per_utc_day': 100,
+                   'pair_vcpu': 2, 'trio_vcpu': 4})
 
 
 def sweep():
-    """Stop every ryor task older than the hard limit and mark its mission failed. Runs on each POST and every 5 min."""
+    """Stop stale task containers. Runs on each POST and once per minute even with no browser polling."""
+    stopped = set()
     # Reconcile completed or failed owners even after ECS removes them from ListTasks.
     for i in range(CAP):
         item = ddb.get_item(TableName=TABLE, Key={'pk': {'S': 'slot#%d' % i}}, ConsistentRead=True).get('Item')
@@ -530,23 +538,31 @@ def sweep():
                 prefix = 'ryor/missions/%s/' % mid
                 why = check(mid, rec, s3_json(prefix + 'status.json'), prefix)
                 if why:
-                    fail(mid, rec, why)
+                    if fail(mid, rec, why):
+                        stopped.add(rec['task'])
             elif rec:
                 release_slot('slot#%d' % i, mid)
     arns = running_tasks()
-    stopped = 0
     for i in range(0, len(arns), 100):
         for t in ecs.describe_tasks(cluster=CLUSTER, tasks=arns[i:i + 100]).get('tasks', []):
+            if t['taskArn'] in stopped:
+                continue
             age = time.time() - t['createdAt'].timestamp()
             if age <= HARD_S:
                 continue
             mid = (t.get('startedBy') or '').replace('ryor-', '', 1) or '-'
             reason = 'hard time limit: running %d s > %d s' % (age, HARD_S)
             rec = record(mid) if MID.match(mid) else None
-            if rec:
-                fail(mid, rec, reason)
+            if rec and rec['state'] not in ('done', 'failed'):
+                if fail(mid, rec, reason):
+                    stopped.add(t['taskArn'])
             else:
-                fail_line(mid, reason)
+                # A terminal database row must not keep a stuck container billable forever.
+                # Completed simulations stay valid; the stale container still has to stop.
+                if not rec:
+                    fail_line(mid, reason)
+                else:
+                    print('RYOR_CLEANUP %s %s stale container' % (mid, rec['state']))
                 ecs.stop_task(cluster=CLUSTER, task=t['taskArn'], reason='ryor: ' + reason)
-            stopped += 1
-    return {'running': len(arns), 'stopped': stopped}
+                stopped.add(t['taskArn'])
+    return {'running': len(arns), 'stopped': len(stopped)}

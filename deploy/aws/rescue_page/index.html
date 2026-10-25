@@ -130,7 +130,7 @@
           <h2 id="wait-h">Getting the mission ready</h2>
           <ol id="stages" class="stages">
             <li data-s="sent">Mission request sent</li>
-            <li data-s="machine">Starting a cloud machine on AWS <span class="eta">usually 40 to 90 s</span></li>
+            <li data-s="machine">Starting a cloud machine on AWS <span class="eta">can take about a minute</span></li>
             <li data-s="door">Robots lined up at the door</li>
             <li data-s="search">Searching the house</li>
           </ol>
@@ -145,7 +145,7 @@
           <h2 id="team-h" class="side-h">Robots</h2>
           <ul id="team" class="team"></ul>
           <p class="team-total"><span>Whole team</span><span id="team-cov">0 % of floor searched</span></p>
-          <p class="team-total"><span>People found</span><span id="team-found">0</span></p>
+          <p class="team-total"><span>People reported</span><span id="team-found">0</span></p>
         </section>
         <section aria-labelledby="log-h">
           <h2 id="log-h" class="side-h">What happened</h2>
@@ -156,7 +156,7 @@
           <h2 class="side-h">Map key</h2>
           <ul>
             <li><i class="k k-seen"></i>Floor one robot has searched, in its colour</li>
-            <li><i class="k k-person"></i>Person confirmed, ring shows who found them</li>
+            <li><i class="k k-person"></i>Brain confirmation, ring shows who reported it</li>
             <li><i class="k k-fire"></i>Fire (simulator truth, the robots only see what their sensors report)</li>
             <li><i class="k k-trail"></i>Path the robot walked</li>
           </ul>
@@ -184,7 +184,7 @@
 </dialog>
 
 <footer class="foot">
-  <p><strong>What you are watching.</strong> The real robot brain, running headless on AWS. There is no rendered camera: people are detected through the simulator's sighting model (distance, line of sight and smoke). The fire and the robots' true positions come from the simulator and are drawn for you only. The coloured searched floor comes from each robot's own map, which is all the robot knows.</p>
+  <p><strong>What you are watching.</strong> The real robot brain, running headless on AWS. There is no rendered camera. The simulator models sightings using distance, line of sight and smoke. Fire and true robot positions are drawn for the viewer only. Coloured floor comes from each robot's own map. Person markers show the brain's confirmations. The final score compares those reports with hidden person positions and counts each person once.</p>
   <p id="citation">Residential dataset plans come from HouseExpo, Li et al., IROS 2020, <a href="https://github.com/TeaganLi/HouseExpo">source</a>. These are synthetic SUNCG-derived layouts converted to our floor plan format. <a href="houseexpo-license.txt">MIT licence and copyright notice</a>.</p>
 </footer>
 <script src="rescue.js"></script>

@@ -13,7 +13,7 @@
   var LIMIT_STALL_S = 150;      // running but no new data for this long
   var LIMIT_TOTAL_S = 660;      // contract hard limit is 600 s wall on the server
   var MAX_NET_FAILS = 6; // Retry temporary network failures before loading the recording.
-  var scene = null, preparedSceneKey = null, preparing = false, placementTool = 'person', prepGeneration = 0;
+  var scene = null, preparedSceneKey = null, preparing = false, placementTool = 'person', prepGeneration = 0, readySetups = null;
   if (/[?&]devlimits=1/.test(location.search)) { LIMIT_STARTING_S = 15; LIMIT_STALL_S = 15; LIMIT_TOTAL_S = 60; } // dev server tests only
   var IDS = ["robot_A", "robot_B", "robot_C"];
   var LETTER = { robot_A: "A", robot_B: "B", robot_C: "C" };
@@ -222,6 +222,7 @@
     $("start").disabled = false;
     drawPreview();
     saveHash();
+    updateStartAvailability();
     if (scroll && window.innerWidth <= 980) $("setup").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
   }
   function setSeg(groupId, attr, val) {
@@ -231,11 +232,13 @@
     var b = e.target.closest("button"); if (!b) return;
     invalidateScene();
     sel.robots = +b.dataset.n; setSeg("robots", "n", sel.robots); drawPreview(); saveHash();
+    updateStartAvailability();
   });
   $("difficulty").addEventListener("click", function (e) {
     var b = e.target.closest("button"); if (!b) return;
     invalidateScene();
     sel.difficulty = b.dataset.d; setSeg("difficulty", "d", sel.difficulty); renderDiffLine(); saveHash();
+    updateStartAvailability();
   });
   function renderDiffLine() {
     var line = $("diff-line"); line.textContent = "";
@@ -301,11 +304,25 @@
       var p = $("gallery-error"); p.hidden = false;
       p.textContent = "The list of houses did not load (" + err.message + "). Reload the page to try again.";
     });
+    refreshHealth();
+  }
+  function refreshHealth() {
     fetchJSON(API + "/health", 8000).then(function (h) {
       if (!h) return;
+      if (Array.isArray(h.ready_setups)) { readySetups = new Set(h.ready_setups); updateStartAvailability(); }
       var p = $("health"); p.hidden = false;
       p.textContent = h.ok ? "Live service is up: " + h.running + " of " + h.cap + " cloud machines in use." : "Live service reports a problem; you will get recorded runs.";
+      if (h.cache_setups < h.cache_expected) setTimeout(refreshHealth, 30000); // Let newly prepared setups become selectable without reloading.
     }).catch(function () {});
+  }
+  function updateStartAvailability() {
+    if (!sel.house) return;
+    var key = sel.house + '__r' + sel.robots + '__' + sel.difficulty;
+    var missing = !scene && readySetups && !readySetups.has(key);
+    $('start').disabled = !!missing;
+    $('start').textContent = missing ? 'Recording is preparing' : scene && !preparedSceneKey ? 'Prepare my scene' : 'Start the rescue';
+    if (missing) $('scene-summary').textContent = 'The recording for this setup is still preparing. Choose another robot count or house, or place your own scene.';
+    else if (!scene) $('scene-summary').textContent = "People and fire follow this house's fixed generator seed.";
   }
 
   /* ---------- network ---------- */
@@ -335,9 +352,11 @@
     scene = null; invalidateScene();
     $('start').textContent = 'Start the rescue';
     $('scene-summary').textContent = "People and fire follow this house's fixed generator seed.";
+    updateStartAvailability();
   }
   function openEditor() {
-    if (!scene) { scene = { people: [], fire: null }; invalidateScene(); }
+    if (!scene) { scene = { people: [], fire: null }; invalidateScene(); $('scene-summary').textContent = 'Custom scene. Place people and one fire origin, or choose Random to restore the generator.'; }
+    updateStartAvailability();
     if (!$('scene-editor').open) $('scene-editor').showModal();
     drawEditor();
   }
@@ -873,7 +892,7 @@
       li.querySelector(".stat b").textContent = Math.round((M.perRobot[id] || 0) * CELL * CELL);
     });
     $("team-cov").textContent = Math.min(100, Math.round(100 * M.unionCount / floorCells)) + " % of floor searched";
-    $("team-found").textContent = M.found.length + " of " + (M.house.people || "?");
+    $("team-found").textContent = String(M.found.length);
   }
 
   /* ---------- canvas ---------- */
@@ -1084,7 +1103,7 @@
     var fc = $("s-false");
     var notes = [];
     if (missed > 0) notes.push(missed + (missed === 1 ? ' person was not found.' : ' people were not found.'));
-    if (s.false_confirmations) notes.push(s.false_confirmations + " false confirmation" + (s.false_confirmations > 1 ? "s" : "") + ": a robot marked a person where there was none.");
+    if (s.false_confirmations) notes.push(s.false_confirmations + ' confirmation' + (s.false_confirmations > 1 ? 's did' : ' did') + ' not match a distinct person.');
     if (num(s.first_person_s)) notes.push("First person found at " + fmt(s.first_person_s) + ".");
     fc.hidden = !notes.length; fc.textContent = notes.join(" ");
     var cmp = $("s-compare");

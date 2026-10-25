@@ -1,0 +1,47 @@
+--- a/src/components/Nav.tsx
++++ b/src/components/Nav.tsx
+@@ -1,7 +1,7 @@
+ "use client";
+ import { useEffect, useState } from "react";
+ 
+-const LINKS = [["#try", "Try it"], ["#house", "The house"], ["#slam", "SLAM"], ["#results", "Results"], ["#built", "How it's built"]];
++const LINKS = [["#mission", "Watch a mission"], ["#try", "Try it"], ["#house", "The house"], ["#slam", "SLAM"], ["#results", "Results"], ["#built", "How it's built"]];
+ 
+ // Floating pill; slides away while scrolling down so it never sits on content, returns on scroll up.
+ export default function Nav() {
+@@ -21,7 +21,7 @@
+       <div className="hidden gap-5 text-sm font-semibold text-sub lg:flex">
+         {LINKS.map(([h, l]) => <a key={h} href={h} className="whitespace-nowrap transition-colors hover:text-ink">{l}</a>)}
+       </div>
+-      <a href="#mission" className="whitespace-nowrap rounded-full bg-heat px-4 py-2.5 text-sm font-extrabold text-heat-ink transition-colors hover:bg-amber">Choose a mission</a>
++      <a href="/rescue/" className="whitespace-nowrap rounded-full bg-heat px-4 py-2.5 text-sm font-extrabold text-heat-ink transition-colors hover:bg-amber">Run a rescue</a>
+     </nav>
+   );
+ }
+--- /dev/null
++++ b/src/app/rescue/page.tsx
+@@ -0,0 +1,24 @@
++import type { Metadata } from "next";
++
++// The mission page and API share this HTTPS origin. Embedding keeps its canvas styles separate from the films.
++const RESCUE_URL = "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/rescue/";
++
++export const metadata: Metadata = {
++  title: "Run your own rescue | Smoke Rescue",
++  description: "Choose a house, place people and fire, and watch the real robot brain search it on AWS.",
++};
++
++export default function RescuePage() {
++  return (
++    <main className="h-dvh w-full bg-[#111416]">
++      <a className="sr-only focus:not-sr-only" href={RESCUE_URL}>Open the rescue page in its own window</a>
++      <iframe
++        title="Run your own rescue"
++        src={RESCUE_URL}
++        className="block h-full w-full border-0"
++        allowFullScreen
++        referrerPolicy="no-referrer"
++      />
++    </main>
++  );
++}

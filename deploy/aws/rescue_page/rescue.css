@@ -66,7 +66,7 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 
 .top, main, .foot { max-width: 1320px; margin: 0 auto; padding-left: clamp(16px, 3vw, 40px); padding-right: clamp(16px, 3vw, 40px); }
 .top { display: flex; align-items: center; justify-content: space-between; padding-top: 14px; padding-bottom: 6px; }
-.brand { font-weight: 750; letter-spacing: -.01em; display: flex; align-items: center; gap: .55rem; }
+.brand { font-weight: 750; letter-spacing: -.01em; display: flex; align-items: center; gap: .55rem; color: var(--ink); text-decoration: none; }
 .mark { width: 14px; height: 14px; border: 2px solid var(--wall); border-top-color: var(--fire); display: inline-block; }
 
 .ghost { background: transparent; border: 1px solid var(--line); border-radius: 6px; min-height: 44px; padding: .45rem .9rem; }

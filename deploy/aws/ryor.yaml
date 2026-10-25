@@ -33,7 +33,7 @@ Parameters:
   Cpu:
     Type: String
     Default: "2048"
-    Description: Two robot sensing threads fit on two vCPUs; two live slots fit beside precompute within the account quota.
+    Description: Two robot sensing threads fit on two vCPUs. The API overrides this to four for trio missions.
   MemoryMb:
     Type: String
     Default: "4096"
@@ -95,7 +95,8 @@ Resources:
     Type: AWS::ECR::Repository
     Properties:
       RepositoryName: smoke-rescue/ryor-engine
-      ImageTagMutability: MUTABLE
+      # Placement cache identities include the engine tag. A tag must never silently name different bytes.
+      ImageTagMutability: IMMUTABLE
       ImageScanningConfiguration: { ScanOnPush: true }
       LifecyclePolicy:
         LifecyclePolicyText: >-
