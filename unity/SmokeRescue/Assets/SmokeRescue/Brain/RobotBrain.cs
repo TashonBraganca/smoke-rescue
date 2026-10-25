@@ -40,6 +40,7 @@ namespace SmokeRescue.Brain
         readonly List<Vector2> survivors = new List<Vector2>();
         float entryYaw;   // the launch heading: robots are placed facing the way in
         double leaveRetryAt = double.NegativeInfinity, wayOutBlockedAt = double.NegativeInfinity;   // walk_out_past_fire
+        Vector2? clearWayGoal; bool clearWayTried;   // end_clear_way_out_m: where a finished robot stands clear of the way in
         List<Vector2> path = new List<Vector2>();
         Track active;
         Vector2? goal;
@@ -226,7 +227,18 @@ namespace SmokeRescue.Brain
                 float toExit = float.PositiveInfinity; foreach (var e in Exits()) toExit = Mathf.Min(toExit, Vector2.Distance(motion.Pose.position, e));
                 // return_home_at_end: back means on this robot's own start pad, not in the doorway: headless 5001 and 5017, robot B
                 // stopped in the only doorway (0, 0.43) and robot A, behind it, found no route out.
-                if (EndReturn) toExit = Vector2.Distance(motion.Pose.position, home);
+                if (EndReturn) toExit = Vector2.Distance(motion.Pose.position, clearWayGoal ?? home);
+                if (EndReturn && !clearWayTried && toExit <= Mathf.Max(c.goal_tolerance_m, c.return_arrive_m) && c.end_clear_way_out_m > 0)
+                {
+                    // At the pad, which can stand in the way in: walk clear of it before finishing (end_clear_way_out_m).
+                    clearWayTried = true; var route = ClearOfWayIn(out var spot);
+                    if (route.Count > 0)
+                    {
+                        clearWayGoal = spot; SetPath(route); lastPlan = t; toExit = Vector2.Distance(motion.Pose.position, spot);
+                        Emit(t, "clear_way_in", "At the start pad, which can stand in the way in: step out and aside so the partner can still walk out.",
+                            "x_m", spot.x, "y_m", spot.y, "route_points", route.Count);
+                    }
+                }
                 bool clearing = !float.IsNaN(carryClearFrom.x);
                 bool arrived = toExit <= Mathf.Max(c.goal_tolerance_m, c.return_arrive_m) || clearing;
                 if (arrived && returnReason == CarryingOut && carryTowM > 0 && float.IsNaN(stepAwayFrom.x))
@@ -2087,7 +2099,7 @@ namespace SmokeRescue.Brain
             if (EndReturn)
             {
                 if (!lockLifted) { lockLifted = true; grid.ClearEntranceLock(); }
-                var pad = planner.Plan(motion.Pose.position, home);
+                var pad = planner.Plan(motion.Pose.position, clearWayGoal ?? home);
                 if (pad.Count > 0) return pad;
             }
             var route = PlanOutFrom(motion.Pose.position);
@@ -2117,6 +2129,20 @@ namespace SmokeRescue.Brain
             if (route.Count == 0) return;
             float m = PathLength(route);
             if (m > c.return_arrive_m && t + m / c.open_speed_mps * c.escape_time_factor + c.escape_check_s >= c.mission_time_limit_s) BeginReturn(t, MissionTimeUp);
+        }
+        /// <summary>end_clear_way_out_m: a route from the pad to a spot further out along the reverse of the launch heading and
+        /// to one side of the line through the pad; the side with the shorter route, or an empty route when neither has one.</summary>
+        List<Vector2> ClearOfWayIn(out Vector2 spot)
+        {
+            Vector2 forward = new Vector2(-Mathf.Sin(entryYaw), Mathf.Cos(entryYaw)), side = new Vector2(forward.y, -forward.x);
+            List<Vector2> best = new List<Vector2>(); spot = home;
+            foreach (float s in new[] { 1f, -1f })
+            {
+                var p = home - forward * c.end_clear_way_out_m + side * (s * c.end_clear_way_side_m);
+                var route = planner.Plan(motion.Pose.position, p);
+                if (route.Count > 0 && (best.Count == 0 || PathLength(route) < PathLength(best))) { best = route; spot = p; }
+            }
+            return best;
         }
         List<Vector2> PlanOutFrom(Vector2 from)
         {
