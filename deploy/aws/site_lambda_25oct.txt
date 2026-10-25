@@ -1,0 +1,30 @@
+HTTPS judge site on a Lambda Function URL (25 Oct 2026)
+
+URL: https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/
+Stack smoke-rescue-site (deploy/aws/site_lambda.yaml), deployed with ./deploy/aws/deploy_site_lambda.sh, which also syncs
+deploy/aws/site into the stack's private S3 bucket (all public access blocked; only the function role can read it).
+
+Why: CloudFront refused new distributions until the account is verified (public_routes_25oct.txt). A Function URL gives
+HTTPS on an AWS domain without CloudFront.
+
+What it does: one Python 3.12 function on arm64 (Graviton), 256 MB, 70 s timeout.
+- GET /, /app.js, /style.css, /runs/... from S3. Files over 5 MB (the 20 MB walkthrough.mp4) get a 302 to a presigned
+  S3 HTTPS URL valid 1 h, because Lambda responses cap at 6 MB.
+- GET /api/health, POST /api/vision/<tool>, POST /api/perceive/people go to the ALB without any origin header. Every
+  other /api path returns 404 from the function; even if one slipped through, the ALB would answer 403 without the header.
+- Logs: CloudWatch log group /aws/lambda/smoke-rescue-site, 14 days.
+
+Verified with curl, 25 Oct 16:5x IST:
+  / 200 text/html (title "Smoke Rescue | Recorded results"); /app.js 200 and byte-identical to the repo file; /style.css,
+  /runs/index.json, /runs/haze_test20/compare.json 200; walkthrough.mp4 302 then 200, 20,517,616 bytes.
+  /api/health 200 (opencv 5.0.0) in 0.77 s; POST /api/vision/assess_visibility with deploy/aws/samples/sample_rgb.png,
+  raw PNG and multipart: 200, laplacian_var 338.9, rms_contrast 53.4, dark_channel 0.214 (same as the direct ALB smoke
+  test), 1.5 s from India.
+  POST /api/robot/robot_A/step, /api/commander/step, /api/runs/x/robot_A/files, /api/trace: 404. ..%2f traversal: 400.
+
+Cost bound, and what differs from the brief: a reserved concurrency cap could not be set. This account's Lambda limit is
+10 concurrent executions in total, and Lambda refuses any reservation that leaves fewer than 10 unreserved. That account
+limit of 10 is the effective cap: at most 10 x 256 MB running, about 2.9 USD a day if saturated around the clock.
+The template takes ReservedConcurrency (e.g. 5) once a quota increase lands. The WAF on the ALB (2000 requests per 5 min
+per source IP) now sees the function's IPs, not the judges', so that limit is shared by all site visitors.
+Undo: aws cloudformation delete-stack --stack-name smoke-rescue-site (empty the bucket first).
