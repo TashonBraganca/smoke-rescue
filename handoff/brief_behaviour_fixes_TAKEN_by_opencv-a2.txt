@@ -1,0 +1,38 @@
+Brief 03 (from opencv-a2, 25 Oct ~18:40 IST): robot behaviour fixes the owner saw in video 1, then real house layouts.
+Same rules as before (the project notes cardinal rule: no house-specific constants, every constant has a *_reason; every fix gets a
+test that FAILS without it and passes with it; tools/headless/test.sh must stay green; do not touch unity/ or restart :8080
+while a recording runs; commit/push overnight-25oct; report in handoff/behaviour_fixes_report_25oct.txt; no em dashes).
+
+Evidence: recording data/recordings/unity_house_onedoor_seed934_full_1520_5of5 (robot_A/B decisions.jsonl, brain_state.jsonl,
+brain_map/, oracle/ for evaluation only), video data/evidence/video1_family_ranch_seed934_5of5.mp4 (3x speed: video second
+x 3 = sim second). Tools: tools/run_audit.py, tools/room_coverage.py, tools/headless (HeadlessSim), tools/bench (RunPod).
+
+Owner's observations (verify each in the logs first, measure, then fix the cause, not the symptom):
+1. Water: robots spray early fires and then have no water when fire closes the only exit at ~470-480 s, so both held in the
+   hallway 480-600 s. Also a fire covering unsearched floor (a person could be behind it) is not sprayed. Want: water is
+   rationed (keep a reserve for the way out, sized from measured fire and the nozzle model), and fire that hides unsearched
+   floor or a room nobody entered is sprayed from close range before giving up on that floor.
+2. Over-searching: robot A re-swept the same room for ~50 sim s near the start (video 0:00-0:55). Owner: a room does not
+   need every centimetre; enter, get wide coverage, move on. Find the dwell/coverage rule causing it (room_searched
+   threshold, sweep looks, frontier inside a done room) and cap it with a general rule.
+3. Stuck: robot B stopped ~90 s around sim 270 s (video 1:31); robot A "Legs not moving: backing off and replanning"
+   repeatedly 238-250 s; robot B stuck in a bathroom in Recover mode near the end (~350 s and after 520 s). Find why the
+   stuck/turn-stall recovery loops (doorway clearance, body swing, small rooms) and fix.
+4. Room inside a room: robot A saw the person at ~420 s but did not enter the adjacent inner room (bedroom closet type).
+   Rooms reachable only through another room must be on the tour.
+5. Leave before the fire closes the exit: keep-a-way-out watch for the end phase (behind a switch): when measured fire comes
+   within margin of the only route out and the remaining search is small, start the walk out now, or spray the exit with the
+   reserved water. Measure the trade-off (people found vs both robots out).
+Validate every fix on the RunPod benchmark (full vs full+fixes, paired, same seeds) and report the numbers; a fix that does
+not improve people found, rooms entered, stuck time or both-out without hurting the others is not shipped.
+
+C. Real house layouts (real-world impact). Find a public dataset of real residential floor plans usable for exploration,
+   e.g. HouseExpo (35,126 2D layouts from SUNCG, used by exploration papers), or Explore-Bench maps, check its licence, convert
+   a sample (e.g. 100 single-floor houses of 6 to 15 rooms) into our floorplan/world format with people and fire placed by
+   the existing generators, run full vs one_robot on RunPod, and report. If a published exploration benchmark gives numbers
+   for known methods on the same maps (e.g. Explore-Bench's frontier baselines, coverage over time), compare against it
+   with the same metric definitions and say exactly where the comparison is or is not like for like.
+
+Owner's rule for item 2 (25 Oct 18:50): a room counts as done once about 85 % of its floor is seen (70 % is acceptable
+where the rest is blind or blocked); spending ~50 s in one room is the bug. Use a general coverage share with a *_reason,
+measured, not a per-house constant.

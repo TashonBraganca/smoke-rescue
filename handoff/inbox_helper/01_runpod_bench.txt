@@ -1,0 +1,45 @@
+Brief: run the 360-mission headless benchmark on RunPod, score it, clean up (from opencv-a2, 25 Oct 2026 ~18:10 IST)
+
+You own this end to end now. Repo /Volumes/Tashon/opencv/smoke-rescue, branch overnight-25oct (commit/push results and
+scripts there). Read the project notes and the global notes first: the RunPod HARD RULE applies. The owner approved, for this job
+only: creating and using /workspace/smoke_bench_25oct and /dev/shm/smoke_bench_25oct, running our own processes there at
+nice 19, and DELETING THOSE TWO FOLDERS when finished (after the results are downloaded and checked). Touch nothing else on
+the pod. Other people (owner, Shreya, Abhijeet, a senior) use the pod; the pod's local / (overlay) disk is 87 % full, do not
+write there. Never `pkill -f` with a pattern that can match your own ssh command line (that killed a session earlier); kill
+by PID found with pgrep on a full unique path, or upload a script and run it.
+
+Access: `ssh runpod` (alias in ~/.ssh/config). Pod: 256 cores, 1 TB RAM, /dev/shm 58 GB RAM disk, /workspace is a slow
+network filesystem (mfs): runs writing their traces there crawled 10x slower, so run from /dev/shm.
+
+State at handoff:
+- /workspace/smoke_bench_25oct has: dotnet/ (.NET 8 runtime), bin/ (HeadlessRunner built for linux-x64 with the portable
+  Newtonsoft.Json from NuGet; the Unity SDK copy is osx-arm64 ReadyToRun and fails on Linux), repo/{config, tools/bench,
+  handoff/houses_evidence, data/runs/bench_25oct} (360 requests from tools/bench/make_requests.py, checked with
+  check_requests.py), and partial runs on the slow disk (ignore/delete at the end).
+- /dev/shm/smoke_bench_25oct has a copy (bin, dotnet, repo with config/tools/requests/worlds/fires). Latest launch printed
+  "restarted" but the new runs may not have started (script exec bit / old launcher). Verify from scratch: list our
+  processes, kill leftovers by PID, `chmod +x tools/bench/*.sh`, then from /dev/shm/smoke_bench_25oct/repo run
+  DOTNET=$S/dotnet/dotnet DOTNET_ROOT=$S/dotnet HEADLESS_DLL=$S/bin/HeadlessRunner.dll NICE=19 TMPDIR=$S/tmp \
+    nohup sh tools/bench/run_all.sh data/runs/bench_25oct/requests 200 > $S/bench_run.log 2>&1 &
+  Check sim time advances (a single run on the pod did ~25 sim s per 41 wall s); one 600 s run ~16 min; 360 at 200 parallel
+  should finish in ~35 to 45 min. Watch logs/failures.txt and any crashed run; fix causes, rerun only failed ones.
+- If /dev/shm fills (traces), check sizes early: du -sh. 360 traces are expected to be a few GB.
+
+Then:
+1. Download all runs to data/runs/bench_25oct/ locally (rsync -rltz --no-o --no-g; it is git-ignored), score with
+   `nice -n 10 brain/.venv/bin/python tools/bench/score_bench.py data/runs/bench_25oct`, sanity-check the numbers (no
+   variant byte-identical to another, coverage not constant, people counts plausible, every run reached 600 s or ended with
+   both out). Mission difficulty: report the fire head start and peak air temperature per house; if the random houses' fires
+   never reach the robots (headless noted 20 C peak in 60 s runs), say so plainly and propose a harder tier.
+2. Commit score.txt/score.json as data/evidence/bench_25oct_score.{txt,json} plus a short data/evidence/bench_25oct_notes.txt
+   (what was run, n, splits, caveats: headless has no rendered camera, so YOLO and visual SLAM are not exercised).
+3. Clean up: after verifying the local copy (count result.json files = runs), delete /dev/shm/smoke_bench_25oct and
+   /workspace/smoke_bench_25oct, then show `ls /dev/shm /workspace | grep smoke` returns nothing and `df -h /dev/shm`.
+4. Write handoff/runpod_bench_report_25oct.txt with the headline table (unseen houses first: full vs one_robot vs no_radio vs
+   baseline, people found, rooms entered, coverage, T90, overlap, both out, with 95 % intervals and paired differences),
+   honest verdict in plain words, and the cleanup proof. No em dashes.
+Keep token use lean. If you run out of usage, write what is done and what is left into the report before stopping.
+
+Owner's storage rule (25 Oct 19:00): others often hit a full disk on the pod. Check df -h /workspace /dev/shm / and du of
+our folders before and during the run, keep our footprint small, never write to / (overlay, 87 % full), and stop and report
+if any disk goes above 90 %. Delete our folders as soon as results are downloaded and verified.

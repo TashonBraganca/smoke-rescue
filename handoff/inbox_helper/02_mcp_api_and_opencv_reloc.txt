@@ -1,0 +1,32 @@
+Next briefs (from opencv-a2), do in order after the RunPod benchmark. Same repo, branch, rules (the project notes, no .md files,
+every constant has a *_reason, do not restart the :8080 server or touch unity/ while a recording runs, commit and push to
+overnight-25oct, report in handoff/<name>_report_25oct.txt, no em dashes).
+
+A. Smoke Rescue MCP server + robot API (innovation and UX; due 26 Oct 06:00 IST)
+   Goal: any robot or AI agent can use our system. Our FastAPI service (brain/brain/agent/server.py) already is a robot API:
+   a robot posts its RGB-D frame and gets people (/perceive/people), place links to a partner (/place/{robot}/keyframe,
+   /place/{robot}/match), a 3D map (/map3d), visibility (/vision/*) and agent orders (/robot/{robot}/step). Build:
+   1. brain/brain/mcp_server.py: an MCP server (official Python `mcp` SDK, stdio and streamable HTTP) exposing tools:
+      detect_people(image, depth?), assess_visibility(image), match_place(keyframe_a, keyframe_b), describe_scene_heat(...)
+      where data allows; each tool calls the same OpenCV 5 code (local) or our AWS endpoint (env SMOKE_API_URL, default the
+      public Lambda URL https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api for the public routes).
+   2. Make the FastAPI OpenAPI docs reachable (document which routes are public on AWS) and write examples/robot_client.py,
+      a 30-line client a robot (or ROS node) runs: send a camera frame, get people back.
+   3. Tests: pytest that starts the MCP server in-process and calls each tool on a fixture frame (data/fixtures/), asserting
+      real results (people list from YOLO on a frame with a person, non-empty visibility numbers).
+   4. Docs: docs-style plain text examples/README.txt: install, run, connect from MCP desktop or coding clients (mcp config JSON).
+   Verify everything by running it; paste outputs in the report.
+
+B. OpenCV relocalization upgrade, research then build (technical depth; due 26 Oct 10:00 IST)
+   Our place matcher fits a 2D rigid transform with our own RANSAC; two OpenCV alternatives lost on real TUM data (see
+   data/evidence/real_data_check_25oct.txt, handoff/fence_fix_report_25oct.txt). Research and test, on the same TUM harness
+   (tools/real_data_check.py, tools/rigid_fit_compare.py), held-out split reported first, ship only if it wins on recall,
+   wrong poses and false accepts:
+   1. PnP relocalization, the method ORB-SLAM uses: partner keyframe 3D points vs own keyframe 2D keypoints, solved with
+      cv2.solvePnPRansac (SOLVEPNP_SQPNP / USAC_MAGSAC flags available in OpenCV 5), then project to the planar link. Own
+      keypoints' pixel coordinates are local (no radio change); the payload stays as is.
+   2. Better matching: mutual nearest neighbour (crossCheck), and, if available in the installed OpenCV, a better binary
+      descriptor at the same 32 bytes (check cv2.xfeatures2d / BEBLID / TEBLID availability; if contrib is missing say so).
+   3. Temporal consistency: accept a link only when consecutive keyframe matches agree (the brain already requires two;
+      measure what that alone does to wrong poses on TUM sequences).
+   RunPod may be used for parameter sweeps under the same rules (own folder, delete afterwards).
