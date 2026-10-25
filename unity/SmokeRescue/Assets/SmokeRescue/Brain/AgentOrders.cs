@@ -21,18 +21,36 @@ namespace SmokeRescue.Brain
         /// then tell the agent it arrived (the camera sees about 37 degrees either side, the arm grips within 60).</summary>
         public void AgentGoTo(Vector2 target, double t, double holdS, string reason, Vector2? face = null) => GoTo(target, t, holdS, reason, face, false);
 
-        void GoTo(Vector2 target, double t, double holdS, string reason, Vector2? face, bool exploring)
+        bool GoTo(Vector2 target, double t, double holdS, string reason, Vector2? face, bool exploring, bool ownReflex = false)
         {
             // Turning where the robot stands (turn_to_face) goes nowhere new, so it needs no indoor evidence (Codex review:
             // near an entrance the robot's own cell may not be known to be inside yet).
             bool turnInPlace = face.HasValue && Vector2.Distance(target, motion.Pose.position) <= c.goal_tolerance_m;
-            if (!turnInPlace && !InSearchArea(target)) { Emit(t, "agent_order", "Refused go_to: no ceiling has been seen over that point, so it is not known to be inside.", "x_m", target.x, "y_m", target.y); return; }
-            string busy = AgentMoveRefusal(t);
-            if (busy != null) { Emit(t, "agent_order", "Refused go_to: " + busy + ".", "x_m", target.x, "y_m", target.y); return; }
+            if (!turnInPlace && !InSearchArea(target)) { Emit(t, "agent_order", "Refused go_to: no ceiling has been seen over that point, so it is not known to be inside.", "x_m", target.x, "y_m", target.y); return false; }
+            // code_spray_ignores_leave_refusal: the refusals below protect an agent from ordering a robot that is leaving; a code spray
+            // approach is the robot's own reflex and the robot is not returning.
+            string busy = ownReflex && c.code_spray_ignores_leave_refusal && !returning ? null : AgentMoveRefusal(t);
+            if (busy != null) { Emit(t, "agent_order", "Refused go_to: " + busy + ".", "x_m", target.x, "y_m", target.y); return false; }
             agentGoal = target; agentGoalUntil = t + holdS; agentGoalReason = reason ?? ""; agentGoalIsFrontier = false;
             agentFace = face; facing = null; agentHoldUntil = double.NegativeInfinity;
             if (active == null && !KeepEvidenceLook(exploring)) ClearPath();
             Emit(t, "agent_order", "go_to: " + agentGoalReason, "x_m", target.x, "y_m", target.y, "hold_s", holdS);
+            return true;
+        }
+
+        /// <summary>code_spray_retry_s: spray spots the robot could not reach, with the time they may be tried again.</summary>
+        readonly List<(Vector2 spot, double until)> unreachableSpraySpots = new List<(Vector2, double)>();
+        Vector2? spraySpotGoal;   // the spot of the code spray approach now driving as the agent goal
+        void NoteSpraySpotFailed(Vector2 spot, double t)
+        {
+            if (c.code_spray_retry_s <= 0) return;
+            unreachableSpraySpots.Add((spot, t + c.code_spray_retry_s));
+            Emit(t, "code_spray_spot_unreachable", "No route to the spray spot: not tried again for code_spray_retry_s.", "x_m", spot.x, "y_m", spot.y, "retry_s", c.code_spray_retry_s);
+        }
+        bool SpraySpotUnreachable(Vector2 spot, double t)
+        {
+            unreachableSpraySpots.RemoveAll(u => t >= u.until);
+            return unreachableSpraySpots.Exists(u => Vector2.Distance(u.spot, spot) <= 1f);
         }
 
         bool agentGoalIsFrontier;
@@ -319,6 +337,38 @@ namespace SmokeRescue.Brain
             return found;
         }
 
+        /// <summary>code_spray_route_fire: the measured fire nearest this robot within the fire margin of the route being walked.</summary>
+        BrainFireBlock? FireOnRoute()
+        {
+            if (path.Count == 0) return null;
+            float margin = c.fire_clearance_m + grid.CellM * .707107f; var at = motion.Pose.position;
+            for (int i = Math.Max(0, cursor); i < path.Count; i++)
+            {
+                int cell = grid.Cell(path[i]); if (cell < 0 || grid.FireDistance(cell) > margin) continue;
+                var fire = NearestFire(path[i], margin + grid.CellM);
+                int fc = grid.Cell(fire); if (fc < 0 || !grid.MeasuredFire(fc)) continue;
+                Vector2 v = fire - at;
+                return new BrainFireBlock { blockAt = fire, frontier = path[path.Count - 1], bearingDegRight = -BrainMath.Angle(motion.Pose.yawRad, Mathf.Atan2(-v.x, v.y)),
+                    distanceM = v.magnitude, frontierPathM = Vector2.Distance(at, path[path.Count - 1]), unsearchedM2 = 0, burningM2 = grid.BurningAreaNear(fire, c.burning_radius_m) };
+            }
+            return null;
+        }
+        /// <summary>code_spray_route_fire: the measured fire nearest this robot on floor no camera has searched yet, in the search area.</summary>
+        BrainFireBlock? FireOnUnsearchedFloor()
+        {
+            Vector2 at = motion.Pose.position; float best = float.PositiveInfinity; Vector2 fire = default;
+            for (int i = 0; i < grid.Count; i++)
+            {
+                if (!grid.MeasuredFire(i) || !grid.Unsearched(i)) continue;
+                var p = grid.Centre(i); float d = Vector2.Distance(p, at);
+                if (d < best && InSearchArea(p)) { best = d; fire = p; }
+            }
+            if (float.IsPositiveInfinity(best)) return null;
+            Vector2 v = fire - at;
+            return new BrainFireBlock { blockAt = fire, frontier = fire, bearingDegRight = -BrainMath.Angle(motion.Pose.yawRad, Mathf.Atan2(-v.x, v.y)),
+                distanceM = v.magnitude, frontierPathM = v.magnitude, unsearchedM2 = 0, burningM2 = grid.BurningAreaNear(fire, c.burning_radius_m) };
+        }
+
         BrainFireBlock? FireInGoalRoom()
         {
             if (!c.room_ledger || path.Count == 0) return null;
@@ -436,7 +486,7 @@ namespace SmokeRescue.Brain
         /// put out. True with the bearing and seconds the host passes to the nozzle.</summary>
         public bool CodeSpray(double t, float waterL, out float bearingDegRight, out float seconds)
         {
-            bearingDegRight = 0; seconds = 0;
+            bearingDegRight = 0; seconds = 0; lastWaterL = waterL;
             // Walking out with the way blocked (wayOutBlockedAt), the spray opens it: the only returning case allowed.
             bool exitBlocked = c.walk_out_past_fire && t - wayOutBlockedAt <= c.no_frontier_scan_s * 2;
             if (!c.code_sprays_fire || !Nozzle.HasValue || waterL <= 1e-6f || t < nextCodeSpray || (returning && !exitBlocked) || active != null) return false;
@@ -449,9 +499,19 @@ namespace SmokeRescue.Brain
             // Fire in the room this robot is walking into: put it out from the doorway before going in (code_spray_goal_room).
             var block = exitBlocked ? FireOnWayOut() : null;
             string why = "Measured fire blocks the way out";
+            bool wayOut = block.HasValue;
+            if (!block.HasValue && c.code_spray_route_fire && !retreating)
+            {
+                // code_spray_route_fire: only fire that cuts the way home, the route being walked, or burns on unsearched floor.
+                block = FireOnWayOut(); why = "Measured fire cuts the way out";
+                if (block.HasValue && block.Value.distanceM > c.fire_near_m) block = null;   // within the nozzle's throw: no walk to a far exit fire mid-search
+                wayOut = block.HasValue;
+                if (!block.HasValue) { block = FireOnRoute(); why = "Measured fire burns beside the route this robot is walking"; }
+                if (!block.HasValue) { block = FireOnUnsearchedFloor(); why = "Measured fire burns on unsearched floor"; }
+            }
             if (!block.HasValue)
             {
-                block = c.code_spray_goal_room && !retreating ? FireInGoalRoom() : null;
+                block = c.code_spray_goal_room && !c.code_spray_route_fire && !retreating ? FireInGoalRoom() : null;
                 why = block.HasValue ? "Measured fire burns in the room this robot is walking into" : "Measured fire blocks the way to unsearched floor";
             }
             bool fromHereOnly = false;
@@ -470,6 +530,9 @@ namespace SmokeRescue.Brain
                 block = FireBlockedFrontier(t);
             }
             if (!block.HasValue || !(block.Value.burningM2 > 0)) return false;
+            // code_spray_reserve_l: only a spray on the way out may use the water kept for it.
+            if (!wayOut) waterL = Mathf.Max(0, waterL - c.code_spray_reserve_l);
+            if (waterL <= 1e-6f) return false;
             var n = Nozzle.Value; var b = block.Value; float waterS = waterL / n.flowLps;
             // Only from close: the owner saw a spray from 3.4 m land short of the fire (25 Oct); farther away, walk to the spray spot.
             double? here = b.distanceM <= Mathf.Min(n.rangeM, c.code_spray_reach_m) ? KnockDownS(n, b.burningM2, b.distanceM) : null;
@@ -489,9 +552,14 @@ namespace SmokeRescue.Brain
             double? there = KnockDownS(n, b.burningM2, standoff);
             if (there.HasValue && there.Value <= waterS && !AgentGoalActive(t) && b.distanceM > standoff + c.goal_tolerance_m)
             {
-                Vector2 from = motion.Pose.position, dir = (b.blockAt - from).normalized;
-                GoTo(b.blockAt - dir * standoff, t, c.code_spray_repeat_s * 2, "walk to the spray spot of the fire blocking the way", b.blockAt, false);
+                Vector2 from = motion.Pose.position, dir = (b.blockAt - from).normalized, spot = b.blockAt - dir * standoff;
                 nextCodeSpray = t + c.replan_s;
+                if (SpraySpotUnreachable(spot, t)) return false;
+                if (!GoTo(spot, t, c.code_spray_repeat_s * 2, "walk to the spray spot of the fire blocking the way", b.blockAt, false, true))
+                {
+                    NoteSpraySpotFailed(spot, t); return false;
+                }
+                spraySpotGoal = spot;
                 Emit(t, "code_spray_approach", why + "; one stream knocks it down from the spray spot: walk there facing it.",
                     "x_m", b.blockAt.x, "y_m", b.blockAt.y, "burning_m2", b.burningM2, "distance_m", b.distanceM, "standoff_m", standoff);
             }
@@ -537,6 +605,7 @@ namespace SmokeRescue.Brain
             withdrawn.RemoveAll(w => Vector2.Distance(w, p) <= c.survivor_merge_m);
             survivors.Add(p);
             confirmed.Add(new BrainSurvivor { position = p, confirmedAt = t, sourceRobot = id });
+            LogSurvivorRoom(t, p);
             foreach (var track in tracks) if (Vector2.Distance(track.position, p) <= c.survivor_merge_m) track.confirmed = true;
             if (active != null && Vector2.Distance(active.position, p) <= c.survivor_merge_m) { active = null; dwell = 0; inspecting = false; ClearPath(); }
             Emit(t, "survivor_confirmed", "Agent confirmed a person with OpenCV evidence " + evidence + ".", "x_m", p.x, "y_m", p.y);
@@ -637,7 +706,10 @@ namespace SmokeRescue.Brain
         }
 
         /// <summary>Logs agent decisions that act outside the brain (torch, arm, radio, approvals) next to its own.</summary>
-        public void LogAgentAction(double t, string reason, params object[] values) => Emit(t, "agent_order", reason, values);
+        /// <summary>Never earlier than this brain's own clock: seed 934 (25 Oct, brain only) logged four "spray_water succeeded" lines at
+        /// t = 0.0 because the host passed a stale agent time, and run_audit then blamed every early stall on them.</summary>
+        public void LogAgentAction(double t, string reason, params object[] values) =>
+            Emit(double.IsNaN(lastStep) ? t : Math.Max(t, lastStep), "agent_order", reason, values);
 
         /// <summary>Records an agent-layer event (decision summary, radio text, approval) in this robot's decision log.</summary>
         public void Log(double t, string kind, string reason, params object[] values) => Emit(t, kind, reason, values);

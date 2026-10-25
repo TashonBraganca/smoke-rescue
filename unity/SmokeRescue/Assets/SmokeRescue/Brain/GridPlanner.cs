@@ -278,6 +278,22 @@ namespace SmokeRescue.Brain
         }
         /// <summary>Unsearched walkable floor in the search area that no known path reaches (behind debris, a closed door or
         /// fire): the nearest such cell, the reachable walkable cell nearest to it, and how many such cells there are.</summary>
+        /// <summary>The cell this robot can route to that lies nearest target, and how many cells it can route to at all: where a blocked walk out
+        /// breaks, and how big the pocket the robot is in.</summary>
+        internal (Vector2 nearest, int cells) ReachableNearest(Vector2 from, Vector2 target)
+        {
+            grid.PrepareNavigation();
+            if (!Lead(from, out int start, out _)) return (from, 0);
+            Search(start, -1, out var distance, out _);
+            int cells = 0; float best = float.PositiveInfinity; Vector2 at = from;
+            for (int i = 0; i < grid.Count; i++)
+            {
+                if (float.IsPositiveInfinity(distance[i])) continue;
+                cells++; float d = Vector2.Distance(grid.Centre(i), target);
+                if (d < best) { best = d; at = grid.Centre(i); }
+            }
+            return (at, cells);
+        }
         internal (Vector2 point, Vector2 approach, int cells)? NearestBlocked(Vector2 from, Func<Vector2, bool> inSearchArea)
         {
             grid.PrepareNavigation();

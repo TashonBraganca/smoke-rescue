@@ -38,6 +38,7 @@ namespace SmokeRescue.Brain
 
         void OnFrontierReached(Vector2 at, double t)
         {
+            committedAt = null;
             visited.Add(new Visited { position = at, radius = c.visited_radius_m, until = t + c.visited_hold_s });
             sweeps.RemoveAll(s => t - s.t > c.sweep_repeat_s);
             if (sweeps.Exists(s => Vector2.Distance(s.position, motion.Pose.position) < c.sweep_spacing_m)) return;
@@ -276,8 +277,19 @@ namespace SmokeRescue.Brain
             return total > 0 ? seen / (float)total : 0f;
         }
 
+        /// <summary>Length of the route still ahead of the robot (NaN with no route).</summary>
+        float RemainingRouteM()
+        {
+            if (path.Count == 0) return float.NaN;
+            int from = Mathf.Min(cursor, path.Count - 1); float m = Vector2.Distance(motion.Pose.position, path[from]);
+            for (int i = from + 1; i < path.Count; i++) m += Vector2.Distance(path[i - 1], path[i]);
+            return m;
+        }
+        float routeAtMark = float.NaN; Vector2? goalAtMark;
+
         /// <summary>Once a second while exploring: if fewer than progress_min_cells new cells were mapped in the
-        /// window, set aside frontiers near the robot and move on.</summary>
+        /// window, set aside frontiers near the robot and move on. progress_route_shrink: not while the route to the same goal
+        /// got shorter by progress_min_travel_m, since a robot walking a long route over seen floor maps nothing and is not circling.</summary>
         void CheckProgress(double t)
         {
             if (t < nextCount) return;
@@ -287,18 +299,26 @@ namespace SmokeRescue.Brain
             knownCells = n;
             bool exploring = active == null && !retreating && !returning && !sweeping && !AgentGoalActive(t);
             Vector2 at = motion.Pose.position;
-            if (!exploring || double.IsNaN(progressMark)) { progressMark = t; knownAtMark = n; progressPose = at; travelSinceMark = 0; return; }
+            float remaining = RemainingRouteM();
+            void Mark() { progressMark = t; knownAtMark = n; progressPose = at; travelSinceMark = 0; routeAtMark = remaining; goalAtMark = goal; }
+            if (!exploring || double.IsNaN(progressMark)) { Mark(); return; }
             travelSinceMark += Vector2.Distance(at, progressPose); progressPose = at;
-            if (n - knownAtMark >= c.progress_min_cells) { progressMark = t; knownAtMark = n; travelSinceMark = 0; return; }
+            if (n - knownAtMark >= c.progress_min_cells) { Mark(); return; }
+            if (c.progress_route_shrink)
+            {
+                // A new goal restarts the route measure; the same goal credits only the route it has actually shortened.
+                if (!goal.HasValue || !goalAtMark.HasValue || Vector2.Distance(goal.Value, goalAtMark.Value) > .3f) { goalAtMark = goal; routeAtMark = remaining; }
+                else if (!float.IsNaN(routeAtMark) && !float.IsNaN(remaining) && routeAtMark - remaining >= c.progress_min_travel_m) { Mark(); return; }
+            }
             if (t - progressMark < c.progress_window_s) return;
             // Standing (turning in place, held between agent orders) is not circling: the frontiers near a robot that has
             // not moved are not what failed (held-out seed 914 run 4, robot A: a 2.5 m circle set aside the open door of an
             // unsearched bedroom while A turned in place to face warm shapes).
-            if (travelSinceMark < c.progress_min_travel_m) { progressMark = t; knownAtMark = n; travelSinceMark = 0; return; }
+            if (travelSinceMark < c.progress_min_travel_m) { Mark(); return; }
             visited.Add(new Visited { position = motion.Pose.position, radius = c.progress_skip_radius_m, until = t + c.visited_hold_s });
             Emit(t, "no_progress", $"Map grew by only {n - knownAtMark} cells in {t - progressMark:0} s; leave this spot for the next unexplored area.",
                 "x_m", motion.Pose.position.x, "y_m", motion.Pose.position.y, "new_cells", n - knownAtMark);
-            progressMark = t; knownAtMark = n; travelSinceMark = 0;
+            Mark();
             ClearPath();
         }
     }
