@@ -107,6 +107,21 @@ evidence, heat, already leaving) and the refusal reason goes back to the model. 
 reports and approves risky actions. Every step is in <code>agent_trace.jsonl</code> and the robot's
 <code>decisions.jsonl</code>.</p>
 
+<h3>Measured agent behaviour (all 34 recorded agent runs)</h3>
+<table>
+<tr><th>Measure</th><th>Value</th></tr>
+<tr><td>Agent steps / tool calls</td><td class="n">1,628 / 6,403</td></tr>
+<tr><td>OpenCV 5 perception calls</td><td class="n">2,727 (scan_thermal 937, inspect_candidate 754, assess_visibility 509, track_fire_spread 292, check_indoors 229, measure_opening 6)</td></tr>
+<tr><td>Robot orders citing an evidence id</td><td class="n">990 of 1,571 (63 %); the rest are orders that need none (turn, team message)</td></tr>
+<tr><td>Cited ids produced by a recorded OpenCV call</td><td class="n">824 of 863</td></tr>
+<tr><td>Guardrail refusals</td><td class="n">169: explore 48, approach 46, confirm 42, spray 11, other 22</td></tr>
+</table>
+<p>The commonest refusals: a confirmation from beyond 4 m (29; the agent then approaches and inspects again), a warm region
+the cited inspection measured as a flat surface (20), exploring during a heat event (14), and an evidence id that names no
+OpenCV result from that step (7). Example from <code>unity_house_agents_run19</code>: at 18.0 s robot A's
+<code>explore_frontier</code> was refused during a heat event; at 35.8 s it ordered <code>approach_candidate</code> citing a new
+OpenCV result. Reproduce with <code>python3 tools/agent_trace_stats.py data/recordings</code>.</p>
+
 <h2>6. Cloud: AWS</h2>
 <p>CloudFormation stacks in us-east-1 (<code>deploy/aws</code>): the agent and OpenCV 5 API on ECS Fargate ARM64
 (1 vCPU, 2 GB) behind an ALB with a WAF rate limit of 2,000 requests per 5 minutes per IP; a Batch job for the offline

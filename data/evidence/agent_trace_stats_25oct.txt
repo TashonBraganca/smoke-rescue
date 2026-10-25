@@ -1,0 +1,23 @@
+Agent runs: 34, agent steps: 1628, tool calls: 6403
+OpenCV perception calls: 2727 (assess_visibility 509, check_indoors 229, inspect_candidate 754, measure_opening 6, scan_thermal 937, track_fire_spread 292)
+Actions (orders to the robot): 1571; citing an evidence id: 990 (63.0 %)
+Cited evidence ids that an OpenCV tool produced in a recorded call: 824 of 863
+Guardrail refusals: 169 (explore_frontier 48, approach_candidate 46, confirm_survivor 42, spray_water 11, avoid_area 8, turn_to_face 6, reject_candidate 4, approach_fire 3, go_to 1)
+Refusal reasons (numbers masked):
+   29  the inspection looked from # m; confirm only within # m: approach_
+   29  you are walking to look closer at an unresolved warm candidate # m a
+   20  the cited inspection measured this warm region as a flat surface (enou
+   14  no exploring during a heat event: let the reflex layer back away
+   14  a thermal#only warm patch on a long wall: over # runs # in # of the
+   11  the cited scan has no hot spot within # deg of bearing # and # m
+    8  the cited scan found no hotspot
+    7  evidence_id does not name an OpenCV result from this step; call the ma
+    7  the inspection measured no range to the person (no depth or LiDAR retu
+    4  no turning toward a target during a heat event; let the reflex layer b
+Refusal followed by a different action on new OpenCV evidence (examples):
+  unity_dark_torch_agents: robot_A@31.650 avoid_area refused (the cited scan found no hotspot) -> robot_A@35.650 approach_candidate citing new evidence 609c492cc82a651c
+  unity_haze_agents_run4_120s: robot_A@72.633 explore_frontier refused (no exploring during a heat event: let the reflex layer back away) -> robot_A@84.633 approach_candidate citing new evidence 18f5134a340af216
+  unity_house_agents_run11: robot_A@56.750 explore_frontier refused (no exploring during a heat event: let the reflex layer back away) -> robot_A@73.950 approach_candidate citing new evidence e089b8cc97a1ea60
+  unity_house_agents_run13: robot_A@49.133 explore_frontier refused (no exploring during a heat event: let the reflex layer back away) -> robot_A@57.083 reject_candidate citing new evidence 884a2b046fe0b1e6
+  unity_house_agents_run19: robot_A@18.033 explore_frontier refused (no exploring during a heat event: let the reflex layer back away) -> robot_A@35.817 approach_candidate citing new evidence fd345518229e212c
+  unity_house_agents_run19: robot_A@125.700 explore_frontier refused (no exploring during a heat event: let the reflex layer back away) -> robot_A@134.883 approach_candidate citing new evidence 89e72f9718747630
