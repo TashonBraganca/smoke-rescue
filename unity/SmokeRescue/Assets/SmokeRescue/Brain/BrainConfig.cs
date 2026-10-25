@@ -193,7 +193,7 @@ namespace SmokeRescue.Brain
         public int visual_keyframe_max = 200, visual_keyframes_per_message = 1, visual_link_min_inliers = 16;
         public float visual_keyframe_period_s = 2f;
         public bool visual_slam_live = false;
-        public float thermal_near_person_m = 0f;
+        public float thermal_near_person_m = 0f, code_spray_reach_m = 5f;
         public float visual_refine_max_deg = 5f, visual_refine_max_m = .5f, visual_refine_agree_deg = 1f, visual_refine_agree_m = .15f,
             visual_prior_radius_m = 3f, visual_prior_turn_deg = 60f, visual_loop_min_age_s = 20f;
         public int link_shortlist = 5, link_max_candidates = 20, link_turn_candidates = 3, link_verifications_per_step = 4;

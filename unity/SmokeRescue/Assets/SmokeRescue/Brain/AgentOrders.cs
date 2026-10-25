@@ -271,10 +271,13 @@ namespace SmokeRescue.Brain
                 foreach (var p in f.path)
                 {
                     if (grid.FireDistance(grid.Cell(p)) > margin) continue;
-                    Vector2 d = p - motion.Pose.position;
-                    return new BrainFireBlock { blockAt = p, frontier = f.position, bearingDegRight = -BrainMath.Angle(motion.Pose.yawRad, Mathf.Atan2(-d.x, d.y)),
+                    // The block is the burning cell itself, not the path point where its margin starts: measured from that
+                    // point, sprays fired from up to 4.6 m and landed short (owner, 25 Oct).
+                    var fire = NearestFire(p, margin + grid.CellM);
+                    Vector2 d = fire - motion.Pose.position;
+                    return new BrainFireBlock { blockAt = fire, frontier = f.position, bearingDegRight = -BrainMath.Angle(motion.Pose.yawRad, Mathf.Atan2(-d.x, d.y)),
                         distanceM = d.magnitude, frontierPathM = f.cost, unsearchedM2 = f.information * grid.CellM * grid.CellM,
-                        burningM2 = grid.BurningAreaNear(p, c.burning_radius_m) };
+                        burningM2 = grid.BurningAreaNear(fire, c.burning_radius_m) };
                 }
             return null;
         }
@@ -294,11 +297,26 @@ namespace SmokeRescue.Brain
             foreach (var p in exit)
             {
                 if (grid.FireDistance(grid.Cell(p)) > margin) continue;
-                Vector2 v = p - at;
-                return new BrainFireBlock { blockAt = p, frontier = p, bearingDegRight = -BrainMath.Angle(motion.Pose.yawRad, Mathf.Atan2(-v.x, v.y)),
-                    distanceM = v.magnitude, frontierPathM = v.magnitude, unsearchedM2 = 0, burningM2 = grid.BurningAreaNear(p, c.burning_radius_m) };
+                var fire = NearestFire(p, margin + grid.CellM);
+                Vector2 v = fire - at;
+                return new BrainFireBlock { blockAt = fire, frontier = p, bearingDegRight = -BrainMath.Angle(motion.Pose.yawRad, Mathf.Atan2(-v.x, v.y)),
+                    distanceM = v.magnitude, frontierPathM = v.magnitude, unsearchedM2 = 0, burningM2 = grid.BurningAreaNear(fire, c.burning_radius_m) };
             }
             return null;
+        }
+
+        /// <summary>The measured burning cell nearest p within radius (p itself when only forecast heat closes it).</summary>
+        Vector2 NearestFire(Vector2 p, float radius)
+        {
+            int r = Mathf.CeilToInt(radius / grid.CellM), centre = grid.Cell(p); if (centre < 0) return p;
+            int cx = centre % grid.Size, cy = centre / grid.Size; float best = float.PositiveInfinity; Vector2 found = p;
+            for (int dy = -r; dy <= r; dy++) for (int dx = -r; dx <= r; dx++)
+            {
+                int x = cx + dx, y = cy + dy; if (x < 0 || y < 0 || x >= grid.Size || y >= grid.Size) continue;
+                int i = y * grid.Size + x; if (!grid.MeasuredFire(i)) continue;
+                float d = Vector2.Distance(grid.Centre(i), p); if (d < best && d <= radius) { best = d; found = grid.Centre(i); }
+            }
+            return found;
         }
 
         BrainFireBlock? FireInGoalRoom()
@@ -453,7 +471,8 @@ namespace SmokeRescue.Brain
             }
             if (!block.HasValue || !(block.Value.burningM2 > 0)) return false;
             var n = Nozzle.Value; var b = block.Value; float waterS = waterL / n.flowLps;
-            double? here = b.distanceM <= n.rangeM ? KnockDownS(n, b.burningM2, b.distanceM) : null;
+            // Only from close: the owner saw a spray from 3.4 m land short of the fire (25 Oct); farther away, walk to the spray spot.
+            double? here = b.distanceM <= Mathf.Min(n.rangeM, c.code_spray_reach_m) ? KnockDownS(n, b.burningM2, b.distanceM) : null;
             if (here.HasValue && here.Value <= waterS)
             {
                 bearingDegRight = b.bearingDegRight;

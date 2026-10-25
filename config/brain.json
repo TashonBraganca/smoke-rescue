@@ -634,6 +634,8 @@
   "code_sprays_fire": true,
   "code_spray_goal_room": true,
   "code_spray_goal_room_reason": "Owner, 24 Oct: use the water to turn off the fire instead of walking into a burning room. Before a robot walks into a room where it measured fire, it sprays that fire first (from where it stands, or from the spray spot on its side) when one stream knocks it down with the water aboard. Seed 934 (24 Oct 18:53): robot A walked into the burning living room at 16 s, its air reached 131 C at 21.7 s and it lost 80 percent of its heat budget.",
+  "code_spray_reach_m": 2.0,
+  "code_spray_reach_m_reason": "Owner, 25 Oct: a robot sprayed from about 3.4 m and the stream landed short of the fire in the video (code sprays tonight fired from 1.9 to 3.5 m). A code spray fires only within 2 m; from farther it walks to the spray spot (fire_clearance_m + 0.4 m = 1.6 m from the fire) first. The nozzle's rated throw (actuators.json range_m 5 m) still bounds it.",
   "heat_marks_room": true,
   "heat_marks_room_reason": "Owner, 24 Oct: mark that room and area on the map as on fire. Where a robot's air passes heat_retreat_c, the room it stands in is marked on fire; no goal in it is taken while the robot still measures fire there, and the robot sprays that fire only from where it stands. The mark lifts when no burning floor is measured in it any more. Seed 934 (24 Oct 18:53): robot A walked into the burning living room at 16 s and its air reached 131 C.",
   "heat_spray_through": true,
