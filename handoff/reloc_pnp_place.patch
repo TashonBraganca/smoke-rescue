@@ -1,0 +1,361 @@
+diff --git a/brain/brain/agent/place.py b/brain/brain/agent/place.py
+index 0f591608..f88e3a04 100644
+--- a/brain/brain/agent/place.py
++++ b/brain/brain/agent/place.py
+@@ -11,6 +11,11 @@ that robot's keyframes and fails its request, and the next keyframe call starts
+ 
+ Body frame of a match result: (dx_m, dy_m, dyaw_deg) is the partner keyframe's body pose in the matched own
+ keyframe's body frame, so a partner point p maps to mine as R(dyaw) p + (dx, dy). Yaw is counter-clockwise positive.
++
++Two fits, chosen by place_fit in config/perception.json. "ransac_rigid": planar RANSAC on both sides' 3D points.
++"pnp_sqpnp": cv2.solvePnPRansac(SOLVEPNP_SQPNP) of the partner's 3D points against the own keyframe's 2D keypoint
++pixels, projected to the planar link through the own camera mount. Own pixels stay in this robot's own keyframe store;
++the radio payload is unchanged, so a decoded payload has no pixels and always uses the planar fit.
+ """
+ from __future__ import annotations
+ 
+@@ -46,7 +51,9 @@ REQUIRED_KEYS = (
+     "place_ratio_test", "place_ransac_threshold_m", "place_height_tolerance_m", "place_min_inliers",
+     "place_max_rmse_m", "place_keyframes_kept", "place_shortlist", "place_ransac_iterations",
+     "place_ransac_seed", "place_ransac_min_baseline_m", "place_refine_iterations", "place_worker_timeout_s",
++    "place_fit", "place_pnp_reproj_px", "place_pnp_min_inliers", "place_pnp_max_tilt_deg", "place_pnp_max_dz_m",
+ )
++FITS = ("ransac_rigid", "pnp_sqpnp")
+ 
+ 
+ def load_settings() -> dict:
+@@ -57,6 +64,8 @@ def load_settings() -> dict:
+         raise KeyError(f"config/perception.json is missing {missing}")
+     sensors = json.loads((CONFIG_DIR / "sensors.json").read_text())
+     settings = {k: perception[k] for k in REQUIRED_KEYS}
++    if settings["place_fit"] not in FITS:
++        raise ValueError(f"place_fit must be one of {FITS}, not {settings['place_fit']!r}")
+     settings["mount"] = dict(sensors["camera"]["mount"])
+     settings["depth_min_m"] = float(sensors["depth"]["min_m"])
+     settings["depth_max_m"] = float(sensors["depth"]["max_m"])
+@@ -65,9 +74,17 @@ def load_settings() -> dict:
+ 
+ @dataclass(frozen=True)
+ class Keyframe:
+-    """Descriptors (n, 32) uint8 and body-frame positions (n, 3) float64 metres: x right, y forward, height up."""
++    """Descriptors (n, 32) uint8 and body-frame positions (n, 3) float64 metres: x right, y forward, height up.
++
++    An own keyframe also keeps what never goes on the radio: keypoint pixels px (n, 2), the pinhole camera
++    (fx, fy, cx, cy), and the camera-to-body rotation (3, 3) and camera centre in the body frame (3,), so that
++    body = cam_to_body @ optical + body_offset. A decoded partner payload leaves them None."""
+     desc: np.ndarray
+     xyh: np.ndarray
++    px: np.ndarray | None = None
++    camera: tuple | None = None
++    cam_to_body: np.ndarray | None = None
++    body_offset: np.ndarray | None = None
+ 
+     def __len__(self):
+         return len(self.desc)
+@@ -129,15 +146,29 @@ def body_points(u, v, z, camera, mount):
+                             mount["height_m"] - z * math.sin(p) - oy * math.cos(p)))
+ 
+ 
++def mount_camera_to_body(mount):
++    """The rotation and offset with body = B @ (ox, oy, z) + offset, the linear form of body_points."""
++    p = math.radians(mount["pitch_down_deg"])
++    c, s = math.cos(p), math.sin(p)
++    return (np.array([[1.0, 0.0, 0.0], [0.0, -s, c], [0.0, -c, -s]]),
++            np.array([0.0, float(mount["forward_offset_m"]), float(mount["height_m"])]))
++
++
+ def extract_features(rgb, depth_m, K, settings):
+     """ORB on the grey colour image. Keep features with valid depth within place_max_depth_m, strongest first.
+ 
+     Returns descriptors (n, 32) uint8 and unquantised body-frame positions (n, 3), n <= place_features_per_keyframe."""
++    desc, xyh, _ = extract_features_px(rgb, depth_m, K, settings)
++    return desc, xyh
++
++
++def extract_features_px(rgb, depth_m, K, settings):
++    """extract_features plus the kept keypoints' subpixel image positions (n, 2)."""
+     gray = cv2.cvtColor(np.ascontiguousarray(rgb), cv2.COLOR_RGB2GRAY)
+     orb = cv2.ORB_create(nfeatures=int(settings["place_detect_features"]),
+                          scaleFactor=float(settings["place_orb_scale_factor"]), nlevels=int(settings["place_orb_levels"]))
+     keypoints, desc = orb.detectAndCompute(gray, None)
+-    empty = np.zeros((0, DESCRIPTOR_BYTES), np.uint8), np.zeros((0, 3))
++    empty = np.zeros((0, DESCRIPTOR_BYTES), np.uint8), np.zeros((0, 3)), np.zeros((0, 2))
+     if desc is None or not len(keypoints):
+         return empty
+     pts = np.array([k.pt for k in keypoints], dtype=np.float64)
+@@ -155,15 +186,18 @@ def extract_features(rgb, depth_m, K, settings):
+     if not len(index):
+         return empty
+     xyh = body_points(pts[index, 0], pts[index, 1], z[index], (K[0, 0], K[1, 1], K[0, 2], K[1, 2]), settings["mount"])
+-    return desc[index], xyh
++    return desc[index], xyh, pts[index].copy()
+ 
+ 
+ def make_keyframe(rgb, depth_m, K, settings):
+-    """Features quantised through the payload codec, so own storage and a partner's copy hold identical values."""
+-    desc, xyh = extract_features(rgb, depth_m, K, settings)
++    """Features quantised through the payload codec, so own storage and a partner's copy hold identical values.
++    The own copy also keeps its keypoint pixels, camera and mount for the PnP fit (never radioed)."""
++    desc, xyh, px = extract_features_px(rgb, depth_m, K, settings)
+     if len(desc) < int(settings["place_min_features"]):
+         return None, len(desc)
+-    return decode_payload(encode_payload(desc, xyh)), len(desc)
++    kf = decode_payload(encode_payload(desc, xyh))
++    B, offset = mount_camera_to_body(settings["mount"])
++    return Keyframe(kf.desc, kf.xyh, px, (float(K[0, 0]), float(K[1, 1]), float(K[0, 2]), float(K[1, 2])), B, offset), len(desc)
+ 
+ 
+ def fit_rigid(p, q):
+@@ -236,6 +270,45 @@ def ransac_rigid(p, q, settings):
+     return a, t, mask, float(np.sqrt(np.mean(err[mask] ** 2)))
+ 
+ 
++def pnp_planar(partner: Keyframe, own: Keyframe, pairs, settings):
++    """Partner 3D body points against own 2D keypoint pixels with cv2.solvePnPRansac(SOLVEPNP_SQPNP), then the planar link.
++
++    PnP gives the own camera pose: optical = R X_partner + t. Through the own mount, body = B optical + offset, so the
++    partner-to-own body transform is M = B R, T = B t + offset; dyaw = atan2(M10, M00), (dx, dy) = T[:2]. Both body
++    frames are gravity aligned and share the floor, so a right pose has M close to a pure yaw (tilt is the angle of M's
++    z column from up) and T close to zero height (dz = T[2]).
++    Inliers are recounted with the final pose at place_pnp_reproj_px (and in front of the camera).
++    Returns (angle rad, t (2,), inlier mask, planar rmse m, tilt deg, dz m, reprojection rmse px) or None."""
++    if own.px is None or len(pairs) < 6:
++        return None
++    obj = partner.xyh[pairs[:, 0]].astype(np.float64)
++    img = own.px[pairs[:, 1]].astype(np.float64)
++    fx, fy, cx, cy = own.camera
++    K = np.array([[fx, 0.0, cx], [0.0, fy, cy], [0.0, 0.0, 1.0]])
++    thr = float(settings["place_pnp_reproj_px"])
++    cv2.setRNGSeed(int(settings["place_ransac_seed"]))
++    try:
++        ok, rvec, tvec, _ = cv2.solvePnPRansac(obj, img, K, None, iterationsCount=int(settings["place_ransac_iterations"]),
++                                               reprojectionError=thr, confidence=0.99, flags=cv2.SOLVEPNP_SQPNP)
++    except cv2.error:
++        return None
++    if not ok or not np.isfinite(rvec).all() or not np.isfinite(tvec).all():
++        return None
++    R = cv2.Rodrigues(rvec)[0]
++    proj = cv2.projectPoints(obj, rvec, tvec, K, None)[0].reshape(-1, 2)
++    reproj = np.hypot(*(proj - img).T)
++    mask = (reproj <= thr) & ((obj @ R.T + tvec.ravel())[:, 2] > 0)
++    if not mask.any():
++        return None
++    M = own.cam_to_body @ R
++    T = own.cam_to_body @ tvec.ravel() + own.body_offset
++    angle = math.atan2(M[1, 0], M[0, 0])
++    tilt = math.degrees(math.acos(float(np.clip(M[2, 2], -1.0, 1.0))))
++    planar = np.hypot(*(_apply(angle, T[:2], obj[:, :2]) - own.xyh[pairs[:, 1], :2]).T)
++    return (angle, T[:2].copy(), mask, float(np.sqrt(np.mean(planar[mask] ** 2))), tilt, float(T[2]),
++            float(np.sqrt(np.mean(reproj[mask] ** 2))))
++
++
+ def good_matches(partner_desc, own_desc, ratio):
+     """Index pairs (partner, own) that pass Lowe's ratio test, from knnMatch with k=2 on Hamming distance.
+ 
+@@ -272,6 +345,8 @@ def match_keyframes(partner: Keyframe, own, settings, candidates=None) -> dict:
+         pairs = good_matches(partner.desc, kf.desc, settings["place_ratio_test"])
+         candidates.append((len(pairs), mine_id, kf, pairs))
+     candidates.sort(key=lambda c: (-c[0], c[1]))
++    # Settings without place_fit (a worker started by an older parent process) keep the planar fit.
++    use_pnp = settings.get("place_fit", "ransac_rigid") == "pnp_sqpnp"
+     best = None
+     seen = []
+     for count, mine_id, kf, pairs in candidates[:int(settings["place_shortlist"])]:
+@@ -280,26 +355,46 @@ def match_keyframes(partner: Keyframe, own, settings, candidates=None) -> dict:
+         # The height of a point does not change under a planar transform, so a pair whose heights differ cannot be an inlier.
+         dh = np.abs(partner.xyh[pairs[:, 0], 2] - kf.xyh[pairs[:, 1], 2])
+         pairs = pairs[dh <= settings["place_height_tolerance_m"]]
+-        fit = ransac_rigid(partner.xyh[pairs[:, 0], :2], kf.xyh[pairs[:, 1], :2], settings) if len(pairs) >= 2 else None
+-        if fit is None:
+-            continue
+-        angle, t, mask, rmse = fit
+-        row = (int(mask.sum()), rmse, mine_id, angle, t)
++        if use_pnp and kf.px is not None:
++            fit = pnp_planar(partner, kf, pairs, settings)
++            if fit is None:
++                continue
++            angle, t, mask, rmse, tilt, dz, reproj = fit
++            # Ranked by inliers, then reprojection RMSE; the planar RMSE is reported, not gated (it carries own depth noise).
++            row = (int(mask.sum()), reproj, mine_id, angle, t, rmse, (tilt, dz), "pnp_sqpnp")
++            ok = row[0] >= settings["place_pnp_min_inliers"] and tilt <= settings["place_pnp_max_tilt_deg"] \
++                and abs(dz) <= settings["place_pnp_max_dz_m"]
++        else:
++            fit = ransac_rigid(partner.xyh[pairs[:, 0], :2], kf.xyh[pairs[:, 1], :2], settings) if len(pairs) >= 2 else None
++            if fit is None:
++                continue
++            angle, t, mask, rmse = fit
++            row = (int(mask.sum()), rmse, mine_id, angle, t, rmse, None, "ransac_rigid")
++            ok = row[0] >= settings["place_min_inliers"] and rmse <= settings["place_max_rmse_m"]
+         seen.append(row)
+-        if row[0] >= settings["place_min_inliers"] and rmse <= settings["place_max_rmse_m"]:
+-            if best is None or (row[0], -row[1]) > (best[0], -best[1]):
+-                best = row
++        if ok and (best is None or (row[0], -row[1]) > (best[0], -best[1])):
++            best = row
+     if best is None:
+         top = max(seen, key=lambda r: (r[0], -r[1])) if seen else None
+-        why = "no shortlisted keyframe had two height-consistent matches" if top is None else \
+-            f"best candidate had {top[0]} inliers, rmse {top[1]:.3f} m"
+-        return {"matched": False, "reason": f"{why}; need {settings['place_min_inliers']} inliers "
+-                                            f"and rmse <= {settings['place_max_rmse_m']} m"}
+-    inliers, rmse, mine_id, angle, t = best
++        if top is None:
++            why = "no shortlisted keyframe had two height-consistent matches"
++        elif top[7] == "pnp_sqpnp":
++            why = f"best candidate had {top[0]} inliers, tilt {top[6][0]:.1f} deg, dz {top[6][1]:.2f} m (PnP)"
++        else:
++            why = f"best candidate had {top[0]} inliers, rmse {top[1]:.3f} m"
++        need = (f"need {settings['place_pnp_min_inliers']} inliers within {settings['place_pnp_reproj_px']} px and tilt <= "
++                f"{settings['place_pnp_max_tilt_deg']} deg and |dz| <= {settings['place_pnp_max_dz_m']} m" if top is not None and top[7] == "pnp_sqpnp" else
++                f"need {settings['place_min_inliers']} inliers and rmse <= {settings['place_max_rmse_m']} m")
++        return {"matched": False, "reason": f"{why}; {need}"}
++    inliers, _, mine_id, angle, t, rmse, tilt, fit_name = best
+     yaw = math.degrees(angle)
+     yaw = (yaw + 180.0) % 360.0 - 180.0
+-    return {"matched": True, "mine_id": int(mine_id), "dx_m": float(t[0]), "dy_m": float(t[1]),
+-            "dyaw_deg": float(yaw), "inliers": inliers, "rmse_m": float(rmse)}
++    out = {"matched": True, "mine_id": int(mine_id), "dx_m": float(t[0]), "dy_m": float(t[1]),
++           "dyaw_deg": float(yaw), "inliers": inliers, "rmse_m": float(rmse), "fit": fit_name}
++    if tilt is not None:
++        out["tilt_deg"], out["dz_m"] = float(tilt[0]), float(tilt[1])
++        out["reproj_rmse_px"] = float(best[1])
++    return out
+ 
+ 
+ class PlaceDatabase:
+diff --git a/brain/tests/test_place_recognition.py b/brain/tests/test_place_recognition.py
+index f2cd1a8c..73f763ad 100644
+--- a/brain/tests/test_place_recognition.py
++++ b/brain/tests/test_place_recognition.py
+@@ -177,3 +177,110 @@ def test_place_endpoints_report_worker_failure_as_unavailable(monkeypatch, tmp_p
+         monkeypatch.setattr(server.place, "keyframe", lambda *args: {"ok": False, "reason": "no usable image"})
+         control = client.post("/place/A/keyframe", json={"robot_dir": str(tmp_path), "t": 1})
+         assert control.status_code == 200 and control.json()["ok"] is False
++
++
++# ---------------------------------------------------------------- place_fit switch (tools/reloc_compare.py)
++UNITY_CAMERA = (415.692, 415.692, 319.5, 239.5)
++LINK_YAW_DEG, LINK_T = 12.0, np.array([0.3, -0.4])
++
++
++def _far_scene(noise_m, seed=5, n=40):
++    """Partner and own views of n points 4 to 7 m ahead of the own robot, related by a known planar link. Own pixels
++    are exact projections through the configured mount; own depth is off along each ray by a random 0.5 to 1 times
++    noise_m with random sign, as long-range depth is. Returns (settings, partner payload keyframe, own keyframe)."""
++    import math
++    settings = place.load_settings()
++    rng = np.random.default_rng(seed)
++    B, offset = place.mount_camera_to_body(settings["mount"])
++    fx, fy, cx, cy = UNITY_CAMERA
++    own_true = np.column_stack((rng.uniform(-2, 2, n), rng.uniform(4, 7, n), rng.uniform(0.6, 2.4, n)))
++    optical = (own_true - offset) @ B                      # B is a rotation, so this is B^T (body - offset) per row
++    px = np.column_stack((fx * optical[:, 0] / optical[:, 2] + cx, fy * optical[:, 1] / optical[:, 2] + cy))
++    assert (optical[:, 2] > 0).all() and (px >= 0).all() and (px[:, 0] < 640).all() and (px[:, 1] < 480).all()
++    c, s = math.cos(math.radians(LINK_YAW_DEG)), math.sin(math.radians(LINK_YAW_DEG))
++    d = own_true[:, :2] - LINK_T                            # own = R(yaw) partner + t, so partner = R^T (own - t)
++    partner_xyh = np.column_stack((c * d[:, 0] + s * d[:, 1], -s * d[:, 0] + c * d[:, 1], own_true[:, 2]))
++    desc = rng.integers(0, 256, (n, 32), dtype=np.uint8)
++    err = rng.choice([-1.0, 1.0], n) * rng.uniform(0.5, 1.0, n) * noise_m
++    measured = optical * (1 + err / np.linalg.norm(optical, axis=1))[:, None]
++    own_xyh = place.decode_payload(place.encode_payload(desc, measured @ B.T + offset)).xyh
++    partner = place.decode_payload(place.encode_payload(desc, partner_xyh))
++    return settings, partner, place.Keyframe(desc, own_xyh, px, UNITY_CAMERA, B, offset)
++
++
++def _link_error(m):
++    return abs(m["dyaw_deg"] - LINK_YAW_DEG), float(np.hypot(m["dx_m"] - LINK_T[0], m["dy_m"] - LINK_T[1]))
++
++
++def test_place_fit_pnp_recovers_a_link_the_planar_fit_cannot_when_own_depth_is_noisy():
++    settings, partner, own = _far_scene(0.4)
++    pnp = place.match_keyframes(partner, [(0, own)], dict(settings, place_fit="pnp_sqpnp"))
++    assert pnp["matched"] and pnp["fit"] == "pnp_sqpnp" and pnp["inliers"] >= 38
++    yaw_err, t_err = _link_error(pnp)
++    assert yaw_err < 0.3 and t_err < 0.05 and pnp["tilt_deg"] < 0.5
++    planar = place.match_keyframes(partner, [(0, own)], dict(settings, place_fit="ransac_rigid"))
++    # Ignoring the switch would run PnP here: it would match with fit pnp_sqpnp and the right link.
++    if planar["matched"]:
++        assert planar["fit"] == "ransac_rigid" and max(_link_error(planar)[0] / 5, _link_error(planar)[1] / 0.5) > 1
++    else:
++        assert "rmse" in planar["reason"] and "PnP" not in planar["reason"]
++
++
++def test_place_fit_switch_selects_the_fit_on_clean_data_and_payloads_fall_back_to_planar():
++    settings, partner, own = _far_scene(0.0)
++    for fit in place.FITS:
++        m = place.match_keyframes(partner, [(0, own)], dict(settings, place_fit=fit))
++        assert m["matched"] and m["fit"] == fit and _link_error(m)[0] < 0.5 and _link_error(m)[1] < 0.05
++        assert ("tilt_deg" in m) == (fit == "pnp_sqpnp")
++    # A decoded payload has no own pixels, so even with the switch on the planar fit runs.
++    payload = place.decode_payload(place.encode_payload(own.desc, own.xyh))
++    assert payload.px is None
++    m = place.match_keyframes(partner, [(0, payload)], dict(settings, place_fit="pnp_sqpnp"))
++    assert m["matched"] and m["fit"] == "ransac_rigid"
++    # Settings from a parent process that predates place_fit keep the planar fit.
++    old = {k: v for k, v in settings.items() if not k.startswith(("place_fit", "place_pnp"))}
++    assert place.match_keyframes(partner, [(0, own)], old)["fit"] == "ransac_rigid"
++
++
++def test_place_database_match_follows_the_configured_fit():
++    settings, partner, own = _far_scene(0.0)
++    payload_b64 = place.encode_b64(partner.desc, partner.xyh)
++    for fit in place.FITS:
++        db = place.PlaceDatabase(dict(settings, place_fit=fit))
++        db.keyframes.append((0, own))
++        m = db.match(payload_b64)
++        assert m["matched"] and m["fit"] == fit
++
++
++def test_make_keyframe_keeps_own_pixels_off_the_radio():
++    settings = place.load_settings()
++    rng = np.random.default_rng(7)
++    rgb = np.repeat(rng.integers(0, 256, (480, 640, 1), dtype=np.uint8), 3, axis=2)
++    rgb = np.ascontiguousarray(np.kron(rgb[::4, ::4], np.ones((4, 4, 1), np.uint8)))
++    depth = np.full((480, 640), 3.0, np.float32)
++    fx, fy, cx, cy = UNITY_CAMERA
++    K = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1.0]])
++    kf, n = place.make_keyframe(rgb, depth, K, settings)
++    assert kf is not None and n == len(kf) and kf.px.shape == (len(kf), 2) and kf.camera == UNITY_CAMERA
++    desc, xyh = place.extract_features(rgb, depth, K, settings)
++    desc2, xyh2, px = place.extract_features_px(rgb, depth, K, settings)
++    np.testing.assert_array_equal(desc, desc2)
++    np.testing.assert_array_equal(xyh, xyh2)
++    np.testing.assert_allclose(kf.px, px)
++    # The stored pixels are the projections of the stored (cm-quantised) points through the mount.
++    optical = (kf.xyh - kf.body_offset) @ kf.cam_to_body
++    proj = np.column_stack((fx * optical[:, 0] / optical[:, 2] + cx, fy * optical[:, 1] / optical[:, 2] + cy))
++    assert np.abs(proj - kf.px).max() < 1.5
++    raw = place.encode_payload(kf.desc, kf.xyh)
++    assert len(raw) == place.HEADER_BYTES + place.RECORD_BYTES * len(kf) and place.decode_payload(raw).px is None
++
++
++def test_load_settings_rejects_an_unknown_place_fit(tmp_path, monkeypatch):
++    for name in ("perception.json", "sensors.json"):
++        (tmp_path / name).write_text((place.CONFIG_DIR / name).read_text())
++    cfg = json.loads((tmp_path / "perception.json").read_text())
++    cfg["place_fit"] = "pnp_typo"
++    (tmp_path / "perception.json").write_text(json.dumps(cfg))
++    monkeypatch.setattr(place, "CONFIG_DIR", tmp_path)
++    with pytest.raises(ValueError, match="place_fit"):
++        place.load_settings()
+diff --git a/config/perception.json b/config/perception.json
+index 6c7f727d..6e658ecc 100644
+--- a/config/perception.json
++++ b/config/perception.json
+@@ -57,6 +57,16 @@
+   "place_refine_iterations_reason": "The inlier set stops changing after 2 or 3 refits; 5 is a cap.",
+   "place_worker_timeout_s": 30.0,
+   "place_worker_timeout_s_reason": "Measured keyframe max 0.35 s and match 10 ms; 30 s covers worker spawn and a slow disk.",
++  "place_fit": "ransac_rigid",
++  "place_fit_reason": "PENDING",
++  "place_pnp_reproj_px": 8.0,
++  "place_pnp_reproj_px_reason": "PENDING",
++  "place_pnp_min_inliers": 10,
++  "place_pnp_min_inliers_reason": "PENDING",
++  "place_pnp_max_tilt_deg": 5.0,
++  "place_pnp_max_tilt_deg_reason": "PENDING",
++  "place_pnp_max_dz_m": 0.3,
++  "place_pnp_max_dz_m_reason": "PENDING",
+   "place_orb_scale_factor": 1.5,
+   "place_orb_scale_factor_reason": "Dev sweep: scale 1.2 with 8 levels gave 11.9% recall at zero false accepts, 1.3-1.5 with 5-6 levels gave 15.6-17.3%. A coarser pyramid stops the same corner taking several of the 96 slots at adjacent levels.",
+   "place_orb_levels": 5,
