@@ -149,13 +149,17 @@ class AzureOpenAIBackend:
                 "max_completion_tokens": 2000, "reasoning_effort": self.effort}
         url = f"{self.endpoint}/openai/deployments/{self.model}/chat/completions?api-version={self.version}"
         start = time.perf_counter()
-        for attempt in range(self.max_attempts):
+        attempt = 0
+        while True:
             r = self.client.post(url, headers={"api-key": self.key}, json=body)
             if r.status_code == 400 and "reasoning_effort" in r.text and "reasoning_effort" in body:
-                body.pop("reasoning_effort")            # deployment does not take the parameter
+                # The deployment does not take the parameter with tools. Resending without it is not a retry: with
+                # AZURE_OPENAI_MAX_ATTEMPTS=1 (the AWS task) the old for-loop ended here and every step raised a 400.
+                body.pop("reasoning_effort")
                 continue
             if r.status_code in (429, 500, 502, 503) and attempt < self.max_attempts - 1:
                 time.sleep(min(10.0, float(r.headers.get("retry-after", 2 ** attempt))))
+                attempt += 1
                 continue
             break
         r.raise_for_status()
