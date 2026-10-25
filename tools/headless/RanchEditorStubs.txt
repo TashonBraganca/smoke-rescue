@@ -2,19 +2,6 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-namespace SmokeRescue.World {
- public static class HouseBuilder {
-  public const string RootName="House",CeilingLayer="Ceiling",PropsLayer="Props",WallsLayer="Walls";
-  public const float WindowSill=.85f,WindowWidth=1.2f,WindowHeight=1.3f;
-  public struct WindowSpan { public bool alongX; public float pos,at; public Vector3 inward; }
-  public struct WallLine { public bool alongX; public float at,a,b; }
-  public static List<WallLine> WallLines(FloorPlan p,Rect r)=>null;
-  public static List<WindowSpan> WindowSpans(FloorPlan p,Rect r)=>null;
-  public static List<(float,float)> Union(List<(float,float)> p)=>p;
-  public static List<(float,float)> Subtract((float,float) a,List<(float,float)> b)=>b;
-  public static GameObject Build(FloorPlan p,Func<string,Material> f)=>null;
- }
-}
 namespace SmokeRescue.Editor {
  public static class MaterialLibrary { public static Material Get(string n)=>null; public static Material GreyBox(string n)=>null; }
  public static class FurnitureBuilder { public static GameObject Place(SmokeRescue.World.FloorPlan p)=>null; public static GameObject RobotBodyPrefab()=>null; public static int ApplyWarmObjects(string s)=>0; public static int PlaceScenarioObstacles(SmokeRescue.World.Scenario s)=>0; }
@@ -35,6 +22,7 @@ namespace UnityEngine.Rendering.HighDefinition {
  public class Param<T> { public void Override(T t){} }
  public enum ExposureMode { Automatic }
  public enum AdaptationMode { Fixed }
+ public static class HDMaterial { public static void ValidateMaterial(Material m){} }
  public class Exposure { public Param<ExposureMode> mode=new(); public Param<AdaptationMode> adaptationMode=new(); public Param<float> limitMin=new(),limitMax=new(); }
  public class Fog { public Param<bool> enabled=new(); }
 }

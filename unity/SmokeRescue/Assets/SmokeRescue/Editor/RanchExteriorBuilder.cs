@@ -31,6 +31,9 @@ namespace SmokeRescue.Editor
             // Replace only the builder's flat roof. Per-room ceilings remain intact.
             var flat = house.transform.Find("Ceiling/Roof");
             if (flat != null) UnityEngine.Object.DestroyImmediate(flat.gameObject);
+            if (plan.footprint_rects != null)
+                BuildShapedRoof(plan,root,roof,trim,ceiling);
+            else {
             float run = fp.height / 2 + Overhang;
             float rise = run * Mathf.Tan(Pitch * Mathf.Deg2Rad);
             float eaveY = plan.wall_height + .10f;
@@ -54,6 +57,7 @@ namespace SmokeRescue.Editor
             }
             Box(root, "RidgeCap", new Vector3(fp.center.x, eaveY + rise + .06f, fp.center.y),
                 new Vector3(fp.width + 2 * Overhang, .1f, .16f), roof, ceiling);
+            }
             Cladding(plan, fp, root, siding);
             // Existing HouseBuilder windows already have frames, mullions and glass.
             // Extend the sill outside the cladding so the windows read on camera.
@@ -67,10 +71,15 @@ namespace SmokeRescue.Editor
             // Four strips leave the interior clear. Grass sits above the original
             // ground at -0.002 m. Paving is 5-6 mm above grass to prevent z-fighting.
             // The original ground supports robots; these finishes have no colliders.
+            if (plan.footprint_rects != null) {
+                foreach (var r in LawnRects(plan))
+                    Slab(root,"Lawn",r.xMin,r.yMin,r.xMax,r.yMax,foliage,0f);
+            } else {
             Slab(root, "SouthLawn", fp.xMin-YardMargin, fp.yMin-YardMargin, fp.xMax+YardMargin, fp.yMin, foliage, 0f);
             Slab(root, "NorthLawn", fp.xMin-YardMargin, fp.yMax, fp.xMax+YardMargin, fp.yMax+YardMargin, foliage, 0f);
             Slab(root, "WestLawn", fp.xMin-YardMargin, fp.yMin, fp.xMin, fp.yMax, foliage, 0f);
             Slab(root, "EastLawn", fp.xMax, fp.yMin, fp.xMax+YardMargin, fp.yMax, foliage, 0f);
+            }
             var entrance = plan.doors.Single(d => d.between.Contains("outside"));
             var at = new Vector2(entrance.at[0], entrance.at[1]);
             Vector2 inward = entrance.RunsAlongX ? new Vector2(0, Mathf.Abs(at.y-fp.yMin)<.01f ? 1 : -1) : new Vector2(Mathf.Abs(at.x-fp.xMin)<.01f ? 1 : -1, 0);
@@ -98,15 +107,115 @@ namespace SmokeRescue.Editor
             Primitive(root, "TreeCrown", PrimitiveType.Sphere, new Vector3(tree.x,3.1f,tree.y), new Vector3(2.4f,2.8f,2.4f), foliage);
         }
 
+        // Extend touching footprint tiles into maximal overlapping wings. Their
+        // upper roof envelope forms hips and valleys without roofing the notch.
+        static List<Rect> RoofRects(FloorPlan plan)
+        {
+            var tiles=plan.BuildingRects.ToList();
+            var result=new List<Rect>();
+            foreach (var tile in tiles) {
+                var r=tile;
+                for (int pass=0;pass<tiles.Count;pass++)
+                    foreach (var other in tiles) {
+                        if (other.xMin<=r.xMin && other.xMax>=r.xMax) {
+                            if (Mathf.Abs(other.yMax-r.yMin)<.001f) r.yMin=other.yMin;
+                            if (Mathf.Abs(other.yMin-r.yMax)<.001f) r.yMax=other.yMax;
+                        }
+                        if (other.yMin<=r.yMin && other.yMax>=r.yMax) {
+                            if (Mathf.Abs(other.xMax-r.xMin)<.001f) r.xMin=other.xMin;
+                            if (Mathf.Abs(other.xMin-r.xMax)<.001f) r.xMax=other.xMax;
+                        }
+                    }
+                result.Add(Rect.MinMaxRect(r.xMin-Overhang,r.yMin-Overhang,r.xMax+Overhang,r.yMax+Overhang));
+            }
+            return result;
+        }
+
+        static float[] Stops(IEnumerable<float> positions,bool subdivide)
+        {
+            var edges=positions.Distinct().OrderBy(v=>v).ToArray();
+            var result=new SortedSet<float>(edges);
+            if (subdivide)
+                for (int i=0;i<edges.Length-1;i++) {
+                    int count=Mathf.CeilToInt((edges[i+1]-edges[i])/.25f);
+                    for (int k=1;k<count;k++) result.Add(Mathf.Lerp(edges[i],edges[i+1],(float)k/count));
+                }
+            return result.ToArray();
+        }
+
+        public static List<Vector3> RoofTriangles(FloorPlan plan)
+        {
+            var rects=RoofRects(plan);
+            var xs=Stops(rects.SelectMany(r=>new[] { r.xMin,r.center.x,r.xMax }),true);
+            var zs=Stops(rects.SelectMany(r=>new[] { r.yMin,r.center.y,r.yMax }),true);
+            float Height(float x,float z) {
+                float rise=0;
+                foreach (var r in rects)
+                    rise=Mathf.Max(rise,Mathf.Min(x-r.xMin,r.xMax-x,z-r.yMin,r.yMax-z));
+                return plan.wall_height+.10f+rise*Mathf.Tan(Pitch*Mathf.Deg2Rad);
+            }
+            Vector3 P(float x,float z)=>new Vector3(x,Height(x,z),z);
+            var vertices=new List<Vector3>();
+            for (int i=0;i<xs.Length-1;i++) for (int j=0;j<zs.Length-1;j++) {
+                float x0=xs[i],x1=xs[i+1],z0=zs[j],z1=zs[j+1];
+                var mid=new Vector2((x0+x1)/2,(z0+z1)/2);
+                if (!rects.Any(r=>r.Contains(mid))) continue;
+                var corners=new[] { P(x0,z0),P(x0,z1),P(x1,z1),P(x1,z0) };
+                var centre=P(mid.x,mid.y);
+                for (int k=0;k<4;k++) vertices.AddRange(new[] { centre,corners[k],corners[(k+1)%4] });
+            }
+            return vertices;
+        }
+
+        public static List<Rect> LawnRects(FloorPlan plan)
+        {
+            var tiles=plan.BuildingRects.ToList();
+            float x0=plan.footprint[0]-YardMargin,z0=plan.footprint[1]-YardMargin;
+            float x1=plan.footprint[2]+YardMargin,z1=plan.footprint[3]+YardMargin;
+            var xs=Stops(tiles.SelectMany(r=>new[] { r.xMin,r.xMax }).Concat(new[] { x0,x1 }),false);
+            var zs=Stops(tiles.SelectMany(r=>new[] { r.yMin,r.yMax }).Concat(new[] { z0,z1 }),false);
+            var lawn=new List<Rect>();
+            for (int i=0;i<xs.Length-1;i++) for (int j=0;j<zs.Length-1;j++) {
+                var r=Rect.MinMaxRect(xs[i],zs[j],xs[i+1],zs[j+1]);
+                if (!tiles.Any(t=>t.Contains(r.center))) lawn.Add(r);
+            }
+            return lawn;
+        }
+
+        static void BuildShapedRoof(FloorPlan plan,GameObject root,Material roof,Material trim,int layer)
+        {
+            var vertices=RoofTriangles(plan);
+            var go=new GameObject("LShapedHipRoof");go.transform.SetParent(root.transform,false);go.layer=layer;
+            var mesh=new Mesh { name="RanchHipRoof",indexFormat=UnityEngine.Rendering.IndexFormat.UInt32 };
+            mesh.SetVertices(vertices);
+            mesh.SetTriangles(Enumerable.Range(0,vertices.Count).ToArray(),0);
+            mesh.SetUVs(0,vertices.Select(v=>new Vector2(v.x,v.z)).ToList());
+            mesh.RecalculateNormals();mesh.RecalculateBounds();
+            go.AddComponent<MeshFilter>().sharedMesh=mesh;go.AddComponent<MeshRenderer>().sharedMaterial=roof;
+            var rects=RoofRects(plan);
+            var xs=Stops(rects.SelectMany(r=>new[] { r.xMin,r.xMax }),false);
+            var zs=Stops(rects.SelectMany(r=>new[] { r.yMin,r.yMax }),false);
+            bool Inside(float x,float z)=>rects.Any(r=>r.Contains(new Vector2(x,z)));
+            foreach (float z in zs) for (int i=0;i<xs.Length-1;i++) {
+                float x=(xs[i]+xs[i+1])/2;
+                if (Inside(x,z-.01f)==Inside(x,z+.01f)) continue;
+                Box(root,"EaveFascia",new Vector3(x,plan.wall_height+.10f-FasciaHeight/2,z),new Vector3(xs[i+1]-xs[i],FasciaHeight,.08f),trim,layer);
+            }
+            foreach (float x in xs) for (int j=0;j<zs.Length-1;j++) {
+                float z=(zs[j]+zs[j+1])/2;
+                if (Inside(x-.01f,z)==Inside(x+.01f,z)) continue;
+                Box(root,"EaveFascia",new Vector3(x,plan.wall_height+.10f-FasciaHeight/2,z),new Vector3(.08f,FasciaHeight,zs[j+1]-zs[j]),trim,layer);
+            }
+        }
+
         static void Cladding(FloorPlan plan, Rect fp, GameObject root, Material mat)
         {
             var windows = HouseBuilder.WindowSpans(plan, fp);
             foreach (var line in HouseBuilder.WallLines(plan, fp))
             {
-                bool low = Mathf.Abs(line.at - (line.alongX ? fp.yMin : fp.xMin)) < .001f;
-                bool high = Mathf.Abs(line.at - (line.alongX ? fp.yMax : fp.xMax)) < .001f;
-                if (!low && !high) continue;
-                float plane = line.at + (low ? -1 : 1) * CladdingDepth / 2;
+                var inward=HouseBuilder.ExteriorInward(plan,line.alongX,line.at,(line.a+line.b)/2);
+                if (inward.sqrMagnitude==0) continue;
+                float plane=line.at-(line.alongX ? inward.z : inward.x)*CladdingDepth/2;
                 for (float y = 0; y < plan.wall_height; y += SidingCourse)
                 {
                     float top = Mathf.Min(y + SidingCourse, plan.wall_height);
