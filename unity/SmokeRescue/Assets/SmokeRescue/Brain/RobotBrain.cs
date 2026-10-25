@@ -361,12 +361,13 @@ namespace SmokeRescue.Brain
                         if (double.IsNaN(returnBlockedSince)) { returnBlockedSince = t; lastReturnBlockedLog = double.NegativeInfinity; }
                         if (t - lastReturnBlockedLog >= 10)
                         {
-                            lastReturnBlockedLog = t; int here = grid.Cell(motion.Pose.position);
+                            lastReturnBlockedLog = t; int here = grid.Cell(motion.Pose.position); var reach = planner.ReachableNearest(motion.Pose.position, home);
                             Emit(t, "return_blocked", "The walk out finds no route at any fire margin: hold and look again.", "blocked_s", t - returnBlockedSince,
                                 "nearest_fire_m", here >= 0 ? grid.FireDistance(here) : -1, "fire_clearance_m", grid.FireClearance, "last_resort_m", c.last_resort_fire_clearance_m,
                                 "water_l", lastWaterL, "x_m", motion.Pose.position.x, "y_m", motion.Pose.position.y,
                                 "start_cause_code", grid.WhyNotWalkable(motion.Pose.position).code, "home_cause_code", grid.WhyNotWalkable(home).code,
-                                "squeezed_people", squeezeSet == null ? (squeezePast ? survivors.Count : 0) : squeezeSet.Count, "people", survivors.Count);
+                                "squeezed_people", squeezeSet == null ? (squeezePast ? survivors.Count : 0) : squeezeSet.Count, "people", survivors.Count,
+                                "home_fire_m", grid.FireDistance(grid.Cell(home)), "reach_fire_m", grid.FireDistance(grid.Cell(reach.nearest)), "nearest_reach_x_m", reach.nearest.x, "nearest_reach_y_m", reach.nearest.y, "reach_cells", reach.cells, "partner_near_home_m", PartnerNearestM(home));
                         }
                         if (c.end_return_blocked_resume_s > 0 && t - returnBlockedSince >= c.end_return_blocked_resume_s)
                         {
