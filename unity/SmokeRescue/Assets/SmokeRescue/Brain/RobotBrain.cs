@@ -161,7 +161,7 @@ namespace SmokeRescue.Brain
             }
             NoteBodyTrack();
             NoteEntrance(t);
-            if (survivors.Count != keptOut) { keptOut = survivors.Count; grid.SetKeepOut(survivors, squeezePast ? c.survivor_squeeze_core_m : c.survivor_keepout_core_m, c.survivor_keepout_m + c.robot_radius_m); }   // the ring is for the robot's centre
+            if (survivors.Count != keptOut) { keptOut = survivors.Count; ApplyKeepOut(); }
             CheckReenter(t);
             if (doorwayProbeGoal.HasValue && (returning || retreating || completed || nearFire || active != null ||
                 (AgentGoalActive(t) && !(c.frontier_doorway_looks && agentGoalIsFrontier)) || recoveryPhase != 0 || t - doorwayProbeStarted >= c.sweep_max_s))
@@ -367,14 +367,35 @@ namespace SmokeRescue.Brain
                         return Command(0, 0, dt, true);
                     // A deadline return cut on the way is the same: retreat and search on, never hold (held-out seed 919,
                     // robot B held 20 s in cool air when fire cut its route home after a deadline return began).
+                    if (path.Count > 0) returnBlockedSince = double.NaN;
                     if (path.Count == 0 && EndReturn)
                     {
+                        if (double.IsNaN(returnBlockedSince)) { returnBlockedSince = t; lastReturnBlockedLog = double.NegativeInfinity; }
+                        if (t - lastReturnBlockedLog >= 10)
+                        {
+                            lastReturnBlockedLog = t; int here = grid.Cell(motion.Pose.position); var reach = planner.ReachableNearest(motion.Pose.position, home);
+                            Emit(t, "return_blocked", "The walk out finds no route at any fire margin: hold and look again.", "blocked_s", t - returnBlockedSince,
+                                "nearest_fire_m", here >= 0 ? grid.FireDistance(here) : -1, "fire_clearance_m", grid.FireClearance, "last_resort_m", c.last_resort_fire_clearance_m,
+                                "water_l", lastWaterL, "x_m", motion.Pose.position.x, "y_m", motion.Pose.position.y,
+                                "start_cause_code", grid.WhyNotWalkable(motion.Pose.position).code, "home_cause_code", grid.WhyNotWalkable(home).code,
+                                "squeezed_people", squeezeSet == null ? (squeezePast ? survivors.Count : 0) : squeezeSet.Count, "people", survivors.Count,
+                                "home_fire_m", grid.FireDistance(grid.Cell(home)), "reach_fire_m", grid.FireDistance(grid.Cell(reach.nearest)), "nearest_reach_x_m", reach.nearest.x, "nearest_reach_y_m", reach.nearest.y, "reach_cells", reach.cells, "partner_near_home_m", PartnerNearestM(home));
+                        }
+                        if (c.end_return_blocked_resume_s > 0 && t - returnBlockedSince >= c.end_return_blocked_resume_s)
+                        {
+                            // end_return_blocked_resume_s: search on (a code spray can open the way) and try the walk out again later.
+                            returning = false; grid.FireClearance = c.fire_clearance_m; grid.FirePrediction = true; ClearPath();
+                            scanSince = double.NaN; noFrontierAt = double.NaN; returnBlockedSince = double.NaN;
+                            leaveRetryAt = t + c.no_frontier_scan_s; wayOutBlockedAt = t; endReturnRetryAt = t + c.end_return_retry_s;
+                            Emit(t, "return_resumed_search", "No way out for end_return_blocked_resume_s: search on inside, spray the fire in the way, try the walk out again later.");
+                            return Command(0, 0, dt, true);
+                        }
                         // The walk out is the last job: no route home is no reason to search on. A confirmed person's keep-out
                         // can close the only way out of the room (headless 5017: robot A shut in the study with s1, flipping
                         // between return and retreat every tick); pass them at the body's half-width, hold, and plan again.
-                        if (!squeezePast && survivors.Count > 0 && c.survivor_squeeze && c.survivor_squeeze_core_m < c.survivor_keepout_core_m)
+                        if ((!squeezePast || squeezeSet != null) && survivors.Count > 0 && c.survivor_squeeze && c.survivor_squeeze_core_m < c.survivor_keepout_core_m)
                         {
-                            squeezePast = true; keptOut = -1;
+                            squeezeSet = null; squeezePast = true; keptOut = -1;
                             Emit(t, "squeeze_past_person", "The way out passes a confirmed person: pass them with the keep-out at the body's half-width.",
                                 "people", survivors.Count, "core_m", c.survivor_squeeze_core_m);
                         }
@@ -493,6 +514,7 @@ namespace SmokeRescue.Brain
                     {
                         active.confirmed = true; survivors.Add(active.position);
                         confirmed.Add(new BrainSurvivor { position = active.position, confirmedAt = t, sourceRobot = id });
+                        LogSurvivorRoom(t, active.position);
                         Emit(t, "survivor_confirmed", "Stopped facing a recently observed person for the required dwell.",
                             "x_m", active.position.x, "y_m", active.position.y, "range_m", range, "dwell_s", dwell);
                         active = null; dwell = 0; ClearPath(); nextSurvivorSearch = t + c.replan_s;
@@ -574,7 +596,9 @@ namespace SmokeRescue.Brain
                 {
                     // Keep what the goal is: an agent go_to refreshed as a frontier sent a claim with radius 0, which the
                     // partner rejected (slow-fire run, 7 s: the recording stopped on "Invalid peer claim").
-                    var keepThrough = throughCentre; SetPath(planner.Plan(motion.Pose.position, goal.Value), frontierGoal); throughCentre = keepThrough; lastPlan = t;
+                    var keepThrough = throughCentre; var refreshed = planner.Plan(motion.Pose.position, goal.Value);
+                    if (refreshed.Count == 0) NotePlanFailure(t, "goal_refresh", goal.Value);
+                    SetPath(refreshed, frontierGoal); throughCentre = keepThrough; lastPlan = t;
                     Emit(t, "replan", "Periodic refresh through current free space and heat costs.", "path_points", path.Count);
                 }
                 if ((path.Count == 0 || blocked) && AgentGoalActive(t))
@@ -609,7 +633,13 @@ namespace SmokeRescue.Brain
                         Emit(t, "goal", "Agent order: the asked viewpoint is not standable; view the same point from the nearest standable spot at the viewing distance.",
                             "x_m", agentGoal.Value.x, "y_m", agentGoal.Value.y, "face_x_m", agentFace.Value.x, "face_y_m", agentFace.Value.y);
                     }
-                    else { Emit(t, "replan", "Agent goal has no known free path; back to exploring.", "x_m", agentGoal.Value.x, "y_m", agentGoal.Value.y); agentGoal = null; }
+                    else
+                    {
+                        Emit(t, "replan", "Agent goal has no known free path; back to exploring.", "x_m", agentGoal.Value.x, "y_m", agentGoal.Value.y);
+                        NotePlanFailure(t, "agent_goal", agentGoal.Value);
+                        if (spraySpotGoal.HasValue && Vector2.Distance(spraySpotGoal.Value, agentGoal.Value) < .2f) { NoteSpraySpotFailed(agentGoal.Value, t); spraySpotGoal = null; }
+                        agentGoal = null;
+                    }
                 }
                 // An agent replacement above has already repaired the old blocked route. Test the new path before fallback.
                 bool fallback = path.Count == 0 || (blocked && (!c.motion_keep_agent_route || !planner.PathSafe(path, cursor)));
@@ -636,10 +666,16 @@ namespace SmokeRescue.Brain
                     Emit(t, "goal", "This room was searched from outside but never entered: walk into it, then search on.",
                         "room_id", walkRoom, "x_m", walkIn[walkIn.Count - 1].x, "y_m", walkIn[walkIn.Count - 1].y);
                 }
+                else if (fallback && c.person_threshold_look && PersonThresholdLook(t, out var personRoute, out var personBeyond))
+                {
+                    SetPath(personRoute, false); scanSince = double.NaN; noFrontierAt = double.NaN; lastPlan = t;
+                    Emit(t, "goal", "A confirmed person lies on floor not yet proven indoors: stand at the edge of proven floor and look in for a ceiling.",
+                        "x_m", goal.Value.x, "y_m", goal.Value.y, "beyond_x_m", personBeyond.x, "beyond_y_m", personBeyond.y);
+                }
                 else if (fallback)
                 {
                     System.Func<Vector2, bool> excluded = p => ClaimBlocks(p, t) || GoalBlacklisted(p, t) || VisitedGoal(p, t) || !InSearchArea(p);
-                    var frontier = planner.Frontier(motion.Pose.position, excluded);
+                    var frontier = CommittedFrontier(planner.Frontiers(motion.Pose.position, excluded), t);
                     lastPlan = t;
                     // Only leftovers (or nothing) are reachable while unsearched floor lies cut off: a confirmed person may be
                     // sealing a corridor. The shrunk keep-out applies from the next step.
@@ -674,6 +710,8 @@ namespace SmokeRescue.Brain
                     {
                         SetPath(frontier.path, true); frontierCentre = frontier.claimCentre; frontierRadius = frontier.claimRadius;
                         scanSince = double.NaN; noFrontierAt = double.NaN; ClaimRoom(t, frontier.position, PathLength(frontier.path));
+                        if (!committedAt.HasValue || Vector2.Distance(committedAt.Value, frontier.position) > c.stuck_repeat_radius_m) committedSince = t;
+                        committedAt = frontier.position;
                         if (c.room_ledger)
                             Emit(t, "goal", "Room ledger ranks admitted frontiers by room completion, entry history, coverage and travel time.",
                                 "x_m", frontier.position.x, "y_m", frontier.position.y, "path_cost", frontier.cost, "information_cells", frontier.information, "score", frontier.score,
@@ -702,6 +740,7 @@ namespace SmokeRescue.Brain
                             "x_m", retry.position.x, "y_m", retry.position.y, "room_id", retry.roomId, "path_cost", retry.cost);
                     }
                     else if (RetryFireCuts(t)) { ClearPath(); }
+                    else if (RetryVisited(t)) { ClearPath(); }
                     else
                     {
                         ClearPath(); lastPlan = t; if (double.IsNaN(scanSince))
@@ -730,10 +769,19 @@ namespace SmokeRescue.Brain
                             { lastScanAt = motion.Pose.position; knownAtLastScan = knownCells; }
                             // leave_when_done (owner, 24 Oct: when all rooms are marked, both robots leave): an inside robot with
                             // nothing reachable left to search after a full scan walks out the way it came in.
-                            if (!c.stay_inside || (c.leave_when_done && t >= leaveRetryAt && InSearchArea(motion.Pose.position) && !(c.leave_waits_for_team && TeamHasUnenteredRoom()))) BeginReturn(t, NoFrontierLeft);
+                            bool teamWait = c.leave_waits_for_team && TeamHasUnenteredRoom() &&
+                                !(c.leave_wait_cap_s > 0 && t - scanSince >= c.no_frontier_scan_s + c.leave_wait_cap_s);   // leave_wait_cap_s: the veto lapses
+                            if (!c.stay_inside || (c.leave_when_done && t >= leaveRetryAt && InSearchArea(motion.Pose.position) && !teamWait)) BeginReturn(t, NoFrontierLeft);
                             // Holding still is for a robot that is inside. Outside (seed 930, robot B at its pad) it keeps
                             // scanning, which can bring the ceiling through the door into its camera's view.
-                            else if (!searchedOut && InSearchArea(motion.Pose.position)) { searchedOut = true; Emit(t, "goal", "Nothing reachable is left to search after a full scan: hold here, inside, until new floor appears or the agent orders a move."); }
+                            else if (!searchedOut && InSearchArea(motion.Pose.position))
+                            {
+                                searchedOut = true;
+                                RoomLedger.RoomRecord veto = null; bool vetoed = c.leave_waits_for_team && TeamHasUnenteredRoom(out veto);
+                                if (vetoed) Emit(t, "goal", "Nothing reachable is left to search after a full scan: hold here, inside, until new floor appears or the agent orders a move.",
+                                    "veto_room_key", veto.key, "veto_x_m", veto.seat.x, "veto_y_m", veto.seat.y, "veto_floor_m2", veto.floorM2, "veto_retry_in_s", Math.Max(0, veto.retryAt - t));
+                                else Emit(t, "goal", "Nothing reachable is left to search after a full scan: hold here, inside, until new floor appears or the agent orders a move.");
+                            }
                         }
                     }
                 }
@@ -753,6 +801,48 @@ namespace SmokeRescue.Brain
             return FollowOrHold(t, dt);
         }
 
+        readonly Dictionary<string, double> planFailureLogged = new Dictionary<string, double>();
+        /// <summary>Log why no route reaches a target (the first cause found: wall, keep-out, obstacle margin, fire margin, or no connection),
+        /// at most once per site per 5 s. Seed 934 (25 Oct): 22 "no known free path" for one spray spot, and no way to tell what blocked it.</summary>
+        void NotePlanFailure(double t, string site, Vector2 target, int key = -1)
+        {
+            if (planFailureLogged.TryGetValue(site, out double last) && t - last < 5) return;
+            planFailureLogged[site] = t; var why = grid.WhyNotWalkable(target);
+            Emit(t, "plan_failed", $"No route to the {site.Replace('_', ' ')} target: {why.name}.", "cause_code", why.code, "x_m", target.x, "y_m", target.y, "key", key,
+                "partner_near_m", PartnerNearestM(target));
+        }
+        float PartnerNearestM(Vector2 p)
+        {
+            float best = -1;
+            foreach (var (pid, at, goal) in planner.Rooms.PartnersNow) { float d = Vector2.Distance(at, p); if (best < 0 || d < best) best = d; }
+            return best;
+        }
+        /// <summary>Why the floor under a confirmed person is or is not search area, at the moment of confirmation (seed 934, 25 Oct: the log could
+        /// not say why robot A never went into bedroom_1 after confirming s2 there).</summary>
+        void LogSurvivorRoom(double t, Vector2 p)
+        {
+            if (!c.room_ledger) return;
+            int cell = grid.Cell(p); var ledger = planner.Rooms; var room = ledger.Get(ledger.RoomNear(p));
+            Emit(t, "survivor_room", "The room under a confirmed person: whether its floor is search area, proven indoors, and why not promoted.",
+                "x_m", p.x, "y_m", p.y, "on_free_floor", cell >= 0 && grid.OwnOccupancy(cell) == 1 ? 1 : 0, "in_search_area", InSearchArea(p) ? 1 : 0,
+                "room_id", room?.id ?? -1, "promoted", room != null && room.promoted ? 1 : 0, "proven_cells", room?.provenCells ?? -1,
+                "wall_share", room?.wallShare ?? -1, "covered_share", room?.coveredShare ?? -1, "floor_m2", room?.floorM2 ?? -1);
+        }
+        Vector2? committedAt; double committedSince;   // goal_commitment: the frontier last chosen and when it was first chosen
+        /// <summary>goal_commitment: the best admitted frontier, unless the one chosen earlier is still admitted and the best is
+        /// neither in a better room tier nor ahead by room_tour_switch_s. Seed 934 (25 Oct), robot A: the goal flipped 7 times
+        /// between a near kitchen frontier and a far hall frontier between 55.8 and 134.0 s.</summary>
+        GridPlanner.FrontierChoice CommittedFrontier(List<GridPlanner.FrontierChoice> all, double t)
+        {
+            var best = all.Count > 0 ? all[0] : null;
+            if (best == null || !c.goal_commitment || !committedAt.HasValue || t - committedSince > c.goal_commit_max_s) return best;
+            var kept = all.Find(f => Vector2.Distance(f.position, committedAt.Value) <= c.stuck_repeat_radius_m);
+            if (kept == null || kept == best) return best;
+            if (best.roomTier < kept.roomTier || best.roomScore + c.room_tour_switch_s < kept.roomScore) return best;
+            Emit(t, "goal_kept", "A frontier chosen earlier is still admitted and the new best is not clearly better: keep walking to it.",
+                "x_m", kept.position.x, "y_m", kept.position.y, "kept_score_s", kept.roomScore, "best_score_s", best.roomScore, "best_x_m", best.position.x, "best_y_m", best.position.y);
+            return kept;
+        }
         Vector2? lastScanAt; int knownAtLastScan;   // no_frontier_scan_once: where the last full no-frontier scan ended
         readonly List<LidarScan> lidarQueue = new List<LidarScan>();
         double lastLidar = double.NegativeInfinity, nextLocalizationReport;
@@ -1002,6 +1092,7 @@ namespace SmokeRescue.Brain
             foreach (var w in withdrawn) if (Vector2.Distance(w, p) <= c.survivor_merge_m) return;
             track.confirmed = true; survivors.Add(p);
             confirmed.Add(new BrainSurvivor { position = p, confirmedAt = t, sourceRobot = id });
+            LogSurvivorRoom(t, p);
             if (active == track) { active = null; dwell = 0; inspecting = false; ClearPath(); nextSurvivorSearch = t + c.replan_s; }
             Emit(t, "survivor_confirmed", "OpenCV dnn person detector (YOLO11m) saw a whole person on the floor: confirmed.",
                 "x_m", p.x, "y_m", p.y, "confidence", confidence, "range_m", rangeM, "floor_gap_m", float.IsNaN(floorGapM) ? -1 : floorGapM,
@@ -1162,6 +1253,25 @@ namespace SmokeRescue.Brain
         /// once per fire_cut_retry_s. Seed 934, robot A: 21 frontiers set aside because the fire margin cut their routes while its
         /// air never passed 44 C; at 209 s and 217 s it reported no reachable floor with six house rooms unsearched. Heat a fresh
         /// cool look has cleared (OccupancyGrid.ProjectHeat) no longer cuts the route; a still-burning one cuts it again.</summary>
+        double lastVisitedRetry = double.NegativeInfinity;
+        /// <summary>visited_retry: with nothing else left, forget the visited circles that are at least visited_retry_s old when a
+        /// frontier lies under one. Seed 934 (25 Oct), robot B: the only frontier, the bathroom door reached at about 200 s, stayed
+        /// hidden by visited_hold_s (90 s) while B held still from 245.9 to 294.0 s.</summary>
+        bool RetryVisited(double t)
+        {
+            if (!c.visited_retry || t - lastVisitedRetry < c.visited_retry_s) return false;
+            visited.RemoveAll(v => t >= v.until);
+            var old = visited.FindAll(v => t - (v.until - c.visited_hold_s) >= c.visited_retry_s);
+            if (old.Count == 0) return false;
+            var keep = visited.FindAll(v => !old.Contains(v));
+            var saved = new List<Visited>(visited); visited.Clear(); visited.AddRange(keep);
+            var found = planner.Frontier(motion.Pose.position, p => ClaimBlocks(p, t) || GoalBlacklisted(p, t) || !InSearchArea(p) || VisitedGoal(p, t));
+            if (found == null) { visited.Clear(); visited.AddRange(saved); return false; }
+            lastVisitedRetry = t; lastPlan = double.NegativeInfinity;
+            Emit(t, "visited_retry", "Nothing reachable left except frontiers hidden by a visited circle: try them again.",
+                "circles", old.Count, "x_m", found.position.x, "y_m", found.position.y, "room_id", found.roomId);
+            return true;
+        }
         bool RetryFireCuts(double t)
         {
             if (!c.fire_cut_retry || t - lastFireCutRetry < c.fire_cut_retry_s) return false;
@@ -1215,8 +1325,13 @@ namespace SmokeRescue.Brain
                 "commanded_speed_mps", commandedSpeed, "measured_speed_mps", motion.ForwardSpeed,
                 "duration_s", stalledFor, "marked_cells", marked, "repeats", place.repeats,
                 "x_m", contactPose.position.x, "y_m", contactPose.position.y);
-            if (place.repeats >= c.stuck_repeat_count && !returning && !retreating)
+            // stall_near_person_blacklists: a stall beside a confirmed person is the body, which is below the LiDAR plane; one stall is enough.
+            bool besidePerson = c.stall_near_person_blacklists && survivors.Exists(s => Vector2.Distance(s, contactPose.position) <=
+                c.survivor_keepout_m + c.robot_radius_m + c.stall_near_person_extra_m);
+            if ((place.repeats >= c.stuck_repeat_count || besidePerson) && !returning && !retreating)
             {
+                if (besidePerson && place.repeats < c.stuck_repeat_count)
+                    Emit(t, "stall_near_person", "Stalled within reach of a confirmed person's body, which the map does not show: set this goal aside at once.", "repeats", place.repeats);
                 if (recoveryGoal.HasValue) BlacklistGoal(recoveryGoal.Value, t, place.repeats);
                 if (active != null)
                 {
@@ -1296,14 +1411,15 @@ namespace SmokeRescue.Brain
         /// </summary>
         void CheckWayOut(double t)
         {
-            if (c.stay_inside) return;   // no way out is used, so none is watched
+            bool insideWatch = c.stay_inside && c.exit_watch_inside && c.return_home_at_end;   // exit_watch_inside: watch the way out, never retreat from it
+            if (c.stay_inside && !insideWatch) return;   // no way out is used, so none is watched
             if (completed || returning || retreating || t < nextWayOutCheck) return;
             nextWayOutCheck = t + c.escape_check_s;
             var route = PlanOut();
             if (route.Count == 0)
             {
                 wayOutPoints.Clear(); wayOutRates.Clear();
-                if (hadWayOut) LoseWayOut(t);
+                if (hadWayOut && !insideWatch) LoseWayOut(t);
                 return;
             }
             hadWayOut = true; cutOff = false;
@@ -1317,7 +1433,7 @@ namespace SmokeRescue.Brain
             float walkS = routeM / c.open_speed_mps, closeS = float.PositiveInfinity;
             // Out by the deadline: leave while the walk out, with the same escape_time_factor allowance the fire test uses,
             // still fits before mission_time_limit_s. It used to start back only at the deadline itself.
-            if (routeM > c.return_arrive_m && t + walkS * c.escape_time_factor + c.escape_check_s >= c.mission_time_limit_s)
+            if (!insideWatch && routeM > c.return_arrive_m && t + walkS * c.escape_time_factor + c.escape_check_s >= c.mission_time_limit_s)
             {
                 BeginReturn(t, MissionTimeUp);
                 return;
@@ -1346,7 +1462,7 @@ namespace SmokeRescue.Brain
                 Emit(t, "escape_closing", closest < c.escape_fire_margin_m ? "Fire is closing on the way out; leave while it is open."
                     : "Fire is closing on the way out faster than the robot could walk it later; leave while it is open.",
                     "fire_distance_m", closest, "margin_m", c.escape_fire_margin_m, "closes_in_s", float.IsInfinity(closeS) ? -1 : closeS, "walk_out_s", walkS);
-                if (!(c.heat_spray_through && c.stay_inside)) BeginReturn(t, WayOutClosing);   // staying inside, it searches on
+                if (!(c.heat_spray_through && c.stay_inside) || insideWatch) BeginReturn(t, WayOutClosing);   // staying inside, it searches on
             }
             else CheckRouteWatch(t, route, routeM);
         }
@@ -1874,6 +1990,13 @@ namespace SmokeRescue.Brain
         readonly List<Vector2> walkedIn = new List<Vector2>();
         int keptOut;   // how many confirmed people the planner's keep-out discs cover
         bool squeezePast;   // the keep-out core is down to survivor_squeeze_core_m (see SqueezePastPerson)
+        List<int> squeezeSet;   // squeeze_per_person: whose core it is; null means everyone's
+        float CoreOf(int person) => squeezePast && (squeezeSet == null || squeezeSet.Contains(person)) ? c.survivor_squeeze_core_m : c.survivor_keepout_core_m;
+        void ApplyKeepOut()
+        {
+            var cores = new float[survivors.Count]; for (int i = 0; i < cores.Length; i++) cores[i] = CoreOf(i);
+            grid.SetKeepOut(survivors, cores, c.survivor_keepout_m + c.robot_radius_m);   // the ring is for the robot's centre
+        }
         bool searchedOut;   // stay_inside: a full scan found nothing reachable; hold still instead of turning
         /// <summary>A route to the last proven-indoor floor on the way to an unproven frontier, when no proven one is left.
         /// Floor seen through an interior doorway is mapped free but not proven indoors until the camera sees its ceiling,
@@ -1906,6 +2029,31 @@ namespace SmokeRescue.Brain
             return false;
         }
         readonly List<Vector2> lookedAt = new List<Vector2>(), lookedFrom = new List<Vector2>();
+        readonly HashSet<int> peopleLooked = new HashSet<int>();
+        /// <summary>person_threshold_look: a route to the last proven point on the way to a confirmed person whose floor is mapped but not
+        /// proven indoors, ending headed through the threshold like ThresholdLook. Each person once, never from near a known way out.</summary>
+        bool PersonThresholdLook(double t, out List<Vector2> route, out Vector2 beyond)
+        {
+            route = null; beyond = default;
+            if (!c.search_requires_ceiling) return false;
+            for (int k = 0; k < survivors.Count; k++)
+            {
+                if (peopleLooked.Contains(k)) continue;
+                var person = survivors[k]; int cell = grid.Cell(person);
+                if (cell < 0 || grid.OwnOccupancy(cell) != 1 || InSearchArea(person)) continue;
+                peopleLooked.Add(k);
+                var path = planner.ApproachPath(motion.Pose.position, person);
+                int j = path.FindIndex(p => InSearchArea(p));
+                int i = j < 0 ? -1 : path.FindIndex(j, p => !InSearchArea(p));
+                if (i <= 0) continue;
+                var at = path[i - 1]; bool nearExit = false;
+                foreach (var e in Exits()) nearExit |= Vector2.Distance(e, at) <= c.threshold_exit_clear_m;
+                if (nearExit || lookedFrom.Exists(q => Vector2.Distance(q, at) <= c.stuck_repeat_radius_m)) continue;
+                lookedFrom.Add(at); route = path.GetRange(0, i); beyond = path[i];
+                return true;
+            }
+            return false;
+        }
         List<Vector2> sensedExits = new List<Vector2>(); double nextExitScan;
         void RefreshSensedExits(double t)
         {
@@ -1944,7 +2092,8 @@ namespace SmokeRescue.Brain
         // leave_when_done's walk out is an end return too. Planned to exits with the entrance lock still on, it found no route
         // at any fire margin (seed 934 full mission, 25 Oct 11:25: both robots retried every 12 s from 360 s to 420 s, never
         // left, and FireOnWayOut, planned the same way, had no fire to spray).
-        bool EndReturn => returning && ((c.return_home_at_end && returnReason == MissionTimeUp) || (c.leave_when_done && returnReason == NoFrontierLeft));
+        bool EndReturn => returning && ((c.return_home_at_end && returnReason == MissionTimeUp) || (c.leave_when_done && returnReason == NoFrontierLeft) ||
+            (c.exit_watch_inside && c.return_home_at_end && returnReason == WayOutClosing));
         List<Vector2> PlanOut()
         {
             if (EndReturn)
@@ -2057,15 +2206,20 @@ namespace SmokeRescue.Brain
             else airTrack.Add((p, airValue, t));
             if (airTrack.Count > 2000) airTrack.RemoveAt(0);
         }
+        double returnBlockedSince = double.NaN, lastReturnBlockedLog = double.NegativeInfinity, endReturnRetryAt = double.NegativeInfinity;
+        float lastWaterL = -1;   // the water the host last offered CodeSpray, for the return_blocked log
         void BeginReturn(double t, string reason)
         {
+            if (reason == MissionTimeUp && t < endReturnRetryAt) return;   // a walk-out that found no way out is not restarted at once
+            returnBlockedSince = double.NaN;
             // Stay inside (the owner's decision, 22 Oct): a robot that has gone in never leaves by the entrance. At the
             // deadline it stops where it stands; every other reason to leave (heat, a closing way out, nothing left to search)
             // becomes a retreat to the coolest floor inside, where it can spray and wait for the air to cool.
             // return_home_at_end (owner, 24 Oct 11:10): at the end both robots walk back out the main exit; staying inside still
             // holds for every other reason to leave. Headless 5001, 5017, 5022 with the time limit: both robots stopped where they
             // stood at 240 s, 7.7 to 19.5 m from the way in. leave_when_done: the same once nothing reachable is left to search.
-            if (c.stay_inside && reason != CarryingOut && !(c.return_home_at_end && reason == MissionTimeUp) && !(c.leave_when_done && reason == NoFrontierLeft))
+            if (c.stay_inside && reason != CarryingOut && !(c.return_home_at_end && reason == MissionTimeUp) && !(c.leave_when_done && reason == NoFrontierLeft) &&
+                !(c.exit_watch_inside && c.return_home_at_end && reason == WayOutClosing))
             {
                 ResetStuckRecovery(); active = null; dwell = 0; ClearPath();
                 if (reason == MissionTimeUp)
@@ -2501,10 +2655,32 @@ namespace SmokeRescue.Brain
             return double.IsNaN(track.candidateSince) || t - track.candidateSince < c.agent_candidate_grace_s;
         }
         float retreatClearance = float.NaN;   // retreat_reduced_clearance: the fire clearance the current retreat route needs
+        /// <summary>squeeze_per_person: the one person, not yet squeezed, whose small core alone reopens the cut-off floor, or null (all of
+        /// them) when no single person does or there is only one.</summary>
+        List<int> BlockingPerson()
+        {
+            if (survivors.Count < 2) return null;
+            bool had = squeezePast; var hadSet = squeezeSet; List<int> found = null;
+            var baseline = had && hadSet != null ? new List<int>(hadSet) : new List<int>();
+            try
+            {
+                squeezePast = true;
+                for (int i = 0; i < survivors.Count && found == null; i++)
+                {
+                    if (baseline.Contains(i)) continue;
+                    squeezeSet = new List<int>(baseline) { i }; ApplyKeepOut();
+                    if (planner.NearestBlocked(motion.Pose.position, InSearchArea) == null) found = new List<int>(baseline) { i };
+                }
+            }
+            finally { squeezePast = had; squeezeSet = hadSet; ApplyKeepOut(); }
+            return found;
+        }
         bool SqueezePastPerson(double t)
         {
-            if (!c.survivor_squeeze || squeezePast || survivors.Count == 0 || c.survivor_squeeze_core_m >= c.survivor_keepout_core_m) return false;
+            // squeeze_per_person: a second person who later seals other floor gets the small core too, one person at a time.
+            if (!c.survivor_squeeze || (squeezePast && squeezeSet == null) || survivors.Count == 0 || c.survivor_squeeze_core_m >= c.survivor_keepout_core_m) return false;
             if (planner.NearestBlocked(motion.Pose.position, InSearchArea) == null) return false;
+            squeezeSet = c.squeeze_per_person ? BlockingPerson() : null;
             squeezePast = true; keptOut = -1;
             Emit(t, "squeeze_past_person", "Unsearched floor lies beyond a confirmed person's keep-out: pass them with the keep-out at the body's half-width.",
                 "people", survivors.Count, "core_m", c.survivor_squeeze_core_m);

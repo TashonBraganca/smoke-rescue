@@ -633,10 +633,17 @@ namespace SmokeRescue.Brain
         /// confirmed 2.4 m inside the one door, with the whole 1.05 m disc an obstacle, closed the entrance to both robots.</summary>
         public void SetKeepOut(IReadOnlyList<Vector2> centres, float coreRadius, float radius)
         {
+            var cores = new float[centres.Count]; for (int k = 0; k < cores.Length; k++) cores[k] = coreRadius;
+            SetKeepOut(centres, cores, radius);
+        }
+        /// <summary>The same with a hard core per person (squeeze_per_person: only the person who seals floor gets the small core).</summary>
+        public void SetKeepOut(IReadOnlyList<Vector2> centres, IReadOnlyList<float> cores, float radius)
+        {
             keepOut ??= new bool[Count]; System.Array.Clear(keepOut, 0, Count);
             keepSoft ??= new float[Count]; System.Array.Clear(keepSoft, 0, Count);
-            foreach (var p in centres)
+            for (int k = 0; k < centres.Count; k++)
             {
+                var p = centres[k]; float coreRadius = cores[k];
                 int c0 = Cell(p); if (c0 < 0) continue;
                 int r = Mathf.CeilToInt(radius / CellM), cx = c0 % Size, cy = c0 / Size;
                 for (int dy = -r; dy <= r; dy++) for (int dx = -r; dx <= r; dx++)
@@ -719,6 +726,20 @@ namespace SmokeRescue.Brain
         /// emergency exit (RobotBrain.CheckEmergencyExit).</summary>
         internal float FireClearance { get => fireClearance ?? c.fire_clearance_m; set => fireClearance = value; }
         float? fireClearance;
+        /// <summary>Why a target cell cannot be planned to, as a code and name: 1 outside the grid, 2 wall, 3 not known free, 4 inside a
+        /// confirmed person's keep-out, 5 inside the obstacle margin, 6 inside the fire margin, 7 the cell is fine but no route reaches it.</summary>
+        internal (int code, string name) WhyNotWalkable(Vector2 p)
+        {
+            int i = Cell(p); PrepareNavigation();
+            if (i < 0) return (1, "outside the grid");
+            if (Occupancy(i) == 255) return (2, "a wall");
+            if (Occupancy(i) != 1) return (3, "not known free");
+            if (keepOut != null && keepOut[i]) return (4, "a confirmed person's keep-out");
+            float padding = CellM * .707107f;
+            if (obstacleDistance[i] <= c.robot_radius_m + padding) return (5, "inside the obstacle margin");
+            if (fireDistance[i] <= FireClearance + padding) return (6, "inside the fire margin");
+            return (7, "free, but no route reaches it");
+        }
         internal bool Walkable(int i)
         {
             if (i < 0 || i >= Count || Occupancy(i) != 1) return false;

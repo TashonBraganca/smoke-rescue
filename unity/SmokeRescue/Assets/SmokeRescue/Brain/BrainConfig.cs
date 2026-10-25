@@ -255,6 +255,23 @@ namespace SmokeRescue.Brain
         public float survivor_stop_yaw_dps = 5.0f;
         public float retreat_start_weight = 0.1f;
         public float retreat_path_weight = 0.01f;
+        public bool person_threshold_look = false;
+        public bool exit_watch_inside = false;
+        public float end_return_blocked_resume_s = 0f;
+        public float end_return_retry_s = 60.0f;
+        public bool code_spray_route_fire = false;
+        public float code_spray_reserve_l = 0f;
+        public bool stall_near_person_blacklists = false;
+        public float stall_near_person_extra_m = 0.8f;
+        public bool squeeze_per_person = false;
+        public float code_spray_retry_s = 0f;
+        public bool code_spray_ignores_leave_refusal = false;
+        public float leave_wait_cap_s = 0f;
+        public bool visited_retry = false;
+        public float visited_retry_s = 30.0f;
+        public bool progress_route_shrink = false;
+        public bool goal_commitment = false;
+        public float goal_commit_max_s = 60.0f;
 
         // Load reads only the limits block, so the brain never depends on the simulator driver.
         [Serializable] public sealed class MotionLimits
