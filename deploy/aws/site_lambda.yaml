@@ -136,6 +136,12 @@ Resources:
     Properties:
       TargetFunctionArn: !Ref SiteFunction
       AuthType: NONE
+      # The judge site on Amplify calls the public OpenCV routes from the browser (25 Oct).
+      Cors:
+        AllowOrigins: ["https://main.dyhvyjxo1bz4g.amplifyapp.com", "http://localhost:3123"]
+        AllowMethods: [GET, POST]
+        AllowHeaders: [content-type]
+        MaxAge: 600
 
   SiteUrlPermission:
     Type: AWS::Lambda::Permission
