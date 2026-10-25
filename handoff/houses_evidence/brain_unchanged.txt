@@ -1,0 +1,2 @@
+git diff --exit-code -- unity/SmokeRescue/Assets/SmokeRescue/Brain config/brain.json
+exit code 0
