@@ -35,6 +35,7 @@ one() {
   fi
 }
 if [ "$mode" = one ]; then one "$2"; exit 0; fi
-ls "$req_dir"/*.json | xargs -n 1 -P "$par" "$here/run_all.sh" --one
+# Through sh, so it also runs from a noexec mount such as /dev/shm.
+ls "$req_dir"/*.json | xargs -n 1 -P "$par" sh "$here/$(basename "$0")" --one
 n_ok=$(ls "$req_dir"/*.json | wc -l | tr -d ' ')
 echo "done: $n_ok requests; failures listed in $log_dir/failures.txt (if it exists)"
