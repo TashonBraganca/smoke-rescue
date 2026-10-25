@@ -247,5 +247,45 @@ namespace SmokeRescue.Tests.EditMode
                 Assert.That(Keep(b, new Vector2(3.3f, -1.5f)), Is.EqualTo(per), per ? "the person in the open room keeps the full core" : "control: without squeeze_per_person it shrinks too");
             }
         }
+
+        // A 4 x 6 m room, all of it searched floor, with fire at (fireX, fireY) and this robot at the origin walking a route north along x = 0.
+        static RobotBrain RoomWithFire(Action<BrainConfig> tweak, float fireX, float fireY, bool unsearched = false, float half = .1f)
+        {
+            var s = Settings(); s.code_sprays_fire = true; s.code_spray_goal_room = true; s.room_ledger = true; tweak(s);
+            var b = new RobotBrain(Calibration(), s, "A", 0); var g = Map(b);
+            for (float y = -1; y <= 5; y += .05f)
+            {
+                for (float x = -2f; x <= 2f; x += .05f) g.ObserveFree(g.Cell(new Vector2(x, y)));
+                g.ObserveOccupied(g.Cell(new Vector2(-2.1f, y))); g.ObserveOccupied(g.Cell(new Vector2(2.1f, y)));
+            }
+            for (float x = -2.1f; x <= 2.1f; x += .05f) { g.ObserveOccupied(g.Cell(new Vector2(x, -1.1f))); g.ObserveOccupied(g.Cell(new Vector2(x, 5.1f))); }
+            var searched = (bool[])typeof(OccupancyGrid).GetField("observed", NP).GetValue(g);
+            for (int i = 0; i < g.Count; i++) searched[i] = !unsearched || g.Centre(i).y < 0;
+            for (float dx = -half; dx <= half + 1e-3f; dx += .1f) for (float dy = -half; dy <= half + 1e-3f; dy += .1f) g.ObserveHeat(g.Cell(new Vector2(fireX + dx, fireY + dy)), 600, 0);
+            b.Nozzle = TestNozzle;
+            ((GridPlanner)typeof(RobotBrain).GetField("planner", NP).GetValue(b)).Rooms.Update(0, Vector2.zero);
+            var route = (List<Vector2>)typeof(RobotBrain).GetField("path", NP).GetValue(b);
+            route.Clear(); for (float y = 0; y <= 4.5f; y += .1f) route.Add(new Vector2(0, y));   // a planned route is dense
+            return b;
+        }
+
+        [Test]
+        public void WaterGoesToFireOnTheRouteNotToAnyFireInTheGoalRoomAndKeepsAReserve()
+        {
+            // F5. Seed 934 (25 Oct), robot A: all 12 L at 371.1, 385.1 and 403.6 s on 2.5, 1.5 and 0.6 m2 of fire about 3 m from its route,
+            // in the same merged ledger room as its goal; A had no water when the exit closed. Fire 1.8 m beside the route, in a room that
+            // is already searched: not sprayed with code_spray_route_fire (control: the old goal-room trigger sprays it).
+            Assert.That(RoomWithFire(c => c.code_spray_route_fire = false, 1.8f, .5f).CodeSpray(0, 12, out _, out _), Is.True, "control: the goal-room trigger sprays it");
+            Assert.That(RoomWithFire(c => c.code_spray_route_fire = true, 1.8f, .5f).CodeSpray(0, 12, out _, out _), Is.False, "fire off the route on searched floor: keep the water");
+            // The same fire on the route (0.6 m from it): sprayed.
+            Assert.That(RoomWithFire(c => c.code_spray_route_fire = true, .6f, 2.4f).CodeSpray(0, 12, out float bearing, out _), Is.True, "fire within the margin of the route: spray it");
+            Assert.That(Mathf.Abs(bearing), Is.LessThan(60f));
+            // Fire on unsearched floor, off the route: sprayed. Control: the same fire on searched floor was not.
+            Assert.That(RoomWithFire(c => c.code_spray_route_fire = true, 1.8f, .5f, true).CodeSpray(0, 12, out _, out _), Is.True, "fire burning on unsearched floor: spray it");
+            // The reserve: 7 L aboard and a 6 L reserve leave 1 s for any spray that is not on the way home; this 1.7 m2 fire needs about 4.5 s.
+            Assert.That(RoomWithFire(c => { c.code_spray_route_fire = true; c.code_spray_reserve_l = 6; }, .6f, 2.4f, false, .65f).CodeSpray(0, 7, out _, out _), Is.False, "7 L with a 6 L reserve: not for this fire");
+            Assert.That(RoomWithFire(c => { c.code_spray_route_fire = true; c.code_spray_reserve_l = 0; }, .6f, 2.4f, false, .65f).CodeSpray(0, 7, out _, out _), Is.True, "control: no reserve, 7 L is enough");
+            Assert.That(RoomWithFire(c => { c.code_spray_route_fire = true; c.code_spray_reserve_l = 6; }, .6f, 2.4f, false, .65f).CodeSpray(0, 12, out _, out _), Is.True, "12 L with the reserve still leaves enough");
+        }
     }
 }
