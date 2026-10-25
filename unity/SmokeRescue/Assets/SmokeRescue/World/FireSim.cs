@@ -334,8 +334,10 @@ namespace SmokeRescue.World
             WaterInput(halfAngleDeg, nameof(halfAngleDeg)); WaterInput(flowLps, nameof(flowLps));
             WaterInput(durationS, nameof(durationS));
             if (t < lastRequestedTime || !Finite(t + durationS)) throw new ArgumentOutOfRangeException(nameof(t));
-            WaterInput(nozzleXZ.x, nameof(nozzleXZ)); WaterInput(nozzleXZ.y, nameof(nozzleXZ));
-            WaterInput(headingRad, nameof(headingRad));
+            // Positions and headings may be negative (a robot outside a house whose origin is its corner, ranch
+            // houses 26 Oct: a spray from z = -1.2 ended the recording); they only have to be finite.
+            if (!Finite(nozzleXZ.x) || !Finite(nozzleXZ.y)) throw new ArgumentOutOfRangeException(nameof(nozzleXZ));
+            if (!Finite(headingRad)) throw new ArgumentOutOfRangeException(nameof(headingRad));
             if (halfAngleDeg > 180) throw new ArgumentOutOfRangeException(nameof(halfAngleDeg));
             // Reject overflow before a tick can change any state.
             double energyPerLitre = config.water.latent_heat_kj_l + config.water.sensible_heat_kj_l;
