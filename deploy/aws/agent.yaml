@@ -403,7 +403,7 @@ Resources:
             - { Name: METRICS_NAMESPACE, Value: SmokeRescue }
             # AWS calls use shorter per-call bounds so the proxy can return a whole step.
             - { Name: AZURE_OPENAI_TIMEOUT_S, Value: "15" }
-            - { Name: AZURE_OPENAI_MAX_ATTEMPTS, Value: "1" }
+            - { Name: AZURE_OPENAI_MAX_ATTEMPTS, Value: "2" }   # 1 stopped the resend without reasoning_effort that gpt-5.6-terra needs with tools (25 Oct)
           Secrets: !If
             - UseAzure
             - - Name: AZURE_OPENAI_ENDPOINT
