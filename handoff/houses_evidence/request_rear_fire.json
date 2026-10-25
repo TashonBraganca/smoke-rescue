@@ -1,0 +1,28 @@
+{
+  "runs": [
+    {
+      "world": "handoff/houses_evidence/world_family_ranch.json",
+      "out": "data/runs/houses_25oct/family_ranch_rear_fire",
+      "duration_s": 600,
+      "time_limit": true,
+      "fire": true,
+      "robot_collision": true,
+      "capsule_walls": true,
+      "settings": {
+        "mission_time_limit_s": 480
+      }
+    },
+    {
+      "world": "handoff/houses_evidence/world_long_ranch.json",
+      "out": "data/runs/houses_25oct/long_ranch_rear_fire",
+      "duration_s": 600,
+      "time_limit": true,
+      "fire": true,
+      "robot_collision": true,
+      "capsule_walls": true,
+      "settings": {
+        "mission_time_limit_s": 480
+      }
+    }
+  ]
+}

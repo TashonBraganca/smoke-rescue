@@ -116,8 +116,8 @@ namespace SmokeRescue.Recording
         public static IEnumerable<Result> RecordSteps(string scenarioFile, string runId, float maxSeconds = float.PositiveInfinity, bool noise = true, Action<string> progress = null)
         {
             var wall = Stopwatch.StartNew();
-            var plan = FloorPlan.Load();
             var scenario = Scenario.Load(scenarioFile);
+            var plan = FloorPlan.Load(scenario.FloorPlanPath);
             CheckSurvivorsMatchScene(scenario);
             var sensorCfg = SensorConfig.Load();
             PeoplePeriodS = BrainConfig.Load().person_rgb_scan_period_s; PeopleBoostS = BrainConfig.Load().person_rgb_boost_period_s;
@@ -132,6 +132,10 @@ namespace SmokeRescue.Recording
                 try { Directory.Delete(trash, true); } catch (IOException e) { Debug.LogWarning($"[SmokeRescue] could not delete {trash}: {e.Message}"); }
             }
             Directory.CreateDirectory(root);
+            // Make the selected plan available to the evaluator before the first frame.
+            string oracleDir = Path.Combine(root, "oracle");
+            Directory.CreateDirectory(oracleDir);
+            File.Copy(scenario.FloorPlanPath, Path.Combine(oracleDir, "floorplan_used.json"), true);
 
             var atmosphere = Atmosphere.Build(plan, scenario);
             var oldRobots = GameObject.Find("Robots");
@@ -490,7 +494,7 @@ namespace SmokeRescue.Recording
                         flashover = sim.RoomStates.Where(r => r.FlashoverTime >= 0).Select(r => new { r.Room, t = r.FlashoverTime - atmosphere.FireSpread.HeadStart }).ToArray(),
                     });
                 }
-                oracle.Finish(scenario, Path.Combine(FloorPlan.ConfigDir, "floorplan.json"));
+                oracle.Finish(scenario, scenario.FloorPlanPath);
                 // Ceilings stay in: the cameras look 20 degrees above the horizon and map them too.
                 if (!truthExported) result.truthPoints = oracle.ExportHouseTruth(new[] { GameObject.Find(HouseBuilder.RootName), GameObject.Find("Furniture") }, layerToSkip: -1);
 

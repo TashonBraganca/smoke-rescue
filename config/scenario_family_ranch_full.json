@@ -1,0 +1,198 @@
+{
+  "id": "family_ranch",
+  "description": "Full mission in a new ranch. Unchanged brain, sensors and local gate pads only. Layout is world-side evaluation data.",
+  "seed": 2510,
+  "duration_s": 600,
+  "duration_s_reason": "Owner, 25 Oct 03:00: demo videos end with the house searched and both robots walked out; the recording stops when both are out (one second after both finish) or at 600 s.",
+  "time_limit": true,
+  "search_s": 480,
+  "search_s_reason": "Owner, 25 Oct 03:00: every demo video ends with both robots out. With the search deadline at 480 s, return_home_at_end starts each robot's walk out in time to be out by then; leave_when_done takes them out sooner if nothing is left to search.",
+  "search_area": [
+    0,
+    0,
+    15,
+    11
+  ],
+  "dark_rooms": [
+    "fr_bed1",
+    "fr_bath1"
+  ],
+  "sim_rate_hz": 15,
+  "yaw_convention": "degrees about Unity +y. 0 faces +z (north), 90 faces +x (east).",
+  "smoke": {
+    "model": "fluid",
+    "global_haze": 0.15,
+    "rooms": {
+      "fr_kitchen": 0.35,
+      "fr_living": 0.25,
+      "fr_bed2": 0.3,
+      "default": 0.15,
+      "fr_kitchen_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
+      "fr_living_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
+      "fr_bed2_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
+      "default_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation."
+    },
+    "ramp_per_minute": 0.0,
+    "global_haze_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
+    "ramp_per_minute_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation."
+  },
+  "robots": [
+    {
+      "id": "robot_A",
+      "color": "#F2A900",
+      "spawn": {
+        "at": [
+          3,
+          -1.2
+        ],
+        "yaw": 0,
+        "at_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
+        "yaw_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation."
+      },
+      "control": "autonomous",
+      "cruise_speed": 0.5,
+      "doorway_speed": 0.3,
+      "route": [],
+      "look_around_at": [],
+      "torch": "off",
+      "launch_pad": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "cruise_speed_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
+      "doorway_speed_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
+      "launch_pad_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation."
+    },
+    {
+      "id": "robot_B",
+      "color": "#2FA3E6",
+      "spawn": {
+        "at": [
+          2.976,
+          -2.402
+        ],
+        "yaw": 2.39,
+        "at_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
+        "yaw_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation."
+      },
+      "control": "autonomous",
+      "cruise_speed": 0.5,
+      "doorway_speed": 0.3,
+      "route": [],
+      "look_around_at": [],
+      "torch": "wide",
+      "launch_pad": [
+        0.0,
+        -1.2,
+        0.0
+      ],
+      "cruise_speed_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
+      "doorway_speed_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
+      "launch_pad_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation."
+    }
+  ],
+  "look_around": {
+    "sweep_deg": 60,
+    "speed_dps": 25,
+    "sweep_deg_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
+    "speed_dps_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation."
+  },
+  "survivors": [
+    {
+      "id": "s1",
+      "room": "fr_bath2",
+      "at": [
+        14.32388973236084,
+        7.442147254943848
+      ],
+      "yaw": 14.433733940124512,
+      "pose": "lying_on_side",
+      "at_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
+      "yaw_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation."
+    },
+    {
+      "id": "s2",
+      "room": "fr_bed2",
+      "at": [
+        5.502893924713135,
+        7.181830883026123
+      ],
+      "yaw": 44.22328567504883,
+      "pose": "slumped_against_wall",
+      "at_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
+      "yaw_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation."
+    },
+    {
+      "id": "s3",
+      "room": "fr_bed3",
+      "at": [
+        9.17015266418457,
+        7.544089317321777
+      ],
+      "yaw": 209.69728088378906,
+      "pose": "collapsed_at_desk",
+      "at_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
+      "yaw_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation."
+    },
+    {
+      "id": "s4",
+      "room": "fr_bed1",
+      "at": [
+        0.966789186000824,
+        7.00441837310791
+      ],
+      "yaw": 16.903200149536133,
+      "pose": "curled_on_bed",
+      "at_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
+      "yaw_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation."
+    },
+    {
+      "id": "s6",
+      "room": "fr_kitchen",
+      "at": [
+        9.180782318115234,
+        0.875281572341919
+      ],
+      "yaw": 11.947297096252441,
+      "pose": "slumped_against_wall",
+      "at_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
+      "yaw_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation."
+    }
+  ],
+  "survivor_placement": "fixed",
+  "radio": {
+    "range_m": 12.0,
+    "max_walls": 1,
+    "broadcast_period_s": 2.0,
+    "budget_bytes_per_s": 2048,
+    "range_m_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
+    "max_walls_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
+    "broadcast_period_s_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
+    "budget_bytes_per_s_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation."
+  },
+  "fire": {
+    "spread": true,
+    "head_start_s": 320.0,
+    "note": "Baseline medium-growth model with one origin in a rear bedroom and the seed 934 head start.",
+    "head_start_s_reason": "The fire has burned for a fire department's benchmark response time before the robots enter: NFPA 1710 (2020) 4.1.2.1, turnout under 80 s plus first-engine travel 240 s, 320 s on 90 % of calls (fems.dc.gov/page/fire-response-time; firefighternation.com, Engine Company Staffing & NFPA 1710/NIST Research). It leaves out detection and call handling, so the real fire would be older. Under the NFPA 72 medium t-squared growth (config/fire.json) the fire is about 1.2 MW at entry; headless model: foyer upper gas past 60 C at entry, hallway 60 C about 54 s and living room 200 C about 130 s after entry. Owner, 23 Oct: the fire looked too mild in a 480 s run.",
+    "config_file": "fire_family_ranch.json"
+  },
+  "obstacles": [],
+  "warm_objects": [],
+  "launch": {
+    "door": "d_front",
+    "pad_spacing_m": 1.2,
+    "placement_sigma_m": 0.05,
+    "placement_sigma_deg": 2.0,
+    "reason": "Same 1.2 m surveyed pad spacing and seeded B placement error as seed 934, rotated to this entrance. Brains receive only the local gate frame.",
+    "pad_spacing_m_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
+    "placement_sigma_m_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
+    "placement_sigma_deg_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation."
+  },
+  "floorplan_file": "floorplan_family_ranch.json",
+  "seed_reason": "World seed 2510 for family ranch and 2511 for long ranch, chosen as adjacent reproducible seeds for the 25 October layouts. This selects furnishing and safe placement candidates, plus world and sensor randomness; the brain receives no layout ID.",
+  "survivor_placement_reason": "Five explicit safe positions in different rooms, chosen by the existing conservative placement checker. Fixed placement preserves the checked rooms and furniture clearance in Unity; no position is sent to a robot.",
+  "search_area_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
+  "sim_rate_hz_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation."
+}

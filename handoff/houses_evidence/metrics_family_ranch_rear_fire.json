@@ -1,0 +1,128 @@
+{
+  "run": "data/runs/houses_25oct/family_ranch_rear_fire",
+  "house": "family_ranch",
+  "duration_s": 600.0,
+  "rooms_entered": 9,
+  "rooms_total": 9,
+  "usable_floor_coverage_pct": 98.19,
+  "gross_floor_coverage_pct": 97.25,
+  "usable_samples_searched": 12013,
+  "usable_samples": 12235,
+  "people_confirmed": 5,
+  "people_total": 5,
+  "confirmed_ids": [
+    "s1",
+    "s2",
+    "s3",
+    "s4",
+    "s6"
+  ],
+  "false_confirmation_events": 0,
+  "both_walked_out": false,
+  "robots": {
+    "robot_A": {
+      "walked_out_at_s": 511.5,
+      "rooms_entered": [
+        "fr_bath1",
+        "fr_bath2",
+        "fr_bed2",
+        "fr_bed3",
+        "fr_hall",
+        "fr_kitchen",
+        "fr_laundry",
+        "fr_living"
+      ],
+      "final_pose_gate": [
+        0.009006493,
+        0.43692008
+      ],
+      "final_state": "complete",
+      "outside_at_end": true,
+      "walked_out": true
+    },
+    "robot_B": {
+      "walked_out_at_s": null,
+      "rooms_entered": [
+        "fr_bath1",
+        "fr_bed1",
+        "fr_bed2",
+        "fr_hall",
+        "fr_kitchen",
+        "fr_laundry",
+        "fr_living"
+      ],
+      "final_pose_gate": [
+        0.5863303,
+        5.5508556
+      ],
+      "final_state": "return",
+      "outside_at_end": false,
+      "walked_out": false
+    }
+  },
+  "rooms": {
+    "fr_hall": {
+      "entered": true,
+      "gross_floor_pct": 100.0,
+      "usable_floor_pct": 100.0,
+      "usable_samples_searched": 2286,
+      "usable_samples": 2286
+    },
+    "fr_living": {
+      "entered": true,
+      "gross_floor_pct": 99.0,
+      "usable_floor_pct": 98.57,
+      "usable_samples_searched": 1448,
+      "usable_samples": 1469
+    },
+    "fr_kitchen": {
+      "entered": true,
+      "gross_floor_pct": 95.71,
+      "usable_floor_pct": 98.88,
+      "usable_samples_searched": 1684,
+      "usable_samples": 1703
+    },
+    "fr_laundry": {
+      "entered": true,
+      "gross_floor_pct": 91.05,
+      "usable_floor_pct": 97.84,
+      "usable_samples_searched": 814,
+      "usable_samples": 832
+    },
+    "fr_bed1": {
+      "entered": true,
+      "gross_floor_pct": 96.31,
+      "usable_floor_pct": 95.26,
+      "usable_samples_searched": 1306,
+      "usable_samples": 1371
+    },
+    "fr_bed2": {
+      "entered": true,
+      "gross_floor_pct": 97.04,
+      "usable_floor_pct": 97.08,
+      "usable_samples_searched": 1331,
+      "usable_samples": 1371
+    },
+    "fr_bed3": {
+      "entered": true,
+      "gross_floor_pct": 97.88,
+      "usable_floor_pct": 98.4,
+      "usable_samples_searched": 1349,
+      "usable_samples": 1371
+    },
+    "fr_bath1": {
+      "entered": true,
+      "gross_floor_pct": 98.28,
+      "usable_floor_pct": 98.91,
+      "usable_samples_searched": 906,
+      "usable_samples": 916
+    },
+    "fr_bath2": {
+      "entered": true,
+      "gross_floor_pct": 96.4,
+      "usable_floor_pct": 97.05,
+      "usable_samples_searched": 889,
+      "usable_samples": 916
+    }
+  }
+}
