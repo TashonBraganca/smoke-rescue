@@ -27,9 +27,9 @@ EVENT_TEXT = {
     "mission_complete": lambda e: f"{name(e['robot'])} is walking out.",
     "room_searched": lambda e: f"{name(e['robot'])} finished searching a room.",
     "door_taken": lambda e: f"{name(e['robot'])} took a doorway; the others leave that room to it.",
-    'agent_decision': lambda e: 'Terra, ' + name(e['robot']) + ': ' + e['reason'],
+    'agent_decision': lambda e: 'Terra for ' + name(e['robot']) + '. ' + e['reason'],
     'agent_unavailable': lambda e: e['reason'],
-    'agent_order': lambda e: name(e['robot']) + ': ' + e['reason'],
+    'agent_order': lambda e: name(e['robot']) + ' applied an agent order. ' + e['reason'].replace('go_to: explore: ', ''),
 }
 
 

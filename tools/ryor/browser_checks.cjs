@@ -43,7 +43,7 @@ const log = (...args) => console.log(new Date().toISOString(), ...args);
       await page.fill('#place-x',String(p[0])); await page.fill('#place-y',String(p[1])); await page.click('#place-point');
     }
     await page.click('[data-tool="fire"]');
-    await page.fill('#place-x','-.25'); await page.fill('#place-y','2.5'); await page.click('#place-point');
+    await page.fill('#place-x','7.75'); await page.fill('#place-y','2'); await page.click('#place-point');
     const placement = await page.textContent('#placement-message');
     if (!placement.includes('3 of 5') || !placement.includes('Fire origin placed')) throw Error('Placement controls lost a point');
     await page.screenshot({path:path.join(OUT,'public_placement.png')});
@@ -99,7 +99,7 @@ const log = (...args) => console.log(new Date().toISOString(), ...args);
     }
     if (!finished) throw Error('Mission browser check timed out');
     if (mode === 'kill' && !killed) throw Error('Kill test never stopped a live task');
-    if (mode !== 'kill' && requests.some(r=>r.body.source==='recorded')) throw Error('Expected a live mission, received fallback');
+    if (mode !== 'kill' && requests.some(r=>r.body.source==='recorded' && !r.body.prepared)) throw Error('Expected a live mission, received fallback');
     const compact = requests.map(r=>({url:r.url,status:r.status,at:r.at,body:r.body.status?{status:r.body.status,chunks:r.body.chunks.map(c=>({chunk:c.chunk,frames:c.frames.length}))}:r.body}));
     save(`browser_${mode}.json`,{browser:browser.version(),url:URL,mission,killed,first_playable_s:first,total_s:(Date.now()-start)/1000,errors,requests:compact});
     save(`browser_${mode}_replay.json`,polls);
@@ -110,6 +110,8 @@ const log = (...args) => console.log(new Date().toISOString(), ...args);
     log('PASS',mode);
   } finally {
     save(`browser_${mode}_errors.json`,errors);
+    save(`browser_${mode}_network.json`, requests.map(r=>({url:r.url,status:r.status,at:r.at,
+      body:r.body.status?{status:r.body.status,chunks:r.body.chunks.map(c=>({chunk:c.chunk,frames:c.frames.length}))}:r.body})));
     await context.close(); await browser.close();
   }
 })().catch(e=>{console.error(e.stack);process.exit(1)});

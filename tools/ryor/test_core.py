@@ -22,7 +22,7 @@ def house():
 
 @pytest.fixture
 def scene():
-    return {'people': [[1.75, 3.5], [5.25, 3], [-2.25, 8.25]], 'fire': [-.25, 2.5]}
+    return {'people': [[1.75, 3.5], [5.25, 3], [-2.25, 8.25]], 'fire': [7.75, 2]}
 
 
 def test_generator_path_validator_accepts_clear_floor(house, scene):
@@ -38,6 +38,8 @@ def test_generator_path_validator_accepts_clear_floor(house, scene):
     ({'people': [[float('inf'), 3]]}, 'finite'),
     ({'people': [[1, 2]] * 6}, 'five'),
     ({'fire': [99, 99]}, 'inside'),
+    ({'fire': [-.25, 2.5]}, '0.9 m path'),
+    ({'fire': [4, 5.5]}, '0.9 m path'),
 ])
 def test_bad_placements_are_rejected(house, scene, change, message):
     with pytest.raises(ValueError, match=message):

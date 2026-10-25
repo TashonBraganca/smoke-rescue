@@ -82,6 +82,7 @@ def main():
         fail(f"unknown setup {SETUP}")
     gallery = json.loads((ROOT / "data/runs/ryor/gallery.json").read_text())
     req = json.loads(req_path.read_text())
+    log('request and gallery loaded')
     run_dir = Path(os.environ.get("RUN_DIR") or f"/tmp/ryor_run/{MISSION}_{SETUP}")
     run_dir.mkdir(parents=True, exist_ok=True)
     for f in ("trace.jsonl", "result.json", "running.marker"):
@@ -118,10 +119,12 @@ def main():
     (run_dir / "request.json").write_text(json.dumps(req))
     write_status(state="starting")
     builder = Builder(gallery, SETUP, req["runs"][0]["duration_s"])
+    log('replay floor grid ready')
     worker = None
     if TERRA:
         from terra import Worker
         worker = Worker(run_dir, MISSION, os.environ['RYOR_TABLE'], boto3.client('dynamodb'), boto3.client('secretsmanager'))
+        log('asynchronous Terra worker ready')
     env = dict(os.environ, SMOKE_REPO=str(ROOT), DOTNET_NOLOGO="1", DOTNET_CLI_TELEMETRY_OPTOUT="1")
     t0 = time.time()
     proc = subprocess.Popen([DOTNET, ENGINE, str(run_dir / "request.json")], env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -138,6 +141,11 @@ def main():
     buf, done = "", False
     with trace.open() as fh:
         while True:
+            wall = time.time() - t0
+            if KILL_AFTER_S and wall > KILL_AFTER_S and proc.poll() is None:
+                fail(f"killed by test after {wall:.0f} s wall (KILL_AFTER_S)", proc)
+            if wall > HARD_LIMIT_S and proc.poll() is None:
+                fail(f"hard limit: {wall:.0f} s wall > {HARD_LIMIT_S:.0f} s at sim {builder.sim_t:.1f} s", proc)
             data = fh.read()
             if data:
                 buf += data
@@ -160,11 +168,6 @@ def main():
             if proc.poll() is not None:
                 done = True     # read once more: the last lines may have landed after the previous read
                 continue
-            wall = time.time() - t0
-            if KILL_AFTER_S and wall > KILL_AFTER_S:
-                fail(f"killed by test after {wall:.0f} s wall (KILL_AFTER_S)", proc)
-            if wall > HARD_LIMIT_S:
-                fail(f"hard limit: {wall:.0f} s wall > {HARD_LIMIT_S:.0f} s at sim {builder.sim_t:.1f} s", proc)
             time.sleep(0.3)
     out = proc.stdout.read().decode()
     if proc.returncode != 0:

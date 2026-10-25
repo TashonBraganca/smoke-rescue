@@ -36,7 +36,7 @@ def validate(house, submitted):
     geometry = house['placement_geometry']
     rooms, doors, furniture = geometry['rooms'], geometry['doors'], geometry['furniture']
     fire_cfg = geometry['footprints']
-    bodies = []
+    bodies, fire_body = [], None
     for i, p in enumerate(result['people'] + [result['fire']]):
         is_fire = i == len(result['people'])
         label = 'The fire' if is_fire else 'Person %d' % (i + 1)
@@ -53,24 +53,28 @@ def validate(house, submitted):
                 raise ValueError('The fire needs combustible floor. Choose a bedroom or living room.')
             if any(math.dist(p, q) < PERSON_SEPARATION_M for q in result['people']):
                 raise ValueError('Keep the fire at least 1.2 m from each person.')
+            # Reserve the same conservative envelope around the ignition. Distance from a door alone
+            # does not prove that the room's only 0.9 m circulation path remains clear.
+            fire_body = {'kind': 'person_body', 'at': p, 'yaw': 0, 'room': room['id']}
         else:
             if any(math.dist(p, q) < PERSON_SEPARATION_M for q in result['people'][:i]):
                 raise ValueError('People must be at least 1.2 m apart.')
             bodies.append({'kind': 'person_body', 'at': p, 'yaw': 0, 'room': room['id']})
     for room in rooms:
         targets = [p for p in bodies if p['room'] == room['id']]
-        if not targets:
+        hazards = [fire_body] if fire_body['room'] == room['id'] else []
+        if not targets and not hazards:
             continue
         obstacles = [f for f in furniture if f['room'] == room['id']]
         issues = room_paths(room, [d for d in doors if room['id'] in d['between']],
-                            obstacles + targets, fire_cfg, targets=targets, require_all=True)
+                            obstacles + targets + hazards, fire_cfg, targets=targets, require_all=True)
         if issues:
-            raise ValueError('A person blocks the 0.9 m path through ' + room.get('name', room['id']) + '.')
+            raise ValueError('A person or the fire blocks the 0.9 m path through ' + room.get('name', room['id']) + '.')
     return result
 
 
 def setup_key(base, placement, engine):
     # Include actual scene bytes, engine and validator revision. Changing any invalidates the recording.
-    data = {'base': base, 'placement': placement, 'engine': engine, 'validator': 1}
+    data = {'base': base, 'placement': placement, 'engine': engine, 'validator': 2}
     digest = hashlib.sha256(json.dumps(data, sort_keys=True, separators=(',', ':')).encode()).hexdigest()[:20]
     return base + '__p' + digest

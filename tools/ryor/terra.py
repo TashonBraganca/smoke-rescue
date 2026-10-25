@@ -23,7 +23,8 @@ SYSTEM = ('You are the search robot agent in Smoke Rescue. You have no images or
           'indoor floor, avoid a peer already searching a room, and respect heat and the time left to exit. '
           'Use explore_frontier with one offered id and a short specific reason, or continue_search. '
           'You cannot confirm people, use camera tools, invent coordinates, or issue safety overrides. '
-          'Reply with exactly one tool call. The brain rechecks every order and keeps moving while you decide.')
+          'Reply with exactly one tool call. Write a plain ASCII sentence for the reason. '
+          'The brain rechecks every order and keeps moving while you decide.')
 TOOLS = [{'type': 'function', 'function': {'name': 'explore_frontier',
     'description': 'Search one of the indoor frontiers in this robot observation.', 'parameters': {
         'type': 'object', 'properties': {'frontier_id': {'type': 'integer'}, 'reason': {'type': 'string'}},
