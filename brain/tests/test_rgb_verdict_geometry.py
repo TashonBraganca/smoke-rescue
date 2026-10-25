@@ -30,7 +30,7 @@ def test_unranged_colour_person_does_not_borrow_a_warm_objects_range(tmp_path,mo
 
 def test_recorded_colour_person_outside_confirmation_range_stays_outside(tmp_path):
     rec=Path(__file__).resolve().parents[2]/'data/recordings/unity_house_onedoor_seed932_nolimit_run1/robot_B'
-    if not rec.exists(): pytest.skip('local recording absent')
+    if not rec.exists() or next(rec.glob('**/rgb/*.png'), None) is None: pytest.skip('local recording absent or its image frames were removed')
     f=V.load_frame(rec,82.)
     comp=next(c for c in V.scan_thermal(f)['people'] if c['bbox']==[0,176,14,8])
     reg=ToolRegistry(rec,AgentContext('recorded_rgb',82.,0.,0.,0.),tmp_path)

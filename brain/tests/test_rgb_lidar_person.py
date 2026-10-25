@@ -25,7 +25,7 @@ def test_floor_only_box_has_no_depth_range():
 
 
 def test_recorded_person_uses_lidar_when_depth_only_sees_floor(tmp_path, monkeypatch):
-    if not REC.exists(): pytest.skip('local recording absent')
+    if not REC.exists() or next(REC.glob('**/rgb/*.png'), None) is None: pytest.skip('local recording absent or its image frames were removed')
     f = V.load_frame(REC,37.4166666667)
     assert V._body_point(f,(251,257,343,372)) is None
     hit = V._rgb_person(f,(251,257,343,372),.92297)
@@ -46,7 +46,7 @@ def test_recorded_person_uses_lidar_when_depth_only_sees_floor(tmp_path, monkeyp
 
 @pytest.mark.parametrize('control',['stale','behind_box','dropout','mixed_ranges'])
 def test_lidar_without_consistent_body_support_leaves_range_unknown(control):
-    if not REC.exists(): pytest.skip('local recording absent')
+    if not REC.exists() or next(REC.glob('**/rgb/*.png'), None) is None: pytest.skip('local recording absent or its image frames were removed')
     from copy import copy
     f = copy(V.load_frame(REC,37.4166666667))
     scan = f.lidar
@@ -67,7 +67,7 @@ def test_lidar_without_consistent_body_support_leaves_range_unknown(control):
 def test_recorded_separate_person_is_not_rejected_with_a_warm_strip(seed,robot,t,expected_range,can_confirm,tmp_path):
     import json
     rec=ROOT/f'data/recordings/unity_house_onedoor_seed{seed}_run1'
-    if not rec.exists(): pytest.skip('local recording absent')
+    if not rec.exists() or next(rec.glob('**/rgb/*.png'), None) is None: pytest.skip('local recording absent or its image frames were removed')
     trace=[json.loads(l) for l in (rec/'agent_trace.jsonl').read_text().splitlines()]
     start=next(r for r in trace if r['kind']=='step_start' and r.get('robot')==robot and abs(r['t']-t)<1e-6)
     call=next(r for r in trace if r['kind']=='tool' and r['name']=='inspect_candidate' and r['step']==start['step'])
@@ -86,7 +86,7 @@ def test_recorded_separate_person_is_not_rejected_with_a_warm_strip(seed,robot,t
 
 def test_lidar_filled_warm_patch_cannot_supply_vertical_body_shape(tmp_path,monkeypatch):
     rec=ROOT/'data/recordings/unity_house_onedoor_seed928_run1'
-    if not rec.exists(): pytest.skip('local recording absent')
+    if not rec.exists() or next(rec.glob('**/rgb/*.png'), None) is None: pytest.skip('local recording absent or its image frames were removed')
     frame=V.load_frame(rec/'robot_B',106.)
     monkeypatch.setattr(V,'detect_people_rgb',lambda frame:[])
     comp=next(c for c in V.scan_thermal(frame)['people'] if c['bbox']==[137,85,73,120])
