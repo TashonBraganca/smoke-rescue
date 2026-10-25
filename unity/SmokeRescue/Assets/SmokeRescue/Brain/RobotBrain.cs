@@ -355,8 +355,26 @@ namespace SmokeRescue.Brain
                         return Command(0, 0, dt, true);
                     // A deadline return cut on the way is the same: retreat and search on, never hold (held-out seed 919,
                     // robot B held 20 s in cool air when fire cut its route home after a deadline return began).
+                    if (path.Count > 0) returnBlockedSince = double.NaN;
                     if (path.Count == 0 && EndReturn)
                     {
+                        if (double.IsNaN(returnBlockedSince)) { returnBlockedSince = t; lastReturnBlockedLog = double.NegativeInfinity; }
+                        if (t - lastReturnBlockedLog >= 10)
+                        {
+                            lastReturnBlockedLog = t; int here = grid.Cell(motion.Pose.position);
+                            Emit(t, "return_blocked", "The walk out finds no route at any fire margin: hold and look again.", "blocked_s", t - returnBlockedSince,
+                                "nearest_fire_m", here >= 0 ? grid.FireDistance(here) : -1, "fire_clearance_m", grid.FireClearance, "last_resort_m", c.last_resort_fire_clearance_m,
+                                "water_l", lastWaterL, "x_m", motion.Pose.position.x, "y_m", motion.Pose.position.y);
+                        }
+                        if (c.end_return_blocked_resume_s > 0 && t - returnBlockedSince >= c.end_return_blocked_resume_s)
+                        {
+                            // end_return_blocked_resume_s: search on (a code spray can open the way) and try the walk out again later.
+                            returning = false; grid.FireClearance = c.fire_clearance_m; grid.FirePrediction = true; ClearPath();
+                            scanSince = double.NaN; noFrontierAt = double.NaN; returnBlockedSince = double.NaN;
+                            leaveRetryAt = t + c.no_frontier_scan_s; wayOutBlockedAt = t; endReturnRetryAt = t + c.end_return_retry_s;
+                            Emit(t, "return_resumed_search", "No way out for end_return_blocked_resume_s: search on inside, spray the fire in the way, try the walk out again later.");
+                            return Command(0, 0, dt, true);
+                        }
                         // The walk out is the last job: no route home is no reason to search on. A confirmed person's keep-out
                         // can close the only way out of the room (headless 5017: robot A shut in the study with s1, flipping
                         // between return and retreat every tick); pass them at the body's half-width, hold, and plan again.
@@ -1333,14 +1351,15 @@ namespace SmokeRescue.Brain
         /// </summary>
         void CheckWayOut(double t)
         {
-            if (c.stay_inside) return;   // no way out is used, so none is watched
+            bool insideWatch = c.stay_inside && c.exit_watch_inside && c.return_home_at_end;   // exit_watch_inside: watch the way out, never retreat from it
+            if (c.stay_inside && !insideWatch) return;   // no way out is used, so none is watched
             if (completed || returning || retreating || t < nextWayOutCheck) return;
             nextWayOutCheck = t + c.escape_check_s;
             var route = PlanOut();
             if (route.Count == 0)
             {
                 wayOutPoints.Clear(); wayOutRates.Clear();
-                if (hadWayOut) LoseWayOut(t);
+                if (hadWayOut && !insideWatch) LoseWayOut(t);
                 return;
             }
             hadWayOut = true; cutOff = false;
@@ -1354,7 +1373,7 @@ namespace SmokeRescue.Brain
             float walkS = routeM / c.open_speed_mps, closeS = float.PositiveInfinity;
             // Out by the deadline: leave while the walk out, with the same escape_time_factor allowance the fire test uses,
             // still fits before mission_time_limit_s. It used to start back only at the deadline itself.
-            if (routeM > c.return_arrive_m && t + walkS * c.escape_time_factor + c.escape_check_s >= c.mission_time_limit_s)
+            if (!insideWatch && routeM > c.return_arrive_m && t + walkS * c.escape_time_factor + c.escape_check_s >= c.mission_time_limit_s)
             {
                 BeginReturn(t, MissionTimeUp);
                 return;
@@ -1383,7 +1402,7 @@ namespace SmokeRescue.Brain
                 Emit(t, "escape_closing", closest < c.escape_fire_margin_m ? "Fire is closing on the way out; leave while it is open."
                     : "Fire is closing on the way out faster than the robot could walk it later; leave while it is open.",
                     "fire_distance_m", closest, "margin_m", c.escape_fire_margin_m, "closes_in_s", float.IsInfinity(closeS) ? -1 : closeS, "walk_out_s", walkS);
-                if (!(c.heat_spray_through && c.stay_inside)) BeginReturn(t, WayOutClosing);   // staying inside, it searches on
+                if (!(c.heat_spray_through && c.stay_inside) || insideWatch) BeginReturn(t, WayOutClosing);   // staying inside, it searches on
             }
             else CheckRouteWatch(t, route, routeM);
         }
@@ -1988,7 +2007,8 @@ namespace SmokeRescue.Brain
         // leave_when_done's walk out is an end return too. Planned to exits with the entrance lock still on, it found no route
         // at any fire margin (seed 934 full mission, 25 Oct 11:25: both robots retried every 12 s from 360 s to 420 s, never
         // left, and FireOnWayOut, planned the same way, had no fire to spray).
-        bool EndReturn => returning && ((c.return_home_at_end && returnReason == MissionTimeUp) || (c.leave_when_done && returnReason == NoFrontierLeft));
+        bool EndReturn => returning && ((c.return_home_at_end && returnReason == MissionTimeUp) || (c.leave_when_done && returnReason == NoFrontierLeft) ||
+            (c.exit_watch_inside && c.return_home_at_end && returnReason == WayOutClosing));
         List<Vector2> PlanOut()
         {
             if (EndReturn)
@@ -2087,15 +2107,20 @@ namespace SmokeRescue.Brain
             else airTrack.Add((p, airValue, t));
             if (airTrack.Count > 2000) airTrack.RemoveAt(0);
         }
+        double returnBlockedSince = double.NaN, lastReturnBlockedLog = double.NegativeInfinity, endReturnRetryAt = double.NegativeInfinity;
+        float lastWaterL = -1;   // the water the host last offered CodeSpray, for the return_blocked log
         void BeginReturn(double t, string reason)
         {
+            if (reason == MissionTimeUp && t < endReturnRetryAt) return;   // a walk-out that found no way out is not restarted at once
+            returnBlockedSince = double.NaN;
             // Stay inside (the owner's decision, 22 Oct): a robot that has gone in never leaves by the entrance. At the
             // deadline it stops where it stands; every other reason to leave (heat, a closing way out, nothing left to search)
             // becomes a retreat to the coolest floor inside, where it can spray and wait for the air to cool.
             // return_home_at_end (owner, 24 Oct 11:10): at the end both robots walk back out the main exit; staying inside still
             // holds for every other reason to leave. Headless 5001, 5017, 5022 with the time limit: both robots stopped where they
             // stood at 240 s, 7.7 to 19.5 m from the way in. leave_when_done: the same once nothing reachable is left to search.
-            if (c.stay_inside && reason != CarryingOut && !(c.return_home_at_end && reason == MissionTimeUp) && !(c.leave_when_done && reason == NoFrontierLeft))
+            if (c.stay_inside && reason != CarryingOut && !(c.return_home_at_end && reason == MissionTimeUp) && !(c.leave_when_done && reason == NoFrontierLeft) &&
+                !(c.exit_watch_inside && c.return_home_at_end && reason == WayOutClosing))
             {
                 ResetStuckRecovery(); active = null; dwell = 0; ClearPath();
                 if (reason == MissionTimeUp)

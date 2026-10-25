@@ -287,5 +287,63 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(RoomWithFire(c => { c.code_spray_route_fire = true; c.code_spray_reserve_l = 0; }, .6f, 2.4f, false, .65f).CodeSpray(0, 7, out _, out _), Is.True, "control: no reserve, 7 L is enough");
             Assert.That(RoomWithFire(c => { c.code_spray_route_fire = true; c.code_spray_reserve_l = 6; }, .6f, 2.4f, false, .65f).CodeSpray(0, 12, out _, out _), Is.True, "12 L with the reserve still leaves enough");
         }
+
+        // A searched 4 x 4 m room with a 1.4 m corridor south to the start pad at (0, -3.5). fireAcross puts burning floor across the corridor
+        // (nothing can walk out); fireBeside puts it 1.3 m east of the corridor, outside its wall (the way out is open but closing).
+        static RobotBrain RoomWithWayOut(Action<BrainConfig> tweak, bool fireAcross, bool fireBeside = false)
+        {
+            var c = Settings(); c.grid_size_m = 12; c.search_requires_ceiling = false; c.stay_inside = true; c.heat_spray_through = true;
+            c.return_home_at_end = true; c.mission_time_limit_s = 1000; c.walk_out_past_fire = true; tweak(c);
+            var b = new RobotBrain(Calibration(), c, "A", 0); var g = Map(b);
+            var searched = (bool[])typeof(OccupancyGrid).GetField("observed", NP).GetValue(g);
+            for (int i = 0; i < g.Count; i++)
+            {
+                var p = g.Centre(i);
+                bool corridor = Mathf.Abs(p.x) <= .7f && p.y < -2 && p.y >= -4.2f;
+                if (Mathf.Abs(p.x) <= 2 && Mathf.Abs(p.y) <= 2 || corridor) { g.ObserveFree(i); searched[i] = true; }
+                else if (Mathf.Abs(p.x) <= 2.3f && Mathf.Abs(p.y) <= 2.3f || Mathf.Abs(p.x) <= 1.1f && p.y < -2 && p.y >= -4.5f) g.ObserveOccupied(i);
+            }
+            if (fireAcross) for (float x = -.7f; x <= .7f; x += .1f) for (float y = -3.2f; y <= -2.8f; y += .1f) g.ObserveHeat(g.Cell(new Vector2(x, y)), 600, 0);
+            if (fireBeside) for (float y = -3.4f; y <= -2.6f; y += .1f) g.ObserveHeat(g.Cell(new Vector2(1.3f, y)), 600, 0);
+            var pad = new Vector2(0, -3.5f);
+            typeof(RobotBrain).GetField("home", NP).SetValue(b, pad);
+            ((GridPlanner)typeof(RobotBrain).GetField("planner", NP).GetValue(b)).Home = pad;
+            return b;
+        }
+        static List<BrainEvent> RunFor(RobotBrain b, int seconds)
+        {
+            var events = new List<BrainEvent>();
+            for (int i = 0; i <= 20 * seconds; i++) { DriveTick(b, i); events.AddRange(b.DrainEvents()); }
+            return events;
+        }
+
+        [Test]
+        public void AWalkOutWithNoRouteIsLoggedAndGivesWayToTheSearchAfterTwentySeconds()
+        {
+            // F6. Seed 934 (25 Oct): from 480 s both robots stood still for 120 s after one goal event (run_audit 'still 120 s'), the log
+            // silent about why. Burning floor across the only way to the pad: the deadline return finds no route at any margin.
+            var on = RunFor(RoomWithWayOut(c => { c.mission_time_limit_s = 3; c.end_return_blocked_resume_s = 20; c.end_return_retry_s = 60; }, true), 70);
+            string kinds = string.Join(",", on.Select(e => e.kind).Distinct());
+            Assert.That(on.Any(e => e.kind == "return_blocked"), Is.True, "the blocked walk out is logged: " + kinds);
+            var blocked = on.First(e => e.kind == "return_blocked");
+            Assert.That(blocked.numbers.ContainsKey("nearest_fire_m") && blocked.numbers.ContainsKey("fire_clearance_m") && blocked.numbers.ContainsKey("water_l"), Is.True);
+            var resumed = on.Where(e => e.kind == "return_resumed_search").ToList();
+            Assert.That(resumed.Count, Is.EqualTo(1), "gives up once and searches on: " + kinds);
+            Assert.That(resumed[0].t - blocked.t, Is.InRange(19.0, 22.0), "after about 20 s");
+            Assert.That(on.Count(e => e.kind == "goal" && e.reason.StartsWith("Mission time is nearly up")), Is.EqualTo(1), "and does not restart the walk out inside end_return_retry_s");
+            var off = RunFor(RoomWithWayOut(c => { c.mission_time_limit_s = 3; c.end_return_blocked_resume_s = 0; }, true), 70);
+            Assert.That(off.Any(e => e.kind == "return_resumed_search"), Is.False, "control: switch off, it holds as before");
+        }
+
+        [Test]
+        public void ARouteHomeThatFireIsClosingStartsTheWalkOutEvenWhenStayingInside()
+        {
+            // F6. Seed 934 (25 Oct): fire reached the foyer on the route home at 351.0 s; CheckWayOut returned at once with stay_inside,
+            // so nothing was logged and no walk out began. Fire 1.3 m beside the corridor to the pad: the way is open but closing.
+            string Closing(bool watch) => string.Join(" | ", RunFor(RoomWithWayOut(c => c.exit_watch_inside = watch, false, true), 12)
+                .Where(e => e.kind == "escape_closing" || (e.kind == "goal" && e.reason.StartsWith("The way out was closing"))).Select(e => e.kind + ": " + e.reason));
+            Assert.That(Closing(true), Does.Contain("The way out was closing. Return to the estimated start."));
+            Assert.That(Closing(false), Is.Empty, "control: switch off, nothing is watched");
+        }
     }
 }

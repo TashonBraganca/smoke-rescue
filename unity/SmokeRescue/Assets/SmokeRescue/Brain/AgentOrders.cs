@@ -486,7 +486,7 @@ namespace SmokeRescue.Brain
         /// put out. True with the bearing and seconds the host passes to the nozzle.</summary>
         public bool CodeSpray(double t, float waterL, out float bearingDegRight, out float seconds)
         {
-            bearingDegRight = 0; seconds = 0;
+            bearingDegRight = 0; seconds = 0; lastWaterL = waterL;
             // Walking out with the way blocked (wayOutBlockedAt), the spray opens it: the only returning case allowed.
             bool exitBlocked = c.walk_out_past_fire && t - wayOutBlockedAt <= c.no_frontier_scan_s * 2;
             if (!c.code_sprays_fire || !Nozzle.HasValue || waterL <= 1e-6f || t < nextCodeSpray || (returning && !exitBlocked) || active != null) return false;
