@@ -597,7 +597,12 @@ namespace SmokeRescue.Brain
                         Emit(t, "goal", "Agent order: the asked viewpoint is not standable; view the same point from the nearest standable spot at the viewing distance.",
                             "x_m", agentGoal.Value.x, "y_m", agentGoal.Value.y, "face_x_m", agentFace.Value.x, "face_y_m", agentFace.Value.y);
                     }
-                    else { Emit(t, "replan", "Agent goal has no known free path; back to exploring.", "x_m", agentGoal.Value.x, "y_m", agentGoal.Value.y); agentGoal = null; }
+                    else
+                    {
+                        Emit(t, "replan", "Agent goal has no known free path; back to exploring.", "x_m", agentGoal.Value.x, "y_m", agentGoal.Value.y);
+                        if (spraySpotGoal.HasValue && Vector2.Distance(spraySpotGoal.Value, agentGoal.Value) < .2f) { NoteSpraySpotFailed(agentGoal.Value, t); spraySpotGoal = null; }
+                        agentGoal = null;
+                    }
                 }
                 // An agent replacement above has already repaired the old blocked route. Test the new path before fallback.
                 bool fallback = path.Count == 0 || (blocked && (!c.motion_keep_agent_route || !planner.PathSafe(path, cursor)));
