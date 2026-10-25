@@ -1,0 +1,8366 @@
+{
+ "seen_seeds": [
+  5001,
+  5002,
+  5003,
+  5004,
+  5005,
+  5006,
+  5007,
+  5010,
+  5011,
+  5013,
+  5014,
+  5015,
+  5016,
+  5017,
+  5020,
+  5021,
+  5022,
+  5023,
+  5027,
+  5028
+ ],
+ "seen_matches": [
+  {
+   "seed": 5001,
+   "source": "config/brain.json:motion_keep_agent_route_reason",
+   "context": "ible, motion_bounded_inspection): headless houses 5001-5004 and 5017-5022, 240 s, n="
+  },
+  {
+   "seed": 5004,
+   "source": "config/brain.json:motion_keep_agent_route_reason",
+   "context": " motion_bounded_inspection): headless houses 5001-5004 and 5017-5022, 240 s, n=1 eac"
+  },
+  {
+   "seed": 5017,
+   "source": "config/brain.json:motion_keep_agent_route_reason",
+   "context": "ounded_inspection): headless houses 5001-5004 and 5017-5022, 240 s, n=1 each, all si"
+  },
+  {
+   "seed": 5022,
+   "source": "config/brain.json:motion_keep_agent_route_reason",
+   "context": "d_inspection): headless houses 5001-5004 and 5017-5022, 240 s, n=1 each, all six on "
+  },
+  {
+   "seed": 5021,
+   "source": "config/brain.json:motion_sweep_visible_floor_reason",
+   "context": " percent, confirmed 29/30 both, zero false. House 5021 loses one coverage point and "
+  },
+  {
+   "seed": 5001,
+   "source": "config/brain.json:motion_sweep_visible_floor_reason",
+   "context": "ible, motion_bounded_inspection): headless houses 5001-5004 and 5017-5022, 240 s, n="
+  },
+  {
+   "seed": 5004,
+   "source": "config/brain.json:motion_sweep_visible_floor_reason",
+   "context": " motion_bounded_inspection): headless houses 5001-5004 and 5017-5022, 240 s, n=1 eac"
+  },
+  {
+   "seed": 5017,
+   "source": "config/brain.json:motion_sweep_visible_floor_reason",
+   "context": "ounded_inspection): headless houses 5001-5004 and 5017-5022, 240 s, n=1 each, all si"
+  },
+  {
+   "seed": 5022,
+   "source": "config/brain.json:motion_sweep_visible_floor_reason",
+   "context": "d_inspection): headless houses 5001-5004 and 5017-5022, 240 s, n=1 each, all six on "
+  },
+  {
+   "seed": 5004,
+   "source": "config/brain.json:motion_bounded_inspection_reason",
+   "context": " viewing for 22 s. The first timeout lost a valid 5004 dwell, which the revised rule"
+  },
+  {
+   "seed": 5001,
+   "source": "config/brain.json:motion_bounded_inspection_reason",
+   "context": "ible, motion_bounded_inspection): headless houses 5001-5004 and 5017-5022, 240 s, n="
+  },
+  {
+   "seed": 5004,
+   "source": "config/brain.json:motion_bounded_inspection_reason",
+   "context": " motion_bounded_inspection): headless houses 5001-5004 and 5017-5022, 240 s, n=1 eac"
+  },
+  {
+   "seed": 5017,
+   "source": "config/brain.json:motion_bounded_inspection_reason",
+   "context": "ounded_inspection): headless houses 5001-5004 and 5017-5022, 240 s, n=1 each, all si"
+  },
+  {
+   "seed": 5022,
+   "source": "config/brain.json:motion_bounded_inspection_reason",
+   "context": "d_inspection): headless houses 5001-5004 and 5017-5022, 240 s, n=1 each, all six on "
+  },
+  {
+   "seed": 5001,
+   "source": "config/brain.json:motion_face_visible_reason",
+   "context": "ible, motion_bounded_inspection): headless houses 5001-5004 and 5017-5022, 240 s, n="
+  },
+  {
+   "seed": 5004,
+   "source": "config/brain.json:motion_face_visible_reason",
+   "context": " motion_bounded_inspection): headless houses 5001-5004 and 5017-5022, 240 s, n=1 eac"
+  },
+  {
+   "seed": 5017,
+   "source": "config/brain.json:motion_face_visible_reason",
+   "context": "ounded_inspection): headless houses 5001-5004 and 5017-5022, 240 s, n=1 each, all si"
+  },
+  {
+   "seed": 5022,
+   "source": "config/brain.json:motion_face_visible_reason",
+   "context": "d_inspection): headless houses 5001-5004 and 5017-5022, 240 s, n=1 each, all six on "
+  },
+  {
+   "seed": 5005,
+   "source": "config/brain.json:survivor_lost_in_view_reason",
+   "context": "/ near_speed_mps (40 s). Headless held-out houses 5005-5010 (23 Oct): 24 people seen"
+  },
+  {
+   "seed": 5010,
+   "source": "config/brain.json:survivor_lost_in_view_reason",
+   "context": "r_speed_mps (40 s). Headless held-out houses 5005-5010 (23 Oct): 24 people seen, 13 "
+  },
+  {
+   "seed": 5007,
+   "source": "config/brain.json:survivor_lost_in_view_reason",
+   "context": " (23 Oct): 24 people seen, 13 confirmed; in house 5007 all five were seen and one co"
+  },
+  {
+   "seed": 5005,
+   "source": "config/brain.json:survivor_lost_in_view_reason",
+   "context": "ction) confirmed 4.5 to 4.8 of 5; held-out houses 5005-5010 (confirmation) 2.2 to 4."
+  },
+  {
+   "seed": 5010,
+   "source": "config/brain.json:survivor_lost_in_view_reason",
+   "context": ") confirmed 4.5 to 4.8 of 5; held-out houses 5005-5010 (confirmation) 2.2 to 4.0, 0 "
+  },
+  {
+   "seed": 5015,
+   "source": "config/brain.json:entrance_lock_passage_reason",
+   "context": "at or threshold look stops there). Headless house 5015 (23 Oct): the way in opened o"
+  },
+  {
+   "seed": 5013,
+   "source": "config/brain.json:entrance_lock_passage_reason",
+   "context": "n its first side room for the whole run in houses 5013, 5014 and 5016. Headless exp1"
+  },
+  {
+   "seed": 5014,
+   "source": "config/brain.json:entrance_lock_passage_reason",
+   "context": "first side room for the whole run in houses 5013, 5014 and 5016. Headless exp10 (240"
+  },
+  {
+   "seed": 5016,
+   "source": "config/brain.json:entrance_lock_passage_reason",
+   "context": "e room for the whole run in houses 5013, 5014 and 5016. Headless exp10 (240 s, off v"
+  },
+  {
+   "seed": 5015,
+   "source": "config/brain.json:entrance_lock_passage_reason",
+   "context": "5014 and 5016. Headless exp10 (240 s, off vs on): 5015 coverage 15 to 85 %, confirme"
+  },
+  {
+   "seed": 5001,
+   "source": "config/brain.json:entrance_lock_passage_reason",
+   "context": "nfirmed 1 to 5 of 5, standing 318 to 40 s; tuning 5001-5004 mean coverage 77 to 80.5"
+  },
+  {
+   "seed": 5004,
+   "source": "config/brain.json:entrance_lock_passage_reason",
+   "context": "ed 1 to 5 of 5, standing 318 to 40 s; tuning 5001-5004 mean coverage 77 to 80.5 %, s"
+  },
+  {
+   "seed": 5003,
+   "source": "config/brain.json:entrance_lock_passage_reason",
+   "context": "%, standing 82 to 47 s, confirmed 19 to 18 of 20 (5003: second person in the study s"
+  },
+  {
+   "seed": 5001,
+   "source": "config/brain.json:frontier_local_evidence_reason",
+   "context": "e proven without the look; headless tuning houses 5001-5004 (exp7, selection) mean r"
+  },
+  {
+   "seed": 5004,
+   "source": "config/brain.json:frontier_local_evidence_reason",
+   "context": "ven without the look; headless tuning houses 5001-5004 (exp7, selection) mean room s"
+  },
+  {
+   "seed": 5001,
+   "source": "config/brain.json:room_ledger_covered_share_reason",
+   "context": "7 -> 8 rooms and 4/5 -> 5/5; current main, houses 5001-5004, 5017, 5020-5022 rooms 5"
+  },
+  {
+   "seed": 5004,
+   "source": "config/brain.json:room_ledger_covered_share_reason",
+   "context": "8 rooms and 4/5 -> 5/5; current main, houses 5001-5004, 5017, 5020-5022 rooms 57/69 "
+  },
+  {
+   "seed": 5017,
+   "source": "config/brain.json:room_ledger_covered_share_reason",
+   "context": "s and 4/5 -> 5/5; current main, houses 5001-5004, 5017, 5020-5022 rooms 57/69 both, "
+  },
+  {
+   "seed": 5020,
+   "source": "config/brain.json:room_ledger_covered_share_reason",
+   "context": "4/5 -> 5/5; current main, houses 5001-5004, 5017, 5020-5022 rooms 57/69 both, floor "
+  },
+  {
+   "seed": 5022,
+   "source": "config/brain.json:room_ledger_covered_share_reason",
+   "context": "> 5/5; current main, houses 5001-5004, 5017, 5020-5022 rooms 57/69 both, floor 80.2 "
+  },
+  {
+   "seed": 5005,
+   "source": "config/brain.json:room_ledger_covered_share_reason",
+   "context": "69 both, floor 80.2 -> 76.5 %, people 40/40 both; 5005, 5006, 5007, 5010 rooms 32 ->"
+  },
+  {
+   "seed": 5006,
+   "source": "config/brain.json:room_ledger_covered_share_reason",
+   "context": "h, floor 80.2 -> 76.5 %, people 40/40 both; 5005, 5006, 5007, 5010 rooms 32 -> 34 of"
+  },
+  {
+   "seed": 5007,
+   "source": "config/brain.json:room_ledger_covered_share_reason",
+   "context": "or 80.2 -> 76.5 %, people 40/40 both; 5005, 5006, 5007, 5010 rooms 32 -> 34 of 39, p"
+  },
+  {
+   "seed": 5010,
+   "source": "config/brain.json:room_ledger_covered_share_reason",
+   "context": "2 -> 76.5 %, people 40/40 both; 5005, 5006, 5007, 5010 rooms 32 -> 34 of 39, people "
+  },
+  {
+   "seed": 5001,
+   "source": "config/brain.json:frontier_turn_cost_reason",
+   "context": "5 deg/s in the headless simulator). Headless seed 5001 (23 Oct): turning in place to"
+  },
+  {
+   "seed": 5001,
+   "source": "config/brain.json:room_indoor_promotion_reason",
+   "context": "coverage is measured on all of it. Headless seeds 5001 to 5004 (23 Oct): the LiDAR m"
+  },
+  {
+   "seed": 5004,
+   "source": "config/brain.json:room_indoor_promotion_reason",
+   "context": " is measured on all of it. Headless seeds 5001 to 5004 (23 Oct): the LiDAR mapped wh"
+  },
+  {
+   "seed": 5001,
+   "source": "config/brain.json:room_ledger_corridor_first_reason",
+   "context": "esearch_23oct/prior_art_23oct.txt). Headless seed 5001 (23 Oct): the kitchen door 17"
+  },
+  {
+   "seed": 5001,
+   "source": "config/brain.json:sweep_once_per_room_reason",
+   "context": "emaining frontiers covers the rest. Headless seed 5001 (23 Oct): sweeps cost 9 to 15"
+  },
+  {
+   "seed": 5001,
+   "source": "config/brain.json:sweep_once_per_room_reason",
+   "context": "nce off (headless exp7, selected on tuning houses 5001-5004)."
+  },
+  {
+   "seed": 5004,
+   "source": "config/brain.json:sweep_once_per_room_reason",
+   "context": "ff (headless exp7, selected on tuning houses 5001-5004)."
+  },
+  {
+   "seed": 5001,
+   "source": "config/brain.json:survivor_squeeze_reason",
+   "context": " R311.6 allows hallways of 0.914 m. Headless seed 5001 (23 Oct): a person in the hal"
+  },
+  {
+   "seed": 5001,
+   "source": "config/brain.json:person_rgb_strong_confidence_reason",
+   "context": "ll to be confirmed. Headless 24 Oct 01:50 (houses 5001-5004 tuning plus sealed 934, "
+  },
+  {
+   "seed": 5004,
+   "source": "config/brain.json:person_rgb_strong_confidence_reason",
+   "context": " be confirmed. Headless 24 Oct 01:50 (houses 5001-5004 tuning plus sealed 934, solid"
+  },
+  {
+   "seed": 5001,
+   "source": "config/brain.json:partner_territory_reason",
+   "context": "t'. ON since 24 Oct 16:52. Measured 240 s, houses 5001-5004, 5017, 5020-5022, with r"
+  },
+  {
+   "seed": 5004,
+   "source": "config/brain.json:partner_territory_reason",
+   "context": "N since 24 Oct 16:52. Measured 240 s, houses 5001-5004, 5017, 5020-5022, with room_l"
+  },
+  {
+   "seed": 5017,
+   "source": "config/brain.json:partner_territory_reason",
+   "context": "e 24 Oct 16:52. Measured 240 s, houses 5001-5004, 5017, 5020-5022, with room_ledger_"
+  },
+  {
+   "seed": 5020,
+   "source": "config/brain.json:partner_territory_reason",
+   "context": "ct 16:52. Measured 240 s, houses 5001-5004, 5017, 5020-5022, with room_ledger_covere"
+  },
+  {
+   "seed": 5022,
+   "source": "config/brain.json:partner_territory_reason",
+   "context": ":52. Measured 240 s, houses 5001-5004, 5017, 5020-5022, with room_ledger_covered_sha"
+  },
+  {
+   "seed": 5001,
+   "source": "config/brain.json:partner_territory_reason",
+   "context": "-> 39/40, false confirmations 0 -> 0 (rooms +1 in 5001 and 5021, -1 in 5020 and 5022"
+  },
+  {
+   "seed": 5021,
+   "source": "config/brain.json:partner_territory_reason",
+   "context": " false confirmations 0 -> 0 (rooms +1 in 5001 and 5021, -1 in 5020 and 5022). Owner:"
+  },
+  {
+   "seed": 5020,
+   "source": "config/brain.json:partner_territory_reason",
+   "context": "rmations 0 -> 0 (rooms +1 in 5001 and 5021, -1 in 5020 and 5022). Owner: rooms first"
+  },
+  {
+   "seed": 5022,
+   "source": "config/brain.json:partner_territory_reason",
+   "context": "0 -> 0 (rooms +1 in 5001 and 5021, -1 in 5020 and 5022). Owner: rooms first, losing "
+  },
+  {
+   "seed": 5003,
+   "source": "config/brain.json:frontier_beyond_room_reason",
+   "context": "tier 4), below every other option. Headless house 5003 (24 Oct): robot A's frontier "
+  },
+  {
+   "seed": 5001,
+   "source": "config/brain.json:frontier_beyond_room_reason",
+   "context": "0 s, with the room-share penalty removed): houses 5001-5004 rooms 28/31 -> 24/31, fl"
+  },
+  {
+   "seed": 5004,
+   "source": "config/brain.json:frontier_beyond_room_reason",
+   "context": "with the room-share penalty removed): houses 5001-5004 rooms 28/31 -> 24/31, floor 8"
+  },
+  {
+   "seed": 5005,
+   "source": "config/brain.json:frontier_beyond_room_reason",
+   "context": "ooms 28/31 -> 24/31, floor 83.0 -> 78.2 %; unseen 5005-5010 rooms 46/56 -> 42/56, fl"
+  },
+  {
+   "seed": 5010,
+   "source": "config/brain.json:frontier_beyond_room_reason",
+   "context": "28/31 -> 24/31, floor 83.0 -> 78.2 %; unseen 5005-5010 rooms 46/56 -> 42/56, floor 8"
+  },
+  {
+   "seed": 5003,
+   "source": "config/brain.json:room_progress_dwell_reason",
+   "context": "and turns make a real room slower. Headless house 5003 (24 Oct): robot A left the ki"
+  },
+  {
+   "seed": 5003,
+   "source": "config/brain.json:pinned_yield_reason",
+   "context": "d_yield_m apart, then steps aside. Headless house 5003 (23 Oct, solid bodies): both "
+  },
+  {
+   "seed": 5011,
+   "source": "config/brain.json:pinned_watchdog_reason",
+   "context": "es a robot that has not travelled. Headless house 5011 (23 Oct), robot B: 25 s still"
+  },
+  {
+   "seed": 5011,
+   "source": "config/brain.json:pinned_move_m_reason",
+   "context": "ift and jitter while held stay under about 0.1 m (5011 robot B moved 0.04 m in 25 s)"
+  },
+  {
+   "seed": 5003,
+   "source": "config/brain.json:candidate_split_reason",
+   "context": "ops one it is already walking to. Headless houses 5003 and 5004 (23 Oct, solid bodie"
+  },
+  {
+   "seed": 5004,
+   "source": "config/brain.json:candidate_split_reason",
+   "context": "t is already walking to. Headless houses 5003 and 5004 (23 Oct, solid bodies): with "
+  },
+  {
+   "seed": 5001,
+   "source": "config/brain.json:room_ledger_drop_slivers_reason",
+   "context": "from room_ledger_relative_doors, which cost house 5001 26 to 34 points of coverage i"
+  },
+  {
+   "seed": 5001,
+   "source": "config/brain.json:room_walk_in_reason",
+   "context": "ooms never entered. Measured 24 Oct 03:20 (houses 5001-5004 and sealed 934, final co"
+  },
+  {
+   "seed": 5004,
+   "source": "config/brain.json:room_walk_in_reason",
+   "context": "never entered. Measured 24 Oct 03:20 (houses 5001-5004 and sealed 934, final config)"
+  },
+  {
+   "seed": 5021,
+   "source": "config/brain.json:step_exact_clearance_reason",
+   "context": " 0.41 m from every wall and furniture edge; house 5021, robot B lost 57 s at a 0.95 "
+  },
+  {
+   "seed": 5001,
+   "source": "config/brain.json:step_exact_clearance_reason",
+   "context": "ible, motion_bounded_inspection): headless houses 5001-5004 and 5017-5022, 240 s, n="
+  },
+  {
+   "seed": 5004,
+   "source": "config/brain.json:step_exact_clearance_reason",
+   "context": " motion_bounded_inspection): headless houses 5001-5004 and 5017-5022, 240 s, n=1 eac"
+  },
+  {
+   "seed": 5017,
+   "source": "config/brain.json:step_exact_clearance_reason",
+   "context": "ounded_inspection): headless houses 5001-5004 and 5017-5022, 240 s, n=1 each, all si"
+  },
+  {
+   "seed": 5022,
+   "source": "config/brain.json:step_exact_clearance_reason",
+   "context": "d_inspection): headless houses 5001-5004 and 5017-5022, 240 s, n=1 each, all six on "
+  },
+  {
+   "seed": 5005,
+   "source": "config/brain.json:step_exact_clearance_reason",
+   "context": "data/runs/tour/e5, e2). Alone, on 18 more houses (5005-5016, 5023-5028): confirmed 7"
+  },
+  {
+   "seed": 5016,
+   "source": "config/brain.json:step_exact_clearance_reason",
+   "context": "runs/tour/e5, e2). Alone, on 18 more houses (5005-5016, 5023-5028): confirmed 70 -> "
+  },
+  {
+   "seed": 5023,
+   "source": "config/brain.json:step_exact_clearance_reason",
+   "context": "our/e5, e2). Alone, on 18 more houses (5005-5016, 5023-5028): confirmed 70 -> 76 of "
+  },
+  {
+   "seed": 5028,
+   "source": "config/brain.json:step_exact_clearance_reason",
+   "context": "5, e2). Alone, on 18 more houses (5005-5016, 5023-5028): confirmed 70 -> 76 of 90, f"
+  },
+  {
+   "seed": 5022,
+   "source": "config/brain.json:survivor_view_sight_line_reason",
+   "context": " robot keeps walking the approach. Headless house 5022 (23 Oct final), robot A stopp"
+  },
+  {
+   "seed": 5001,
+   "source": "config/brain.json:survivor_view_sight_line_reason",
+   "context": "ible, motion_bounded_inspection): headless houses 5001-5004 and 5017-5022, 240 s, n="
+  },
+  {
+   "seed": 5004,
+   "source": "config/brain.json:survivor_view_sight_line_reason",
+   "context": " motion_bounded_inspection): headless houses 5001-5004 and 5017-5022, 240 s, n=1 eac"
+  },
+  {
+   "seed": 5017,
+   "source": "config/brain.json:survivor_view_sight_line_reason",
+   "context": "ounded_inspection): headless houses 5001-5004 and 5017-5022, 240 s, n=1 each, all si"
+  },
+  {
+   "seed": 5022,
+   "source": "config/brain.json:survivor_view_sight_line_reason",
+   "context": "d_inspection): headless houses 5001-5004 and 5017-5022, 240 s, n=1 each, all six on "
+  },
+  {
+   "seed": 5027,
+   "source": "config/brain.json:survivor_close_view_min_m_reason",
+   "context": " that range at the approach's end. Headless house 5027 (23-24 Oct, every variant): s"
+  },
+  {
+   "seed": 5027,
+   "source": "config/brain.json:turn_stall_flip_reason",
+   "context": "ded) is taken the other way round. Headless house 5027: the bodies touched tail to t"
+  },
+  {
+   "seed": 5027,
+   "source": "config/brain.json:turn_stall_flip_reason",
+   "context": "0 of 5 people found. On since 24 Oct 11:05: house 5027 0 -> 4 of 5 confirmed, house "
+  },
+  {
+   "seed": 5017,
+   "source": "config/brain.json:turn_stall_flip_reason",
+   "context": "of 5 confirmed, house searched 22 -> 90 %; houses 5017, 5020, 5021, 5022 byte-identi"
+  },
+  {
+   "seed": 5020,
+   "source": "config/brain.json:turn_stall_flip_reason",
+   "context": "onfirmed, house searched 22 -> 90 %; houses 5017, 5020, 5021, 5022 byte-identical re"
+  },
+  {
+   "seed": 5021,
+   "source": "config/brain.json:turn_stall_flip_reason",
+   "context": "ed, house searched 22 -> 90 %; houses 5017, 5020, 5021, 5022 byte-identical results "
+  },
+  {
+   "seed": 5022,
+   "source": "config/brain.json:turn_stall_flip_reason",
+   "context": "use searched 22 -> 90 %; houses 5017, 5020, 5021, 5022 byte-identical results (no tu"
+  },
+  {
+   "seed": 5003,
+   "source": "config/brain.json:turn_stall_flip_reason",
+   "context": "22 byte-identical results (no turn stalls there); 5003 unchanged (3 of 5)."
+  },
+  {
+   "seed": 5001,
+   "source": "config/brain.json:return_home_at_end_reason",
+   "context": "actor, would reach mission_time_limit_s. Headless 5001, 5017, 5022 (time limit on): "
+  },
+  {
+   "seed": 5017,
+   "source": "config/brain.json:return_home_at_end_reason",
+   "context": " would reach mission_time_limit_s. Headless 5001, 5017, 5022 (time limit on): withou"
+  },
+  {
+   "seed": 5022,
+   "source": "config/brain.json:return_home_at_end_reason",
+   "context": " reach mission_time_limit_s. Headless 5001, 5017, 5022 (time limit on): without it b"
+  },
+  {
+   "seed": 5001,
+   "source": "config/brain.json:return_home_early_reason",
+   "context": " and about 80 -> 68 % coverage on headless houses 5001, 5017, 5020, 5022."
+  },
+  {
+   "seed": 5017,
+   "source": "config/brain.json:return_home_early_reason",
+   "context": "bout 80 -> 68 % coverage on headless houses 5001, 5017, 5020, 5022."
+  },
+  {
+   "seed": 5020,
+   "source": "config/brain.json:return_home_early_reason",
+   "context": "0 -> 68 % coverage on headless houses 5001, 5017, 5020, 5022."
+  },
+  {
+   "seed": 5022,
+   "source": "config/brain.json:return_home_early_reason",
+   "context": "8 % coverage on headless houses 5001, 5017, 5020, 5022."
+  },
+  {
+   "seed": 5021,
+   "source": "config/brain.json:door_claim_max_m2_reason",
+   "context": "med: one robot cannot search it in time. Headless 5021: robot A took a 134 m2 bedroo"
+  },
+  {
+   "seed": 5002,
+   "source": "config/brain.json:door_left_s_reason",
+   "context": "this long, whichever doorway it left by. Headless 5002: robot A took the kitchen and"
+  },
+  {
+   "seed": 5001,
+   "source": "config/brain.json:door_enter_reason",
+   "context": "oom; split by a nearest-doorway auction. Headless 5001-5022: 14 of 63 rooms never en"
+  },
+  {
+   "seed": 5022,
+   "source": "config/brain.json:door_enter_reason",
+   "context": "split by a nearest-doorway auction. Headless 5001-5022: 14 of 63 rooms never entered"
+  },
+  {
+   "seed": 5022,
+   "source": "config/brain.json:door_enter_reason",
+   "context": "Headless 5001-5022: 14 of 63 rooms never entered; 5022 robot A confirmed 4 people fr"
+  },
+  {
+   "seed": 5001,
+   "source": "config/brain.json:room_entered_near_seat_reason",
+   "context": "probe, 24 Oct). Trace analysis of headless houses 5001-5022 (24 Oct): a bedroom merg"
+  },
+  {
+   "seed": 5022,
+   "source": "config/brain.json:room_entered_near_seat_reason",
+   "context": ", 24 Oct). Trace analysis of headless houses 5001-5022 (24 Oct): a bedroom merged wi"
+  },
+  {
+   "seed": 5001,
+   "source": "config/brain.json:door_seen_merge_m_reason",
+   "context": " cleared one is the same doorway. Headless houses 5001-5021, first 15 s: 40 % of lis"
+  },
+  {
+   "seed": 5021,
+   "source": "config/brain.json:door_seen_merge_m_reason",
+   "context": "red one is the same doorway. Headless houses 5001-5021, first 15 s: 40 % of listings"
+  },
+  {
+   "seed": 5004,
+   "source": "config/brain.json:door_geometric_room_reason",
+   "context": "ith the rooms seen through its doorways. Headless 5004 and 5021 with door_enter: one"
+  },
+  {
+   "seed": 5021,
+   "source": "config/brain.json:door_geometric_room_reason",
+   "context": "ooms seen through its doorways. Headless 5004 and 5021 with door_enter: one cleared "
+  },
+  {
+   "seed": 5001,
+   "source": "config/brain.json:room_walk_in_any_coverage_reason",
+   "context": "ECTED (24 Oct, g10, 240 s, main 886ae7fc): houses 5001-5004, 5017, 5020-5022 rooms 5"
+  },
+  {
+   "seed": 5004,
+   "source": "config/brain.json:room_walk_in_any_coverage_reason",
+   "context": " (24 Oct, g10, 240 s, main 886ae7fc): houses 5001-5004, 5017, 5020-5022 rooms 57/69 "
+  },
+  {
+   "seed": 5017,
+   "source": "config/brain.json:room_walk_in_any_coverage_reason",
+   "context": "ct, g10, 240 s, main 886ae7fc): houses 5001-5004, 5017, 5020-5022 rooms 57/69 -> 51/"
+  },
+  {
+   "seed": 5020,
+   "source": "config/brain.json:room_walk_in_any_coverage_reason",
+   "context": "0, 240 s, main 886ae7fc): houses 5001-5004, 5017, 5020-5022 rooms 57/69 -> 51/69, fl"
+  },
+  {
+   "seed": 5022,
+   "source": "config/brain.json:room_walk_in_any_coverage_reason",
+   "context": "0 s, main 886ae7fc): houses 5001-5004, 5017, 5020-5022 rooms 57/69 -> 51/69, floor 8"
+  },
+  {
+   "seed": 5003,
+   "source": "config/brain.json:room_walk_in_any_coverage_reason",
+   "context": "/69, floor 80.2 -> 75.9 %, people 40/40 -> 37/40 (5003 5/7 -> 7/7, but 5001 7 -> 4, "
+  },
+  {
+   "seed": 5001,
+   "source": "config/brain.json:room_walk_in_any_coverage_reason",
+   "context": ".9 %, people 40/40 -> 37/40 (5003 5/7 -> 7/7, but 5001 7 -> 4, 5004 8 -> 6); 5005-50"
+  },
+  {
+   "seed": 5004,
+   "source": "config/brain.json:room_walk_in_any_coverage_reason",
+   "context": "40/40 -> 37/40 (5003 5/7 -> 7/7, but 5001 7 -> 4, 5004 8 -> 6); 5005-5010 46/56 -> 4"
+  },
+  {
+   "seed": 5005,
+   "source": "config/brain.json:room_walk_in_any_coverage_reason",
+   "context": " (5003 5/7 -> 7/7, but 5001 7 -> 4, 5004 8 -> 6); 5005-5010 46/56 -> 48/56, people 2"
+  },
+  {
+   "seed": 5010,
+   "source": "config/brain.json:room_walk_in_any_coverage_reason",
+   "context": "3 5/7 -> 7/7, but 5001 7 -> 4, 5004 8 -> 6); 5005-5010 46/56 -> 48/56, people 28/30 "
+  }
+ ],
+ "missing": [
+  "random_5001_s1_full",
+  "random_5001_s1_no_radio",
+  "random_5001_s1_one_robot",
+  "random_5001_s1_baseline",
+  "random_5001_s2_full",
+  "random_5001_s2_no_radio",
+  "random_5001_s2_one_robot",
+  "random_5001_s2_baseline",
+  "random_5002_s1_full",
+  "random_5002_s1_no_radio",
+  "random_5002_s1_one_robot",
+  "random_5002_s1_baseline",
+  "random_5002_s2_full",
+  "random_5002_s2_no_radio",
+  "random_5002_s2_one_robot",
+  "random_5002_s2_baseline",
+  "random_5003_s1_full",
+  "random_5003_s1_no_radio",
+  "random_5003_s1_one_robot",
+  "random_5003_s1_baseline",
+  "random_5003_s2_full",
+  "random_5003_s2_no_radio",
+  "random_5003_s2_one_robot",
+  "random_5003_s2_baseline",
+  "random_5004_s1_full",
+  "random_5004_s1_no_radio",
+  "random_5004_s1_one_robot",
+  "random_5004_s1_baseline",
+  "random_5004_s2_full",
+  "random_5004_s2_no_radio",
+  "random_5004_s2_one_robot",
+  "random_5004_s2_baseline",
+  "random_5005_s1_full",
+  "random_5005_s1_no_radio",
+  "random_5005_s1_one_robot",
+  "random_5005_s1_baseline",
+  "random_5005_s2_full",
+  "random_5005_s2_no_radio",
+  "random_5005_s2_one_robot",
+  "random_5005_s2_baseline",
+  "random_5006_s1_full",
+  "random_5006_s1_no_radio",
+  "random_5006_s1_one_robot",
+  "random_5006_s1_baseline",
+  "random_5006_s2_full",
+  "random_5006_s2_no_radio",
+  "random_5006_s2_one_robot",
+  "random_5006_s2_baseline",
+  "random_5007_s1_full",
+  "random_5007_s1_no_radio",
+  "random_5007_s1_one_robot",
+  "random_5007_s1_baseline",
+  "random_5007_s2_full",
+  "random_5007_s2_no_radio",
+  "random_5007_s2_one_robot",
+  "random_5007_s2_baseline",
+  "random_5008_s1_full",
+  "random_5008_s1_no_radio",
+  "random_5008_s1_one_robot",
+  "random_5008_s1_baseline",
+  "random_5008_s2_full",
+  "random_5008_s2_no_radio",
+  "random_5008_s2_one_robot",
+  "random_5008_s2_baseline",
+  "random_5009_s1_full",
+  "random_5009_s1_no_radio",
+  "random_5009_s1_one_robot",
+  "random_5009_s1_baseline",
+  "random_5009_s2_full",
+  "random_5009_s2_no_radio",
+  "random_5009_s2_one_robot",
+  "random_5009_s2_baseline",
+  "random_5010_s1_full",
+  "random_5010_s1_no_radio",
+  "random_5010_s1_one_robot",
+  "random_5010_s1_baseline",
+  "random_5010_s2_full",
+  "random_5010_s2_no_radio",
+  "random_5010_s2_one_robot",
+  "random_5010_s2_baseline",
+  "random_5011_s1_full",
+  "random_5011_s1_no_radio",
+  "random_5011_s1_one_robot",
+  "random_5011_s1_baseline",
+  "random_5011_s2_full",
+  "random_5011_s2_no_radio",
+  "random_5011_s2_one_robot",
+  "random_5011_s2_baseline",
+  "random_5012_s1_full",
+  "random_5012_s1_no_radio",
+  "random_5012_s1_one_robot",
+  "random_5012_s1_baseline",
+  "random_5012_s2_full",
+  "random_5012_s2_no_radio",
+  "random_5012_s2_one_robot",
+  "random_5012_s2_baseline",
+  "random_5013_s1_full",
+  "random_5013_s1_no_radio",
+  "random_5013_s1_one_robot",
+  "random_5013_s1_baseline",
+  "random_5013_s2_full",
+  "random_5013_s2_no_radio",
+  "random_5013_s2_one_robot",
+  "random_5013_s2_baseline",
+  "random_5014_s1_full",
+  "random_5014_s1_no_radio",
+  "random_5014_s1_one_robot",
+  "random_5014_s1_baseline",
+  "random_5014_s2_full",
+  "random_5014_s2_no_radio",
+  "random_5014_s2_one_robot",
+  "random_5014_s2_baseline",
+  "random_5015_s1_full",
+  "random_5015_s1_no_radio",
+  "random_5015_s1_one_robot",
+  "random_5015_s1_baseline",
+  "random_5015_s2_full",
+  "random_5015_s2_no_radio",
+  "random_5015_s2_one_robot",
+  "random_5015_s2_baseline",
+  "random_5016_s1_full",
+  "random_5016_s1_no_radio",
+  "random_5016_s1_one_robot",
+  "random_5016_s1_baseline",
+  "random_5016_s2_full",
+  "random_5016_s2_no_radio",
+  "random_5016_s2_one_robot",
+  "random_5016_s2_baseline",
+  "random_5017_s1_full",
+  "random_5017_s1_no_radio",
+  "random_5017_s1_one_robot",
+  "random_5017_s1_baseline",
+  "random_5017_s2_full",
+  "random_5017_s2_no_radio",
+  "random_5017_s2_one_robot",
+  "random_5017_s2_baseline",
+  "random_5018_s1_full",
+  "random_5018_s1_no_radio",
+  "random_5018_s1_one_robot",
+  "random_5018_s1_baseline",
+  "random_5018_s2_full",
+  "random_5018_s2_no_radio",
+  "random_5018_s2_one_robot",
+  "random_5018_s2_baseline",
+  "random_5019_s1_full",
+  "random_5019_s1_no_radio",
+  "random_5019_s1_one_robot",
+  "random_5019_s1_baseline",
+  "random_5019_s2_full",
+  "random_5019_s2_no_radio",
+  "random_5019_s2_one_robot",
+  "random_5019_s2_baseline",
+  "random_5020_s1_full",
+  "random_5020_s1_no_radio",
+  "random_5020_s1_one_robot",
+  "random_5020_s1_baseline",
+  "random_5020_s2_full",
+  "random_5020_s2_no_radio",
+  "random_5020_s2_one_robot",
+  "random_5020_s2_baseline",
+  "random_5021_s1_full",
+  "random_5021_s1_no_radio",
+  "random_5021_s1_one_robot",
+  "random_5021_s1_baseline",
+  "random_5021_s2_full",
+  "random_5021_s2_no_radio",
+  "random_5021_s2_one_robot",
+  "random_5021_s2_baseline",
+  "random_5022_s1_full",
+  "random_5022_s1_no_radio",
+  "random_5022_s1_one_robot",
+  "random_5022_s1_baseline",
+  "random_5022_s2_full",
+  "random_5022_s2_no_radio",
+  "random_5022_s2_one_robot",
+  "random_5022_s2_baseline",
+  "random_5023_s1_full",
+  "random_5023_s1_no_radio",
+  "random_5023_s1_one_robot",
+  "random_5023_s1_baseline",
+  "random_5023_s2_full",
+  "random_5023_s2_no_radio",
+  "random_5023_s2_one_robot",
+  "random_5023_s2_baseline",
+  "random_5024_s1_full",
+  "random_5024_s1_no_radio",
+  "random_5024_s1_one_robot",
+  "random_5024_s1_baseline",
+  "random_5024_s2_full",
+  "random_5024_s2_no_radio",
+  "random_5024_s2_one_robot",
+  "random_5024_s2_baseline",
+  "random_5025_s1_full",
+  "random_5025_s1_no_radio",
+  "random_5025_s1_one_robot",
+  "random_5025_s1_baseline",
+  "random_5025_s2_full",
+  "random_5025_s2_no_radio",
+  "random_5025_s2_one_robot",
+  "random_5025_s2_baseline",
+  "random_5026_s1_full",
+  "random_5026_s1_no_radio",
+  "random_5026_s1_one_robot",
+  "random_5026_s1_baseline",
+  "random_5026_s2_full",
+  "random_5026_s2_no_radio",
+  "random_5026_s2_one_robot",
+  "random_5026_s2_baseline",
+  "random_5027_s1_full",
+  "random_5027_s1_no_radio",
+  "random_5027_s1_one_robot",
+  "random_5027_s1_baseline",
+  "random_5027_s2_full",
+  "random_5027_s2_no_radio",
+  "random_5027_s2_one_robot",
+  "random_5027_s2_baseline",
+  "random_5028_s1_full",
+  "random_5028_s1_no_radio",
+  "random_5028_s1_one_robot",
+  "random_5028_s1_baseline",
+  "random_5028_s2_full",
+  "random_5028_s2_no_radio",
+  "random_5028_s2_one_robot",
+  "random_5028_s2_baseline",
+  "family_ranch_s1_full",
+  "family_ranch_s1_no_radio",
+  "family_ranch_s1_one_robot",
+  "family_ranch_s1_baseline",
+  "family_ranch_s2_full",
+  "family_ranch_s2_no_radio",
+  "family_ranch_s2_one_robot",
+  "family_ranch_s2_baseline",
+  "long_ranch_s1_full",
+  "long_ranch_s1_no_radio",
+  "long_ranch_s1_one_robot",
+  "long_ranch_s1_baseline",
+  "long_ranch_s2_full",
+  "long_ranch_s2_no_radio",
+  "long_ranch_s2_one_robot",
+  "long_ranch_s2_baseline"
+ ],
+ "aggregate": {
+  "unseen": {
+   "full": {
+    "n_runs": 10,
+    "t90_reached": 10,
+    "rooms_entered_pct": [
+     98.57,
+     95.71,
+     100.0
+    ],
+    "usable_coverage_pct": [
+     94.62,
+     91.39,
+     97.22
+    ],
+    "people_found_pct": [
+     96.0,
+     90.0,
+     100.0
+    ],
+    "false_confirmations": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "mean_time_to_confirm_s": [
+     87.34,
+     68.45,
+     109.47
+    ],
+    "t90_s": [
+     324.9,
+     264.8,
+     388.6
+    ],
+    "overlap_pct": [
+     66.78,
+     54.44,
+     78.48
+    ],
+    "all_out": [
+     0.9,
+     0.7,
+     1.0
+    ]
+   },
+   "no_radio": {
+    "n_runs": 10,
+    "t90_reached": 8,
+    "rooms_entered_pct": [
+     97.46,
+     93.81,
+     100.0
+    ],
+    "usable_coverage_pct": [
+     93.02,
+     90.33,
+     95.44
+    ],
+    "people_found_pct": [
+     94.0,
+     88.0,
+     100.0
+    ],
+    "false_confirmations": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "mean_time_to_confirm_s": [
+     127.72,
+     102.39,
+     155.3
+    ],
+    "t90_s": [
+     360.5,
+     279.9,
+     447.4
+    ],
+    "overlap_pct": [
+     80.26,
+     70.38,
+     89.03
+    ],
+    "all_out": [
+     0.1,
+     0.0,
+     0.3
+    ]
+   },
+   "one_robot": {
+    "n_runs": 10,
+    "t90_reached": 10,
+    "rooms_entered_pct": [
+     96.17,
+     89.33,
+     100.0
+    ],
+    "usable_coverage_pct": [
+     91.42,
+     87.54,
+     94.29
+    ],
+    "people_found_pct": [
+     98.0,
+     94.0,
+     100.0
+    ],
+    "false_confirmations": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "mean_time_to_confirm_s": [
+     143.09,
+     118.58,
+     168.49
+    ],
+    "t90_s": [
+     271.3,
+     213.3,
+     331.5
+    ],
+    "overlap_pct": [
+     null,
+     null,
+     null
+    ],
+    "all_out": [
+     1.0,
+     1.0,
+     1.0
+    ]
+   },
+   "baseline": {
+    "n_runs": 10,
+    "t90_reached": 4,
+    "rooms_entered_pct": [
+     100.0,
+     100.0,
+     100.0
+    ],
+    "usable_coverage_pct": [
+     95.29,
+     92.57,
+     97.27
+    ],
+    "people_found_pct": [
+     98.0,
+     94.0,
+     100.0
+    ],
+    "false_confirmations": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "mean_time_to_confirm_s": [
+     88.22,
+     65.87,
+     109.98
+    ],
+    "t90_s": [
+     490.8,
+     403.19,
+     571.1
+    ],
+    "overlap_pct": [
+     55.64,
+     43.92,
+     67.19
+    ],
+    "all_out": [
+     0.6,
+     0.3,
+     0.9
+    ]
+   },
+   "full_minus_no_radio": {
+    "rooms_entered_pct": {
+     "mean": 1.11,
+     "ci95": [
+      -3.18,
+      5.4
+     ],
+     "wilcoxon_p": 1.0
+    },
+    "usable_coverage_pct": {
+     "mean": 1.61,
+     "ci95": [
+      -1.59,
+      4.73
+     ],
+     "wilcoxon_p": 0.0645
+    },
+    "people_found_pct": {
+     "mean": 2.0,
+     "ci95": [
+      -4.0,
+      8.0
+     ],
+     "wilcoxon_p": 1.0
+    },
+    "false_confirmations": {
+     "mean": 0.0,
+     "ci95": [
+      0.0,
+      0.0
+     ],
+     "wilcoxon_p": null
+    },
+    "mean_time_to_confirm_s": {
+     "mean": -40.38,
+     "ci95": [
+      -58.7,
+      -21.06
+     ],
+     "wilcoxon_p": 0.0098
+    },
+    "t90_s": {
+     "mean": -35.6,
+     "ci95": [
+      -101.9,
+      38.71
+     ],
+     "wilcoxon_p": 0.3223
+    },
+    "overlap_pct": {
+     "mean": -13.48,
+     "ci95": [
+      -30.44,
+      3.82
+     ],
+     "wilcoxon_p": 0.2324
+    },
+    "all_out": {
+     "mean": 0.8,
+     "ci95": [
+      0.5,
+      1.0
+     ],
+     "wilcoxon_p": 0.0078
+    }
+   },
+   "full_minus_one_robot": {
+    "rooms_entered_pct": {
+     "mean": 2.4,
+     "ci95": [
+      -3.45,
+      9.83
+     ],
+     "wilcoxon_p": 0.75
+    },
+    "usable_coverage_pct": {
+     "mean": 3.21,
+     "ci95": [
+      0.69,
+      5.56
+     ],
+     "wilcoxon_p": 0.0488
+    },
+    "people_found_pct": {
+     "mean": -2.0,
+     "ci95": [
+      -6.0,
+      0.0
+     ],
+     "wilcoxon_p": 1.0
+    },
+    "false_confirmations": {
+     "mean": 0.0,
+     "ci95": [
+      0.0,
+      0.0
+     ],
+     "wilcoxon_p": null
+    },
+    "mean_time_to_confirm_s": {
+     "mean": -55.75,
+     "ci95": [
+      -73.47,
+      -38.94
+     ],
+     "wilcoxon_p": 0.002
+    },
+    "t90_s": {
+     "mean": 53.6,
+     "ci95": [
+      2.1,
+      113.5
+     ],
+     "wilcoxon_p": 0.1387
+    },
+    "overlap_pct": {
+     "mean": null,
+     "ci95": [
+      null,
+      null
+     ],
+     "wilcoxon_p": null
+    },
+    "all_out": {
+     "mean": -0.1,
+     "ci95": [
+      -0.3,
+      0.0
+     ],
+     "wilcoxon_p": 1.0
+    }
+   },
+   "full_minus_baseline": {
+    "rooms_entered_pct": {
+     "mean": -1.43,
+     "ci95": [
+      -4.29,
+      0.0
+     ],
+     "wilcoxon_p": 1.0
+    },
+    "usable_coverage_pct": {
+     "mean": -0.66,
+     "ci95": [
+      -2.47,
+      0.53
+     ],
+     "wilcoxon_p": 0.7695
+    },
+    "people_found_pct": {
+     "mean": -2.0,
+     "ci95": [
+      -6.0,
+      0.0
+     ],
+     "wilcoxon_p": 1.0
+    },
+    "false_confirmations": {
+     "mean": 0.0,
+     "ci95": [
+      0.0,
+      0.0
+     ],
+     "wilcoxon_p": null
+    },
+    "mean_time_to_confirm_s": {
+     "mean": -0.88,
+     "ci95": [
+      -20.14,
+      15.25
+     ],
+     "wilcoxon_p": 0.5566
+    },
+    "t90_s": {
+     "mean": -165.9,
+     "ci95": [
+      -265.9,
+      -55.7
+     ],
+     "wilcoxon_p": 0.0273
+    },
+    "overlap_pct": {
+     "mean": 11.14,
+     "ci95": [
+      2.02,
+      20.81
+     ],
+     "wilcoxon_p": 0.084
+    },
+    "all_out": {
+     "mean": 0.3,
+     "ci95": [
+      0.0,
+      0.6
+     ],
+     "wilcoxon_p": 0.25
+    }
+   }
+  },
+  "seen": {
+   "full": {
+    "n_runs": 20,
+    "t90_reached": 20,
+    "rooms_entered_pct": [
+     99.0,
+     97.0,
+     100.0
+    ],
+    "usable_coverage_pct": [
+     95.68,
+     93.65,
+     97.2
+    ],
+    "people_found_pct": [
+     97.0,
+     92.0,
+     100.0
+    ],
+    "false_confirmations": [
+     0.05,
+     0.0,
+     0.15
+    ],
+    "mean_time_to_confirm_s": [
+     101.3,
+     81.99,
+     120.98
+    ],
+    "t90_s": [
+     342.05,
+     312.2,
+     370.85
+    ],
+    "overlap_pct": [
+     61.42,
+     53.32,
+     68.72
+    ],
+    "all_out": [
+     0.65,
+     0.45,
+     0.85
+    ]
+   },
+   "no_radio": {
+    "n_runs": 20,
+    "t90_reached": 13,
+    "rooms_entered_pct": [
+     94.61,
+     89.41,
+     98.89
+    ],
+    "usable_coverage_pct": [
+     92.23,
+     88.39,
+     95.22
+    ],
+    "people_found_pct": [
+     97.0,
+     92.0,
+     100.0
+    ],
+    "false_confirmations": [
+     0.1,
+     0.0,
+     0.3
+    ],
+    "mean_time_to_confirm_s": [
+     137.2,
+     113.3,
+     161.18
+    ],
+    "t90_s": [
+     412.55,
+     348.75,
+     479.45
+    ],
+    "overlap_pct": [
+     74.72,
+     65.14,
+     82.92
+    ],
+    "all_out": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   "one_robot": {
+    "n_runs": 20,
+    "t90_reached": 19,
+    "rooms_entered_pct": [
+     90.99,
+     85.52,
+     95.98
+    ],
+    "usable_coverage_pct": [
+     89.38,
+     86.14,
+     92.24
+    ],
+    "people_found_pct": [
+     95.0,
+     90.0,
+     99.0
+    ],
+    "false_confirmations": [
+     0.15,
+     0.0,
+     0.45
+    ],
+    "mean_time_to_confirm_s": [
+     164.24,
+     140.14,
+     188.4
+    ],
+    "t90_s": [
+     332.4,
+     292.05,
+     376.4
+    ],
+    "overlap_pct": [
+     null,
+     null,
+     null
+    ],
+    "all_out": [
+     1.0,
+     1.0,
+     1.0
+    ]
+   },
+   "baseline": {
+    "n_runs": 20,
+    "t90_reached": 10,
+    "rooms_entered_pct": [
+     97.07,
+     93.57,
+     100.0
+    ],
+    "usable_coverage_pct": [
+     95.51,
+     93.81,
+     96.87
+    ],
+    "people_found_pct": [
+     98.0,
+     95.0,
+     100.0
+    ],
+    "false_confirmations": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "mean_time_to_confirm_s": [
+     94.96,
+     78.49,
+     111.78
+    ],
+    "t90_s": [
+     457.3,
+     388.8,
+     522.0
+    ],
+    "overlap_pct": [
+     53.18,
+     45.37,
+     60.33
+    ],
+    "all_out": [
+     0.3,
+     0.1,
+     0.5
+    ]
+   },
+   "full_minus_no_radio": {
+    "rooms_entered_pct": {
+     "mean": 4.38,
+     "ci95": [
+      1.0,
+      8.92
+     ],
+     "wilcoxon_p": 0.0625
+    },
+    "usable_coverage_pct": {
+     "mean": 3.45,
+     "ci95": [
+      0.63,
+      6.95
+     ],
+     "wilcoxon_p": 0.0037
+    },
+    "people_found_pct": {
+     "mean": 0.0,
+     "ci95": [
+      -3.0,
+      3.0
+     ],
+     "wilcoxon_p": 1.0
+    },
+    "false_confirmations": {
+     "mean": -0.05,
+     "ci95": [
+      -0.3,
+      0.15
+     ],
+     "wilcoxon_p": 1.0
+    },
+    "mean_time_to_confirm_s": {
+     "mean": -35.9,
+     "ci95": [
+      -51.81,
+      -20.16
+     ],
+     "wilcoxon_p": 0.0005
+    },
+    "t90_s": {
+     "mean": -70.5,
+     "ci95": [
+      -139.15,
+      -7.95
+     ],
+     "wilcoxon_p": 0.2024
+    },
+    "overlap_pct": {
+     "mean": -13.3,
+     "ci95": [
+      -22.64,
+      -2.35
+     ],
+     "wilcoxon_p": 0.0064
+    },
+    "all_out": {
+     "mean": 0.65,
+     "ci95": [
+      0.45,
+      0.85
+     ],
+     "wilcoxon_p": 0.0002
+    }
+   },
+   "full_minus_one_robot": {
+    "rooms_entered_pct": {
+     "mean": 8.01,
+     "ci95": [
+      2.99,
+      13.62
+     ],
+     "wilcoxon_p": 0.0156
+    },
+    "usable_coverage_pct": {
+     "mean": 6.3,
+     "ci95": [
+      3.27,
+      9.73
+     ],
+     "wilcoxon_p": 0.0002
+    },
+    "people_found_pct": {
+     "mean": 2.0,
+     "ci95": [
+      -2.0,
+      6.0
+     ],
+     "wilcoxon_p": 0.625
+    },
+    "false_confirmations": {
+     "mean": -0.1,
+     "ci95": [
+      -0.3,
+      0.0
+     ],
+     "wilcoxon_p": 1.0
+    },
+    "mean_time_to_confirm_s": {
+     "mean": -62.94,
+     "ci95": [
+      -76.02,
+      -48.89
+     ],
+     "wilcoxon_p": 0.0
+    },
+    "t90_s": {
+     "mean": 9.65,
+     "ci95": [
+      -25.55,
+      40.95
+     ],
+     "wilcoxon_p": 0.3045
+    },
+    "overlap_pct": {
+     "mean": null,
+     "ci95": [
+      null,
+      null
+     ],
+     "wilcoxon_p": null
+    },
+    "all_out": {
+     "mean": -0.35,
+     "ci95": [
+      -0.55,
+      -0.15
+     ],
+     "wilcoxon_p": 0.0156
+    }
+   },
+   "full_minus_baseline": {
+    "rooms_entered_pct": {
+     "mean": 1.93,
+     "ci95": [
+      0.0,
+      4.86
+     ],
+     "wilcoxon_p": 0.5
+    },
+    "usable_coverage_pct": {
+     "mean": 0.17,
+     "ci95": [
+      -1.54,
+      1.73
+     ],
+     "wilcoxon_p": 0.6215
+    },
+    "people_found_pct": {
+     "mean": -1.0,
+     "ci95": [
+      -4.0,
+      2.0
+     ],
+     "wilcoxon_p": 1.0
+    },
+    "false_confirmations": {
+     "mean": 0.05,
+     "ci95": [
+      0.0,
+      0.15
+     ],
+     "wilcoxon_p": 1.0
+    },
+    "mean_time_to_confirm_s": {
+     "mean": 6.34,
+     "ci95": [
+      -12.46,
+      23.35
+     ],
+     "wilcoxon_p": 0.3884
+    },
+    "t90_s": {
+     "mean": -115.25,
+     "ci95": [
+      -168.6,
+      -60.55
+     ],
+     "wilcoxon_p": 0.0012
+    },
+    "overlap_pct": {
+     "mean": 8.25,
+     "ci95": [
+      -0.4,
+      16.9
+     ],
+     "wilcoxon_p": 0.1054
+    },
+    "all_out": {
+     "mean": 0.35,
+     "ci95": [
+      0.1,
+      0.6
+     ],
+     "wilcoxon_p": 0.0391
+    }
+   }
+  },
+  "all": {
+   "full": {
+    "n_runs": 30,
+    "t90_reached": 30,
+    "rooms_entered_pct": [
+     98.86,
+     97.05,
+     100.0
+    ],
+    "usable_coverage_pct": [
+     95.33,
+     93.64,
+     96.7
+    ],
+    "people_found_pct": [
+     96.67,
+     93.33,
+     99.33
+    ],
+    "false_confirmations": [
+     0.03,
+     0.0,
+     0.1
+    ],
+    "mean_time_to_confirm_s": [
+     96.64,
+     81.93,
+     111.89
+    ],
+    "t90_s": [
+     336.33,
+     307.67,
+     365.37
+    ],
+    "overlap_pct": [
+     63.21,
+     56.43,
+     69.62
+    ],
+    "all_out": [
+     0.73,
+     0.57,
+     0.9
+    ]
+   },
+   "no_radio": {
+    "n_runs": 30,
+    "t90_reached": 21,
+    "rooms_entered_pct": [
+     95.56,
+     91.89,
+     98.57
+    ],
+    "usable_coverage_pct": [
+     92.49,
+     89.84,
+     94.7
+    ],
+    "people_found_pct": [
+     96.0,
+     92.0,
+     99.33
+    ],
+    "false_confirmations": [
+     0.07,
+     0.0,
+     0.2
+    ],
+    "mean_time_to_confirm_s": [
+     134.04,
+     115.64,
+     152.5
+    ],
+    "t90_s": [
+     395.2,
+     342.43,
+     448.6
+    ],
+    "overlap_pct": [
+     76.57,
+     69.4,
+     82.89
+    ],
+    "all_out": [
+     0.03,
+     0.0,
+     0.1
+    ]
+   },
+   "one_robot": {
+    "n_runs": 30,
+    "t90_reached": 29,
+    "rooms_entered_pct": [
+     92.71,
+     88.29,
+     96.6
+    ],
+    "usable_coverage_pct": [
+     90.06,
+     87.53,
+     92.25
+    ],
+    "people_found_pct": [
+     96.0,
+     92.0,
+     98.67
+    ],
+    "false_confirmations": [
+     0.1,
+     0.0,
+     0.3
+    ],
+    "mean_time_to_confirm_s": [
+     157.19,
+     138.82,
+     175.69
+    ],
+    "t90_s": [
+     312.03,
+     277.46,
+     348.8
+    ],
+    "overlap_pct": [
+     null,
+     null,
+     null
+    ],
+    "all_out": [
+     1.0,
+     1.0,
+     1.0
+    ]
+   },
+   "baseline": {
+    "n_runs": 30,
+    "t90_reached": 14,
+    "rooms_entered_pct": [
+     98.05,
+     95.52,
+     100.0
+    ],
+    "usable_coverage_pct": [
+     95.44,
+     94.0,
+     96.62
+    ],
+    "people_found_pct": [
+     98.0,
+     95.33,
+     100.0
+    ],
+    "false_confirmations": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "mean_time_to_confirm_s": [
+     92.71,
+     79.3,
+     106.41
+    ],
+    "t90_s": [
+     468.47,
+     413.43,
+     520.74
+    ],
+    "overlap_pct": [
+     54.0,
+     47.69,
+     60.16
+    ],
+    "all_out": [
+     0.4,
+     0.23,
+     0.57
+    ]
+   },
+   "full_minus_no_radio": {
+    "rooms_entered_pct": {
+     "mean": 3.29,
+     "ci95": [
+      0.46,
+      6.71
+     ],
+     "wilcoxon_p": 0.0938
+    },
+    "usable_coverage_pct": {
+     "mean": 2.83,
+     "ci95": [
+      0.61,
+      5.47
+     ],
+     "wilcoxon_p": 0.0005
+    },
+    "people_found_pct": {
+     "mean": 0.67,
+     "ci95": [
+      -2.0,
+      3.33
+     ],
+     "wilcoxon_p": 1.0
+    },
+    "false_confirmations": {
+     "mean": -0.03,
+     "ci95": [
+      -0.2,
+      0.1
+     ],
+     "wilcoxon_p": 1.0
+    },
+    "mean_time_to_confirm_s": {
+     "mean": -37.39,
+     "ci95": [
+      -49.69,
+      -24.88
+     ],
+     "wilcoxon_p": 0.0
+    },
+    "t90_s": {
+     "mean": -58.87,
+     "ci95": [
+      -111.27,
+      -10.0
+     ],
+     "wilcoxon_p": 0.0803
+    },
+    "overlap_pct": {
+     "mean": -13.36,
+     "ci95": [
+      -21.96,
+      -4.09
+     ],
+     "wilcoxon_p": 0.004
+    },
+    "all_out": {
+     "mean": 0.7,
+     "ci95": [
+      0.53,
+      0.87
+     ],
+     "wilcoxon_p": 0.0
+    }
+   },
+   "full_minus_one_robot": {
+    "rooms_entered_pct": {
+     "mean": 6.14,
+     "ci95": [
+      2.09,
+      10.7
+     ],
+     "wilcoxon_p": 0.0117
+    },
+    "usable_coverage_pct": {
+     "mean": 5.27,
+     "ci95": [
+      3.03,
+      7.8
+     ],
+     "wilcoxon_p": 0.0
+    },
+    "people_found_pct": {
+     "mean": 0.67,
+     "ci95": [
+      -2.0,
+      3.33
+     ],
+     "wilcoxon_p": 1.0
+    },
+    "false_confirmations": {
+     "mean": -0.07,
+     "ci95": [
+      -0.2,
+      0.0
+     ],
+     "wilcoxon_p": 1.0
+    },
+    "mean_time_to_confirm_s": {
+     "mean": -60.54,
+     "ci95": [
+      -71.38,
+      -49.71
+     ],
+     "wilcoxon_p": 0.0
+    },
+    "t90_s": {
+     "mean": 24.3,
+     "ci95": [
+      -5.6,
+      54.73
+     ],
+     "wilcoxon_p": 0.0752
+    },
+    "overlap_pct": {
+     "mean": null,
+     "ci95": [
+      null,
+      null
+     ],
+     "wilcoxon_p": null
+    },
+    "all_out": {
+     "mean": -0.27,
+     "ci95": [
+      -0.43,
+      -0.1
+     ],
+     "wilcoxon_p": 0.0078
+    }
+   },
+   "full_minus_baseline": {
+    "rooms_entered_pct": {
+     "mean": 0.81,
+     "ci95": [
+      -0.95,
+      3.19
+     ],
+     "wilcoxon_p": 0.75
+    },
+    "usable_coverage_pct": {
+     "mean": -0.11,
+     "ci95": [
+      -1.42,
+      1.05
+     ],
+     "wilcoxon_p": 0.8394
+    },
+    "people_found_pct": {
+     "mean": -1.33,
+     "ci95": [
+      -4.0,
+      1.33
+     ],
+     "wilcoxon_p": 0.625
+    },
+    "false_confirmations": {
+     "mean": 0.03,
+     "ci95": [
+      0.0,
+      0.1
+     ],
+     "wilcoxon_p": 1.0
+    },
+    "mean_time_to_confirm_s": {
+     "mean": 3.93,
+     "ci95": [
+      -10.02,
+      16.72
+     ],
+     "wilcoxon_p": 0.3085
+    },
+    "t90_s": {
+     "mean": -132.13,
+     "ci95": [
+      -183.43,
+      -79.8
+     ],
+     "wilcoxon_p": 0.0001
+    },
+    "overlap_pct": {
+     "mean": 9.21,
+     "ci95": [
+      2.8,
+      15.79
+     ],
+     "wilcoxon_p": 0.0137
+    },
+    "all_out": {
+     "mean": 0.33,
+     "ci95": [
+      0.13,
+      0.53
+     ],
+     "wilcoxon_p": 0.0063
+    }
+   }
+  }
+ },
+ "runs": [
+  {
+   "run_id": "random_5001_s0_full",
+   "house": "random_5001",
+   "seed_index": 0,
+   "variant": "full",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 7,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 86.81,
+   "usable_samples": 24369,
+   "people_found": 4,
+   "people_total": 5,
+   "people_found_pct": 80.0,
+   "time_to_person_s": {
+    "s1": 41.33,
+    "s2": 74.13,
+    "s3": 32.95,
+    "s5": 16.95
+   },
+   "mean_time_to_confirm_s": 41.34,
+   "false_confirmations": 1,
+   "confirm_events": 6,
+   "overlap_pct": 51.38,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 6,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 3,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 53.52,
+   "t90_ceiling_pct": 53.52,
+   "t90_reached": true,
+   "t90_s": 273.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5001_s0_no_radio",
+   "house": "random_5001",
+   "seed_index": 0,
+   "variant": "no_radio",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 7,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 96.25,
+   "usable_samples": 24369,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 44.77,
+    "s2": 83.97,
+    "s3": 58.5,
+    "s4": 231.08,
+    "s5": 16.95
+   },
+   "mean_time_to_confirm_s": 87.05,
+   "false_confirmations": 0,
+   "confirm_events": 10,
+   "overlap_pct": 59.97,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 6,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 6,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    }
+   },
+   "swept_final_pct": 79.61,
+   "t90_ceiling_pct": 53.52,
+   "t90_reached": true,
+   "t90_s": 202.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5001_s0_one_robot",
+   "house": "random_5001",
+   "seed_index": 0,
+   "variant": "one_robot",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A"
+   ],
+   "rooms_entered": 5,
+   "rooms_total": 7,
+   "rooms_entered_pct": 71.43,
+   "usable_coverage_pct": 94.95,
+   "usable_samples": 24369,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 38.85,
+    "s2": 138.13,
+    "s3": 101.97,
+    "s4": 227.22,
+    "s5": 16.95
+   },
+   "mean_time_to_confirm_s": 104.62,
+   "false_confirmations": 3,
+   "confirm_events": 8,
+   "overlap_pct": null,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 5,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 71.26,
+   "t90_ceiling_pct": 53.52,
+   "t90_reached": true,
+   "t90_s": 205.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5001_s0_baseline",
+   "house": "random_5001",
+   "seed_index": 0,
+   "variant": "baseline",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480,
+    "room_memory": false,
+    "door_claims": false,
+    "room_entered_near_seat": false,
+    "room_memory_same_space": false,
+    "leave_waits_for_team": false,
+    "walk_out_past_fire": false,
+    "end_clear_way_out_m": 0.0
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 7,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 98.77,
+   "usable_samples": 24369,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 29.12,
+    "s2": 166.75,
+    "s3": 134.58,
+    "s4": 209.43,
+    "s5": 16.95
+   },
+   "mean_time_to_confirm_s": 111.37,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 9.92,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 3,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 5,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    }
+   },
+   "swept_final_pct": 63.16,
+   "t90_ceiling_pct": 53.52,
+   "t90_reached": true,
+   "t90_s": 181.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5002_s0_full",
+   "house": "random_5002",
+   "seed_index": 0,
+   "variant": "full",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 9,
+   "rooms_total": 9,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 96.5,
+   "usable_samples": 19379,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 20.13,
+    "s2": 0.0,
+    "s3": 18.83,
+    "s4": 41.3,
+    "s5": 80.13
+   },
+   "mean_time_to_confirm_s": 32.08,
+   "false_confirmations": 0,
+   "confirm_events": 6,
+   "overlap_pct": 10.18,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 4,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 6,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 43.17,
+   "t90_ceiling_pct": 43.17,
+   "t90_reached": true,
+   "t90_s": 186.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5002_s0_no_radio",
+   "house": "random_5002",
+   "seed_index": 0,
+   "variant": "no_radio",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 9,
+   "rooms_total": 9,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 95.53,
+   "usable_samples": 19379,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 26.43,
+    "s2": 0.0,
+    "s3": 24.7,
+    "s4": 38.6,
+    "s5": 131.7
+   },
+   "mean_time_to_confirm_s": 44.29,
+   "false_confirmations": 0,
+   "confirm_events": 9,
+   "overlap_pct": 40.06,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 4,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 9,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 36.14,
+   "t90_ceiling_pct": 43.17,
+   "t90_reached": false,
+   "t90_s": 600.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5002_s0_one_robot",
+   "house": "random_5002",
+   "seed_index": 0,
+   "variant": "one_robot",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 9,
+   "rooms_entered_pct": 77.78,
+   "usable_coverage_pct": 79.13,
+   "usable_samples": 19379,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 26.65,
+    "s2": 0.0,
+    "s3": 24.92,
+    "s4": 39.82,
+    "s5": 235.93
+   },
+   "mean_time_to_confirm_s": 65.46,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": null,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 7,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 65.84,
+   "t90_ceiling_pct": 43.17,
+   "t90_reached": true,
+   "t90_s": 200.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5002_s0_baseline",
+   "house": "random_5002",
+   "seed_index": 0,
+   "variant": "baseline",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480,
+    "room_memory": false,
+    "door_claims": false,
+    "room_entered_near_seat": false,
+    "room_memory_same_space": false,
+    "leave_waits_for_team": false,
+    "walk_out_past_fire": false,
+    "end_clear_way_out_m": 0.0
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 9,
+   "rooms_total": 9,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 95.18,
+   "usable_samples": 19379,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 20.13,
+    "s2": 0.0,
+    "s3": 18.83,
+    "s4": 41.3,
+    "s5": 56.12
+   },
+   "mean_time_to_confirm_s": 27.28,
+   "false_confirmations": 0,
+   "confirm_events": 6,
+   "overlap_pct": 39.31,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 4,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 8,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    }
+   },
+   "swept_final_pct": 42.32,
+   "t90_ceiling_pct": 43.17,
+   "t90_reached": true,
+   "t90_s": 283.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5003_s0_full",
+   "house": "random_5003",
+   "seed_index": 0,
+   "variant": "full",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 7,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 97.59,
+   "usable_samples": 24241,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 133.97,
+    "s2": 2.73,
+    "s3": 153.35,
+    "s4": 85.0,
+    "s5": 1.22
+   },
+   "mean_time_to_confirm_s": 75.25,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 45.19,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 6,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 4,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 80.1,
+   "t90_ceiling_pct": 80.1,
+   "t90_reached": true,
+   "t90_s": 275.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5003_s0_no_radio",
+   "house": "random_5003",
+   "seed_index": 0,
+   "variant": "no_radio",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 7,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 97.44,
+   "usable_samples": 24241,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 322.25,
+    "s2": 2.73,
+    "s3": 323.55,
+    "s4": 144.97,
+    "s5": 1.22
+   },
+   "mean_time_to_confirm_s": 158.94,
+   "false_confirmations": 0,
+   "confirm_events": 8,
+   "overlap_pct": 56.82,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 4,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 7,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 48.93,
+   "t90_ceiling_pct": 80.1,
+   "t90_reached": false,
+   "t90_s": 600.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5003_s0_one_robot",
+   "house": "random_5003",
+   "seed_index": 0,
+   "variant": "one_robot",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 7,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 95.66,
+   "usable_samples": 24241,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 285.27,
+    "s2": 2.73,
+    "s3": 287.0,
+    "s4": 213.97,
+    "s5": 1.22
+   },
+   "mean_time_to_confirm_s": 158.04,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": null,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 7,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 91.97,
+   "t90_ceiling_pct": 80.1,
+   "t90_reached": true,
+   "t90_s": 359.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5003_s0_baseline",
+   "house": "random_5003",
+   "seed_index": 0,
+   "variant": "baseline",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480,
+    "room_memory": false,
+    "door_claims": false,
+    "room_entered_near_seat": false,
+    "room_memory_same_space": false,
+    "leave_waits_for_team": false,
+    "walk_out_past_fire": false,
+    "end_clear_way_out_m": 0.0
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 7,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 97.14,
+   "usable_samples": 24241,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 188.7,
+    "s2": 2.73,
+    "s3": 190.43,
+    "s4": 117.97,
+    "s5": 1.22
+   },
+   "mean_time_to_confirm_s": 100.21,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 46.6,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 6,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 4,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 81.4,
+   "t90_ceiling_pct": 80.1,
+   "t90_reached": true,
+   "t90_s": 291.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5004_s0_full",
+   "house": "random_5004",
+   "seed_index": 0,
+   "variant": "full",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 8,
+   "rooms_total": 8,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 98.38,
+   "usable_samples": 16207,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 110.1,
+    "s2": 139.0,
+    "s3": 59.0,
+    "s4": 146.18,
+    "s5": 189.08
+   },
+   "mean_time_to_confirm_s": 128.67,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 88.77,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 6,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 8,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 78.07,
+   "t90_ceiling_pct": 78.07,
+   "t90_reached": true,
+   "t90_s": 311.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5004_s0_no_radio",
+   "house": "random_5004",
+   "seed_index": 0,
+   "variant": "no_radio",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 8,
+   "rooms_total": 8,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 98.76,
+   "usable_samples": 16207,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 168.08,
+    "s2": 210.17,
+    "s3": 120.0,
+    "s4": 219.25,
+    "s5": 262.35
+   },
+   "mean_time_to_confirm_s": 195.97,
+   "false_confirmations": 0,
+   "confirm_events": 10,
+   "overlap_pct": 95.68,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 8,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 8,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 86.99,
+   "t90_ceiling_pct": 78.07,
+   "t90_reached": true,
+   "t90_s": 287.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5004_s0_one_robot",
+   "house": "random_5004",
+   "seed_index": 0,
+   "variant": "one_robot",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A"
+   ],
+   "rooms_entered": 8,
+   "rooms_total": 8,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 95.84,
+   "usable_samples": 16207,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 152.08,
+    "s2": 223.17,
+    "s3": 106.0,
+    "s4": 244.25,
+    "s5": 313.35
+   },
+   "mean_time_to_confirm_s": 207.77,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": null,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 8,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 92.44,
+   "t90_ceiling_pct": 78.07,
+   "t90_reached": true,
+   "t90_s": 292.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5004_s0_baseline",
+   "house": "random_5004",
+   "seed_index": 0,
+   "variant": "baseline",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480,
+    "room_memory": false,
+    "door_claims": false,
+    "room_entered_near_seat": false,
+    "room_memory_same_space": false,
+    "leave_waits_for_team": false,
+    "walk_out_past_fire": false,
+    "end_clear_way_out_m": 0.0
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 8,
+   "rooms_total": 8,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 98.54,
+   "usable_samples": 16207,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 82.1,
+    "s2": 100.18,
+    "s3": 59.0,
+    "s4": 106.27,
+    "s5": 208.35
+   },
+   "mean_time_to_confirm_s": 111.18,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 60.15,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 6,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 7,
+     "final_state": "return",
+     "outside_at_end": true,
+     "walked_out": false
+    }
+   },
+   "swept_final_pct": 54.41,
+   "t90_ceiling_pct": 78.07,
+   "t90_reached": false,
+   "t90_s": 600.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5005_s0_full",
+   "house": "random_5005",
+   "seed_index": 0,
+   "variant": "full",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 8,
+   "rooms_total": 8,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 98.18,
+   "usable_samples": 20384,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 20.0,
+    "s2": 144.18,
+    "s3": 144.18,
+    "s4": 36.08,
+    "s5": 6.73
+   },
+   "mean_time_to_confirm_s": 70.24,
+   "false_confirmations": 0,
+   "confirm_events": 6,
+   "overlap_pct": 75.17,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 5,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 7,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 69.32,
+   "t90_ceiling_pct": 69.32,
+   "t90_reached": true,
+   "t90_s": 320.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5005_s0_no_radio",
+   "house": "random_5005",
+   "seed_index": 0,
+   "variant": "no_radio",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 8,
+   "rooms_total": 8,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 98.05,
+   "usable_samples": 20384,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 34.9,
+    "s2": 259.07,
+    "s3": 259.07,
+    "s4": 69.98,
+    "s5": 6.73
+   },
+   "mean_time_to_confirm_s": 125.95,
+   "false_confirmations": 0,
+   "confirm_events": 8,
+   "overlap_pct": 84.32,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 8,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 5,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 79.25,
+   "t90_ceiling_pct": 69.32,
+   "t90_reached": true,
+   "t90_s": 264.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5005_s0_one_robot",
+   "house": "random_5005",
+   "seed_index": 0,
+   "variant": "one_robot",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A"
+   ],
+   "rooms_entered": 8,
+   "rooms_total": 8,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 94.15,
+   "usable_samples": 20384,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 61.9,
+    "s2": 247.18,
+    "s3": 247.18,
+    "s4": 95.07,
+    "s5": 6.73
+   },
+   "mean_time_to_confirm_s": 131.61,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": null,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 8,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 81.92,
+   "t90_ceiling_pct": 69.32,
+   "t90_reached": true,
+   "t90_s": 257.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5005_s0_baseline",
+   "house": "random_5005",
+   "seed_index": 0,
+   "variant": "baseline",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480,
+    "room_memory": false,
+    "door_claims": false,
+    "room_entered_near_seat": false,
+    "room_memory_same_space": false,
+    "leave_waits_for_team": false,
+    "walk_out_past_fire": false,
+    "end_clear_way_out_m": 0.0
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 8,
+   "rooms_total": 8,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 95.05,
+   "usable_samples": 20384,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 26.9,
+    "s2": 132.08,
+    "s3": 132.08,
+    "s4": 75.0,
+    "s5": 6.73
+   },
+   "mean_time_to_confirm_s": 74.56,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 64.54,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 6,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 7,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    }
+   },
+   "swept_final_pct": 54.0,
+   "t90_ceiling_pct": 69.32,
+   "t90_reached": false,
+   "t90_s": 600.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5006_s0_full",
+   "house": "random_5006",
+   "seed_index": 0,
+   "variant": "full",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 8,
+   "rooms_total": 10,
+   "rooms_entered_pct": 80.0,
+   "usable_coverage_pct": 81.8,
+   "usable_samples": 17833,
+   "people_found": 3,
+   "people_total": 5,
+   "people_found_pct": 60.0,
+   "time_to_person_s": {
+    "s2": 70.92,
+    "s3": 27.0,
+    "s4": 57.0
+   },
+   "mean_time_to_confirm_s": 51.64,
+   "false_confirmations": 0,
+   "confirm_events": 3,
+   "overlap_pct": 87.21,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 7,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 8,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 63.69,
+   "t90_ceiling_pct": 63.69,
+   "t90_reached": true,
+   "t90_s": 285.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5006_s0_no_radio",
+   "house": "random_5006",
+   "seed_index": 0,
+   "variant": "no_radio",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 10,
+   "rooms_entered_pct": 70.0,
+   "usable_coverage_pct": 72.44,
+   "usable_samples": 17833,
+   "people_found": 3,
+   "people_total": 5,
+   "people_found_pct": 60.0,
+   "time_to_person_s": {
+    "s2": 65.2,
+    "s3": 25.0,
+    "s4": 50.08
+   },
+   "mean_time_to_confirm_s": 46.76,
+   "false_confirmations": 0,
+   "confirm_events": 6,
+   "overlap_pct": 65.01,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 4,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 7,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 26.69,
+   "t90_ceiling_pct": 63.69,
+   "t90_reached": false,
+   "t90_s": 600.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5006_s0_one_robot",
+   "house": "random_5006",
+   "seed_index": 0,
+   "variant": "one_robot",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A"
+   ],
+   "rooms_entered": 8,
+   "rooms_total": 10,
+   "rooms_entered_pct": 80.0,
+   "usable_coverage_pct": 79.2,
+   "usable_samples": 17833,
+   "people_found": 3,
+   "people_total": 5,
+   "people_found_pct": 60.0,
+   "time_to_person_s": {
+    "s2": 103.77,
+    "s3": 71.0,
+    "s4": 90.08
+   },
+   "mean_time_to_confirm_s": 88.28,
+   "false_confirmations": 0,
+   "confirm_events": 3,
+   "overlap_pct": null,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 8,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 67.13,
+   "t90_ceiling_pct": 63.69,
+   "t90_reached": true,
+   "t90_s": 302.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5006_s0_baseline",
+   "house": "random_5006",
+   "seed_index": 0,
+   "variant": "baseline",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480,
+    "room_memory": false,
+    "door_claims": false,
+    "room_entered_near_seat": false,
+    "room_memory_same_space": false,
+    "leave_waits_for_team": false,
+    "walk_out_past_fire": false,
+    "end_clear_way_out_m": 0.0
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 8,
+   "rooms_total": 10,
+   "rooms_entered_pct": 80.0,
+   "usable_coverage_pct": 83.8,
+   "usable_samples": 17833,
+   "people_found": 4,
+   "people_total": 5,
+   "people_found_pct": 80.0,
+   "time_to_person_s": {
+    "s1": 79.0,
+    "s2": 71.77,
+    "s3": 42.0,
+    "s4": 57.08
+   },
+   "mean_time_to_confirm_s": 62.46,
+   "false_confirmations": 0,
+   "confirm_events": 4,
+   "overlap_pct": 69.24,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 5,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 6,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    }
+   },
+   "swept_final_pct": 54.3,
+   "t90_ceiling_pct": 63.69,
+   "t90_reached": false,
+   "t90_s": 600.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5007_s0_full",
+   "house": "random_5007",
+   "seed_index": 0,
+   "variant": "full",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 10,
+   "rooms_total": 10,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 97.16,
+   "usable_samples": 19811,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 193.22,
+    "s2": 10.0,
+    "s3": 248.32,
+    "s4": 138.13,
+    "s5": 201.0
+   },
+   "mean_time_to_confirm_s": 158.13,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 63.54,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 7,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 8,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 63.71,
+   "t90_ceiling_pct": 63.71,
+   "t90_reached": true,
+   "t90_s": 335.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5007_s0_no_radio",
+   "house": "random_5007",
+   "seed_index": 0,
+   "variant": "no_radio",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 10,
+   "rooms_total": 10,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 95.87,
+   "usable_samples": 19811,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 214.27,
+    "s2": 24.0,
+    "s3": 280.35,
+    "s4": 114.1,
+    "s5": 174.18
+   },
+   "mean_time_to_confirm_s": 161.38,
+   "false_confirmations": 0,
+   "confirm_events": 10,
+   "overlap_pct": 92.38,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 8,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 10,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 73.94,
+   "t90_ceiling_pct": 63.71,
+   "t90_reached": true,
+   "t90_s": 228.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5007_s0_one_robot",
+   "house": "random_5007",
+   "seed_index": 0,
+   "variant": "one_robot",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A"
+   ],
+   "rooms_entered": 10,
+   "rooms_total": 10,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 95.08,
+   "usable_samples": 19811,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 228.27,
+    "s2": 18.0,
+    "s3": 298.35,
+    "s4": 116.1,
+    "s5": 172.18
+   },
+   "mean_time_to_confirm_s": 166.58,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": null,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 10,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 78.56,
+   "t90_ceiling_pct": 63.71,
+   "t90_reached": true,
+   "t90_s": 241.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5007_s0_baseline",
+   "house": "random_5007",
+   "seed_index": 0,
+   "variant": "baseline",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480,
+    "room_memory": false,
+    "door_claims": false,
+    "room_entered_near_seat": false,
+    "room_memory_same_space": false,
+    "leave_waits_for_team": false,
+    "walk_out_past_fire": false,
+    "end_clear_way_out_m": 0.0
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 10,
+   "rooms_total": 10,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 97.43,
+   "usable_samples": 19811,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 107.22,
+    "s2": 10.0,
+    "s3": 129.3,
+    "s4": 173.0,
+    "s5": 83.13
+   },
+   "mean_time_to_confirm_s": 100.53,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 68.63,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 9,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 8,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    }
+   },
+   "swept_final_pct": 72.44,
+   "t90_ceiling_pct": 63.71,
+   "t90_reached": true,
+   "t90_s": 358.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5008_s0_full",
+   "house": "random_5008",
+   "seed_index": 0,
+   "variant": "full",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 7,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 98.71,
+   "usable_samples": 11348,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 2.0,
+    "s2": 57.0,
+    "s3": 44.85,
+    "s4": 107.1,
+    "s5": 49.02
+   },
+   "mean_time_to_confirm_s": 51.99,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 92.14,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 6,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 6,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 88.11,
+   "t90_ceiling_pct": 88.11,
+   "t90_reached": true,
+   "t90_s": 300.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "random_5008_s0_no_radio",
+   "house": "random_5008",
+   "seed_index": 0,
+   "variant": "no_radio",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 7,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 98.34,
+   "usable_samples": 11348,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 2.0,
+    "s2": 122.12,
+    "s3": 109.87,
+    "s4": 246.2,
+    "s5": 113.03
+   },
+   "mean_time_to_confirm_s": 118.64,
+   "false_confirmations": 0,
+   "confirm_events": 10,
+   "overlap_pct": 97.44,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 7,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 7,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    }
+   },
+   "swept_final_pct": 90.3,
+   "t90_ceiling_pct": 88.11,
+   "t90_reached": true,
+   "t90_s": 333.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "random_5008_s0_one_robot",
+   "house": "random_5008",
+   "seed_index": 0,
+   "variant": "one_robot",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 7,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 96.6,
+   "usable_samples": 11348,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 52.0,
+    "s2": 97.65,
+    "s3": 83.4,
+    "s4": 235.75,
+    "s5": 87.57
+   },
+   "mean_time_to_confirm_s": 111.27,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": null,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 7,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 91.8,
+   "t90_ceiling_pct": 88.11,
+   "t90_reached": true,
+   "t90_s": 232.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "random_5008_s0_baseline",
+   "house": "random_5008",
+   "seed_index": 0,
+   "variant": "baseline",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480,
+    "room_memory": false,
+    "door_claims": false,
+    "room_entered_near_seat": false,
+    "room_memory_same_space": false,
+    "leave_waits_for_team": false,
+    "walk_out_past_fire": false,
+    "end_clear_way_out_m": 0.0
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 7,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 98.78,
+   "usable_samples": 11348,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 2.0,
+    "s2": 38.52,
+    "s3": 25.27,
+    "s4": 77.6,
+    "s5": 28.43
+   },
+   "mean_time_to_confirm_s": 34.36,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 88.18,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 6,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 7,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 78.92,
+   "t90_ceiling_pct": 88.11,
+   "t90_reached": false,
+   "t90_s": 600.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "random_5009_s0_full",
+   "house": "random_5009",
+   "seed_index": 0,
+   "variant": "full",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 10,
+   "rooms_total": 10,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 94.29,
+   "usable_samples": 24235,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 219.1,
+    "s2": 40.0,
+    "s3": 13.03,
+    "s4": 237.22,
+    "s5": 9.0
+   },
+   "mean_time_to_confirm_s": 103.67,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 57.98,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 8,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 7,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 60.24,
+   "t90_ceiling_pct": 60.24,
+   "t90_reached": true,
+   "t90_s": 461.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "random_5009_s0_no_radio",
+   "house": "random_5009",
+   "seed_index": 0,
+   "variant": "no_radio",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 10,
+   "rooms_total": 10,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 94.05,
+   "usable_samples": 24235,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 343.43,
+    "s2": 155.52,
+    "s3": 89.35,
+    "s4": 310.6,
+    "s5": 12.0
+   },
+   "mean_time_to_confirm_s": 182.18,
+   "false_confirmations": 0,
+   "confirm_events": 10,
+   "overlap_pct": 81.26,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 7,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 10,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    }
+   },
+   "swept_final_pct": 64.94,
+   "t90_ceiling_pct": 60.24,
+   "t90_reached": true,
+   "t90_s": 408.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "random_5009_s0_one_robot",
+   "house": "random_5009",
+   "seed_index": 0,
+   "variant": "one_robot",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A"
+   ],
+   "rooms_entered": 10,
+   "rooms_total": 10,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 90.97,
+   "usable_samples": 24235,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 287.4,
+    "s2": 128.22,
+    "s3": 19.05,
+    "s4": 250.32,
+    "s5": 13.0
+   },
+   "mean_time_to_confirm_s": 139.6,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": null,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 10,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 72.85,
+   "t90_ceiling_pct": 60.24,
+   "t90_reached": true,
+   "t90_s": 299.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "random_5009_s0_baseline",
+   "house": "random_5009",
+   "seed_index": 0,
+   "variant": "baseline",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480,
+    "room_memory": false,
+    "door_claims": false,
+    "room_entered_near_seat": false,
+    "room_memory_same_space": false,
+    "leave_waits_for_team": false,
+    "walk_out_past_fire": false,
+    "end_clear_way_out_m": 0.0
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 10,
+   "rooms_total": 10,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 94.46,
+   "usable_samples": 24235,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 224.1,
+    "s2": 40.0,
+    "s3": 13.03,
+    "s4": 226.22,
+    "s5": 9.0
+   },
+   "mean_time_to_confirm_s": 102.47,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 72.07,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 9,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 8,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 61.9,
+   "t90_ceiling_pct": 60.24,
+   "t90_reached": true,
+   "t90_s": 311.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "random_5010_s0_full",
+   "house": "random_5010",
+   "seed_index": 0,
+   "variant": "full",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 11,
+   "rooms_total": 11,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 96.09,
+   "usable_samples": 21091,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 39.0,
+    "s2": 123.18,
+    "s3": 74.1,
+    "s4": 57.0,
+    "s5": 149.27
+   },
+   "mean_time_to_confirm_s": 88.51,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 76.56,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 8,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 8,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 56.81,
+   "t90_ceiling_pct": 56.81,
+   "t90_reached": true,
+   "t90_s": 338.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5010_s0_no_radio",
+   "house": "random_5010",
+   "seed_index": 0,
+   "variant": "no_radio",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 10,
+   "rooms_total": 11,
+   "rooms_entered_pct": 90.91,
+   "usable_coverage_pct": 92.04,
+   "usable_samples": 21091,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 115.08,
+    "s2": 195.27,
+    "s3": 105.0,
+    "s4": 85.0,
+    "s5": 228.35
+   },
+   "mean_time_to_confirm_s": 145.74,
+   "false_confirmations": 0,
+   "confirm_events": 10,
+   "overlap_pct": 77.67,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 9,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 9,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    }
+   },
+   "swept_final_pct": 71.13,
+   "t90_ceiling_pct": 56.81,
+   "t90_reached": true,
+   "t90_s": 247.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5010_s0_one_robot",
+   "house": "random_5010",
+   "seed_index": 0,
+   "variant": "one_robot",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A"
+   ],
+   "rooms_entered": 10,
+   "rooms_total": 11,
+   "rooms_entered_pct": 90.91,
+   "usable_coverage_pct": 92.21,
+   "usable_samples": 21091,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 108.08,
+    "s2": 306.27,
+    "s3": 143.18,
+    "s4": 78.0,
+    "s5": 336.35
+   },
+   "mean_time_to_confirm_s": 194.38,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": null,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 10,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 81.34,
+   "t90_ceiling_pct": 56.81,
+   "t90_reached": true,
+   "t90_s": 282.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5010_s0_baseline",
+   "house": "random_5010",
+   "seed_index": 0,
+   "variant": "baseline",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480,
+    "room_memory": false,
+    "door_claims": false,
+    "room_entered_near_seat": false,
+    "room_memory_same_space": false,
+    "leave_waits_for_team": false,
+    "walk_out_past_fire": false,
+    "end_clear_way_out_m": 0.0
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 11,
+   "rooms_total": 11,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 95.68,
+   "usable_samples": 21091,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 72.08,
+    "s2": 76.1,
+    "s3": 38.0,
+    "s4": 63.0,
+    "s5": 100.18
+   },
+   "mean_time_to_confirm_s": 69.87,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 61.97,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 10,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 6,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 70.51,
+   "t90_ceiling_pct": 56.81,
+   "t90_reached": true,
+   "t90_s": 237.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5011_s0_full",
+   "house": "random_5011",
+   "seed_index": 0,
+   "variant": "full",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 7,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 97.94,
+   "usable_samples": 26833,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 91.95,
+    "s2": 115.1,
+    "s3": 210.93,
+    "s4": 207.12,
+    "s5": 42.0
+   },
+   "mean_time_to_confirm_s": 133.42,
+   "false_confirmations": 0,
+   "confirm_events": 6,
+   "overlap_pct": 57.23,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 5,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 5,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 69.06,
+   "t90_ceiling_pct": 69.06,
+   "t90_reached": true,
+   "t90_s": 347.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5011_s0_no_radio",
+   "house": "random_5011",
+   "seed_index": 0,
+   "variant": "no_radio",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 7,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 97.79,
+   "usable_samples": 26833,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 190.6,
+    "s2": 142.1,
+    "s3": 210.8,
+    "s4": 200.77,
+    "s5": 27.0
+   },
+   "mean_time_to_confirm_s": 154.25,
+   "false_confirmations": 0,
+   "confirm_events": 10,
+   "overlap_pct": 76.81,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 7,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 5,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 83.49,
+   "t90_ceiling_pct": 69.06,
+   "t90_reached": true,
+   "t90_s": 315.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5011_s0_one_robot",
+   "house": "random_5011",
+   "seed_index": 0,
+   "variant": "one_robot",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A"
+   ],
+   "rooms_entered": 5,
+   "rooms_total": 7,
+   "rooms_entered_pct": 71.43,
+   "usable_coverage_pct": 86.8,
+   "usable_samples": 26833,
+   "people_found": 4,
+   "people_total": 5,
+   "people_found_pct": 80.0,
+   "time_to_person_s": {
+    "s1": 203.47,
+    "s3": 223.67,
+    "s4": 214.07,
+    "s5": 110.0
+   },
+   "mean_time_to_confirm_s": 187.8,
+   "false_confirmations": 0,
+   "confirm_events": 4,
+   "overlap_pct": null,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 5,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 66.87,
+   "t90_ceiling_pct": 69.06,
+   "t90_reached": true,
+   "t90_s": 401.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5011_s0_baseline",
+   "house": "random_5011",
+   "seed_index": 0,
+   "variant": "baseline",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480,
+    "room_memory": false,
+    "door_claims": false,
+    "room_entered_near_seat": false,
+    "room_memory_same_space": false,
+    "leave_waits_for_team": false,
+    "walk_out_past_fire": false,
+    "end_clear_way_out_m": 0.0
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 5,
+   "rooms_total": 7,
+   "rooms_entered_pct": 71.43,
+   "usable_coverage_pct": 89.04,
+   "usable_samples": 26833,
+   "people_found": 4,
+   "people_total": 5,
+   "people_found_pct": 80.0,
+   "time_to_person_s": {
+    "s1": 61.17,
+    "s3": 114.47,
+    "s4": 73.57,
+    "s5": 65.0
+   },
+   "mean_time_to_confirm_s": 78.55,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 53.32,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 5,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 4,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    }
+   },
+   "swept_final_pct": 51.69,
+   "t90_ceiling_pct": 69.06,
+   "t90_reached": false,
+   "t90_s": 600.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5012_s0_full",
+   "house": "random_5012",
+   "seed_index": 0,
+   "variant": "full",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 7,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 96.45,
+   "usable_samples": 17234,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 14.57,
+    "s2": 9.17,
+    "s3": 7.08,
+    "s4": 36.22,
+    "s5": 147.77
+   },
+   "mean_time_to_confirm_s": 42.96,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 80.0,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 5,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 7,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 64.77,
+   "t90_ceiling_pct": 64.77,
+   "t90_reached": true,
+   "t90_s": 471.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "random_5012_s0_no_radio",
+   "house": "random_5012",
+   "seed_index": 0,
+   "variant": "no_radio",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 7,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 96.12,
+   "usable_samples": 17234,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 14.57,
+    "s2": 9.17,
+    "s3": 7.08,
+    "s4": 90.25,
+    "s5": 145.33
+   },
+   "mean_time_to_confirm_s": 53.28,
+   "false_confirmations": 0,
+   "confirm_events": 9,
+   "overlap_pct": 65.52,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 7,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 4,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 80.72,
+   "t90_ceiling_pct": 64.77,
+   "t90_reached": true,
+   "t90_s": 257.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "random_5012_s0_one_robot",
+   "house": "random_5012",
+   "seed_index": 0,
+   "variant": "one_robot",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 7,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 95.4,
+   "usable_samples": 17234,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 14.57,
+    "s2": 9.17,
+    "s3": 7.08,
+    "s4": 78.65,
+    "s5": 232.9
+   },
+   "mean_time_to_confirm_s": 68.47,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": null,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 7,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 81.52,
+   "t90_ceiling_pct": 64.77,
+   "t90_reached": true,
+   "t90_s": 212.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "random_5012_s0_baseline",
+   "house": "random_5012",
+   "seed_index": 0,
+   "variant": "baseline",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480,
+    "room_memory": false,
+    "door_claims": false,
+    "room_entered_near_seat": false,
+    "room_memory_same_space": false,
+    "leave_waits_for_team": false,
+    "walk_out_past_fire": false,
+    "end_clear_way_out_m": 0.0
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 7,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 97.62,
+   "usable_samples": 17234,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 14.57,
+    "s2": 9.17,
+    "s3": 7.08,
+    "s4": 47.52,
+    "s5": 108.08
+   },
+   "mean_time_to_confirm_s": 37.28,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 41.19,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 6,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 4,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    }
+   },
+   "swept_final_pct": 61.83,
+   "t90_ceiling_pct": 64.77,
+   "t90_reached": true,
+   "t90_s": 378.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "random_5013_s0_full",
+   "house": "random_5013",
+   "seed_index": 0,
+   "variant": "full",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 10,
+   "rooms_total": 10,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 96.7,
+   "usable_samples": 25731,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 150.12,
+    "s2": 97.95,
+    "s3": 17.0,
+    "s4": 210.2,
+    "s5": 95.0
+   },
+   "mean_time_to_confirm_s": 114.05,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 56.04,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 7,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 6,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 67.6,
+   "t90_ceiling_pct": 67.6,
+   "t90_reached": true,
+   "t90_s": 457.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5013_s0_no_radio",
+   "house": "random_5013",
+   "seed_index": 0,
+   "variant": "no_radio",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 8,
+   "rooms_total": 10,
+   "rooms_entered_pct": 80.0,
+   "usable_coverage_pct": 90.16,
+   "usable_samples": 25731,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 192.25,
+    "s2": 153.17,
+    "s3": 8.0,
+    "s4": 261.35,
+    "s5": 149.78
+   },
+   "mean_time_to_confirm_s": 152.91,
+   "false_confirmations": 0,
+   "confirm_events": 10,
+   "overlap_pct": 83.0,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 7,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 7,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    }
+   },
+   "swept_final_pct": 63.67,
+   "t90_ceiling_pct": 67.6,
+   "t90_reached": true,
+   "t90_s": 456.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5013_s0_one_robot",
+   "house": "random_5013",
+   "seed_index": 0,
+   "variant": "one_robot",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A"
+   ],
+   "rooms_entered": 8,
+   "rooms_total": 10,
+   "rooms_entered_pct": 80.0,
+   "usable_coverage_pct": 80.78,
+   "usable_samples": 25731,
+   "people_found": 4,
+   "people_total": 5,
+   "people_found_pct": 80.0,
+   "time_to_person_s": {
+    "s1": 237.13,
+    "s3": 10.0,
+    "s4": 297.23,
+    "s5": 365.53
+   },
+   "mean_time_to_confirm_s": 227.47,
+   "false_confirmations": 0,
+   "confirm_events": 4,
+   "overlap_pct": null,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 8,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 66.9,
+   "t90_ceiling_pct": 67.6,
+   "t90_reached": true,
+   "t90_s": 440.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5013_s0_baseline",
+   "house": "random_5013",
+   "seed_index": 0,
+   "variant": "baseline",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480,
+    "room_memory": false,
+    "door_claims": false,
+    "room_entered_near_seat": false,
+    "room_memory_same_space": false,
+    "leave_waits_for_team": false,
+    "walk_out_past_fire": false,
+    "end_clear_way_out_m": 0.0
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 10,
+   "rooms_total": 10,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 97.76,
+   "usable_samples": 25731,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 76.13,
+    "s2": 267.13,
+    "s3": 8.0,
+    "s4": 104.22,
+    "s5": 264.4
+   },
+   "mean_time_to_confirm_s": 143.98,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 53.18,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 6,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 7,
+     "final_state": "return",
+     "outside_at_end": true,
+     "walked_out": false
+    }
+   },
+   "swept_final_pct": 51.92,
+   "t90_ceiling_pct": 67.6,
+   "t90_reached": false,
+   "t90_s": 600.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5014_s0_full",
+   "house": "random_5014",
+   "seed_index": 0,
+   "variant": "full",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 7,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 97.61,
+   "usable_samples": 14373,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 3.3,
+    "s2": 6.68,
+    "s3": 118.75,
+    "s4": 30.0,
+    "s5": 86.77
+   },
+   "mean_time_to_confirm_s": 49.1,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 75.36,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 6,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 6,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 74.23,
+   "t90_ceiling_pct": 74.23,
+   "t90_reached": true,
+   "t90_s": 391.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5014_s0_no_radio",
+   "house": "random_5014",
+   "seed_index": 0,
+   "variant": "no_radio",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 7,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 94.68,
+   "usable_samples": 14373,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 3.3,
+    "s2": 6.68,
+    "s3": 185.93,
+    "s4": 23.25,
+    "s5": 76.35
+   },
+   "mean_time_to_confirm_s": 59.1,
+   "false_confirmations": 0,
+   "confirm_events": 9,
+   "overlap_pct": 72.27,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 7,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 5,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 77.69,
+   "t90_ceiling_pct": 74.23,
+   "t90_reached": true,
+   "t90_s": 293.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5014_s0_one_robot",
+   "house": "random_5014",
+   "seed_index": 0,
+   "variant": "one_robot",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 7,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 91.55,
+   "usable_samples": 14373,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 3.3,
+    "s2": 5.25,
+    "s3": 180.55,
+    "s4": 270.73,
+    "s5": 132.47
+   },
+   "mean_time_to_confirm_s": 118.46,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": null,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 7,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 82.76,
+   "t90_ceiling_pct": 74.23,
+   "t90_reached": true,
+   "t90_s": 281.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5014_s0_baseline",
+   "house": "random_5014",
+   "seed_index": 0,
+   "variant": "baseline",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480,
+    "room_memory": false,
+    "door_claims": false,
+    "room_entered_near_seat": false,
+    "room_memory_same_space": false,
+    "leave_waits_for_team": false,
+    "walk_out_past_fire": false,
+    "end_clear_way_out_m": 0.0
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 7,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 97.63,
+   "usable_samples": 14373,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 3.3,
+    "s2": 6.68,
+    "s3": 64.1,
+    "s4": 43.85,
+    "s5": 45.0
+   },
+   "mean_time_to_confirm_s": 32.59,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 52.2,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 5,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 5,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    }
+   },
+   "swept_final_pct": 60.08,
+   "t90_ceiling_pct": 74.23,
+   "t90_reached": false,
+   "t90_s": 600.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5015_s0_full",
+   "house": "random_5015",
+   "seed_index": 0,
+   "variant": "full",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 9,
+   "rooms_total": 9,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 96.82,
+   "usable_samples": 23024,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 15.0,
+    "s2": 17.0,
+    "s3": 222.18,
+    "s4": 32.38,
+    "s5": 85.1
+   },
+   "mean_time_to_confirm_s": 74.33,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 74.5,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 8,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 7,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 81.74,
+   "t90_ceiling_pct": 81.74,
+   "t90_reached": true,
+   "t90_s": 435.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5015_s0_no_radio",
+   "house": "random_5015",
+   "seed_index": 0,
+   "variant": "no_radio",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 9,
+   "rooms_total": 9,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 91.75,
+   "usable_samples": 23024,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 35.0,
+    "s2": 10.0,
+    "s3": 378.17,
+    "s4": 133.0,
+    "s5": 64.1
+   },
+   "mean_time_to_confirm_s": 124.05,
+   "false_confirmations": 0,
+   "confirm_events": 6,
+   "overlap_pct": 13.78,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 2,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 9,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 10.79,
+   "t90_ceiling_pct": 81.74,
+   "t90_reached": false,
+   "t90_s": 600.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5015_s0_one_robot",
+   "house": "random_5015",
+   "seed_index": 0,
+   "variant": "one_robot",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A"
+   ],
+   "rooms_entered": 9,
+   "rooms_total": 9,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 91.58,
+   "usable_samples": 23024,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 155.8,
+    "s2": 11.0,
+    "s3": 273.07,
+    "s4": 61.12,
+    "s5": 187.97
+   },
+   "mean_time_to_confirm_s": 137.79,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": null,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 9,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 76.12,
+   "t90_ceiling_pct": 81.74,
+   "t90_reached": true,
+   "t90_s": 467.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5015_s0_baseline",
+   "house": "random_5015",
+   "seed_index": 0,
+   "variant": "baseline",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480,
+    "room_memory": false,
+    "door_claims": false,
+    "room_entered_near_seat": false,
+    "room_memory_same_space": false,
+    "leave_waits_for_team": false,
+    "walk_out_past_fire": false,
+    "end_clear_way_out_m": 0.0
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 9,
+   "rooms_total": 9,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 97.06,
+   "usable_samples": 23024,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 15.0,
+    "s2": 18.0,
+    "s3": 125.17,
+    "s4": 93.53,
+    "s5": 50.08
+   },
+   "mean_time_to_confirm_s": 60.36,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 29.0,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 6,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 5,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 43.38,
+   "t90_ceiling_pct": 81.74,
+   "t90_reached": false,
+   "t90_s": 600.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5016_s0_full",
+   "house": "random_5016",
+   "seed_index": 0,
+   "variant": "full",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 9,
+   "rooms_total": 9,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 97.78,
+   "usable_samples": 27422,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 47.0,
+    "s2": 237.18,
+    "s3": 205.82,
+    "s4": 158.65,
+    "s5": 187.1
+   },
+   "mean_time_to_confirm_s": 167.15,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 53.82,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 8,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 5,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 76.18,
+   "t90_ceiling_pct": 76.18,
+   "t90_reached": true,
+   "t90_s": 407.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5016_s0_no_radio",
+   "house": "random_5016",
+   "seed_index": 0,
+   "variant": "no_radio",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 8,
+   "rooms_total": 9,
+   "rooms_entered_pct": 88.89,
+   "usable_coverage_pct": 84.02,
+   "usable_samples": 27422,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 18.1,
+    "s2": 149.3,
+    "s3": 251.42,
+    "s4": 227.38,
+    "s5": 134.22
+   },
+   "mean_time_to_confirm_s": 156.08,
+   "false_confirmations": 0,
+   "confirm_events": 10,
+   "overlap_pct": 95.82,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 8,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 8,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 59.53,
+   "t90_ceiling_pct": 76.18,
+   "t90_reached": false,
+   "t90_s": 600.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5016_s0_one_robot",
+   "house": "random_5016",
+   "seed_index": 0,
+   "variant": "one_robot",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A"
+   ],
+   "rooms_entered": 9,
+   "rooms_total": 9,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 88.7,
+   "usable_samples": 27422,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 57.0,
+    "s2": 281.18,
+    "s3": 345.08,
+    "s4": 318.48,
+    "s5": 224.1
+   },
+   "mean_time_to_confirm_s": 245.17,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": null,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 9,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 70.45,
+   "t90_ceiling_pct": 76.18,
+   "t90_reached": true,
+   "t90_s": 474.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5016_s0_baseline",
+   "house": "random_5016",
+   "seed_index": 0,
+   "variant": "baseline",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480,
+    "room_memory": false,
+    "door_claims": false,
+    "room_entered_near_seat": false,
+    "room_memory_same_space": false,
+    "leave_waits_for_team": false,
+    "walk_out_past_fire": false,
+    "end_clear_way_out_m": 0.0
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 9,
+   "rooms_total": 9,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 94.35,
+   "usable_samples": 27422,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 6.0,
+    "s2": 113.08,
+    "s3": 225.22,
+    "s4": 135.62,
+    "s5": 91.0
+   },
+   "mean_time_to_confirm_s": 114.18,
+   "false_confirmations": 0,
+   "confirm_events": 6,
+   "overlap_pct": 73.88,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 9,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 7,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 70.24,
+   "t90_ceiling_pct": 76.18,
+   "t90_reached": true,
+   "t90_s": 466.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5017_s0_full",
+   "house": "random_5017",
+   "seed_index": 0,
+   "variant": "full",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 10,
+   "rooms_total": 10,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 94.74,
+   "usable_samples": 28845,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 82.0,
+    "s2": 188.08,
+    "s3": 154.0,
+    "s4": 221.17,
+    "s5": 207.73
+   },
+   "mean_time_to_confirm_s": 170.6,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 66.19,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 8,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 8,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 64.14,
+   "t90_ceiling_pct": 64.14,
+   "t90_reached": true,
+   "t90_s": 429.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5017_s0_no_radio",
+   "house": "random_5017",
+   "seed_index": 0,
+   "variant": "no_radio",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 10,
+   "rooms_total": 10,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 94.9,
+   "usable_samples": 28845,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 41.0,
+    "s2": 393.27,
+    "s3": 187.1,
+    "s4": 401.35,
+    "s5": 223.18
+   },
+   "mean_time_to_confirm_s": 249.18,
+   "false_confirmations": 0,
+   "confirm_events": 8,
+   "overlap_pct": 71.0,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 8,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 9,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    }
+   },
+   "swept_final_pct": 57.08,
+   "t90_ceiling_pct": 64.14,
+   "t90_reached": false,
+   "t90_s": 600.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5017_s0_one_robot",
+   "house": "random_5017",
+   "seed_index": 0,
+   "variant": "one_robot",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A"
+   ],
+   "rooms_entered": 10,
+   "rooms_total": 10,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 91.61,
+   "usable_samples": 28845,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 120.0,
+    "s2": 292.35,
+    "s3": 189.08,
+    "s4": 299.43,
+    "s5": 233.17
+   },
+   "mean_time_to_confirm_s": 226.81,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": null,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 10,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 71.05,
+   "t90_ceiling_pct": 64.14,
+   "t90_reached": true,
+   "t90_s": 321.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5017_s0_baseline",
+   "house": "random_5017",
+   "seed_index": 0,
+   "variant": "baseline",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480,
+    "room_memory": false,
+    "door_claims": false,
+    "room_entered_near_seat": false,
+    "room_memory_same_space": false,
+    "leave_waits_for_team": false,
+    "walk_out_past_fire": false,
+    "end_clear_way_out_m": 0.0
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 9,
+   "rooms_total": 10,
+   "rooms_entered_pct": 90.0,
+   "usable_coverage_pct": 91.5,
+   "usable_samples": 28845,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 39.0,
+    "s2": 164.35,
+    "s3": 75.1,
+    "s4": 153.27,
+    "s5": 106.18
+   },
+   "mean_time_to_confirm_s": 107.58,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 53.97,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 6,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 7,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    }
+   },
+   "swept_final_pct": 48.9,
+   "t90_ceiling_pct": 64.14,
+   "t90_reached": false,
+   "t90_s": 600.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5018_s0_full",
+   "house": "random_5018",
+   "seed_index": 0,
+   "variant": "full",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 10,
+   "rooms_total": 10,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 96.44,
+   "usable_samples": 27291,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 139.55,
+    "s2": 227.55,
+    "s3": 101.38,
+    "s4": 211.38,
+    "s5": 91.0
+   },
+   "mean_time_to_confirm_s": 154.17,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 74.39,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 7,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 8,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 65.54,
+   "t90_ceiling_pct": 65.54,
+   "t90_reached": true,
+   "t90_s": 396.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "random_5018_s0_no_radio",
+   "house": "random_5018",
+   "seed_index": 0,
+   "variant": "no_radio",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 10,
+   "rooms_total": 10,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 94.88,
+   "usable_samples": 27291,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 165.9,
+    "s2": 344.23,
+    "s3": 112.73,
+    "s4": 330.07,
+    "s5": 103.0
+   },
+   "mean_time_to_confirm_s": 211.19,
+   "false_confirmations": 0,
+   "confirm_events": 8,
+   "overlap_pct": 48.71,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 7,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 8,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 46.56,
+   "t90_ceiling_pct": 65.54,
+   "t90_reached": false,
+   "t90_s": 600.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "random_5018_s0_one_robot",
+   "house": "random_5018",
+   "seed_index": 0,
+   "variant": "one_robot",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 10,
+   "rooms_entered_pct": 70.0,
+   "usable_coverage_pct": 87.75,
+   "usable_samples": 27291,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 204.33,
+    "s2": 301.32,
+    "s3": 166.17,
+    "s4": 286.15,
+    "s5": 156.0
+   },
+   "mean_time_to_confirm_s": 222.79,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": null,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 7,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 67.49,
+   "t90_ceiling_pct": 65.54,
+   "t90_reached": true,
+   "t90_s": 372.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "random_5018_s0_baseline",
+   "house": "random_5018",
+   "seed_index": 0,
+   "variant": "baseline",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480,
+    "room_memory": false,
+    "door_claims": false,
+    "room_entered_near_seat": false,
+    "room_memory_same_space": false,
+    "leave_waits_for_team": false,
+    "walk_out_past_fire": false,
+    "end_clear_way_out_m": 0.0
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 10,
+   "rooms_total": 10,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 95.0,
+   "usable_samples": 27291,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 184.77,
+    "s2": 110.12,
+    "s3": 146.6,
+    "s4": 77.95,
+    "s5": 136.0
+   },
+   "mean_time_to_confirm_s": 131.09,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 42.5,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 7,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 7,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 41.73,
+   "t90_ceiling_pct": 65.54,
+   "t90_reached": false,
+   "t90_s": 600.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "random_5019_s0_full",
+   "house": "random_5019",
+   "seed_index": 0,
+   "variant": "full",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 7,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 97.15,
+   "usable_samples": 19761,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 115.13,
+    "s2": 7.65,
+    "s3": 150.67,
+    "s4": 88.82,
+    "s5": 13.0
+   },
+   "mean_time_to_confirm_s": 75.05,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 93.21,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 7,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 5,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 86.55,
+   "t90_ceiling_pct": 86.55,
+   "t90_reached": true,
+   "t90_s": 437.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "random_5019_s0_no_radio",
+   "house": "random_5019",
+   "seed_index": 0,
+   "variant": "no_radio",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 6,
+   "rooms_total": 7,
+   "rooms_entered_pct": 85.71,
+   "usable_coverage_pct": 85.96,
+   "usable_samples": 19761,
+   "people_found": 4,
+   "people_total": 5,
+   "people_found_pct": 80.0,
+   "time_to_person_s": {
+    "s1": 174.02,
+    "s2": 8.52,
+    "s4": 241.18,
+    "s5": 24.0
+   },
+   "mean_time_to_confirm_s": 111.93,
+   "false_confirmations": 0,
+   "confirm_events": 6,
+   "overlap_pct": 65.3,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 6,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 4,
+     "final_state": "return",
+     "outside_at_end": true,
+     "walked_out": false
+    }
+   },
+   "swept_final_pct": 66.74,
+   "t90_ceiling_pct": 86.55,
+   "t90_reached": false,
+   "t90_s": 600.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "random_5019_s0_one_robot",
+   "house": "random_5019",
+   "seed_index": 0,
+   "variant": "one_robot",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 7,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 93.4,
+   "usable_samples": 19761,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 175.83,
+    "s2": 8.52,
+    "s3": 285.95,
+    "s4": 130.8,
+    "s5": 52.72
+   },
+   "mean_time_to_confirm_s": 130.76,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": null,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 7,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 82.19,
+   "t90_ceiling_pct": 86.55,
+   "t90_reached": true,
+   "t90_s": 460.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "random_5019_s0_baseline",
+   "house": "random_5019",
+   "seed_index": 0,
+   "variant": "baseline",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480,
+    "room_memory": false,
+    "door_claims": false,
+    "room_entered_near_seat": false,
+    "room_memory_same_space": false,
+    "leave_waits_for_team": false,
+    "walk_out_past_fire": false,
+    "end_clear_way_out_m": 0.0
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 7,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 95.82,
+   "usable_samples": 19761,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 104.32,
+    "s2": 7.65,
+    "s3": 68.12,
+    "s4": 157.5,
+    "s5": 31.0
+   },
+   "mean_time_to_confirm_s": 73.72,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 69.06,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 4,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 7,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    }
+   },
+   "swept_final_pct": 56.84,
+   "t90_ceiling_pct": 86.55,
+   "t90_reached": false,
+   "t90_s": 600.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "random_5020_s0_full",
+   "house": "random_5020",
+   "seed_index": 0,
+   "variant": "full",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 10,
+   "rooms_total": 10,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 94.41,
+   "usable_samples": 26727,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 116.03,
+    "s2": 39.43,
+    "s3": 187.1,
+    "s4": 55.0,
+    "s5": 117.77
+   },
+   "mean_time_to_confirm_s": 103.07,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 54.98,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 8,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 7,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 66.45,
+   "t90_ceiling_pct": 66.45,
+   "t90_reached": true,
+   "t90_s": 308.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5020_s0_no_radio",
+   "house": "random_5020",
+   "seed_index": 0,
+   "variant": "no_radio",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 10,
+   "rooms_total": 10,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 93.79,
+   "usable_samples": 26727,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 273.23,
+    "s2": 59.87,
+    "s3": 337.02,
+    "s4": 116.0,
+    "s5": 216.07
+   },
+   "mean_time_to_confirm_s": 200.44,
+   "false_confirmations": 0,
+   "confirm_events": 10,
+   "overlap_pct": 96.63,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 10,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 10,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 73.66,
+   "t90_ceiling_pct": 66.45,
+   "t90_reached": true,
+   "t90_s": 371.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5020_s0_one_robot",
+   "house": "random_5020",
+   "seed_index": 0,
+   "variant": "one_robot",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A"
+   ],
+   "rooms_entered": 10,
+   "rooms_total": 10,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 91.78,
+   "usable_samples": 26727,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 211.7,
+    "s2": 75.0,
+    "s3": 265.82,
+    "s4": 181.18,
+    "s5": 213.65
+   },
+   "mean_time_to_confirm_s": 189.47,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": null,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 10,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 70.87,
+   "t90_ceiling_pct": 66.45,
+   "t90_reached": true,
+   "t90_s": 309.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5020_s0_baseline",
+   "house": "random_5020",
+   "seed_index": 0,
+   "variant": "baseline",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480,
+    "room_memory": false,
+    "door_claims": false,
+    "room_entered_near_seat": false,
+    "room_memory_same_space": false,
+    "leave_waits_for_team": false,
+    "walk_out_past_fire": false,
+    "end_clear_way_out_m": 0.0
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 10,
+   "rooms_total": 10,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 95.05,
+   "usable_samples": 26727,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 202.68,
+    "s2": 140.52,
+    "s3": 137.0,
+    "s4": 77.0,
+    "s5": 102.82
+   },
+   "mean_time_to_confirm_s": 132.0,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 53.59,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 7,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 5,
+     "final_state": "return",
+     "outside_at_end": true,
+     "walked_out": false
+    }
+   },
+   "swept_final_pct": 66.81,
+   "t90_ceiling_pct": 66.45,
+   "t90_reached": true,
+   "t90_s": 364.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5021_s0_full",
+   "house": "random_5021",
+   "seed_index": 0,
+   "variant": "full",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 9,
+   "rooms_total": 9,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 97.72,
+   "usable_samples": 28651,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 64.3,
+    "s2": 94.98,
+    "s3": 101.37,
+    "s4": 57.0,
+    "s5": 152.1
+   },
+   "mean_time_to_confirm_s": 93.95,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 43.02,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 8,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 5,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    }
+   },
+   "swept_final_pct": 54.57,
+   "t90_ceiling_pct": 54.57,
+   "t90_reached": true,
+   "t90_s": 326.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5021_s0_no_radio",
+   "house": "random_5021",
+   "seed_index": 0,
+   "variant": "no_radio",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 9,
+   "rooms_total": 9,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 96.01,
+   "usable_samples": 28651,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 106.32,
+    "s2": 167.12,
+    "s3": 136.52,
+    "s4": 14.0,
+    "s5": 74.1
+   },
+   "mean_time_to_confirm_s": 99.61,
+   "false_confirmations": 0,
+   "confirm_events": 10,
+   "overlap_pct": 90.66,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 7,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 8,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 77.11,
+   "t90_ceiling_pct": 54.57,
+   "t90_reached": true,
+   "t90_s": 290.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5021_s0_one_robot",
+   "house": "random_5021",
+   "seed_index": 0,
+   "variant": "one_robot",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A"
+   ],
+   "rooms_entered": 9,
+   "rooms_total": 9,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 94.92,
+   "usable_samples": 28651,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 232.7,
+    "s2": 261.9,
+    "s3": 248.52,
+    "s4": 14.0,
+    "s5": 113.1
+   },
+   "mean_time_to_confirm_s": 174.04,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": null,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 9,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 86.38,
+   "t90_ceiling_pct": 54.57,
+   "t90_reached": true,
+   "t90_s": 265.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5021_s0_baseline",
+   "house": "random_5021",
+   "seed_index": 0,
+   "variant": "baseline",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480,
+    "room_memory": false,
+    "door_claims": false,
+    "room_entered_near_seat": false,
+    "room_memory_same_space": false,
+    "leave_waits_for_team": false,
+    "walk_out_past_fire": false,
+    "end_clear_way_out_m": 0.0
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 9,
+   "rooms_total": 9,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 97.91,
+   "usable_samples": 28651,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 240.52,
+    "s2": 246.9,
+    "s3": 264.72,
+    "s4": 99.0,
+    "s5": 99.0
+   },
+   "mean_time_to_confirm_s": 190.03,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 35.94,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 6,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 7,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 66.47,
+   "t90_ceiling_pct": 54.57,
+   "t90_reached": true,
+   "t90_s": 322.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5022_s0_full",
+   "house": "random_5022",
+   "seed_index": 0,
+   "variant": "full",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 9,
+   "rooms_total": 9,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 98.02,
+   "usable_samples": 27789,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 175.27,
+    "s2": 40.0,
+    "s3": 212.08,
+    "s4": 89.0,
+    "s5": 45.08
+   },
+   "mean_time_to_confirm_s": 112.29,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 73.68,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 9,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 5,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 78.14,
+   "t90_ceiling_pct": 78.14,
+   "t90_reached": true,
+   "t90_s": 433.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5022_s0_no_radio",
+   "house": "random_5022",
+   "seed_index": 0,
+   "variant": "no_radio",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 9,
+   "rooms_total": 9,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 95.36,
+   "usable_samples": 27789,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 292.43,
+    "s2": 59.0,
+    "s3": 230.35,
+    "s4": 176.27,
+    "s5": 94.1
+   },
+   "mean_time_to_confirm_s": 170.43,
+   "false_confirmations": 0,
+   "confirm_events": 10,
+   "overlap_pct": 85.6,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 9,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 6,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 79.03,
+   "t90_ceiling_pct": 78.14,
+   "t90_reached": true,
+   "t90_s": 446.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5022_s0_one_robot",
+   "house": "random_5022",
+   "seed_index": 0,
+   "variant": "one_robot",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A"
+   ],
+   "rooms_entered": 9,
+   "rooms_total": 9,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 92.52,
+   "usable_samples": 27789,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 304.27,
+    "s2": 98.0,
+    "s3": 358.35,
+    "s4": 221.18,
+    "s5": 111.08
+   },
+   "mean_time_to_confirm_s": 218.58,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": null,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 9,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 80.4,
+   "t90_ceiling_pct": 78.14,
+   "t90_reached": true,
+   "t90_s": 373.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5022_s0_baseline",
+   "house": "random_5022",
+   "seed_index": 0,
+   "variant": "baseline",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480,
+    "room_memory": false,
+    "door_claims": false,
+    "room_entered_near_seat": false,
+    "room_memory_same_space": false,
+    "leave_waits_for_team": false,
+    "walk_out_past_fire": false,
+    "end_clear_way_out_m": 0.0
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 9,
+   "rooms_total": 9,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 96.33,
+   "usable_samples": 27789,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 132.27,
+    "s2": 41.0,
+    "s3": 111.18,
+    "s4": 68.1,
+    "s5": 191.87
+   },
+   "mean_time_to_confirm_s": 108.88,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 65.43,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 7,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 8,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    }
+   },
+   "swept_final_pct": 59.4,
+   "t90_ceiling_pct": 78.14,
+   "t90_reached": false,
+   "t90_s": 600.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5023_s0_full",
+   "house": "random_5023",
+   "seed_index": 0,
+   "variant": "full",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 8,
+   "rooms_total": 8,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 98.24,
+   "usable_samples": 15925,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 92.15,
+    "s2": 10.0,
+    "s3": 337.25,
+    "s4": 51.33,
+    "s5": 38.73
+   },
+   "mean_time_to_confirm_s": 105.89,
+   "false_confirmations": 0,
+   "confirm_events": 6,
+   "overlap_pct": 68.69,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 8,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 5,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 92.78,
+   "t90_ceiling_pct": 92.78,
+   "t90_reached": true,
+   "t90_s": 387.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5023_s0_no_radio",
+   "house": "random_5023",
+   "seed_index": 0,
+   "variant": "no_radio",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 5,
+   "rooms_total": 8,
+   "rooms_entered_pct": 62.5,
+   "usable_coverage_pct": 69.66,
+   "usable_samples": 15925,
+   "people_found": 4,
+   "people_total": 5,
+   "people_found_pct": 80.0,
+   "time_to_person_s": {
+    "s1": 81.13,
+    "s2": 10.0,
+    "s4": 148.03,
+    "s5": 27.08
+   },
+   "mean_time_to_confirm_s": 66.56,
+   "false_confirmations": 0,
+   "confirm_events": 7,
+   "overlap_pct": 79.59,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 5,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 4,
+     "final_state": "return",
+     "outside_at_end": true,
+     "walked_out": false
+    }
+   },
+   "swept_final_pct": 59.86,
+   "t90_ceiling_pct": 92.78,
+   "t90_reached": false,
+   "t90_s": 600.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5023_s0_one_robot",
+   "house": "random_5023",
+   "seed_index": 0,
+   "variant": "one_robot",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A"
+   ],
+   "rooms_entered": 5,
+   "rooms_total": 8,
+   "rooms_entered_pct": 62.5,
+   "usable_coverage_pct": 70.57,
+   "usable_samples": 15925,
+   "people_found": 4,
+   "people_total": 5,
+   "people_found_pct": 80.0,
+   "time_to_person_s": {
+    "s1": 200.3,
+    "s2": 10.0,
+    "s4": 143.22,
+    "s5": 29.12
+   },
+   "mean_time_to_confirm_s": 95.66,
+   "false_confirmations": 0,
+   "confirm_events": 4,
+   "overlap_pct": null,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 5,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 64.68,
+   "t90_ceiling_pct": 92.78,
+   "t90_reached": false,
+   "t90_s": 600.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5023_s0_baseline",
+   "house": "random_5023",
+   "seed_index": 0,
+   "variant": "baseline",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480,
+    "room_memory": false,
+    "door_claims": false,
+    "room_entered_near_seat": false,
+    "room_memory_same_space": false,
+    "leave_waits_for_team": false,
+    "walk_out_past_fire": false,
+    "end_clear_way_out_m": 0.0
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 8,
+   "rooms_total": 8,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 98.3,
+   "usable_samples": 15925,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 52.22,
+    "s2": 8.0,
+    "s3": 269.1,
+    "s4": 42.0,
+    "s5": 19.1
+   },
+   "mean_time_to_confirm_s": 78.08,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 32.1,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 3,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 7,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 40.4,
+   "t90_ceiling_pct": 92.78,
+   "t90_reached": false,
+   "t90_s": 600.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5024_s0_full",
+   "house": "random_5024",
+   "seed_index": 0,
+   "variant": "full",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 8,
+   "rooms_total": 8,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 97.34,
+   "usable_samples": 18969,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 148.25,
+    "s2": 34.0,
+    "s3": 81.75,
+    "s4": 84.35,
+    "s5": 16.0
+   },
+   "mean_time_to_confirm_s": 72.87,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 75.68,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 4,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 8,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 64.82,
+   "t90_ceiling_pct": 64.82,
+   "t90_reached": true,
+   "t90_s": 249.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "random_5024_s0_no_radio",
+   "house": "random_5024",
+   "seed_index": 0,
+   "variant": "no_radio",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 8,
+   "rooms_total": 8,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 93.8,
+   "usable_samples": 18969,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 257.15,
+    "s2": 81.1,
+    "s3": 82.75,
+    "s4": 87.57,
+    "s5": 9.0
+   },
+   "mean_time_to_confirm_s": 103.51,
+   "false_confirmations": 0,
+   "confirm_events": 10,
+   "overlap_pct": 92.5,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 7,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 8,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 72.07,
+   "t90_ceiling_pct": 64.82,
+   "t90_reached": true,
+   "t90_s": 309.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "random_5024_s0_one_robot",
+   "house": "random_5024",
+   "seed_index": 0,
+   "variant": "one_robot",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A"
+   ],
+   "rooms_entered": 8,
+   "rooms_total": 8,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 92.58,
+   "usable_samples": 18969,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 267.97,
+    "s2": 91.22,
+    "s3": 153.47,
+    "s4": 157.15,
+    "s5": 10.0
+   },
+   "mean_time_to_confirm_s": 135.96,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": null,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 8,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 82.09,
+   "t90_ceiling_pct": 64.82,
+   "t90_reached": true,
+   "t90_s": 206.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "random_5024_s0_baseline",
+   "house": "random_5024",
+   "seed_index": 0,
+   "variant": "baseline",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480,
+    "room_memory": false,
+    "door_claims": false,
+    "room_entered_near_seat": false,
+    "room_memory_same_space": false,
+    "leave_waits_for_team": false,
+    "walk_out_past_fire": false,
+    "end_clear_way_out_m": 0.0
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 8,
+   "rooms_total": 8,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 97.29,
+   "usable_samples": 18969,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 291.88,
+    "s2": 43.12,
+    "s3": 184.43,
+    "s4": 188.12,
+    "s5": 11.0
+   },
+   "mean_time_to_confirm_s": 143.71,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 68.12,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 5,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 8,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 63.77,
+   "t90_ceiling_pct": 64.82,
+   "t90_reached": true,
+   "t90_s": 369.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "random_5025_s0_full",
+   "house": "random_5025",
+   "seed_index": 0,
+   "variant": "full",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 10,
+   "rooms_total": 10,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 97.18,
+   "usable_samples": 17808,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 0.0,
+    "s2": 91.13,
+    "s3": 179.3,
+    "s4": 11.1,
+    "s5": 139.22
+   },
+   "mean_time_to_confirm_s": 84.15,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 33.41,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 6,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 6,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 65.7,
+   "t90_ceiling_pct": 65.7,
+   "t90_reached": true,
+   "t90_s": 281.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "random_5025_s0_no_radio",
+   "house": "random_5025",
+   "seed_index": 0,
+   "variant": "no_radio",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 10,
+   "rooms_total": 10,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 96.81,
+   "usable_samples": 17808,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 0.0,
+    "s2": 232.22,
+    "s3": 294.38,
+    "s4": 20.1,
+    "s5": 266.3
+   },
+   "mean_time_to_confirm_s": 162.6,
+   "false_confirmations": 0,
+   "confirm_events": 10,
+   "overlap_pct": 94.03,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 10,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 10,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 85.25,
+   "t90_ceiling_pct": 65.7,
+   "t90_reached": true,
+   "t90_s": 326.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "random_5025_s0_one_robot",
+   "house": "random_5025",
+   "seed_index": 0,
+   "variant": "one_robot",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A"
+   ],
+   "rooms_entered": 10,
+   "rooms_total": 10,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 95.2,
+   "usable_samples": 17808,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 0.0,
+    "s2": 275.23,
+    "s3": 378.4,
+    "s4": 38.12,
+    "s5": 315.32
+   },
+   "mean_time_to_confirm_s": 201.41,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": null,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 10,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 88.85,
+   "t90_ceiling_pct": 65.7,
+   "t90_reached": true,
+   "t90_s": 294.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "random_5025_s0_baseline",
+   "house": "random_5025",
+   "seed_index": 0,
+   "variant": "baseline",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480,
+    "room_memory": false,
+    "door_claims": false,
+    "room_entered_near_seat": false,
+    "room_memory_same_space": false,
+    "leave_waits_for_team": false,
+    "walk_out_past_fire": false,
+    "end_clear_way_out_m": 0.0
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 10,
+   "rooms_total": 10,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 97.41,
+   "usable_samples": 17808,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 0.0,
+    "s2": 61.12,
+    "s3": 100.28,
+    "s4": 11.1,
+    "s5": 73.2
+   },
+   "mean_time_to_confirm_s": 49.14,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 23.14,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 5,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 7,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 52.71,
+   "t90_ceiling_pct": 65.7,
+   "t90_reached": false,
+   "t90_s": 600.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "random_5026_s0_full",
+   "house": "random_5026",
+   "seed_index": 0,
+   "variant": "full",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 6,
+   "rooms_total": 7,
+   "rooms_entered_pct": 85.71,
+   "usable_coverage_pct": 84.99,
+   "usable_samples": 18161,
+   "people_found": 4,
+   "people_total": 5,
+   "people_found_pct": 80.0,
+   "time_to_person_s": {
+    "s1": 53.12,
+    "s2": 0.0,
+    "s3": 156.03,
+    "s4": 58.2
+   },
+   "mean_time_to_confirm_s": 66.84,
+   "false_confirmations": 0,
+   "confirm_events": 4,
+   "overlap_pct": 36.07,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 3,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 5,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    }
+   },
+   "swept_final_pct": 38.85,
+   "t90_ceiling_pct": 38.85,
+   "t90_reached": true,
+   "t90_s": 179.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "random_5026_s0_no_radio",
+   "house": "random_5026",
+   "seed_index": 0,
+   "variant": "no_radio",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 7,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 94.51,
+   "usable_samples": 18161,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 134.75,
+    "s2": 0.0,
+    "s3": 267.0,
+    "s4": 145.83,
+    "s5": 55.28
+   },
+   "mean_time_to_confirm_s": 120.57,
+   "false_confirmations": 0,
+   "confirm_events": 9,
+   "overlap_pct": 76.9,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 5,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 7,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 61.37,
+   "t90_ceiling_pct": 38.85,
+   "t90_reached": true,
+   "t90_s": 122.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "random_5026_s0_one_robot",
+   "house": "random_5026",
+   "seed_index": 0,
+   "variant": "one_robot",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 7,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 90.72,
+   "usable_samples": 18161,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 206.98,
+    "s2": 0.0,
+    "s3": 113.13,
+    "s4": 209.07,
+    "s5": 178.73
+   },
+   "mean_time_to_confirm_s": 141.58,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": null,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 7,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 72.86,
+   "t90_ceiling_pct": 38.85,
+   "t90_reached": true,
+   "t90_s": 93.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "random_5026_s0_baseline",
+   "house": "random_5026",
+   "seed_index": 0,
+   "variant": "baseline",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480,
+    "room_memory": false,
+    "door_claims": false,
+    "room_entered_near_seat": false,
+    "room_memory_same_space": false,
+    "leave_waits_for_team": false,
+    "walk_out_past_fire": false,
+    "end_clear_way_out_m": 0.0
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 7,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 92.99,
+   "usable_samples": 18161,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 52.12,
+    "s2": 0.0,
+    "s3": 254.12,
+    "s4": 88.27,
+    "s5": 107.03
+   },
+   "mean_time_to_confirm_s": 100.31,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 36.69,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 3,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 6,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    }
+   },
+   "swept_final_pct": 41.93,
+   "t90_ceiling_pct": 38.85,
+   "t90_reached": true,
+   "t90_s": 250.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "random_5027_s0_full",
+   "house": "random_5027",
+   "seed_index": 0,
+   "variant": "full",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 7,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 97.44,
+   "usable_samples": 13628,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 55.0,
+    "s2": 62.25,
+    "s3": 59.08,
+    "s4": 134.13,
+    "s5": 8.0
+   },
+   "mean_time_to_confirm_s": 63.69,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 62.81,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 6,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 4,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 78.96,
+   "t90_ceiling_pct": 78.96,
+   "t90_reached": true,
+   "t90_s": 296.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5027_s0_no_radio",
+   "house": "random_5027",
+   "seed_index": 0,
+   "variant": "no_radio",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 7,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 97.51,
+   "usable_samples": 13628,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 130.18,
+    "s2": 118.1,
+    "s3": 141.22,
+    "s4": 317.27,
+    "s5": 7.0
+   },
+   "mean_time_to_confirm_s": 142.75,
+   "false_confirmations": 0,
+   "confirm_events": 10,
+   "overlap_pct": 91.5,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 7,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 6,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 86.94,
+   "t90_ceiling_pct": 78.96,
+   "t90_reached": true,
+   "t90_s": 340.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5027_s0_one_robot",
+   "house": "random_5027",
+   "seed_index": 0,
+   "variant": "one_robot",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 7,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 96.92,
+   "usable_samples": 13628,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 109.22,
+    "s2": 97.13,
+    "s3": 114.3,
+    "s4": 176.38,
+    "s5": 9.0
+   },
+   "mean_time_to_confirm_s": 101.21,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": null,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 7,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 90.79,
+   "t90_ceiling_pct": 78.96,
+   "t90_reached": true,
+   "t90_s": 332.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5027_s0_baseline",
+   "house": "random_5027",
+   "seed_index": 0,
+   "variant": "baseline",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480,
+    "room_memory": false,
+    "door_claims": false,
+    "room_entered_near_seat": false,
+    "room_memory_same_space": false,
+    "leave_waits_for_team": false,
+    "walk_out_past_fire": false,
+    "end_clear_way_out_m": 0.0
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 7,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 97.06,
+   "usable_samples": 13628,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 53.08,
+    "s2": 42.0,
+    "s3": 103.13,
+    "s4": 78.17,
+    "s5": 9.0
+   },
+   "mean_time_to_confirm_s": 57.08,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 83.19,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 7,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 5,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 86.99,
+   "t90_ceiling_pct": 78.96,
+   "t90_reached": true,
+   "t90_s": 253.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5028_s0_full",
+   "house": "random_5028",
+   "seed_index": 0,
+   "variant": "full",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 7,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 93.65,
+   "usable_samples": 24963,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 281.75,
+    "s2": 206.07,
+    "s3": 231.0,
+    "s4": 68.3,
+    "s5": 175.47
+   },
+   "mean_time_to_confirm_s": 192.52,
+   "false_confirmations": 0,
+   "confirm_events": 8,
+   "overlap_pct": 44.11,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 5,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 5,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 52.61,
+   "t90_ceiling_pct": 52.61,
+   "t90_reached": true,
+   "t90_s": 302.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5028_s0_no_radio",
+   "house": "random_5028",
+   "seed_index": 0,
+   "variant": "no_radio",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 7,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 92.6,
+   "usable_samples": 24963,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 309.52,
+    "s2": 207.27,
+    "s3": 244.43,
+    "s4": 73.03,
+    "s5": 178.18
+   },
+   "mean_time_to_confirm_s": 202.49,
+   "false_confirmations": 2,
+   "confirm_events": 9,
+   "overlap_pct": 65.91,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 7,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 6,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 66.12,
+   "t90_ceiling_pct": 52.61,
+   "t90_reached": true,
+   "t90_s": 312.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5028_s0_one_robot",
+   "house": "random_5028",
+   "seed_index": 0,
+   "variant": "one_robot",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A"
+   ],
+   "rooms_entered": 6,
+   "rooms_total": 7,
+   "rooms_entered_pct": 85.71,
+   "usable_coverage_pct": 83.61,
+   "usable_samples": 24963,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 379.22,
+    "s2": 234.32,
+    "s3": 323.48,
+    "s4": 87.73,
+    "s5": 202.93
+   },
+   "mean_time_to_confirm_s": 245.54,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": null,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 6,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 66.39,
+   "t90_ceiling_pct": 52.61,
+   "t90_reached": true,
+   "t90_s": 247.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "random_5028_s0_baseline",
+   "house": "random_5028",
+   "seed_index": 0,
+   "variant": "baseline",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480,
+    "room_memory": false,
+    "door_claims": false,
+    "room_entered_near_seat": false,
+    "room_memory_same_space": false,
+    "leave_waits_for_team": false,
+    "walk_out_past_fire": false,
+    "end_clear_way_out_m": 0.0
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 7,
+   "rooms_total": 7,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 96.59,
+   "usable_samples": 24963,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 160.03,
+    "s2": 210.08,
+    "s3": 141.08,
+    "s4": 80.0,
+    "s5": 101.0
+   },
+   "mean_time_to_confirm_s": 138.44,
+   "false_confirmations": 0,
+   "confirm_events": 6,
+   "overlap_pct": 57.35,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 6,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 6,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    }
+   },
+   "swept_final_pct": 52.48,
+   "t90_ceiling_pct": 52.61,
+   "t90_reached": true,
+   "t90_s": 391.0,
+   "split": "seen"
+  },
+  {
+   "run_id": "family_ranch_s0_full",
+   "house": "family_ranch",
+   "seed_index": 0,
+   "variant": "full",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 9,
+   "rooms_total": 9,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 98.01,
+   "usable_samples": 12253,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 229.27,
+    "s2": 21.0,
+    "s3": 102.18,
+    "s4": 45.0,
+    "s6": 63.08
+   },
+   "mean_time_to_confirm_s": 92.11,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 61.15,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 8,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 6,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 79.48,
+   "t90_ceiling_pct": 79.48,
+   "t90_reached": true,
+   "t90_s": 248.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "family_ranch_s0_no_radio",
+   "house": "family_ranch",
+   "seed_index": 0,
+   "variant": "no_radio",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 8,
+   "rooms_total": 9,
+   "rooms_entered_pct": 88.89,
+   "usable_coverage_pct": 90.27,
+   "usable_samples": 12253,
+   "people_found": 4,
+   "people_total": 5,
+   "people_found_pct": 80.0,
+   "time_to_person_s": {
+    "s1": 193.8,
+    "s2": 23.43,
+    "s3": 86.63,
+    "s6": 109.72
+   },
+   "mean_time_to_confirm_s": 103.4,
+   "false_confirmations": 0,
+   "confirm_events": 8,
+   "overlap_pct": 92.62,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 8,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 8,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    }
+   },
+   "swept_final_pct": 76.56,
+   "t90_ceiling_pct": 79.48,
+   "t90_reached": true,
+   "t90_s": 315.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "family_ranch_s0_one_robot",
+   "house": "family_ranch",
+   "seed_index": 0,
+   "variant": "one_robot",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A"
+   ],
+   "rooms_entered": 9,
+   "rooms_total": 9,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 95.02,
+   "usable_samples": 12253,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 275.63,
+    "s2": 27.22,
+    "s3": 151.47,
+    "s4": 71.38,
+    "s6": 182.55
+   },
+   "mean_time_to_confirm_s": 141.65,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": null,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 9,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 84.85,
+   "t90_ceiling_pct": 79.48,
+   "t90_reached": true,
+   "t90_s": 272.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "family_ranch_s0_baseline",
+   "house": "family_ranch",
+   "seed_index": 0,
+   "variant": "baseline",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480,
+    "room_memory": false,
+    "door_claims": false,
+    "room_entered_near_seat": false,
+    "room_memory_same_space": false,
+    "leave_waits_for_team": false,
+    "walk_out_past_fire": false,
+    "end_clear_way_out_m": 0.0
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 9,
+   "rooms_total": 9,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 98.53,
+   "usable_samples": 12253,
+   "people_found": 5,
+   "people_total": 5,
+   "people_found_pct": 100.0,
+   "time_to_person_s": {
+    "s1": 196.18,
+    "s2": 21.0,
+    "s3": 110.08,
+    "s4": 89.1,
+    "s6": 68.0
+   },
+   "mean_time_to_confirm_s": 96.87,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 61.64,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 6,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 8,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 61.61,
+   "t90_ceiling_pct": 79.48,
+   "t90_reached": false,
+   "t90_s": 600.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "long_ranch_s0_full",
+   "house": "long_ranch",
+   "seed_index": 0,
+   "variant": "full",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 12,
+   "rooms_total": 12,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 85.69,
+   "usable_samples": 15816,
+   "people_found": 4,
+   "people_total": 5,
+   "people_found_pct": 80.0,
+   "time_to_person_s": {
+    "s1": 36.0,
+    "s2": 123.0,
+    "s3": 150.53,
+    "s4": 208.7
+   },
+   "mean_time_to_confirm_s": 129.56,
+   "false_confirmations": 0,
+   "confirm_events": 4,
+   "overlap_pct": 63.78,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 11,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    },
+    "robot_B": {
+     "rooms_entered": 6,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 69.87,
+   "t90_ceiling_pct": 69.87,
+   "t90_reached": true,
+   "t90_s": 227.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "long_ranch_s0_no_radio",
+   "house": "long_ranch",
+   "seed_index": 0,
+   "variant": "no_radio",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 12,
+   "rooms_total": 12,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 85.43,
+   "usable_samples": 15816,
+   "people_found": 4,
+   "people_total": 5,
+   "people_found_pct": 80.0,
+   "time_to_person_s": {
+    "s1": 39.0,
+    "s2": 120.08,
+    "s3": 83.1,
+    "s4": 197.35
+   },
+   "mean_time_to_confirm_s": 109.88,
+   "false_confirmations": 0,
+   "confirm_events": 8,
+   "overlap_pct": 88.28,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 11,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 9,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    }
+   },
+   "swept_final_pct": 72.99,
+   "t90_ceiling_pct": 69.87,
+   "t90_reached": true,
+   "t90_s": 335.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "long_ranch_s0_one_robot",
+   "house": "long_ranch",
+   "seed_index": 0,
+   "variant": "one_robot",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480
+   },
+   "robots_in_result": [
+    "robot_A"
+   ],
+   "rooms_entered": 11,
+   "rooms_total": 12,
+   "rooms_entered_pct": 91.67,
+   "usable_coverage_pct": 76.52,
+   "usable_samples": 15816,
+   "people_found": 4,
+   "people_total": 5,
+   "people_found_pct": 80.0,
+   "time_to_person_s": {
+    "s1": 32.0,
+    "s2": 71.1,
+    "s3": 193.62,
+    "s4": 252.78
+   },
+   "mean_time_to_confirm_s": 137.38,
+   "false_confirmations": 0,
+   "confirm_events": 4,
+   "overlap_pct": null,
+   "all_out": 1.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 11,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 68.64,
+   "t90_ceiling_pct": 69.87,
+   "t90_reached": true,
+   "t90_s": 273.0,
+   "split": "unseen"
+  },
+  {
+   "run_id": "long_ranch_s0_baseline",
+   "house": "long_ranch",
+   "seed_index": 0,
+   "variant": "baseline",
+   "duration_s": 600.0,
+   "settings": {
+    "mission_time_limit_s": 480,
+    "room_memory": false,
+    "door_claims": false,
+    "room_entered_near_seat": false,
+    "room_memory_same_space": false,
+    "leave_waits_for_team": false,
+    "walk_out_past_fire": false,
+    "end_clear_way_out_m": 0.0
+   },
+   "robots_in_result": [
+    "robot_A",
+    "robot_B"
+   ],
+   "rooms_entered": 12,
+   "rooms_total": 12,
+   "rooms_entered_pct": 100.0,
+   "usable_coverage_pct": 85.0,
+   "usable_samples": 15816,
+   "people_found": 4,
+   "people_total": 5,
+   "people_found_pct": 80.0,
+   "time_to_person_s": {
+    "s1": 27.0,
+    "s2": 74.0,
+    "s3": 149.08,
+    "s4": 202.7
+   },
+   "mean_time_to_confirm_s": 113.2,
+   "false_confirmations": 0,
+   "confirm_events": 5,
+   "overlap_pct": 53.79,
+   "all_out": 0.0,
+   "robots": {
+    "robot_A": {
+     "rooms_entered": 7,
+     "final_state": "return",
+     "outside_at_end": false,
+     "walked_out": false
+    },
+    "robot_B": {
+     "rooms_entered": 9,
+     "final_state": "complete",
+     "outside_at_end": true,
+     "walked_out": true
+    }
+   },
+   "swept_final_pct": 49.46,
+   "t90_ceiling_pct": 69.87,
+   "t90_reached": false,
+   "t90_s": 600.0,
+   "split": "unseen"
+  }
+ ],
+ "definitions": "Score a benchmark folder made by make_requests.py and run by run_all.sh. Evaluator side only: reads trace.jsonl, result.json\nand the world; no robot reads any of this.\n\n    brain/.venv/bin/python tools/bench/score_bench.py data/runs/bench_25oct\nWrites <bench>/score.txt and <bench>/score.json and prints the text.\n\nPer run:\n  rooms entered / total: evaluator rooms that contain at least one pose of any robot (as tools/score_ranches.py).\n  usable floor coverage %: 0.1 m evaluator samples inside rooms, off furniture 0.15 m or taller and 0.125 m clear of full-height\n      walls (the score_ranches.py usable floor), searched in the union of the robots' own_searched masks in result.json.\n  people confirmed: people with a survivor_confirmed event within 1.5 m. False confirmations: survivor_confirmed events farther\n      than 1.5 m from every person. Time to each confirmed person: first matching event time.\n  T90: result.json holds only the final searched masks, so coverage over time is not recorded. T90 uses a swept-floor proxy:\n      the usable samples within 2.0 m of a robot pose and in the same evaluator room as that pose, accumulated over time\n      (poses every 1 s). T90 = first time the team's swept proxy reaches 90 % of the house's ceiling, where the ceiling is the\n      largest final swept proxy among that house's full-variant runs (all seeds). Not reached: counted as duration_s (censored)\n      in the means; the count of runs that reached it is reported.\n  overlap %: usable samples in both robots' own_searched / usable samples in either (2-robot variants; one_robot has none).\n  all robots out: every robot ended outside every room in state complete having entered a room (score_ranches.py walked_out).\nSeen vs unseen: a seeded house is seen if its seed number (5001..5028) appears in any string of config/brain.json or\nconfig/perception.json, or in any data/evidence/*.txt; ranches are unseen. Every match is listed so the list can be audited.\nAggregates per variant and split: mean with a nested bootstrap 95 % CI (10,000 resamples: houses with replacement, then seeds\nwithin each house with replacement), and paired full minus variant per (house, seed) with the same bootstrap and a Wilcoxon\nsigned-rank p over per-house mean differences (houses are the independent units).\n"
+}
