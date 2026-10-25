@@ -12,7 +12,8 @@ plans stay out of git; see handoff/real_layouts_report_25oct.txt on the SUNCG qu
 Houses: ours (family ranch, long ranch, the one-door house of seed 934) and the first --hx HouseExpo houses in the converter's
 own shuffled order (tools/bench/real_layouts.py, data/runs/real_layouts_25oct/manifest.json). People and fire are the ones the
 existing generators placed; nothing is chosen by hand.
-Robots: 1 = robot_A only; 2 = robot_A and robot_B as compiled; 3 = adds robot_C on the next pad of the same queue, 1.2 m behind
+Every setup runs with parallel_robots (tools/ryor/patch_headless.py): live and cached runs use the same mode, so a setup
+always gives the same mission. Robots: 1 = robot_A only; 2 = robot_A and robot_B as compiled; 3 = adds robot_C on the next pad of the same queue, 1.2 m behind
 robot_B (the queue spacing every compiled world uses: B's pad is 1.2 m behind A's).
 """
 import argparse
@@ -145,7 +146,8 @@ def main():
                 req = {"runs": [{"world": rel(wp), "out": "", "duration_s": MISSION_S, "time_limit": True, "fire": True,
                                  "robot_collision": True, "capsule_walls": True,
                                  "settings": {"mission_time_limit_s": LEAVE_BY_S}, "head_start_s": d["head_start_s"],
-                                 "visibility_m": d["visibility_m"], "replay_every_s": 0.5}],
+                                 "visibility_m": d["visibility_m"], "replay_every_s": 0.5,
+                                 "parallel_robots": True}],
                        "ryor": {"setup": key, "house": hid, "robots": n, "difficulty": diff}}
                 (OUT / "setups" / f"{key}.json").write_text(json.dumps(req, indent=1) + "\n")
                 setups.append(key)
