@@ -73,5 +73,33 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(Pick(true, 10, new List<GridPlanner.FrontierChoice> { near }), Is.SameAs(near), "the kept frontier is no longer admitted");
             Assert.That(Pick(true, 100, new List<GridPlanner.FrontierChoice> { near, kept }), Is.SameAs(near), "a commitment expires after goal_commit_max_s");
         }
+
+        [Test]
+        public void AVisitedCircleHidingTheOnlyFrontierIsDroppedOnceItIsOldEnough()
+        {
+            // F2. Seed 934 (25 Oct), robot B: the bathroom door frontier reached at about 200 s stayed hidden by visited_hold_s (90 s);
+            // B reported no frontier at 233.9 s, held still 245.9 to 294.0 s, and the frontier came back at 294.9 s.
+            bool Retry(bool on, double circleAge, out int circlesLeft)
+            {
+                var c = Settings(); c.grid_size_m = 12; c.robot_radius_m = .25f; c.visited_retry = on;
+                var b = new RobotBrain(Calibration(), c, "A", 0, new EntryPose(.05f, .05f, 0)); Room(b, -4, 4, -4, 4);
+                var planner = (GridPlanner)typeof(RobotBrain).GetField("planner", NP).GetValue(b);
+                Assert.That(planner.Frontier(new Vector2(.05f, .05f)), Is.Not.Null, "fixture: the open room has a frontier");
+                var type = typeof(RobotBrain).GetNestedType("Visited", System.Reflection.BindingFlags.NonPublic);
+                var list = (System.Collections.IList)typeof(RobotBrain).GetField("visited", NP).GetValue(b);
+                double now = 200;
+                object v = System.Activator.CreateInstance(type);
+                type.GetField("position").SetValue(v, new Vector2(0, 0)); type.GetField("radius").SetValue(v, 50f);
+                type.GetField("until").SetValue(v, now - circleAge + c.visited_hold_s);
+                list.Add(v);
+                var hidden = typeof(RobotBrain).GetMethod("VisitedGoal", NP);
+                Assert.That(planner.Frontier(new Vector2(.05f, .05f), p => (bool)hidden.Invoke(b, new object[] { p, now })), Is.Null, "the circle hides every frontier");
+                bool result = (bool)typeof(RobotBrain).GetMethod("RetryVisited", NP).Invoke(b, new object[] { now });
+                circlesLeft = list.Count; return result;
+            }
+            Assert.That(Retry(true, 46, out int left), Is.True, "a 46 s old circle over the only frontier is dropped"); Assert.That(left, Is.Zero);
+            Assert.That(Retry(true, 5, out left), Is.False, "a circle 5 s old stays: the spot was just seen"); Assert.That(left, Is.EqualTo(1));
+            Assert.That(Retry(false, 46, out left), Is.False, "control: switch off"); Assert.That(left, Is.EqualTo(1));
+        }
     }
 }

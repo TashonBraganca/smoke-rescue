@@ -692,6 +692,7 @@ namespace SmokeRescue.Brain
                             "x_m", retry.position.x, "y_m", retry.position.y, "room_id", retry.roomId, "path_cost", retry.cost);
                     }
                     else if (RetryFireCuts(t)) { ClearPath(); }
+                    else if (RetryVisited(t)) { ClearPath(); }
                     else
                     {
                         ClearPath(); lastPlan = t; if (double.IsNaN(scanSince))
@@ -720,7 +721,9 @@ namespace SmokeRescue.Brain
                             { lastScanAt = motion.Pose.position; knownAtLastScan = knownCells; }
                             // leave_when_done (owner, 24 Oct: when all rooms are marked, both robots leave): an inside robot with
                             // nothing reachable left to search after a full scan walks out the way it came in.
-                            if (!c.stay_inside || (c.leave_when_done && t >= leaveRetryAt && InSearchArea(motion.Pose.position) && !(c.leave_waits_for_team && TeamHasUnenteredRoom()))) BeginReturn(t, NoFrontierLeft);
+                            bool teamWait = c.leave_waits_for_team && TeamHasUnenteredRoom() &&
+                                !(c.leave_wait_cap_s > 0 && t - scanSince >= c.no_frontier_scan_s + c.leave_wait_cap_s);   // leave_wait_cap_s: the veto lapses
+                            if (!c.stay_inside || (c.leave_when_done && t >= leaveRetryAt && InSearchArea(motion.Pose.position) && !teamWait)) BeginReturn(t, NoFrontierLeft);
                             // Holding still is for a robot that is inside. Outside (seed 930, robot B at its pad) it keeps
                             // scanning, which can bring the ceiling through the door into its camera's view.
                             else if (!searchedOut && InSearchArea(motion.Pose.position)) { searchedOut = true; Emit(t, "goal", "Nothing reachable is left to search after a full scan: hold here, inside, until new floor appears or the agent orders a move."); }
@@ -1167,6 +1170,25 @@ namespace SmokeRescue.Brain
         /// once per fire_cut_retry_s. Seed 934, robot A: 21 frontiers set aside because the fire margin cut their routes while its
         /// air never passed 44 C; at 209 s and 217 s it reported no reachable floor with six house rooms unsearched. Heat a fresh
         /// cool look has cleared (OccupancyGrid.ProjectHeat) no longer cuts the route; a still-burning one cuts it again.</summary>
+        double lastVisitedRetry = double.NegativeInfinity;
+        /// <summary>visited_retry: with nothing else left, forget the visited circles that are at least visited_retry_s old when a
+        /// frontier lies under one. Seed 934 (25 Oct), robot B: the only frontier, the bathroom door reached at about 200 s, stayed
+        /// hidden by visited_hold_s (90 s) while B held still from 245.9 to 294.0 s.</summary>
+        bool RetryVisited(double t)
+        {
+            if (!c.visited_retry || t - lastVisitedRetry < c.visited_retry_s) return false;
+            visited.RemoveAll(v => t >= v.until);
+            var old = visited.FindAll(v => t - (v.until - c.visited_hold_s) >= c.visited_retry_s);
+            if (old.Count == 0) return false;
+            var keep = visited.FindAll(v => !old.Contains(v));
+            var saved = new List<Visited>(visited); visited.Clear(); visited.AddRange(keep);
+            var found = planner.Frontier(motion.Pose.position, p => ClaimBlocks(p, t) || GoalBlacklisted(p, t) || !InSearchArea(p) || VisitedGoal(p, t));
+            if (found == null) { visited.Clear(); visited.AddRange(saved); return false; }
+            lastVisitedRetry = t; lastPlan = double.NegativeInfinity;
+            Emit(t, "visited_retry", "Nothing reachable left except frontiers hidden by a visited circle: try them again.",
+                "circles", old.Count, "x_m", found.position.x, "y_m", found.position.y, "room_id", found.roomId);
+            return true;
+        }
         bool RetryFireCuts(double t)
         {
             if (!c.fire_cut_retry || t - lastFireCutRetry < c.fire_cut_retry_s) return false;

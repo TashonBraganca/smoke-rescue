@@ -2273,10 +2273,10 @@ namespace SmokeRescue.Tests.EditMode
             // unentered by either robot. The searched 4 x 4 m room of the walk-out test, plus a second walled room beside it that
             // no route reaches (as when fire or a partner's claim keeps it from this robot) and nobody has entered: the robot holds
             // inside. Control: without the second room it walks out.
-            List<BrainEvent> Run(bool secondRoom, out string rooms)
+            List<BrainEvent> Run(bool secondRoom, out string rooms, int seconds = 25, float cap = 0)
             {
                 var c = Settings(); c.grid_size_m = 14; c.search_requires_ceiling = false; c.stay_inside = true; c.leave_when_done = true;
-                c.leave_waits_for_team = true; c.room_memory = true; c.room_ledger = true; c.mission_time_limit_s = 1000;
+                c.leave_waits_for_team = true; c.room_memory = true; c.room_ledger = true; c.mission_time_limit_s = 1000; c.leave_wait_cap_s = cap;
                 var b = new RobotBrain(Calibration(), c, "A", 0); var g = Map(b);
                 var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
                 var searched = (bool[])typeof(OccupancyGrid).GetField("observed", flags).GetValue(g);
@@ -2289,7 +2289,7 @@ namespace SmokeRescue.Tests.EditMode
                     else if (secondRoom && p.x >= 2.7f && p.x <= 6.3f && Mathf.Abs(p.y) <= 2.3f) g.ObserveOccupied(i);
                 }
                 var events = new List<BrainEvent>();
-                for (int i = 0; i <= 20 * 25; i++) { DriveTick(b, i); events.AddRange(b.DrainEvents()); }
+                for (int i = 0; i <= 20 * seconds; i++) { DriveTick(b, i); events.AddRange(b.DrainEvents()); }
                 var ledger = ((GridPlanner)typeof(RobotBrain).GetField("planner", flags).GetValue(b)).Rooms;
                 rooms = string.Join("; ", ledger.Records.Select(r => $"label {r.label} seat {r.seat} {r.floorM2:F1} m2 entered {r.entered} done {r.done} corridor {r.corridor}"));
                 return events;
@@ -2300,6 +2300,14 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(waiting.Any(e => e.kind == "goal" && e.reason.StartsWith("Nothing reachable is left to search")), Is.True, "holds inside: " + roomsWaiting);
             var control = Run(false, out var roomsControl);
             Assert.That(Left(control), Is.True, "control: with every room entered it walks out: " + roomsControl);
+            // leave_wait_cap_s (25 Oct, seed 934 full mission, robot B): 48 s standing in a bathroom (245.9 to 294.0 s) because a room only
+            // the partner could reach counted as unentered. The veto now lapses leave_wait_cap_s after the no-frontier scan ends: still
+            // holding 25 s in (12 s scan + 13 s), walking out once 12 + 30 s have passed.
+            var early = Run(true, out var roomsEarly, 25, 30);
+            Assert.That(Left(early), Is.False, "inside the cap it still waits: " + roomsEarly);
+            var late = Run(true, out var roomsLate, 70, 30);
+            Assert.That(Left(late), Is.True, "past the cap it walks out: " + roomsLate);
+            Assert.That(Left(Run(true, out var roomsOff, 70, 0)), Is.False, "control: cap 0 holds as before: " + roomsOff);
         }
 
         [Test]
