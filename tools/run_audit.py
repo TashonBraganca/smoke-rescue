@@ -21,6 +21,16 @@ def rows(path):
     return [json.loads(l) for l in open(path) if l.strip().startswith("{")] if path.exists() else []
 
 
+CAUSE_KINDS = ("goal", "agent_order", "retreat", "no_frontier", "sweep_look", "survivor_confirmed", "stuck", "collision_hold")
+
+
+def cause_before(evs, t):
+    """The last decision at or before t, by time. File order is no clock: seed 934 (25 Oct) wrote four agent_order lines
+    stamped t=0.0 late in the file, and taking the last row in file order blamed every early stall on 'spray_water succeeded'."""
+    c = sorted((e for e in evs if e[0] <= t and e[1] in CAUSE_KINDS), key=lambda e: e[0])
+    return (c[-1][1] + ": " + c[-1][2][:80]) if c else "start"
+
+
 def truth(rec, robot):
     out = []
     for l in open(rec / "oracle" / f"{robot}_groundtruth.txt"):
@@ -99,9 +109,7 @@ def main():
             dt = tb - ta; dh = abs((math.degrees(hb - ha) + 180) % 360 - 180)
             if dt > 0 and math.dist((xa, za), (xb, zb)) / dt < .05 and dh / dt > 5: turn_s += dt; turn_deg += dh
         evs = [(e["t"], e["kind"], e.get("reason", "")) for e in dec[r]]
-        def cause(t):
-            c = [e for e in evs if e[0] <= t and e[1] in ("goal", "agent_order", "retreat", "no_frontier", "sweep_look", "survivor_confirmed", "stuck", "collision_hold")]
-            return (c[-1][1] + ": " + c[-1][2][:80]) if c else "start"
+        def cause(t): return cause_before(evs, t)
         long = [s for s in still if s[1] - s[0] >= 5]
         say(f"  turning in place {turn_s:.0f} s, {turn_deg:.0f} deg ({turn_deg / 360:.1f} full turns)")
         say(f"  walked {walked:.0f} m, still {sum(b - a for a, b in still):.0f} s ({100 * sum(b - a for a, b in still) / end:.0f} %), outside {outside:.0f} s, rooms entered {len(rooms)}/{len(plan['rooms'])}")

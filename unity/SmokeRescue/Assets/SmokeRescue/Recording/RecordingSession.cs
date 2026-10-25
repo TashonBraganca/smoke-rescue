@@ -286,7 +286,7 @@ namespace SmokeRescue.Recording
                 {
                     if (k > 0)
                         foreach (var rig in rigs) rig.robot.Step(dt);
-                    if (k > 0) AgentWorldStep(world, rigs, dt);
+                    if (k > 0) { LastT = t; AgentWorldStep(world, rigs, dt); }   // LastT stamps agent action results; brain-only runs never reach AgentDecisions
                 }
                 // A robot that left for heat or to carry someone out may go back in, so it does not end the run (run 18
                 // ended at 69 s, one second after robot A's emergency exit, before it could recover and re-enter).

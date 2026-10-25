@@ -637,7 +637,10 @@ namespace SmokeRescue.Brain
         }
 
         /// <summary>Logs agent decisions that act outside the brain (torch, arm, radio, approvals) next to its own.</summary>
-        public void LogAgentAction(double t, string reason, params object[] values) => Emit(t, "agent_order", reason, values);
+        /// <summary>Never earlier than this brain's own clock: seed 934 (25 Oct, brain only) logged four "spray_water succeeded" lines at
+        /// t = 0.0 because the host passed a stale agent time, and run_audit then blamed every early stall on them.</summary>
+        public void LogAgentAction(double t, string reason, params object[] values) =>
+            Emit(double.IsNaN(lastStep) ? t : Math.Max(t, lastStep), "agent_order", reason, values);
 
         /// <summary>Records an agent-layer event (decision summary, radio text, approval) in this robot's decision log.</summary>
         public void Log(double t, string kind, string reason, params object[] values) => Emit(t, kind, reason, values);
