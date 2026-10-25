@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Cloud engine for Run your own rescue: tools/headless with HeadlessSim.cs patched by tools/ryor/patch_headless.py
+       (gen/ is generated) and the portable Newtonsoft.Json from NuGet, so the output runs on Linux arm64.
+       Build: tools/ryor/build_engine.sh -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><AssemblyName>RyorRunner</AssemblyName><TargetFramework>net8.0</TargetFramework><Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems><NoWarn>CS0436;CS0618;CS0649;CS0169;CS0414</NoWarn>
+    <Src>$(MSBuildThisFileDirectory)../../../unity/SmokeRescue/Assets/SmokeRescue</Src>
+    <UnityResources>/Applications/Unity/Hub/Editor/6000.6.6f1/Unity.app/Contents/Resources</UnityResources>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(Src)/Brain/*.cs" />
+    <Compile Include="$(Src)/Sensors/SensorConfig.cs;$(Src)/Sensors/ImuSensor.cs;$(Src)/Sensors/OdometrySensor.cs;$(Src)/Sensors/AirTemperatureSensor.cs;$(Src)/Sensors/SensorRandom.cs;$(Src)/Sensors/FrameConvert.cs" />
+    <Compile Include="$(Src)/World/FloorPlan.cs;$(Src)/World/FireSim.cs;$(Src)/World/FireSimHeat.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)gen/HeadlessSim.cs;$(Src)/Tests/EditMode/HeadlessMotionErrors.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../headless/Standalone.cs;$(MSBuildThisFileDirectory)../../headless/Program.cs;$(MSBuildThisFileDirectory)../../headless/SensorReplay.cs" />
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(UnityResources)/Scripting/Managed/UnityEngine/UnityEngine.CoreModule.dll</HintPath></Reference>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <Reference Include="nunit.framework"><HintPath>$(UnityResources)/PackageManager/BuiltInPackages/com.unity.ext.nunit/net472/unity-custom/nunit.framework.dll</HintPath></Reference>
+  </ItemGroup>
+</Project>

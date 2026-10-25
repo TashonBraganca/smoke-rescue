@@ -1,0 +1,64 @@
+Run your own rescue: the contract between engine, AWS and page (brief handoff/inbox_rescue/01_run_your_own_rescue.txt).
+Owner of this file: session opencv-eb. Change it only together with every side that reads it.
+
+1. Setup space
+  house       gallery id: "family_ranch", "long_ranch", "onedoor_934", and "hx_<10 hex>" for HouseExpo houses (about 24).
+  robots      1, 2 or 3 (robot_A, robot_B, robot_C; pads in one queue behind the door, 1.2 m apart).
+  difficulty  "easy" | "medium" | "hard". Fire head start before the robots enter: 0 / 90 / 180 s. Smoke: the person
+              detector's world-side visibility limit: 6.0 (no limit beyond the brain's own 6 m) / 4.0 / 2.5 m.
+  mission     180 simulated s; brain setting mission_time_limit_s 140: the brain searches until 140 s, then walks out.
+  seed        fixed per house (the generator's people and fire). The brain is deterministic and uses no LLM:
+              same house + robots + difficulty = same mission.
+  setup key   "<house>__r<robots>__<difficulty>", e.g. "hx_035feb0125__r2__hard".
+
+2. Gallery file (static, served by the page): gallery.json
+  {"v":1, "mission_s":180, "difficulties":{"easy":{"head_start_s":0,"visibility_m":6.0,"label":"..."},...},
+   "houses":[{"id","name","source":"ours"|"HouseExpo","source_id","licence","rooms":int,"floor_m2":float,
+              "people":int, "bounds":[xmin,ymin,xmax,ymax],
+              "walls":[[x1,y1,x2,y2],...],            gate frame, metres, viewer only
+              "rooms_poly":[{"id","kind","poly":[[x,y],...]}],
+              "door":[x,y], "pads":[[x,y],...]}],
+   "citation":"..."}
+  Frame: the robots' gate frame. Robot A's pad at (0,0), facing +y, x to its right. y up on screen.
+
+3. Replay (what the page draws). Written in chunks so the page can play while the run is still going.
+  S3 (runs bucket) layout, prefix ryor/:
+    ryor/cache/<setup key>/status.json, chunk_0000.json ...      precomputed, never expires (lifecycle excludes cache/)
+    ryor/missions/<mission id>/status.json, chunk_0000.json ...  live, expire after 7 days
+  status.json:
+    {"v":1,"mission":"<id>","setup":"<key>","state":"starting"|"running"|"done"|"failed",
+     "source":"live"|"recorded", "chunks":int, "sim_t":float, "updated":iso,
+     "error":null|"reason", "score":null|{...see below}, "engine":{"git":"sha","image":"tag"}}
+  chunk_NNNN.json covers sim time [10*N, 10*N+10) s:
+    {"v":1,"chunk":N,"t0":10N,"frames":[frame,...]}
+  frame (every 0.5 s of sim time):
+    {"t":12.5,
+     "robots":[{"id":"robot_A","x":..,"y":..,"yaw":deg,"state":"explore","out":false}],   true pose, viewer only
+     "seen":{"robot_A":[cell,...], ...},     cells newly marked searched on THAT robot's own brain map since the last frame;
+                                             cell = iy*500 + ix, grid origin (-25,-25) m, 0.1 m cells, gate frame
+     "fire":[[x,y,r],...],                   flame regions, gate frame, simulator truth, viewer only
+     "found":[{"id":"c1","x":..,"y":..,"by":"robot_A"}],  new confirmations (brain's own estimate of the spot)
+     "events":[{"robot":"robot_A","kind":"map_shared","text":"short plain sentence"}]}
+    Event kinds the page highlights: map_shared (frame link moment), survivor_confirmed, survivor_from_peer,
+    room_marked_fire, mission_complete (robot walking out), robot out (state "out" when a robot is back outside).
+  score (in the final status.json):
+    {"people_found":int,"people_total":int,"time_s":float (all robots out, or 180),
+     "coverage_pct":float (team union of searched cells over the house's floor cells),
+     "robots_out":int, "false_confirmations":int}
+    The page adds "same house with 1 robot: ..." by reading ryor/cache/<house>__r1__<difficulty>/status.json score.
+
+4. HTTP API (public site Lambda Function URL, CORS for the Amplify origin):
+  POST /api/mission            body {"house","robots","difficulty"}
+     -> 200 {"mission":"<id>","source":"live","poll":"/api/mission/<id>"}
+     -> 200 {"mission":"cache:<setup key>","source":"recorded","reason":"busy"|"rate_limited"|"disabled"}  fallback
+     -> 400 bad setup
+  GET  /api/mission/<id>?from=N
+     -> 200 {"status":{...status.json},"chunks":[chunk N, N+1, ... up to 6]}
+     A live mission that failed, timed out (hard limit 600 s wall) or failed validation answers
+       {"status":{...,"state":"failed","fallback":"cache:<setup key>"}} and the page switches to the cached replay,
+       labelled "recorded run of this exact setup".
+  GET  /api/mission/health    -> {"ok":true,"running":n,"cap":n,"cache_setups":n,"engine":"tag"}
+
+5. Validation (engine side writes it, API checks it again before serving a live result as done):
+  frames present for every 0.5 s up to sim_t, sim_t reaches 180, every robot pose inside the house bounds + 3 m,
+  every robot id in the setup present. A failed check sets state "failed" with the reason.
