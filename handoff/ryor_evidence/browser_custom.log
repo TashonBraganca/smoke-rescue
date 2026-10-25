@@ -1,0 +1,13 @@
+2026-10-25T20:26:51.676Z browser 156.0.8078.4 mode custom
+2026-10-25T20:26:57.905Z Live run on AWS 0:00 / 3:00 Waiting for AWS to start the cloud machine.
+2026-10-25T20:27:28.052Z Live run on AWS 0:00 / 3:00 Simulating on AWS, 0 s of 180 s ready. The first 10 s arrive as one piece.
+2026-10-25T20:27:32.071Z first playable frame 36.27 s 6ade66101b945a3cd1
+2026-10-25T20:27:58.286Z Live run on AWS 0:30 / 3:00 Waiting for the simulator. 30 s of 180 s ready; the replay catches up as each 10 s arrives.
+2026-10-25T20:28:28.481Z Live run on AWS 1:00 / 3:00 Waiting for the simulator. 60 s of 180 s ready; the replay catches up as each 10 s arrives.
+2026-10-25T20:28:58.667Z Live run on AWS 1:20 / 3:00 Waiting for the simulator. 80 s of 180 s ready; the replay catches up as each 10 s arrives.
+2026-10-25T20:29:28.878Z Live run on AWS 1:44 / 3:00 Simulating on AWS, 110 s of 180 s ready.
+2026-10-25T20:29:59.061Z Live run on AWS 2:10 / 3:00 Waiting for the simulator. 130 s of 180 s ready; the replay catches up as each 10 s arrives.
+2026-10-25T20:30:29.234Z Live run on AWS 2:40 / 3:00 Waiting for the simulator. 160 s of 180 s ready; the replay catches up as each 10 s arrives.
+2026-10-25T20:30:53.457Z finished 237.656 s
+Error: Expected a live mission, received fallback
+    at /Volumes/Tashon/opencv/smoke-rescue-ryor/tools/ryor/browser_checks.cjs:102:80

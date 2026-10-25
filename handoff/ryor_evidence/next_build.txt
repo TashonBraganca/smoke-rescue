@@ -1,0 +1,29 @@
+▲ Next.js 16.4.3 (Turbopack)
+✓ Running next.config.ts took 23ms
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 1042ms
+  Running TypeScript ...
+  Finished TypeScript in 1893ms ...
+  Collecting page data using 6 workers ...
+  Generating static pages using 6 workers (0/5) ...
+  Generating static pages using 6 workers (1/5) 
+  Generating static pages using 6 workers (2/5) 
+  Generating static pages using 6 workers (3/5) 
+✓ Generating static pages using 6 workers (5/5) in 244ms
+Turbopack build encountered 1 warning:
+./
+Warning: Failed to find font override values for font `Saira Stencil`
+Skipping generating a fallback font.
+
+
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+└ ○ /rescue
+
+
+○  (Static)  prerendered as static content
+

@@ -1,0 +1,11 @@
+{
+ "http": 200,
+ "body": {
+  "mission": "cache:family_ranch__r2__medium",
+  "setup": "family_ranch__r2__medium",
+  "source": "recorded",
+  "reason": "daily_limited"
+ },
+ "counter_after": 151,
+ "running_tasks_after": 0
+}

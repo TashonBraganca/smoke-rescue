@@ -1,0 +1,6 @@
+{
+  route: 'http://host.docker.internal:8199/rescue/',
+  iframeHouses: 27,
+  phoneOverflow: false,
+  errors: []
+}

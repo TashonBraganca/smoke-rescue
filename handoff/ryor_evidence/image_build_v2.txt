@@ -1,0 +1,46 @@
+patched unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/HeadlessSim.cs -> /Volumes/Tashon/opencv/smoke-rescue-ryor/tools/ryor/engine/gen/HeadlessSim.cs
+-rwxr--r--@ 1 tashonbraganca  admin   712464 Mar  8  2023 /Volumes/Tashon/opencv/smoke-rescue-ryor/tools/ryor/engine/bin/Newtonsoft.Json.dll
+-rw-r--r--@ 1 tashonbraganca  admin   403968 Oct 26 02:04 /Volumes/Tashon/opencv/smoke-rescue-ryor/tools/ryor/engine/bin/RyorRunner.dll
+-rw-r--r--@ 1 tashonbraganca  admin  2212352 Oct 19 23:08 /Volumes/Tashon/opencv/smoke-rescue-ryor/tools/ryor/engine/bin/UnityEngine.CoreModule.dll
+DEPRECATED: The legacy builder is deprecated and will be removed in a future release.
+            Install the buildx component to build images with BuildKit:
+            https://docs.docker.com/go/buildx/
+
+Sending build context to Docker daemon  38.11MB
+Step 1/10 : FROM mcr.microsoft.com/dotnet/runtime:8.0-bookworm-slim
+ ---> ac29abc7855e
+Step 2/10 : RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-boto3 python3-httpx && rm -rf /var/lib/apt/lists/*
+ ---> Using cache
+ ---> 11cb4c4d205a
+Step 3/10 : RUN useradd -m -u 1000 ryor
+ ---> Using cache
+ ---> b95ed9d138a8
+Step 4/10 : WORKDIR /app
+ ---> Using cache
+ ---> 93c19ddc2f7b
+Step 5/10 : COPY --chown=ryor ctx/ /app/
+ ---> acb7d4d4068c
+Step 6/10 : RUN mkdir -p /app/unity/SmokeRescue/Assets && chown -R ryor /app/unity
+ ---> Running in f845f29b744c
+ ---> Removed intermediate container f845f29b744c
+ ---> 2ea4b8e97330
+Step 7/10 : USER ryor
+ ---> Running in e1264f5c1271
+ ---> Removed intermediate container e1264f5c1271
+ ---> af951ee05c60
+Step 8/10 : ARG TAG=local
+ ---> Running in 345c27db1b02
+ ---> Removed intermediate container 345c27db1b02
+ ---> dc243c825c90
+Step 9/10 : ENV ENGINE_TAG=$TAG ENGINE_GIT=$TAG DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1 DOTNET_gcServer=0
+ ---> Running in 017923bc1d8b
+ ---> Removed intermediate container 017923bc1d8b
+ ---> 4360e24fa348
+Step 10/10 : ENTRYPOINT ["python3", "-u", "/app/tools/ryor/entry.py"]
+ ---> Running in 9366a574cefe
+ ---> Removed intermediate container 9366a574cefe
+ ---> 86e0ee7ec7c5
+Successfully built 86e0ee7ec7c5
+Successfully tagged smoke-rescue/ryor-engine:84455305
+IMAGE                               ID             DISK USAGE   CONTENT SIZE   EXTRA
+smoke-rescue/ryor-engine:84455305   86e0ee7ec7c5        553MB          116MB        

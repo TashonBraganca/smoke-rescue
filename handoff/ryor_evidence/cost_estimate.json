@@ -1,0 +1,22 @@
+{
+ "checked_date": "2026-10-26",
+ "stop_window_planning_s": 700,
+ "stop_window_reason": "600 s API age limit, one-minute scheduled sweep, task stop grace and request-latency margin. Not a provider timing SLA.",
+ "pair_max_compute_usd": 0.01536108,
+ "trio_max_compute_usd": 0.03072216,
+ "max_launches_per_utc_day": 150,
+ "max_compute_trio_day_usd": 4.608324,
+ "max_task_ipv4_day_usd": 0.14583333333333334,
+ "model_max_day_global_rate_usd": 7.400000000000001,
+ "model_bound_reason": "100 reservations/day, at most 12,000 ASCII observation characters plus fixed prompt/tool schemas, conservatively 20,000 input tokens and 2,000 output tokens per call. Uses the higher published Global input/cache-write rate of $2.50/M and output $12/M.",
+ "accepted_compute_model_ipv4_sum_usd": 12.154157333333334,
+ "accepted_workload_planning_allowance_usd_per_utc_day": 13,
+ "incremental_idle_planning_usd_per_day": 0.1,
+ "sources": {
+  "fargate": "https://aws.amazon.com/fargate/pricing/",
+  "ipv4": "https://aws.amazon.com/vpc/pricing/",
+  "azure": "https://azure.microsoft.com/en-us/blog/gpt-5-6-now-available-in-microsoft-foundry/",
+  "ecr": "https://aws.amazon.com/ecr/pricing/",
+  "monitoring": "https://aws.amazon.com/cloudwatch/pricing/"
+ }
+}

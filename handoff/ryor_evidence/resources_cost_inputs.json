@@ -1,0 +1,67 @@
+{
+ "ryor/cache/": {
+  "objects": 3140,
+  "bytes": 48779849
+ },
+ "ryor/cache-custom/": {
+  "objects": 40,
+  "bytes": 611036
+ },
+ "ryor/missions/": {
+  "objects": 3465,
+  "bytes": 53985144
+ },
+ "deploy/": {
+  "objects": 8,
+  "bytes": 168835
+ },
+ "ecr_image_size_sum_upper_bytes": 675910873,
+ "lifecycle": [
+  {
+   "Expiration": {
+    "Days": 7
+   },
+   "ID": "expire-live-missions",
+   "Filter": {
+    "Prefix": "ryor/missions/"
+   },
+   "Status": "Enabled"
+  },
+  {
+   "ID": "abort-multipart",
+   "Filter": {
+    "Prefix": ""
+   },
+   "Status": "Enabled",
+   "AbortIncompleteMultipartUpload": {
+    "DaysAfterInitiation": 1
+   }
+  },
+  {
+   "Expiration": {
+    "Days": 7
+   },
+   "ID": "expire-custom-recordings",
+   "Filter": {
+    "Prefix": "ryor/cache-custom/"
+   },
+   "Status": "Enabled"
+  },
+  {
+   "Expiration": {
+    "Days": 7
+   },
+   "ID": "expire-placement-requests",
+   "Filter": {
+    "Prefix": "ryor/requests/"
+   },
+   "Status": "Enabled"
+  }
+ ],
+ "agent_service": {
+  "desiredCount": 0,
+  "runningCount": 0,
+  "pendingCount": 0
+ },
+ "checked_at": "2026-10-25T21:07:32.542804+00:00"
+}

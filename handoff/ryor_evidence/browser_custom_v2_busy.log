@@ -1,0 +1,7 @@
+2026-10-25T20:38:55.085Z browser 156.0.8078.4 mode custom
+2026-10-25T20:43:04.016Z Recorded run of this exact setup 0:00 / 3:00 Loading the recorded run.
+2026-10-25T20:43:06.028Z first playable frame 4.117 s 6ade68e24e88583df5
+2026-10-25T20:43:34.267Z Recorded run of this exact setup 1:57 / 3:00 Recorded run, all 180 s loaded.
+2026-10-25T20:43:50.422Z finished 48.511 s
+Error: Expected a live mission, received fallback
+    at /Volumes/Tashon/opencv/smoke-rescue-ryor/tools/ryor/browser_checks.cjs:102:100

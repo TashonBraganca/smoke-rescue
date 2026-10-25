@@ -1,0 +1,45 @@
+{
+ "status": {
+  "v": 1,
+  "mission": "modelfail2aac6dde9b",
+  "setup": "family_ranch__r1__medium",
+  "state": "done",
+  "source": "live",
+  "chunks": 19,
+  "sim_t": 180.0,
+  "updated": "2026-10-25T20:43:59+00:00",
+  "error": null,
+  "score": {
+   "people_found": 2,
+   "people_total": 5,
+   "time_s": 155.0,
+   "all_out": true,
+   "coverage_pct": 41.5,
+   "robots_out": 1,
+   "robots": 1,
+   "false_confirmations": 0,
+   "first_person_s": 30.0
+  },
+  "engine": {
+   "git": "84455305",
+   "image": "84455305"
+  },
+  "wall": {
+   "started": 1792960934.9755676,
+   "first_frame_s": 6.0,
+   "total_s": 104.2
+  },
+  "terra": true,
+  "validated": true
+ },
+ "frames": 361,
+ "frame_content_matches_brain_only_cache": 361,
+ "compared_frames": 361,
+ "unavailable_captions": 4,
+ "audit_error_types": [
+  "ClientError",
+  "ClientError",
+  "ClientError",
+  "ClientError"
+ ]
+}

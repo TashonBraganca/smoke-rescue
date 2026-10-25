@@ -1,0 +1,80 @@
+{
+ "requests": [
+  {
+   "request": 1,
+   "http": 200,
+   "body": {
+    "mission": "6ade67c06ac93ab279",
+    "setup": "family_ranch__r2__medium",
+    "source": "live",
+    "preparing": false,
+    "poll": "/api/mission/6ade67c06ac93ab279"
+   }
+  },
+  {
+   "request": 2,
+   "http": 200,
+   "body": {
+    "mission": "6ade67c160b09bc9fc",
+    "setup": "family_ranch__r2__medium",
+    "source": "live",
+    "preparing": false,
+    "poll": "/api/mission/6ade67c160b09bc9fc"
+   }
+  },
+  {
+   "request": 3,
+   "http": 200,
+   "body": {
+    "mission": "cache:family_ranch__r2__medium",
+    "setup": "family_ranch__r2__medium",
+    "source": "recorded",
+    "reason": "busy"
+   }
+  },
+  {
+   "request": 4,
+   "http": 200,
+   "body": {
+    "mission": "cache:family_ranch__r2__medium",
+    "setup": "family_ranch__r2__medium",
+    "source": "recorded",
+    "reason": "rate_limited"
+   }
+  },
+  {
+   "request": 5,
+   "http": 200,
+   "body": {
+    "mission": "cache:family_ranch__r2__medium",
+    "setup": "family_ranch__r2__medium",
+    "source": "recorded",
+    "reason": "rate_limited"
+   }
+  },
+  {
+   "request": 6,
+   "http": 200,
+   "body": {
+    "mission": "cache:family_ranch__r2__medium",
+    "setup": "family_ranch__r2__medium",
+    "source": "recorded",
+    "reason": "rate_limited"
+   }
+  },
+  {
+   "request": 7,
+   "http": 200,
+   "body": {
+    "mission": "cache:family_ranch__r2__medium",
+    "setup": "family_ranch__r2__medium",
+    "source": "recorded",
+    "reason": "rate_limited"
+   }
+  }
+ ],
+ "test_runs_stopped": [
+  "6ade67c06ac93ab279",
+  "6ade67c160b09bc9fc"
+ ]
+}

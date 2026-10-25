@@ -1,0 +1,6 @@
+{
+  setup: 'hx_d56de8c558__r3__hard',
+  button: 'Recording is preparing',
+  message: 'The recording for this setup is still preparing. Choose another robot count or house, or place your own scene.',
+  posts: []
+}

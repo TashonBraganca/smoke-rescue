@@ -1,0 +1,89 @@
+{
+ "test": "Artificially age this mission by 601 seconds; no mission GET during the wait.",
+ "mission": "6ade74c7b51d0edf94",
+ "observations": [
+  {
+   "s": 1.8,
+   "mission_state": "starting",
+   "task_state": "RUNNING",
+   "task_desired": "RUNNING"
+  },
+  {
+   "s": 5.4,
+   "mission_state": "starting",
+   "task_state": "RUNNING",
+   "task_desired": "RUNNING"
+  },
+  {
+   "s": 8.99,
+   "mission_state": "starting",
+   "task_state": "RUNNING",
+   "task_desired": "RUNNING"
+  },
+  {
+   "s": 12.58,
+   "mission_state": "starting",
+   "task_state": "RUNNING",
+   "task_desired": "RUNNING"
+  },
+  {
+   "s": 16.17,
+   "mission_state": "starting",
+   "task_state": "RUNNING",
+   "task_desired": "RUNNING"
+  },
+  {
+   "s": 19.77,
+   "mission_state": "starting",
+   "task_state": "RUNNING",
+   "task_desired": "RUNNING"
+  },
+  {
+   "s": 23.36,
+   "mission_state": "starting",
+   "task_state": "RUNNING",
+   "task_desired": "RUNNING"
+  },
+  {
+   "s": 26.96,
+   "mission_state": "starting",
+   "task_state": "RUNNING",
+   "task_desired": "RUNNING"
+  },
+  {
+   "s": 30.56,
+   "mission_state": "starting",
+   "task_state": "RUNNING",
+   "task_desired": "RUNNING"
+  },
+  {
+   "s": 34.15,
+   "mission_state": "failed",
+   "task_state": "RUNNING",
+   "task_desired": "STOPPED"
+  }
+ ],
+ "public_result": {
+  "v": 1,
+  "mission": "6ade74c7b51d0edf94",
+  "setup": "family_ranch__r1__medium",
+  "state": "failed",
+  "source": "live",
+  "chunks": 7,
+  "sim_t": 70.0,
+  "updated": "2026-10-25T21:30:45+00:00",
+  "error": "hard time limit: running 633 s > 600 s",
+  "score": null,
+  "engine": {
+   "git": "84455305",
+   "image": "84455305"
+  },
+  "wall": {
+   "started": 1792963803.8475835,
+   "first_frame_s": 6.3,
+   "total_s": null
+  },
+  "terra": false,
+  "fallback": "cache:family_ranch__r1__medium"
+ }
+}

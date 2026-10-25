@@ -1,0 +1,4357 @@
+{
+  "browser": "156.0.8078.4",
+  "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/rescue/",
+  "mission": "6ade6a772e60a55326",
+  "killed": false,
+  "first_playable_s": 58.374,
+  "total_s": 223.487,
+  "errors": [],
+  "requests": [
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/health",
+      "status": 200,
+      "at": 1792961138863,
+      "body": {
+        "ok": true,
+        "running": 0,
+        "cap": 2,
+        "cache_setups": 83,
+        "engine": "84455305",
+        "cache_expected": 243,
+        "enabled": true,
+        "ip_limit_per_hour": 6,
+        "daily_cap": 150,
+        "hard_limit_s": 600,
+        "terra_steps_per_mission": 20,
+        "terra_steps_per_utc_day": 100
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission",
+      "status": 200,
+      "at": 1792961142639,
+      "body": {
+        "mission": "cache:family_ranch__r2__medium__p4bedfe03a13995d9403e",
+        "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+        "source": "recorded",
+        "prepared": true
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission",
+      "status": 200,
+      "at": 1792961143870,
+      "body": {
+        "mission": "6ade6a772e60a55326",
+        "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+        "source": "live",
+        "preparing": false,
+        "poll": "/api/mission/6ade6a772e60a55326"
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=0",
+      "status": 200,
+      "at": 1792961144209,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "starting",
+          "source": "live",
+          "chunks": 0,
+          "sim_t": 0,
+          "updated": null,
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": null,
+            "image": "84455305"
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=0",
+      "status": 200,
+      "at": 1792961146558,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "starting",
+          "source": "live",
+          "chunks": 0,
+          "sim_t": 0,
+          "updated": null,
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": null,
+            "image": "84455305"
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=0",
+      "status": 200,
+      "at": 1792961148922,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "starting",
+          "source": "live",
+          "chunks": 0,
+          "sim_t": 0,
+          "updated": null,
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": null,
+            "image": "84455305"
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=0",
+      "status": 200,
+      "at": 1792961151252,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "starting",
+          "source": "live",
+          "chunks": 0,
+          "sim_t": 0,
+          "updated": null,
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": null,
+            "image": "84455305"
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=0",
+      "status": 200,
+      "at": 1792961153607,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "starting",
+          "source": "live",
+          "chunks": 0,
+          "sim_t": 0,
+          "updated": null,
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": null,
+            "image": "84455305"
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=0",
+      "status": 200,
+      "at": 1792961155958,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "starting",
+          "source": "live",
+          "chunks": 0,
+          "sim_t": 0,
+          "updated": null,
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": null,
+            "image": "84455305"
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=0",
+      "status": 200,
+      "at": 1792961158419,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "starting",
+          "source": "live",
+          "chunks": 0,
+          "sim_t": 0,
+          "updated": null,
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": null,
+            "image": "84455305"
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=0",
+      "status": 200,
+      "at": 1792961160772,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "starting",
+          "source": "live",
+          "chunks": 0,
+          "sim_t": 0,
+          "updated": null,
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": null,
+            "image": "84455305"
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=0",
+      "status": 200,
+      "at": 1792961163123,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "starting",
+          "source": "live",
+          "chunks": 0,
+          "sim_t": 0,
+          "updated": null,
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": null,
+            "image": "84455305"
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=0",
+      "status": 200,
+      "at": 1792961165464,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "starting",
+          "source": "live",
+          "chunks": 0,
+          "sim_t": 0,
+          "updated": null,
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": null,
+            "image": "84455305"
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=0",
+      "status": 200,
+      "at": 1792961167840,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "starting",
+          "source": "live",
+          "chunks": 0,
+          "sim_t": 0,
+          "updated": null,
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": null,
+            "image": "84455305"
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=0",
+      "status": 200,
+      "at": 1792961170183,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "starting",
+          "source": "live",
+          "chunks": 0,
+          "sim_t": 0,
+          "updated": null,
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": null,
+            "image": "84455305"
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=0",
+      "status": 200,
+      "at": 1792961172536,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "starting",
+          "source": "live",
+          "chunks": 0,
+          "sim_t": 0,
+          "updated": null,
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": null,
+            "image": "84455305"
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=0",
+      "status": 200,
+      "at": 1792961174905,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "starting",
+          "source": "live",
+          "chunks": 0,
+          "sim_t": 0,
+          "updated": null,
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": null,
+            "image": "84455305"
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=0",
+      "status": 200,
+      "at": 1792961177254,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "starting",
+          "source": "live",
+          "chunks": 0,
+          "sim_t": 0,
+          "updated": null,
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": null,
+            "image": "84455305"
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=0",
+      "status": 200,
+      "at": 1792961179607,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "starting",
+          "source": "live",
+          "chunks": 0,
+          "sim_t": 0,
+          "updated": null,
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": null,
+            "image": "84455305"
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=0",
+      "status": 200,
+      "at": 1792961181961,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "starting",
+          "source": "live",
+          "chunks": 0,
+          "sim_t": 0,
+          "updated": null,
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": null,
+            "image": "84455305"
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=0",
+      "status": 200,
+      "at": 1792961184326,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "starting",
+          "source": "live",
+          "chunks": 0,
+          "sim_t": 0,
+          "updated": null,
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": null,
+            "image": "84455305"
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=0",
+      "status": 200,
+      "at": 1792961186692,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "starting",
+          "source": "live",
+          "chunks": 0,
+          "sim_t": 0,
+          "updated": null,
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": null,
+            "image": "84455305"
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=0",
+      "status": 200,
+      "at": 1792961189054,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "starting",
+          "source": "live",
+          "chunks": 0,
+          "sim_t": 0,
+          "updated": "2026-10-25T20:46:28+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": null,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=0",
+      "status": 200,
+      "at": 1792961191421,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 0,
+          "sim_t": 0,
+          "updated": "2026-10-25T20:46:29+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": null,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=0",
+      "status": 200,
+      "at": 1792961193805,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 0,
+          "sim_t": 0,
+          "updated": "2026-10-25T20:46:29+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": null,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=0",
+      "status": 200,
+      "at": 1792961196192,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 0,
+          "sim_t": 0,
+          "updated": "2026-10-25T20:46:29+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": null,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=0",
+      "status": 200,
+      "at": 1792961199282,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 1,
+          "sim_t": 10,
+          "updated": "2026-10-25T20:46:37+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": [
+          {
+            "chunk": 0,
+            "frames": 20
+          }
+        ]
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=1",
+      "status": 200,
+      "at": 1792961201635,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 1,
+          "sim_t": 10,
+          "updated": "2026-10-25T20:46:37+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=1",
+      "status": 200,
+      "at": 1792961203996,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 1,
+          "sim_t": 10,
+          "updated": "2026-10-25T20:46:37+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=1",
+      "status": 200,
+      "at": 1792961206412,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 2,
+          "sim_t": 20,
+          "updated": "2026-10-25T20:46:44+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": [
+          {
+            "chunk": 1,
+            "frames": 20
+          }
+        ]
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=2",
+      "status": 200,
+      "at": 1792961208776,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 2,
+          "sim_t": 20,
+          "updated": "2026-10-25T20:46:44+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=2",
+      "status": 200,
+      "at": 1792961211161,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 2,
+          "sim_t": 20,
+          "updated": "2026-10-25T20:46:44+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=2",
+      "status": 200,
+      "at": 1792961213562,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 2,
+          "sim_t": 20,
+          "updated": "2026-10-25T20:46:44+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=2",
+      "status": 200,
+      "at": 1792961215996,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 3,
+          "sim_t": 30,
+          "updated": "2026-10-25T20:46:53+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": [
+          {
+            "chunk": 2,
+            "frames": 20
+          }
+        ]
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=3",
+      "status": 200,
+      "at": 1792961218380,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 3,
+          "sim_t": 30,
+          "updated": "2026-10-25T20:46:53+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=3",
+      "status": 200,
+      "at": 1792961220744,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 3,
+          "sim_t": 30,
+          "updated": "2026-10-25T20:46:53+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=3",
+      "status": 200,
+      "at": 1792961223110,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 3,
+          "sim_t": 30,
+          "updated": "2026-10-25T20:46:53+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=3",
+      "status": 200,
+      "at": 1792961225511,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 4,
+          "sim_t": 40,
+          "updated": "2026-10-25T20:47:02+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": [
+          {
+            "chunk": 3,
+            "frames": 20
+          }
+        ]
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=4",
+      "status": 200,
+      "at": 1792961227879,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 4,
+          "sim_t": 40,
+          "updated": "2026-10-25T20:47:02+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=4",
+      "status": 200,
+      "at": 1792961230244,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 4,
+          "sim_t": 40,
+          "updated": "2026-10-25T20:47:02+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=4",
+      "status": 200,
+      "at": 1792961232609,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 4,
+          "sim_t": 40,
+          "updated": "2026-10-25T20:47:02+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=4",
+      "status": 200,
+      "at": 1792961235009,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 5,
+          "sim_t": 50,
+          "updated": "2026-10-25T20:47:13+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": [
+          {
+            "chunk": 4,
+            "frames": 20
+          }
+        ]
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=5",
+      "status": 200,
+      "at": 1792961237374,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 5,
+          "sim_t": 50,
+          "updated": "2026-10-25T20:47:13+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=5",
+      "status": 200,
+      "at": 1792961239740,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 5,
+          "sim_t": 50,
+          "updated": "2026-10-25T20:47:13+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=5",
+      "status": 200,
+      "at": 1792961242117,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 5,
+          "sim_t": 50,
+          "updated": "2026-10-25T20:47:13+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=5",
+      "status": 200,
+      "at": 1792961244520,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 6,
+          "sim_t": 60,
+          "updated": "2026-10-25T20:47:23+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": [
+          {
+            "chunk": 5,
+            "frames": 20
+          }
+        ]
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=6",
+      "status": 200,
+      "at": 1792961246889,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 6,
+          "sim_t": 60,
+          "updated": "2026-10-25T20:47:23+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=6",
+      "status": 200,
+      "at": 1792961249258,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 6,
+          "sim_t": 60,
+          "updated": "2026-10-25T20:47:23+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=6",
+      "status": 200,
+      "at": 1792961251623,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 6,
+          "sim_t": 60,
+          "updated": "2026-10-25T20:47:23+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=6",
+      "status": 200,
+      "at": 1792961253990,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 6,
+          "sim_t": 60,
+          "updated": "2026-10-25T20:47:23+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=6",
+      "status": 200,
+      "at": 1792961256403,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 7,
+          "sim_t": 70,
+          "updated": "2026-10-25T20:47:34+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": [
+          {
+            "chunk": 6,
+            "frames": 20
+          }
+        ]
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=7",
+      "status": 200,
+      "at": 1792961258778,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 7,
+          "sim_t": 70,
+          "updated": "2026-10-25T20:47:34+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=7",
+      "status": 200,
+      "at": 1792961261140,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 7,
+          "sim_t": 70,
+          "updated": "2026-10-25T20:47:34+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=7",
+      "status": 200,
+      "at": 1792961263505,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 7,
+          "sim_t": 70,
+          "updated": "2026-10-25T20:47:34+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=7",
+      "status": 200,
+      "at": 1792961265921,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 8,
+          "sim_t": 80,
+          "updated": "2026-10-25T20:47:43+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": [
+          {
+            "chunk": 7,
+            "frames": 20
+          }
+        ]
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=8",
+      "status": 200,
+      "at": 1792961268293,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 8,
+          "sim_t": 80,
+          "updated": "2026-10-25T20:47:43+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=8",
+      "status": 200,
+      "at": 1792961270660,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 8,
+          "sim_t": 80,
+          "updated": "2026-10-25T20:47:43+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=8",
+      "status": 200,
+      "at": 1792961273109,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 8,
+          "sim_t": 80,
+          "updated": "2026-10-25T20:47:43+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=8",
+      "status": 200,
+      "at": 1792961275540,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 9,
+          "sim_t": 90,
+          "updated": "2026-10-25T20:47:53+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": [
+          {
+            "chunk": 8,
+            "frames": 20
+          }
+        ]
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=9",
+      "status": 200,
+      "at": 1792961277936,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 9,
+          "sim_t": 90,
+          "updated": "2026-10-25T20:47:53+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=9",
+      "status": 200,
+      "at": 1792961280291,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 9,
+          "sim_t": 90,
+          "updated": "2026-10-25T20:47:53+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=9",
+      "status": 200,
+      "at": 1792961282672,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 9,
+          "sim_t": 90,
+          "updated": "2026-10-25T20:47:53+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=9",
+      "status": 200,
+      "at": 1792961285111,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 10,
+          "sim_t": 100,
+          "updated": "2026-10-25T20:48:03+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": [
+          {
+            "chunk": 9,
+            "frames": 20
+          }
+        ]
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=10",
+      "status": 200,
+      "at": 1792961287492,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 10,
+          "sim_t": 100,
+          "updated": "2026-10-25T20:48:03+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=10",
+      "status": 200,
+      "at": 1792961289872,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 10,
+          "sim_t": 100,
+          "updated": "2026-10-25T20:48:03+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=10",
+      "status": 200,
+      "at": 1792961292236,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 10,
+          "sim_t": 100,
+          "updated": "2026-10-25T20:48:03+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=10",
+      "status": 200,
+      "at": 1792961294643,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 11,
+          "sim_t": 110,
+          "updated": "2026-10-25T20:48:13+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": [
+          {
+            "chunk": 10,
+            "frames": 20
+          }
+        ]
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=11",
+      "status": 200,
+      "at": 1792961297014,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 11,
+          "sim_t": 110,
+          "updated": "2026-10-25T20:48:13+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=11",
+      "status": 200,
+      "at": 1792961299377,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 11,
+          "sim_t": 110,
+          "updated": "2026-10-25T20:48:13+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=11",
+      "status": 200,
+      "at": 1792961301766,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 11,
+          "sim_t": 110,
+          "updated": "2026-10-25T20:48:13+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=11",
+      "status": 200,
+      "at": 1792961304158,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 12,
+          "sim_t": 120,
+          "updated": "2026-10-25T20:48:23+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": [
+          {
+            "chunk": 11,
+            "frames": 20
+          }
+        ]
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=12",
+      "status": 200,
+      "at": 1792961306534,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 12,
+          "sim_t": 120,
+          "updated": "2026-10-25T20:48:23+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=12",
+      "status": 200,
+      "at": 1792961308907,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 12,
+          "sim_t": 120,
+          "updated": "2026-10-25T20:48:23+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=12",
+      "status": 200,
+      "at": 1792961311287,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 12,
+          "sim_t": 120,
+          "updated": "2026-10-25T20:48:23+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=12",
+      "status": 200,
+      "at": 1792961313687,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 13,
+          "sim_t": 130,
+          "updated": "2026-10-25T20:48:33+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": [
+          {
+            "chunk": 12,
+            "frames": 20
+          }
+        ]
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=13",
+      "status": 200,
+      "at": 1792961316069,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 13,
+          "sim_t": 130,
+          "updated": "2026-10-25T20:48:33+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=13",
+      "status": 200,
+      "at": 1792961318424,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 13,
+          "sim_t": 130,
+          "updated": "2026-10-25T20:48:33+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=13",
+      "status": 200,
+      "at": 1792961320806,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 13,
+          "sim_t": 130,
+          "updated": "2026-10-25T20:48:33+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=13",
+      "status": 200,
+      "at": 1792961323688,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 14,
+          "sim_t": 140,
+          "updated": "2026-10-25T20:48:42+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": [
+          {
+            "chunk": 13,
+            "frames": 20
+          }
+        ]
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=14",
+      "status": 200,
+      "at": 1792961326085,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 14,
+          "sim_t": 140,
+          "updated": "2026-10-25T20:48:42+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=14",
+      "status": 200,
+      "at": 1792961328438,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 14,
+          "sim_t": 140,
+          "updated": "2026-10-25T20:48:42+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=14",
+      "status": 200,
+      "at": 1792961330814,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 14,
+          "sim_t": 140,
+          "updated": "2026-10-25T20:48:42+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=14",
+      "status": 200,
+      "at": 1792961333471,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 15,
+          "sim_t": 150,
+          "updated": "2026-10-25T20:48:52+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": [
+          {
+            "chunk": 14,
+            "frames": 20
+          }
+        ]
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=15",
+      "status": 200,
+      "at": 1792961335837,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 15,
+          "sim_t": 150,
+          "updated": "2026-10-25T20:48:52+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=15",
+      "status": 200,
+      "at": 1792961338213,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 15,
+          "sim_t": 150,
+          "updated": "2026-10-25T20:48:52+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=15",
+      "status": 200,
+      "at": 1792961340568,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 15,
+          "sim_t": 150,
+          "updated": "2026-10-25T20:48:52+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=15",
+      "status": 200,
+      "at": 1792961343249,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 16,
+          "sim_t": 160,
+          "updated": "2026-10-25T20:49:01+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": [
+          {
+            "chunk": 15,
+            "frames": 20
+          }
+        ]
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=16",
+      "status": 200,
+      "at": 1792961345615,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 16,
+          "sim_t": 160,
+          "updated": "2026-10-25T20:49:01+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=16",
+      "status": 200,
+      "at": 1792961347972,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 16,
+          "sim_t": 160,
+          "updated": "2026-10-25T20:49:01+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=16",
+      "status": 200,
+      "at": 1792961350337,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 16,
+          "sim_t": 160,
+          "updated": "2026-10-25T20:49:01+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=16",
+      "status": 200,
+      "at": 1792961352987,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 17,
+          "sim_t": 170,
+          "updated": "2026-10-25T20:49:10+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": [
+          {
+            "chunk": 16,
+            "frames": 20
+          }
+        ]
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=17",
+      "status": 200,
+      "at": 1792961355350,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 17,
+          "sim_t": 170,
+          "updated": "2026-10-25T20:49:10+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=17",
+      "status": 200,
+      "at": 1792961357954,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 17,
+          "sim_t": 170,
+          "updated": "2026-10-25T20:49:10+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": []
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=17",
+      "status": 200,
+      "at": 1792961360618,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "running",
+          "source": "live",
+          "chunks": 18,
+          "sim_t": 180,
+          "updated": "2026-10-25T20:49:19+00:00",
+          "error": null,
+          "score": null,
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": null
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "preparing": false
+        },
+        "chunks": [
+          {
+            "chunk": 17,
+            "frames": 20
+          }
+        ]
+      }
+    },
+    {
+      "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/mission/6ade6a772e60a55326?from=18",
+      "status": 200,
+      "at": 1792961364331,
+      "body": {
+        "status": {
+          "v": 1,
+          "mission": "6ade6a772e60a55326",
+          "setup": "family_ranch__r2__medium__p4bedfe03a13995d9403e",
+          "state": "done",
+          "source": "live",
+          "chunks": 19,
+          "sim_t": 180,
+          "updated": "2026-10-25T20:49:20+00:00",
+          "error": null,
+          "score": {
+            "people_found": 3,
+            "people_total": 3,
+            "time_s": 170.5,
+            "all_out": true,
+            "coverage_pct": 72.3,
+            "robots_out": 2,
+            "robots": 2,
+            "false_confirmations": 0,
+            "first_person_s": 6
+          },
+          "engine": {
+            "git": "84455305",
+            "image": "84455305"
+          },
+          "wall": {
+            "started": 1792961188.6784375,
+            "first_frame_s": 8.8,
+            "total_s": 171.5
+          },
+          "terra": true,
+          "placement": {
+            "people": [
+              [
+                1.75,
+                3.5
+              ],
+              [
+                5.25,
+                3
+              ],
+              [
+                -2.25,
+                8.25
+              ]
+            ],
+            "fire": [
+              7.75,
+              2
+            ]
+          },
+          "validated": true,
+          "preparing": false
+        },
+        "chunks": [
+          {
+            "chunk": 18,
+            "frames": 1
+          }
+        ]
+      }
+    }
+  ]
+}

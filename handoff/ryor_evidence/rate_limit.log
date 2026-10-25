@@ -1,0 +1,7 @@
+1 200 {'mission': '6ade67c06ac93ab279', 'setup': 'family_ranch__r2__medium', 'source': 'live', 'preparing': False, 'poll': '/api/mission/6ade67c06ac93ab279'}
+2 200 {'mission': '6ade67c160b09bc9fc', 'setup': 'family_ranch__r2__medium', 'source': 'live', 'preparing': False, 'poll': '/api/mission/6ade67c160b09bc9fc'}
+3 200 {'mission': 'cache:family_ranch__r2__medium', 'setup': 'family_ranch__r2__medium', 'source': 'recorded', 'reason': 'busy'}
+4 200 {'mission': 'cache:family_ranch__r2__medium', 'setup': 'family_ranch__r2__medium', 'source': 'recorded', 'reason': 'rate_limited'}
+5 200 {'mission': 'cache:family_ranch__r2__medium', 'setup': 'family_ranch__r2__medium', 'source': 'recorded', 'reason': 'rate_limited'}
+6 200 {'mission': 'cache:family_ranch__r2__medium', 'setup': 'family_ranch__r2__medium', 'source': 'recorded', 'reason': 'rate_limited'}
+7 200 {'mission': 'cache:family_ranch__r2__medium', 'setup': 'family_ranch__r2__medium', 'source': 'recorded', 'reason': 'rate_limited'}

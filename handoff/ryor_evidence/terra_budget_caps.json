@@ -1,0 +1,7 @@
+{
+ "first_reservation": true,
+ "second_reservation": false,
+ "day_count": 100,
+ "mission_count": 20,
+ "model_calls": 0
+}

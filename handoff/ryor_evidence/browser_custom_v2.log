@@ -1,0 +1,12 @@
+2026-10-25T20:45:35.335Z browser 156.0.8078.4 mode custom
+2026-10-25T20:45:44.841Z Live run on AWS 0:00 / 3:00 Waiting for AWS to start the cloud machine.
+2026-10-25T20:46:14.951Z Live run on AWS 0:00 / 3:00 Waiting for AWS to start the cloud machine.
+2026-10-25T20:46:41.115Z first playable frame 58.374 s 6ade6a772e60a55326
+2026-10-25T20:46:45.210Z Live run on AWS 0:10 / 3:00 Waiting for the simulator. 10 s of 180 s ready; the replay catches up as each 10 s arrives.
+2026-10-25T20:47:15.368Z Live run on AWS 0:41 / 3:00 Simulating on AWS, 50 s of 180 s ready.
+2026-10-25T20:47:45.540Z Live run on AWS 1:10 / 3:00 Waiting for the simulator. 70 s of 180 s ready; the replay catches up as each 10 s arrives.
+2026-10-25T20:48:15.708Z Live run on AWS 1:44 / 3:00 Simulating on AWS, 110 s of 180 s ready.
+2026-10-25T20:48:45.915Z Live run on AWS 2:18 / 3:00 Simulating on AWS, 140 s of 180 s ready.
+2026-10-25T20:49:16.081Z Live run on AWS 2:50 / 3:00 Waiting for the simulator. 170 s of 180 s ready; the replay catches up as each 10 s arrives.
+2026-10-25T20:49:26.228Z finished 223.487 s
+2026-10-25T20:49:26.308Z PASS custom

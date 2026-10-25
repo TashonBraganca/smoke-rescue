@@ -1,0 +1,6 @@
+{
+ "mission": "modelfail2aac6dde9b",
+ "task": "arn:aws:ecs:us-east-1:968000946565:task/smoke-rescue/6e2501ca08154f98a6063459ac49653e",
+ "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/rescue/?mission=modelfail2aac6dde9b",
+ "fault": "Credential lookup deliberately denied. Azure must not be called; brain continues."
+}

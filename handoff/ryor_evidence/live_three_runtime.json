@@ -1,0 +1,12 @@
+{
+ "mission": "6ade6f456da6ffe9e7",
+ "cpu": "4096",
+ "memory": "8192",
+ "overrides": {
+  "cpu": "4096",
+  "memory": "8192"
+ },
+ "image": "968000946565.dkr.ecr.us-east-1.amazonaws.com/smoke-rescue/ryor-engine:84455305",
+ "task": "arn:aws:ecs:us-east-1:968000946565:task/smoke-rescue/5b2b50df9a6c45c1bd83ba5c13ad67ce",
+ "status": "RUNNING"
+}
