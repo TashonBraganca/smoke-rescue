@@ -55,7 +55,11 @@ ENV PATH=/opt/venv/bin:$PATH PYTHONPATH=/app/brain PYTHONUNBUFFERED=1 PYTHONDONT
 WORKDIR /app
 # Build gate: fails the build if the lean dependency set cannot import the server.
 RUN AGENT_RUN_DIR=/tmp/image-check python /tmp/check_agent_image.py \
-    && rm /tmp/check_agent_image.py && rmdir /tmp/image-check
+    && rm /tmp/check_agent_image.py && rmdir /tmp/image-check && chmod 1777 /tmp
+# Fargate mounts an empty volume at /tmp (the root filesystem is read-only) owned by root with mode 0755, so user 10001
+# could not create its run folder and the server exited on import. A VOLUME at the same path makes ECS copy this
+# directory's 1777 mode to the volume (Amazon ECS developer guide, bind mounts).
+VOLUME ["/tmp"]
 USER 10001:10001
 EXPOSE 8080
 HEALTHCHECK --interval=15s --timeout=3s --start-period=20s --retries=3 \
