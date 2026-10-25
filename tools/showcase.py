@@ -450,6 +450,21 @@ class HousePlan:
         rooms = [r['rect'] for r in plan.get('rooms', []) if r['rect'][0] >= x0 - 1e-6 and r['rect'][1] >= y0 - 1e-6
                  and r['rect'][2] <= x1 + 1e-6 and r['rect'][3] <= y1 + 1e-6] or [list(area)]
         self.floor_m2 = float(sum((r[2] - r[0]) * (r[3] - r[1]) for r in rooms))
+        # The floor the evaluator counts (tools/room_coverage.py): room rectangles minus walls and furniture from the true
+        # house points, on a 0.1 m grid. The owner (25 Oct) saw "145 of 280 m2" while the same run scored 93 % of 215 m2.
+        self.truth_floor = None
+        try:
+            from brain.nav_eval import truth_occupancy
+            from brain.oracle import load_house_points
+            fc = .1; shape = (int(np.ceil((y1 - y0) / fc)), int(np.ceil((x1 - x0) / fc)))
+            yy, xx = np.indices(shape); cxy = np.array([x0, y0]) + (np.stack([xx, yy], -1) + .5) * fc
+            inroom = np.zeros(shape, bool)
+            for r in rooms: inroom |= (cxy[..., 0] >= r[0]) & (cxy[..., 0] < r[2]) & (cxy[..., 1] >= r[1]) & (cxy[..., 1] < r[3])
+            occ = truth_occupancy(load_house_points(rec), shape, np.array([x0, y0]), fc)
+            self.truth_floor = inroom & ~occ; self.truth_cell = fc
+            self.floor_m2 = float(self.truth_floor.sum() * fc * fc)
+        except Exception:
+            pass
         self.bounds = np.array([x0 - .5, y0 - .9, x1 + .5, y1 + .5])
         bx0, by0, bx1, by1 = self.bounds
         self.scale = min(size[0] / (bx1 - bx0), size[1] / (by1 - by0))
@@ -528,6 +543,11 @@ class HousePlan:
         house = transform_xy(grid.origin + (np.stack([xx, yy], axis=-1) + .5) * grid.cell_m, self.frames[self.receiver])
         x0, y0, x1, y1 = self.area
         inside = (house[..., 0] >= x0) & (house[..., 0] < x1) & (house[..., 1] >= y0) & (house[..., 1] < y1)
+        if self.truth_floor is not None:
+            # Only cells on the true floor count, as in the evaluator.
+            ix = np.clip(((house[..., 0] - x0) / self.truth_cell).astype(int), 0, self.truth_floor.shape[1] - 1)
+            iy = np.clip(((house[..., 1] - y0) / self.truth_cell).astype(int), 0, self.truth_floor.shape[0] - 1)
+            inside &= self.truth_floor[iy, ix]
         bits = robot_bits(grid, self.robots)[inside]
         cell = grid.cell_m ** 2
         known = (grid.source_mask[inside] != 0) & (grid.occupancy[inside] <= .5)
