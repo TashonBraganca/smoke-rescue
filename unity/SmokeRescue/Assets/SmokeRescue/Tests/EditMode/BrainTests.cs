@@ -2267,6 +2267,43 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void TheWalkOutWhenDoneCrossesTheEntranceLock()
+        {
+            // Seed 934 full mission (25 Oct 11:25): with the floor at the way in locked, the leave-when-done return found no
+            // route out at any fire margin and both robots never left. A searched 4 x 4 m room with a doorway south to the
+            // start pad 3.5 m away, the doorway inside the entrance lock: the walk out must find a route through it.
+            List<BrainEvent> Run(out int pathPoints)
+            {
+                var c = Settings(); c.grid_size_m = 12; c.search_requires_ceiling = false; c.stay_inside = true; c.leave_when_done = true;
+                c.mission_time_limit_s = 1000; c.entrance_lock_passage = false;
+                var b = new RobotBrain(Calibration(), c, "A", 0); var g = Map(b);
+                var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+                var searched = (bool[])typeof(OccupancyGrid).GetField("observed", flags).GetValue(g);
+                for (int i = 0; i < g.Count; i++)
+                {
+                    var p = g.Centre(i);
+                    bool corridor = Mathf.Abs(p.x) <= .7f && p.y < -2 && p.y >= -4.2f;
+                    if (Mathf.Abs(p.x) <= 2 && Mathf.Abs(p.y) <= 2 || corridor) { g.ObserveFree(i); searched[i] = true; }
+                    else if (Mathf.Abs(p.x) <= 2.3f && Mathf.Abs(p.y) <= 2.3f || Mathf.Abs(p.x) <= 1.1f && p.y < -2 && p.y >= -4.5f) g.ObserveOccupied(i);
+                }
+                Vector2 pad = new Vector2(0, -3.5f), entry = new Vector2(0, -2.2f);
+                typeof(RobotBrain).GetField("home", flags).SetValue(b, pad);
+                ((GridPlanner)typeof(RobotBrain).GetField("planner", flags).GetValue(b)).Home = pad;
+                g.SetEntranceLock(entry, 1f);
+                typeof(RobotBrain).GetField("entryPoint", flags).SetValue(b, (Vector2?)entry);
+                typeof(RobotBrain).GetField("entranceLocked", flags).SetValue(b, true);
+                var events = new List<BrainEvent>(); pathPoints = 0;
+                for (int i = 0; i <= 20 * 25; i++) { DriveTick(b, i); events.AddRange(b.DrainEvents()); pathPoints = Math.Max(pathPoints, b.Snapshot().path.Length); }
+                return events;
+            }
+            var events = Run(out int points);
+            string goals = string.Join(" | ", events.Where(e => e.kind == "goal").Select(e => e.reason).Distinct());
+            Assert.That(events.Any(e => e.kind == "goal" && e.reason.StartsWith("No reachable frontier remains after a full scan. Return")), Is.True, goals);
+            Assert.That(events.Any(e => e.kind == "goal" && e.reason.StartsWith("No way out even past the fire")), Is.False, goals);
+            Assert.That(points, Is.GreaterThan(0), "a route out through the locked doorway: " + goals);
+        }
+
+        [Test]
         public void AThermalShapeBesideAConfirmedPersonIsNotApproachedAgain()
         {
             // thermal_near_person_m. The approach scene above (a thermal-only shape at (0, 3)) with a person already confirmed

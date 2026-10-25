@@ -1929,7 +1929,10 @@ namespace SmokeRescue.Brain
             return best;
         }
         /// <summary>The end-of-mission walk out (return_home_at_end): to this robot's own start pad.</summary>
-        bool EndReturn => c.return_home_at_end && returning && returnReason == MissionTimeUp;
+        // leave_when_done's walk out is an end return too. Planned to exits with the entrance lock still on, it found no route
+        // at any fire margin (seed 934 full mission, 25 Oct 11:25: both robots retried every 12 s from 360 s to 420 s, never
+        // left, and FireOnWayOut, planned the same way, had no fire to spray).
+        bool EndReturn => returning && ((c.return_home_at_end && returnReason == MissionTimeUp) || (c.leave_when_done && returnReason == NoFrontierLeft));
         List<Vector2> PlanOut()
         {
             if (EndReturn)
