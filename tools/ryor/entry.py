@@ -78,7 +78,7 @@ def main():
         fail(f"unknown setup {SETUP}")
     gallery = json.loads((ROOT / "data/runs/ryor/gallery.json").read_text())
     req = json.loads(req_path.read_text())
-    run_dir = Path(os.environ.get("RUN_DIR", f"/tmp/ryor_run/{MISSION}_{SETUP}"))
+    run_dir = Path(os.environ.get("RUN_DIR") or f"/tmp/ryor_run/{MISSION}_{SETUP}")
     run_dir.mkdir(parents=True, exist_ok=True)
     for f in ("trace.jsonl", "result.json", "running.marker"):
         (run_dir / f).unlink(missing_ok=True)
