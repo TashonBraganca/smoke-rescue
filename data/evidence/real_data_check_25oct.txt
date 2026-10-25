@@ -139,3 +139,39 @@ points). cv2_usac loses 13.7 points of recall and has more wrong-pose accepts in
 gains 3.1 points of recall but has 3 false accepts on negatives (max negative inliers 13) and 126 wrong-pose
 accepts against 70. place.py keeps its own ransac_rigid; no config switch was added. The Pioneer-hall aliasing is
 not fixed by swapping the estimator: all three accept wrong poses there.
+
+FENCE FIX: OpenCV fit with uniqueness and spread gates (tools/fence_fix_compare.py, 2026-10-25 17:12 IST, 22 s)
+cv2_unique = cv2.estimateAffinePartial2D(RANSAC, 0.1 m, 500 iterations, seed 0) hypothesis, rigid refit on its
+inliers with place.fit_rigid until the inlier set is stable; uniqueness: the same fit on the matches left after
+removing the winner's inliers gives a runner-up, reject when runner-up inliers / winner inliers > ratio; spread:
+the smaller of the partner-side and own-side convex hull areas (cv2.convexHull + cv2.contourArea) of the
+inliers' planar body points must be >= area. Planar body points, not image points: the radio payload has no
+image coordinates. Same match sets and accept rule (>= 10 inliers, rmse <= 0.06 m) for every variant.
+Tuning split: fr2_pioneer_slam + fr1_room (and cross-sequence negatives between them). Held-out split:
+fr2_pioneer_360 + fr3_long_office_household (and cross negatives between them). Cross negatives that mix a
+tuning and a held-out sequence count only in the pooled rows.
+Grid: ratio 0.3 to 1.0 step 0.05 plus off; area [0.0, 0.02, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1.0, 1.25, 1.5, 2.0] m^2.
+Thresholds: ratio 0.65, area 0.0 m^2 (picked on tuning: fewest wrong poses with 0 false accepts and recall >= ours).
+Harness gate passed: 'ours' all = 1518/2414 accepted, 70 wrong, 0/6500 false; cv2_ransac all = 1594, 126, 3 (the committed numbers).
+ms/match = kNN match set + fit, per pair, averaged; machine was shared with other jobs, so treat it as rough.
+  variant / subset            pos  recall (Wilson 95 % CI)  yaw med/p90 deg  trans med/p90 m  wrong/acc  false/neg maxneg  ms/match
+  ours held-out               1601  75.1 % (73.0-77.2)  0.60/ 1.79  0.028/0.082    46/1203    0/3394    6    0.44
+  cv2_ransac held-out         1601  78.3 % (76.2-80.3)  0.68/ 2.52  0.038/0.239    82/1254    1/3394   13    0.36
+  cv2_unique held-out         1601  74.4 % (72.2-76.5)  0.62/ 1.92  0.028/0.088    43/1191    0/3394    6    0.42
+  ours tuning                  813  38.7 % (35.5-42.1)  1.39/ 4.25  0.063/0.266    24/315     0/1871    6    0.42
+  cv2_ransac tuning            813  41.8 % (38.5-45.2)  1.55/ 5.04  0.087/0.471    44/340     0/1871    7    0.38
+  cv2_unique tuning            813  39.0 % (35.7-42.4)  1.41/ 4.18  0.063/0.254    22/317     0/1871    5    0.42
+  ours pooled                 2414  62.9 % (60.9-64.8)  0.69/ 2.47  0.031/0.136    70/1518    0/6500    6    0.42
+  cv2_ransac pooled           2414  66.0 % (64.1-67.9)  0.79/ 3.48  0.044/0.328   126/1594    3/6500   13    0.36
+  cv2_unique pooled           2414  62.5 % (60.5-64.4)  0.72/ 2.55  0.031/0.150    65/1508    0/6500    6    0.41
+    rgbd_dataset_freiburg1_room: ours 98/380 acc, 4 wrong; cv2_unique 102/380 acc, 5 wrong
+    rgbd_dataset_freiburg2_pioneer_360: ours 198/455 acc, 45 wrong; cv2_unique 183/455 acc, 42 wrong
+    rgbd_dataset_freiburg2_pioneer_slam: ours 217/433 acc, 20 wrong; cv2_unique 215/433 acc, 17 wrong
+    rgbd_dataset_freiburg3_long_office_household: ours 1005/1146 acc, 1 wrong; cv2_unique 1008/1146 acc, 1 wrong
+    held-out cv2_unique no gates: 1211/1601 acc, 55 wrong, 0 false
+    held-out cv2_unique uniqueness only: 1191/1601 acc, 43 wrong, 0 false
+    held-out cv2_unique spread only: 1211/1601 acc, 55 wrong, 0 false
+    tuning grid, best six by (false, wrong, -recall): r 0.55 a 2.0: 27/813 1w 0f; r 0.6 a 2.0: 27/813 1w 0f; r 0.65 a 2.0: 27/813 1w 0f; r 0.7 a 2.0: 27/813 1w 0f; r 0.75 a 2.0: 27/813 1w 0f; r 0.8 a 2.0: 27/813 1w 0f; ours tuning 315/813 24w 0f
+    tuning right poses before the gates (n=299): runner-up ratio p10/p50/p90 0.00/0.10/0.44; hull area m^2 0.11/0.36/1.87; median inlier range m 0.9/1.8/5.1
+    tuning wrong poses before the gates (n=25): runner-up ratio p10/p50/p90 0.00/0.21/0.58; hull area m^2 0.05/0.27/1.40; median inlier range m 1.2/4.9/8.2
+  Ship rule on held-out (recall >= ours, fewer wrong poses, 0 false accepts): FAIL (ours 1203 acc / 46 wrong / 0 false; cv2_unique 1191 / 43 / 0). place.py is unchanged and no config switch was added.
