@@ -450,5 +450,27 @@ namespace SmokeRescue.Tests.EditMode
                 Assert.That(e.numbers.ContainsKey(key), Is.True, key);
             Assert.That(e.numbers["on_free_floor"], Is.EqualTo(1)); Assert.That(e.numbers["room_id"], Is.GreaterThanOrEqualTo(0)); Assert.That(e.numbers["floor_m2"], Is.GreaterThan(10));
         }
+
+        [Test]
+        public void ABodyWedgedWhereTheMapShowsNothingBehindItBacksOverItsOwnTrail()
+        {
+            // Headless long_ranch_v2_final vidcheck (26 Oct), robot A: wedged at (12.63, 5.76) from 422.5 s after driving east; 13 pinned,
+            // 39 turn_stall, 90 return replans, no movement to 600 s: the reverse recovery needs the cells behind to be mapped free.
+            // Here the cells behind are unknown, but the body held them a moment ago. Control: switch off, the reverse is refused.
+            bool Backs(bool on, bool escalate, out float reverseM)
+            {
+                var c = Settings(); c.grid_size_m = 12; c.reverse_along_trail = on; c.stuck_escalate = escalate;
+                var b = new RobotBrain(Calibration(), c, "A", 0, new EntryPose(.05f, .05f, 0));
+                var track = (List<BrainPose>)typeof(RobotBrain).GetField("bodyTrack", NP).GetValue(b);
+                for (float y = -1; y <= 0; y += .1f) track.Add(new BrainPose { position = new Vector2(.05f, y), yawRad = 0 });
+                var pos = Vector2.zero;
+                var ok = typeof(RobotBrain).GetMethod("ReverseOk", NP);
+                bool result = (bool)ok.Invoke(b, new object[] { new Vector2(.05f, 0f), new Vector2(.05f, -.3f) });
+                var place = typeof(RobotBrain).GetField("recoveryReverseM", NP);
+                reverseM = (float)place.GetValue(b); return result;
+            }
+            Assert.That(Backs(true, true, out _), Is.True, "over its own trail");
+            Assert.That(Backs(false, true, out _), Is.False, "control: switch off");
+        }
     }
 }

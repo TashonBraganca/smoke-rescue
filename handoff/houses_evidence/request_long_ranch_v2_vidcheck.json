@@ -1,0 +1,16 @@
+{
+ "runs": [
+  {
+   "world": "handoff/houses_evidence/world_long_ranch_v2_final.json",
+   "out": "data/runs/vidcheck_26oct/long_ranch_v2",
+   "duration_s": 600,
+   "time_limit": true,
+   "fire": true,
+   "robot_collision": true,
+   "capsule_walls": true,
+   "settings": {
+    "mission_time_limit_s": 480
+   }
+  }
+ ]
+}
