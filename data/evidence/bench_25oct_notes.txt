@@ -1,0 +1,28 @@
+Headless benchmark, 25 Oct 2026 (tools/bench; run on RunPod, scored with tools/bench/score_bench.py)
+
+What was run: 30 houses (28 seeded random houses 5001-5028 plus family ranch and long ranch) x 1 seed (seed 0) x 4
+variants (full, no_radio, one_robot, baseline) = 120 missions of duration_s 600 with mission_time_limit_s 480, fire,
+robot collision and capsule walls on. The brief planned 3 seeds (360 runs); it was cut to seed 0 because the pod's CPU
+quota is 27.2 cores (cgroup cfs_quota 2720000 / period 100000), not the 256 it reports, so 360 runs would have taken
+7 to 8 hours. All 120 finished, 0 failed. The score file lists the seed 1 and 2 runs as "missing"; they were not run.
+
+Splits: a house counts as "seen" when its seed number appears in config/brain.json or config/perception.json reason
+strings or in data/evidence/*.txt (the grep and its matches are printed in the score file). 20 seeded houses are seen;
+unseen are 5008, 5009, 5012, 5018, 5019, 5024, 5025, 5026 and both ranches (n = 10). brain.json's end_clear_way_out_m
+reason cites runs on both ranches, so calling them unseen is generous.
+
+Statistics: bootstrap 95 % intervals over houses (10,000 resamples) and paired differences full minus each variant
+with a Wilcoxon signed-rank p value. With one seed per house the intervals capture house-to-house variation only, not
+seed variation.
+
+Caveats:
+  * Headless has no rendered camera: YOLO and visual SLAM are not exercised, smoke does not degrade sensing, and person
+    confirmation uses the headless sighting model. Results speak to search strategy and coordination, not perception.
+  * T90 is a proxy: time until floor swept within 2 m of a robot's path reached 90 % of that house's full-variant
+    final ceiling. result.json has no coverage over time. Using full's own ceiling favours full.
+  * Fire difficulty: result.json and trace.jsonl hold no air temperature, so peak air temperature and fire head start
+    per house could not be reported. The traces do show fire acting on the mission (9 to 11 room_marked_fire events
+    per run in the two runs checked). Seeded houses use a fire floor plan snapped to the 0.25 m fire grid (edges move
+    at most 0.125 m); walls the robots see are unchanged.
+  * The runner was the linux-x64 build on the pod (built 25 Oct 11:44 UTC). Edits to World/FloorPlan.cs, Scenario.cs,
+    Atmosphere.cs and RecordingSession.cs made after that build are not in it.

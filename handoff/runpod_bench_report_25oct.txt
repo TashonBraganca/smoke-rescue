@@ -1,0 +1,64 @@
+RunPod benchmark report, 25 Oct 2026 (brief: handoff/inbox_helper/01_runpod_bench.txt)
+
+What ran: 30 houses (28 seeded houses plus family ranch and long ranch) x seed 0 x 4 variants = 120 headless missions
+of 600 s. All 120 finished, 0 failed. Evidence: data/evidence/bench_25oct_score.{txt,json} and bench_25oct_notes.txt
+(commit 9826b7d3).
+
+The brief planned 360 runs (3 seeds). They were cut to 120 because the pod is capped at 27.2 CPU cores even though it
+reports 256, so 360 would have taken 7 to 8 hours. Three launch problems were fixed first:
+  * /dev/shm is mounted noexec, so run_all.sh now calls itself through sh (commit 575fa611), and dotnet and the
+    runner ran from /workspace.
+  * A yield watcher stopped the first 120-run attempt at 18:48 IST, when a GPU process appeared for under two
+    minutes. The owner then confirmed no one else would use the pod tonight, and the runs restarted without a watcher.
+  * The restart wrote into a fresh runs2/ folder, so no stale run markers had to be deleted.
+
+Headline, unseen houses first (n = 10 houses; mean and bootstrap 95 % interval over houses):
+
+  variant    rooms %             floor cover %      people found %     time to confirm s    T90 s (proxy)        overlap %         both out
+  full        98.6 [95.7,100]    94.6 [91.4,97.2]   96.0 [90.0,100]     87.3 [68.5,109.5]   324.9 [264.8,388.6]  66.8 [54.4,78.5]  0.9 [0.7,1.0]
+  no_radio    97.5 [93.8,100]    93.0 [90.3,95.4]   94.0 [88.0,100]    127.7 [102.4,155.3]  360.5 [279.9,447.4]  80.3 [70.4,89.0]  0.1 [0.0,0.3]
+  one_robot   96.2 [89.3,100]    91.4 [87.5,94.3]   98.0 [94.0,100]    143.1 [118.6,168.5]  271.3 [213.3,331.5]  n/a               1.0 [1.0,1.0]
+  baseline   100.0 [100,100]     95.3 [92.6,97.3]   98.0 [94.0,100]     88.2 [65.9,110.0]   490.8 [403.2,571.1]  55.6 [43.9,67.2]  0.6 [0.3,0.9]
+
+All 30 houses, paired difference full minus each variant (mean [95 % CI], Wilcoxon p):
+
+  vs no_radio:  rooms +3.3 [+0.5,+6.7]; cover +2.8 [+0.6,+5.5] p=0.0005; people +0.7 [-2.0,+3.3]; time to confirm
+                -37.4 s [-49.7,-24.9] p<0.001; overlap -13.4 points [-22.0,-4.1] p=0.004; both out +0.7 p<0.001
+  vs one_robot: rooms +6.1 [+2.1,+10.7] p=0.012; cover +5.3 [+3.0,+7.8] p<0.001; people +0.7 [-2.0,+3.3]; time to
+                confirm -60.5 s [-71.4,-49.7] p<0.001; both out -0.3 p=0.008
+  vs baseline:  rooms +0.8 [-0.9,+3.2]; cover -0.1 [-1.4,+1.1]; people -1.3 [-4.0,+1.3]; time to confirm +3.9 s
+                [-10.0,+16.7]; T90 -132 s [-183,-80] p<0.001; overlap +9.2 points p=0.014; both out +0.3 p=0.006
+
+Verdict:
+  * Two robots that share context find people about 37 s sooner than two robots with no radio, and 60 s sooner than
+    one robot. They also cover more floor, with less double-searching than the no-radio pair.
+  * The final share of people found is the same for every variant (94 to 98 %). With 480 s, even one robot finds
+    nearly everyone in these houses. The team's advantage is speed, not the final count.
+  * The features added since 23 Oct (full vs baseline) buy faster coverage (T90 132 s sooner) and more missions
+    ending with both robots out (+0.3). They do not change rooms, people or time to confirm, and the baseline robots
+    overlap less.
+  * Both out is the cost of the team: full gets both robots out in 70 % of all missions, one_robot in 100 %, and
+    no_radio almost never (no shared map of the way out).
+  * No false confirmations anywhere, so that metric does not separate the variants headless.
+
+Mission difficulty: result.json and trace.jsonl record no air temperature, so the brief's per-house fire head start
+and peak air temperature cannot be reported from these runs. Fire did act on the missions: 9 to 11 rooms per run were
+marked as burning and later cleared in the two traces checked. People found sits near 100 % for every variant, so the
+missions are probably too easy to separate the variants on that measure. Proposed harder tier:
+  * a fire head start before the robots enter, so rooms burn on arrival;
+  * mission_time_limit_s 300 instead of 480;
+  * people placed in rooms reachable only through another room.
+
+Caveats:
+  * Headless has no rendered camera: YOLO and visual SLAM are not exercised, and person confirmation uses the
+    headless sighting model.
+  * One seed per house, so the intervals capture differences between houses, not between seeds.
+  * T90 is a swept-floor proxy measured against full's own ceiling, which favours full.
+  * The pod runner was built at 11:44 UTC; later edits to the world C# files are not in it.
+  * Calling the ranches unseen is generous: a brain.json reason string cites runs on them.
+
+Cleanup: not done yet. The auto-mode classifier blocked rm -rf of /dev/shm/smoke_bench_25oct and
+/workspace/smoke_bench_25oct. The local copy is verified: 120 result.json files under data/runs/bench_25oct/runs. Both
+folders are still on the pod, holding about 450 MB of /dev/shm and our dotnet copy on /workspace. No processes of
+ours are running. The real-layout runs for brief 03 will reuse them, and both folders are deleted after that, with
+the proof added here.
