@@ -1,0 +1,150 @@
+Real house layouts (item C), 25 Oct 2026, prepared locally. Nothing was run on RunPod.
+
+Result in one line
+  39 real HouseExpo houses (not the ~100 asked for) converted, 78 requests (full + one_robot, 1 seed, duration_s 600) in
+  data/runs/real_layouts_25oct/. Only 39 of the 17,084 candidate houses can be written in our floor-plan format without
+  distorting them. I chose not to relax the rules to reach 100 (see "Why only 39").
+
+Dataset and licence
+  Source: HouseExpo, https://github.com/TeaganLi/HouseExpo (git clone --depth 1, 25 Oct 2026), file HouseExpo/json.tar.gz,
+  35,126 JSON plans, extracted to data/real/layouts_src/houseexpo_json/json (git-ignored). The archive was listed before
+  extraction: no absolute or ".." paths. I read the files with json.load only. No code from the download was run.
+  Licence file in the repo, exact text:
+    MIT License
+    Copyright (c) 2019 Tingguang Li
+    Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+    documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
+    rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit
+    persons to whom the Software is furnished to do so, subject to the following conditions:
+    The above copyright notice and this permission notice shall be included in all copies or substantial portions of the
+    Software.
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
+    WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+    COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+    OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+  Caveat, please decide: the README says HouseExpo is "built on SUNCG dataset". SUNCG had its own terms of use and was
+  withdrawn by Princeton in 2019 during a legal dispute. The MIT text covers the repo, and the repo ships the derived
+  layouts. Whether SUNCG's terms still bind the derived 2D layouts is a legal question I cannot settle. Internal research
+  use looks fine to me. Before publishing these houses or results on them, check that question. The derived files stay
+  git-ignored and are not committed.
+
+Selection rule
+  All 35,126 file names, sorted, then shuffled with random.Random(20261025). A house is a candidate if it has 6 to 15
+  rooms after merging rooms that SUNCG lists twice with the same box (e.g. Kitchen + Dining_Room): 17,084 candidates.
+  Candidates are converted in shuffled order until 100 pass or the list ends. The list ended at 39.
+
+Conversion (tools/bench/real_layouts.py; every constant has a *_REASON)
+  1. 0.25 m grid (the fire grid) over the house box, x -> x, HouseExpo y -> our z, origin moved to (0, 0).
+  2. Each cell takes the smallest room box that contains its centre.
+  3. A room is kept as the bounding rectangle of its cells if they fill >= 90 % of it. Neighbours that overlap by one
+     0.25 m strip (both SUNCG boxes include the wall) are trimmed. The larger room gives up the strip. Deeper overlap is a
+     rejection.
+  4. Area covered by no room is split into rectangles. A rectangle becomes a corridor if >= 50 % of it is real floor in
+     the HouseExpo outline. Otherwise the house is rejected (17 of 39 houses carry such filler corridors).
+  5. Doors: HouseExpo has none, so I read them from the outline. For each pair of rooms sharing >= 1.6 m of wall I take the
+     longest run where floor is free 0.20 m on both sides of the wall line. A run >= 0.6 m becomes one door.
+  6. Entrance, pads, furniture, people and fire origin all come from the existing generator: the make_doors entrance rule
+     (corridor, else living room, on an exterior side), random_layout.place_furniture, random_layout.people, and the same
+     fire draw as random_layout.generate. Then random_layout.validate runs, with one change: its 7..12 room-count check is
+     replaced by 6..15 plus a duplicate-id check (VALIDATE_IGNORED_REASON).
+  Label map: Bedroom/Child_Room/Guest_Room/Room -> bedroom, Living/Dining -> living, Kitchen, Bathroom/Toilet -> bathroom,
+  Office/Gym -> study, Hallway/Hall/Entryway/Lobby -> corridor, Storage/Wardrobe -> closet, Boiler_room/Garage -> laundry.
+  Houses with Balcony, Terrace, Loggia, Aeration or elevators are rejected.
+
+Conversion stats (data/runs/real_layouts_25oct/real_layouts_stats.json, data/runs/real_layouts_25oct.convert.log)
+  tried 17084, kept 39, requests 78
+    rejected  9444  room not rectangular
+    rejected  1686  room rectangles overlap
+    rejected  1459  footprint not rectangular (area outside the house)
+    rejected  1420  non-living-space category Balcony
+    rejected  1093  room hidden inside another room's box
+    rejected   670  Terrace     595  Loggia     334  Aeration     64+24  elevators
+    rejected   127  furniture: No usable furniture position
+    rejected    64  no corridor or living room for the entrance
+    rejected    21  validate: Corridor too narrow
+    rejected    15  room count outside 6..15 after conversion
+    rejected    13  entrance room has no exterior wall
+    rejected  5 unreachable room, 4 habitable room too small, 3 utility room too small, 3 people placement exhausted, 1 no combustible room
+  Kept houses: 6 to 14 rooms (median 7), footprints 74 to 424 m2.
+  Maximum snap shift: 0.25 m (one cell), not the 0.125 m of make_requests.fire_grid_plan. A room edge comes from which cells'
+  centres fall inside the box, so an edge can move by up to a full cell. Five houses have a 0.23 to 0.25 m shift. All room
+  edges end up on the fire grid, so fire_grid_plan's extra snap is not needed (checked per house).
+  Doors: 181 of 307 interior openings were wider than 1.0 m (open plan) and were narrowed to a 1.0 m door, because the
+  format and validate allow 0.8 to 1.0 m. That is the largest distortion left in the kept houses: open-plan houses get
+  walls they do not have. One door per room pair, so a second real opening between the same two rooms is lost.
+
+Why only 39
+  Our format and HouseBuilder only build rectangular rooms that tile a rectangular footprint, with doors of at most 1 m.
+  Most real houses have an L-shaped room, a non-rectangular outline or a balcony. I tested a 0.80 rectangle-fill threshold
+  and it still gives 39: the rejections move from "not rectangular" to "overlap". Reaching 100 would need a format change
+  (non-rectangular rooms or footprints, wide openings), which belongs to docs/INTERFACES.md and to you. Selection bias:
+  the 39 are the boxy subset of HouseExpo, mostly grid-like houses. They are real layouts, but not a random sample of
+  real houses.
+
+Looked at (rendered with random_layout.render, data/runs/real_layouts_25oct/plans/*.png, 6 drawn, 3 opened):
+  hx_035feb0125 (entryway, toilet, two storage rooms, living and kitchen), hx_dad1851b27 (3 x 2 grid of bedrooms, living,
+  kitchen), hx_ce454d45fe (office, living, entryway, garage, kitchen, bathroom). The rooms and doors look like small real
+  houses. Each house's room sizes vary, unlike our generator's corridor spine. The garage in hx_ce454d45fe has a door to the
+  office and to the kitchen, as in the HouseExpo outline.
+
+Validation (real output)
+  check_requests on the full set:   78 runs checked, 0 unexpected (every one_robot world differs from full only in robots).
+  check_requests on the 60 s set:   4 runs checked, 0 unexpected.
+  Local run: same converter, --count 2 --duration 60 -> data/runs/real_layouts_val_25oct (the first 2 houses of the full set):
+    DOTNET=/Applications/Unity/Hub/Editor/6000.6.6f1/Unity.app/Contents/Resources/Scripting/DotNetSdk/dotnet NICE=10 \
+      sh tools/bench/run_all.sh data/runs/real_layouts_val_25oct/requests 4
+    hx_035feb0125_s0_one_robot ok 27 s
+    hx_cb9d3d6726_s0_one_robot ok 30 s
+    hx_cb9d3d6726_s0_full ok 47 s
+    hx_035feb0125_s0_full ok 49 s
+  All 4 result.json written (2.7, 1.3, 2.7, 1.3 MB, 25 Oct 19:52 to 19:53). Every trace ends at t = 60.0. No failures.txt.
+  score_bench.py data/runs/real_layouts_val_25oct, per run:
+    unseen hx_035feb0125 s0 full      | 2/6 | 43.8 | 3/5 {'s1': 0.0, 's2': 20.05, 's5': 21.35} | 0 | 37.0 (yes) | 61.43 | 0
+    unseen hx_035feb0125 s0 one_robot | 3/6 | 71.7 | 3/5 {'s1': 0.0, 's2': 15.27, 's5': 16.57} | 0 | 56.0 (yes) | None | 0
+    unseen hx_cb9d3d6726 s0 full      | 4/7 | 63.6 | 4/5 {'s1': 13.0, 's2': 33.12, 's3': 48.72, 's4': 59.88} | 0 | 56.0 (yes) | 42.92 | 0
+    unseen hx_cb9d3d6726 s0 one_robot | 1/7 | 43.6 | 2/5 {'s2': 18.0, 's3': 44.25} | 0 | 60.0 (no) | None | 0
+  These are pipeline checks, not results: 2 houses, 60 s of a 480 s mission. Person s1 in hx_035feb0125 is confirmed at
+  t = 0.0. The fair placement put s1 in the entryway, and the entryway's door is in line with the pad, so the robot sees s1
+  from outside. That follows the generator's rule (keep-out 1.2 m from doors and pads), but it is an easy find.
+
+Published comparison
+  Explore-Bench (Xu et al., ICRA 2022, https://arxiv.org/abs/2202.11931, code github.com/efc-robot/Explore-Bench) gives
+  frontier baselines (nearest-frontier "Cost", RRT "Sample", potential field) and a DRL policy, single- and multi-robot.
+  Its maps are its own scenes (loop, corridor, rooms-type layouts and real testbed rooms), not HouseExpo. Its metrics are
+  2D occupancy-grid ones: explored area over time and time or path length to finish. I found no table of Explore-Bench
+  numbers on HouseExpo maps. HouseExpo's own paper (Li et al., IROS 2019, arXiv 1903.09845) uses its maps for learned
+  exploration in its PseudoSLAM 2D simulator. I did not verify, within this budget, whether it reports frontier numbers
+  that could be reused, so treat that as open.
+  Where our metrics match and where they do not:
+   - Coverage: theirs is the share of free grid cells seen by a 2D laser (a range-limited, 360 deg or wide-FOV ray cast in
+     an occupancy grid). Ours is usable floor (off tall furniture, 0.125 m from walls) in the union of the robots'
+     own_searched masks from a forward RGB-D camera in smoke. Same idea (seen floor / floor), different sensor model and
+     denominator. Not like for like.
+   - Time: their curves are coverage over simulator steps or seconds of a point/differential robot. Our result.json keeps
+     only the final masks, so our T90 is a swept-floor proxy (2 m radius) normalised to the best full run, not seen area.
+     Not comparable.
+   - Maps: even on HouseExpo, ours are a filtered, rectangularised subset with 1 m doors, furniture and fire. They are not
+     their maps.
+   - Task: theirs is pure mapping; ours stops for people and fire and has a 480 s mission limit.
+  Conclusion: no like-for-like comparison exists today. The closest honest one would run Explore-Bench's nearest-frontier
+  baseline in its grid simulator on our 39 converted plans, rasterised, and compare coverage-over-time curves with ours.
+  That needs coverage-over-time logging in result.json, which we do not have.
+
+Run the full set on RunPod (you run it; I did not touch RunPod)
+  The worlds, requests and house files are under data/runs/real_layouts_25oct (git-ignored), so either copy that folder or
+  regenerate it on the pod. Regenerating needs the HouseExpo JSONs (git clone + tar -xzf as above).
+    cd <repo on pod> && git pull
+    git clone --depth 1 https://github.com/TeaganLi/HouseExpo.git data/real/layouts_src/HouseExpo
+    mkdir -p data/real/layouts_src/houseexpo_json && tar -xzf data/real/layouts_src/HouseExpo/HouseExpo/json.tar.gz -C data/real/layouts_src/houseexpo_json
+    brain/.venv/bin/python -I tools/bench/real_layouts.py data/real/layouts_src/houseexpo_json/json data/runs/real_layouts_25oct
+    brain/.venv/bin/python -I tools/bench/check_requests.py data/runs/real_layouts_25oct
+    NICE=10 sh tools/bench/run_all.sh data/runs/real_layouts_25oct/requests 6
+    nice -n 10 brain/.venv/bin/python tools/bench/score_bench.py data/runs/real_layouts_25oct
+  Expect "tried 17084, kept 39, requests 78" and "78 runs checked, 0 unexpected". The worlds read house files through
+  config/../data/runs/real_layouts_25oct/houses/, so the folder must sit at that repo-relative path.
+
+Not verified
+  - Any 600 s run, and anything on RunPod.
+  - The SUNCG terms question above.
+  - Whether HouseExpo's paper has reusable frontier numbers.
+  - I opened 3 of the 39 plans. The other 36 passed the same validate checks but I did not look at them.
