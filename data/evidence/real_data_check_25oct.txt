@@ -175,3 +175,92 @@ ms/match = kNN match set + fit, per pair, averaged; machine was shared with othe
     tuning right poses before the gates (n=299): runner-up ratio p10/p50/p90 0.00/0.10/0.44; hull area m^2 0.11/0.36/1.87; median inlier range m 0.9/1.8/5.1
     tuning wrong poses before the gates (n=25): runner-up ratio p10/p50/p90 0.00/0.21/0.58; hull area m^2 0.05/0.27/1.40; median inlier range m 1.2/4.9/8.2
   Ship rule on held-out (recall >= ours, fewer wrong poses, 0 false accepts): FAIL (ours 1203 acc / 46 wrong / 0 false; cv2_unique 1191 / 43 / 0). place.py is unchanged and no config switch was added.
+
+RELOCALIZATION (tools/reloc_compare.py, run 4, 25 Oct; needs handoff/reloc_pnp_place.patch applied)
+
+RELOCALIZATION UPGRADE: PnP, mutual matching, temporal consistency (tools/reloc_compare.py, 2026-10-25 19:38 IST, 1414 s, OpenCV 5.0.0)
+Same keyframes, pairs and split as the fence fix. Variants are defined in the tool's docstring. Thresholds picked
+on tuning only (fr2_pioneer_slam + fr1_room); held-out = fr2_pioneer_360 + fr3_long_office_household.
+Gates passed: 'ours' all 1518/2414, 70 wrong, 0/6500 false and held-out 1203/1601, 46 wrong, 0/3394 false;
+keyframes with pixels equal rdc.keyframe on every 10th frame and own pixels match an independent ORB run
+(max 6.4e-14 px); PnP self-match on unquantised points is the identity link on 80
+solves (worst 0.37 of a 1e-3 deg / 1e-3 m tolerance); with cm-quantised radio points the self-match
+is off by up to 0.43 deg yaw, 0.011 m, 0.80 deg tilt (quantisation, not gated).
+OpenCV build: opencv-python 5.0.0 without contrib: cv2.xfeatures2d is absent, so BEBLID and TEBLID cannot be
+tested (not installed, per the brief). ORB is the only 32-byte binary descriptor in this build.
+Within-sequence negatives: committed sample 4500, every one 18338 (tuning 12394 with tuning cross pairs, held-out 6709 with held-out cross pairs).
+Picked parameters, v2 protocol (used in every table below), then v1:
+    ours: - (production)
+    ours_wide: {'thr': 0.1, 'rmse': 0.06, 'min_inl': 10} (fewest wrong with 0 false and recall >= ours)
+    ours_range: {'range': inf} (fewest wrong with 0 false and recall >= ours)
+    mutual: {'min_inl': 16} (fewest wrong with 0 false and recall >= ours)
+    mutual_ratio: {'min_inl': 10} (no point kept recall >= ours; highest-recall zero-false point)
+    pnp_sqpnp: {'thr': 6.0, 'min_inl': 12, 'tilt': inf, 'dz': 0.3} (no point kept recall >= ours; highest-recall zero-false point); v1 {'thr': 8.0, 'min_inl': 10, 'tilt': 5.0, 'dz': inf} (fewest wrong with 0 false and recall >= ours)
+    pnp_magsac: {'thr': 8.0, 'min_inl': 12, 'tilt': inf, 'dz': 0.3} (no point kept recall >= ours; highest-recall zero-false point); v1 {'thr': 6.0, 'min_inl': 8, 'tilt': inf, 'dz': 0.3} (fewest wrong with 0 false and recall >= ours)
+    temporal_next: - (brain tolerances, not tuned)
+    temporal_either: - (brain tolerances, not tuned)
+  variant / subset            pos  recall (Wilson 95 % CI)  yaw med/p90 deg  trans med/p90 m  wrong/acc  false/neg maxneg  ms/match
+  ours held-out               1601  75.1 % (73.0-77.2)  0.60/ 1.79  0.028/0.082    46/1203    0/3394    6    0.73
+  ours_wide held-out          1601  75.1 % (73.0-77.2)  0.60/ 1.79  0.028/0.082    46/1203    0/3394    6    0.73
+  ours_range held-out         1601  75.1 % (73.0-77.2)  0.60/ 1.79  0.028/0.082    46/1203    0/3394    6    0.73
+  mutual held-out             1601  74.5 % (72.3-76.5)  0.58/ 1.74  0.027/0.073    46/1192    1/3394   16    1.55
+  mutual_ratio held-out       1601  74.2 % (72.0-76.3)  0.62/ 1.88  0.028/0.085    50/1188    0/3394    6    1.41
+  pnp_sqpnp held-out          1601  73.8 % (71.6-75.9)  0.46/ 1.46  0.027/0.100     8/1181    0/3394    7    9.73
+  pnp_magsac held-out         1601  73.0 % (70.8-75.1)  0.45/ 1.58  0.032/0.122    14/1169    0/3394    6    2.03
+  temporal_next held-out      1601  63.4 % (61.0-65.7)  0.57/ 1.46  0.027/0.060    17/1015    0/3394    6    0.73
+  temporal_either held-out    1601  71.5 % (69.2-73.6)  0.59/ 1.56  0.027/0.064    28/1144    0/3394    6    0.73
+  ours pooled                 2414  62.9 % (60.9-64.8)  0.69/ 2.47  0.031/0.136    70/1518    0/6500    6    0.69
+  ours_wide pooled            2414  62.9 % (60.9-64.8)  0.69/ 2.47  0.031/0.136    70/1518    0/6500    6    0.69
+  ours_range pooled           2414  62.9 % (60.9-64.8)  0.69/ 2.47  0.031/0.136    70/1518    0/6500    6    0.69
+  mutual pooled               2414  62.9 % (61.0-64.8)  0.68/ 2.58  0.029/0.130    71/1519    1/6500   16    1.53
+  mutual_ratio pooled         2414  61.3 % (59.3-63.2)  0.69/ 2.52  0.031/0.137    68/1479    0/6500    6    1.39
+  pnp_sqpnp pooled            2414  60.4 % (58.4-62.3)  0.56/ 2.04  0.033/0.123    24/1458    0/6500    9    8.93
+  pnp_magsac pooled           2414  59.5 % (57.6-61.5)  0.53/ 2.09  0.037/0.145    34/1437    0/6500    9    1.67
+  temporal_next pooled        2414  49.7 % (47.7-51.7)  0.62/ 1.86  0.029/0.081    23/1199    0/6500    6    0.69
+  temporal_either pooled      2414  58.0 % (56.0-59.9)  0.65/ 2.04  0.030/0.095    39/1400    0/6500    6    0.69
+  ours tuning                  813  38.7 % (35.5-42.1)  1.39/ 4.25  0.063/0.266    24/315     0/1871    6    0.60
+  ours_wide tuning             813  38.7 % (35.5-42.1)  1.39/ 4.25  0.063/0.266    24/315     0/1871    6    0.60
+  ours_range tuning            813  38.7 % (35.5-42.1)  1.39/ 4.25  0.063/0.266    24/315     0/1871    6    0.60
+  mutual tuning                813  40.2 % (36.9-43.6)  1.51/ 4.38  0.056/0.259    25/327     0/1871    9    1.43
+  mutual_ratio tuning          813  35.8 % (32.6-39.1)  1.29/ 3.97  0.060/0.252    18/291     0/1871    6    1.30
+  pnp_sqpnp tuning             813  34.1 % (30.9-37.4)  1.52/ 4.13  0.071/0.202    16/277     0/1871    9    6.61
+  pnp_magsac tuning            813  33.0 % (29.8-36.3)  1.45/ 4.01  0.076/0.207    20/268     0/1871    9    1.32
+  temporal_next tuning         813  22.6 % (19.9-25.6)  1.21/ 3.39  0.058/0.208     6/184     0/1871    6    0.60
+  temporal_either tuning       813  31.5 % (28.4-34.8)  1.31/ 3.56  0.058/0.229    11/256     0/1871    6    0.60
+    rgbd_dataset_freiburg1_room: ours 98/380 4w; ours_wide 98/380 4w; ours_range 98/380 4w; mutual 120/380 5w; mutual_ratio 93/380 4w; pnp_sqpnp 76/380 3w; pnp_magsac 73/380 3w; temporal_next 56/380 0w; temporal_either 78/380 0w
+    rgbd_dataset_freiburg2_pioneer_360: ours 198/455 45w; ours_wide 198/455 45w; ours_range 198/455 45w; mutual 173/455 43w; mutual_ratio 198/455 50w; pnp_sqpnp 269/455 7w; pnp_magsac 265/455 6w; temporal_next 101/455 17w; temporal_either 147/455 28w
+    rgbd_dataset_freiburg2_pioneer_slam: ours 217/433 20w; ours_wide 217/433 20w; ours_range 217/433 20w; mutual 207/433 20w; mutual_ratio 198/433 14w; pnp_sqpnp 201/433 13w; pnp_magsac 195/433 17w; temporal_next 128/433 6w; temporal_either 178/433 11w
+    rgbd_dataset_freiburg3_long_office_household: ours 1005/1146 1w; ours_wide 1005/1146 1w; ours_range 1005/1146 1w; mutual 1019/1146 3w; mutual_ratio 990/1146 0w; pnp_sqpnp 912/1146 1w; pnp_magsac 904/1146 8w; temporal_next 914/1146 0w; temporal_either 997/1146 0w
+  Every within-sequence negative (plus the cross pairs of that split), false accepts and max inliers:
+    ours: held-out 0/6709 false, maxneg 7; tuning 0/12394 false, maxneg 9
+    ours_wide: held-out 0/6709 false, maxneg 7; tuning 0/12394 false, maxneg 9
+    ours_range: held-out 0/6709 false, maxneg 7; tuning 0/12394 false, maxneg 9
+    mutual: held-out 1/6709 false, maxneg 17; tuning 0/12394 false, maxneg 10
+    mutual_ratio: held-out 0/6709 false, maxneg 6; tuning 0/12394 false, maxneg 7
+    pnp_sqpnp: held-out 0/6709 false, maxneg 7; tuning 0/12394 false, maxneg 13
+    pnp_magsac: held-out 0/6709 false, maxneg 7; tuning 0/12394 false, maxneg 12
+    temporal_next: held-out 0/6709 false, maxneg 7; tuning 0/12394 false, maxneg 9
+    temporal_either: held-out 0/6709 false, maxneg 7; tuning 0/12394 false, maxneg 9
+    v1 pick pnp_sqpnp {'thr': 8.0, 'min_inl': 10, 'tilt': 5.0, 'dz': inf}: held-out 1267/1601 acc, 16 wrong, 0/3394 false; every held-out negative 0/6709 false (maxneg 8); every tuning negative 7/12394 false (maxneg 13)
+    v1 pick pnp_magsac {'thr': 6.0, 'min_inl': 8, 'tilt': inf, 'dz': 0.3}: held-out 1281/1601 acc, 39 wrong, 0/3394 false; every held-out negative 0/6709 false (maxneg 7); every tuning negative 10/12394 false (maxneg 11)
+    held-out pnp_sqpnp no tilt/dz gates: 1185/1601 acc, 8 wrong, 0 false, maxneg 7
+    held-out pnp_sqpnp tilt gate only: 1185/1601 acc, 8 wrong, 0 false, maxneg 7
+    held-out pnp_sqpnp dz gate only: 1181/1601 acc, 8 wrong, 0 false, maxneg 7
+    held-out pnp_magsac no tilt/dz gates: 1180/1601 acc, 21 wrong, 0 false, maxneg 6
+    held-out pnp_magsac tilt gate only: 1180/1601 acc, 21 wrong, 0 false, maxneg 6
+    held-out pnp_magsac dz gate only: 1169/1601 acc, 14 wrong, 0 false, maxneg 6
+    held-out pnp_sqpnp at min inliers 12: 1181/1601 acc, 8 wrong, 0 false, maxneg 7
+    tuning pnp_sqpnp at min inliers 12: 277/813 acc, 16 wrong, 0 false, maxneg 9
+    held-out pnp_sqpnp at min inliers 15: 1074/1601 acc, 7 wrong, 0 false, maxneg 7
+    tuning pnp_sqpnp at min inliers 15: 222/813 acc, 4 wrong, 0 false, maxneg 9
+    held-out pairs where ours accepts a wrong pose (n=46): pnp_sqpnp rejects 1, accepts with a right pose 45
+    held-out pairs where ours accepts a wrong pose (n=46): pnp_magsac rejects 2, accepts with a right pose 43
+    held-out ours wrong, pnp_sqpnp right (n=45): matches within 0.1 m of the TRUE planar link, median 8 (ours needs 10); ours inliers median 22; pnp inliers median 30; own match range median 4.9 m; planar residual under truth (matches within 1 m) median 0.189 m
+    held-out both right (n=1058): matches within 0.1 m of the TRUE planar link, median 33 (ours needs 10); ours inliers median 33; pnp inliers median 33; own match range median 2.1 m; planar residual under truth (matches within 1 m) median 0.029 m
+    fixed mount rgbd_dataset_freiburg2_pioneer_360 (pitch down 5.5 deg, roll -0.4 deg, height 0.57 m): ours 200/455 acc 51w, 0/1500 false, maxneg 4; ours_wide 200/455 acc 51w, 0/1500 false, maxneg 4; pnp_sqpnp 270/455 acc 6w, 0/1500 false, maxneg 6; pnp_magsac 265/455 acc 5w, 0/1500 false, maxneg 6
+    fixed mount rgbd_dataset_freiburg2_pioneer_slam (pitch down 5.5 deg, roll -0.5 deg, height 0.57 m): ours 216/433 acc 19w, 0/1500 false, maxneg 7; ours_wide 216/433 acc 19w, 0/1500 false, maxneg 7; pnp_sqpnp 191/433 acc 10w, 0/1500 false, maxneg 10; pnp_magsac 189/433 acc 13w, 0/1500 false, maxneg 10
+  Shipped-path gate passed: place.match_keyframes with place_fit=pnp_sqpnp at the picked thresholds gives the harness decision on all 8914 pairs (largest pose difference 0.0e+00); place_fit=ransac_rigid gives ours on every pair; a decoded payload on the own side falls back to the planar fit.
+  config/perception.json place_fit = ransac_rigid; its place_pnp_* thresholds differ from the v2 pick {'thr': 6.0, 'min_inl': 12, 'tilt': inf, 'dz': 0.3}.
+  Ship rule on held-out (recall >= ours, fewer wrong poses, 0 false accepts incl. every held-out negative): FAIL for every variant (ours 1203 acc / 46 wrong / 0 false; ours_wide 1203 / 46 / 0; ours_range 1203 / 46 / 0; mutual 1192 / 46 / 1; mutual_ratio 1188 / 50 / 0; pnp_sqpnp 1181 / 8 / 0; pnp_magsac 1169 / 14 / 0; temporal_next 1015 / 17 / 0; temporal_either 1144 / 28 / 0).
+
+nice -n 10 brain/.venv/bin/python -I tools/reloc_compare.py --no-write --cach  1425.29s user 8.49s system 95% cpu 25:01.95 total

@@ -1,0 +1,56 @@
+Relocalization report, 25 Oct 2026 (brief B in handoff/brief_next_25oct.txt, from opencv-a2)
+
+Verdict: nothing tested beats our 2D rigid RANSAC on held-out recall, wrong poses and false accepts together, so
+place.py and config/perception.json are unchanged. The PnP code is kept as a patch, handoff/reloc_pnp_place.patch.
+
+What was tested, on the fence-fix TUM harness, with the same pairs and split. Tuning is fr2_pioneer_slam + fr1_room;
+held-out is fr2_pioneer_360 + fr3_long_office_household. The harness halts unless 'ours' reproduces the committed
+numbers (1518/2414 accepted, 70 wrong, 0/6500 false), and that check passed. Thresholds were picked on tuning only.
+  * PnP relocalization, the method ORB-SLAM uses: partner 3D points against own 2D keypoints with cv2.solvePnPRansac,
+    SOLVEPNP_SQPNP (with RANSAC) and USAC_MAGSAC, projected to the planar link. Own pixel coordinates stay local to
+    the robot; the radio payload is unchanged.
+  * Matching: mutual nearest neighbour (crossCheck), with and without the ratio test.
+  * Temporal consistency: accept pair (i, j) only when (i+1, j+1) agrees within 0.3 m and 4 deg (the brain's
+    tolerances); 'either' accepts if the next or the previous pair agrees.
+  * Better 32-byte descriptors (BEBLID, TEBLID): not testable. The installed opencv-python 5.0.0 has no contrib, so
+    cv2.xfeatures2d is missing. Nothing was installed.
+
+Final run (run 4), with thresholds picked so that every within-sequence tuning negative stays unaccepted (12,394 pairs):
+
+  variant          split     recall (Wilson 95 % CI)  wrong/acc  false/neg  maxneg  ms/match
+  ours             held-out  75.1 % (73.0-77.2)       46/1203    0/3394     6       0.73
+  pnp_sqpnp        held-out  73.8 % (71.6-75.9)        8/1181    0/3394     7       9.73
+  pnp_magsac       held-out  73.0 % (70.8-75.1)       14/1169    0/3394     6       2.03
+  mutual           held-out  74.5 % (72.3-76.5)       46/1192    1/3394     16      1.55
+  mutual_ratio     held-out  74.2 % (72.0-76.3)       50/1188    0/3394     6       1.41
+  temporal_next    held-out  63.4 % (61.0-65.7)       17/1015    0/3394     6       0.73
+  temporal_either  held-out  71.5 % (69.2-73.6)       28/1144    0/3394     6       0.73
+  ours             pooled    62.9 % (60.9-64.8)       70/1518    0/6500     6       0.69
+  pnp_sqpnp        pooled    60.4 % (58.4-62.3)       24/1458    0/6500     9       8.93
+  pnp_magsac       pooled    59.5 % (57.6-61.5)       34/1437    0/6500     9       1.67
+
+PnP SQPNP cuts held-out wrong poses from 46 to 8, which is the real finding, but it loses 22 held-out accepts, so it
+fails the ship rule on recall. An earlier, looser pick, tuned on the sampled tuning negatives only, gave held-out
+1267/1601 accepted with 16 wrong and 0 false. It was not used, because on every tuning negative the PnP pick reached
+13 inliers against the 10-inlier accept threshold, a false-accept risk the sampled negatives had hidden. That stricter
+rule was added after the looser pick's held-out result had been seen, and both results are reported here.
+
+PnP wins on TUM because the wrong poses come from points about 4.9 m away, where Kinect depth noise gives a 0.19 m
+median planar residual even under the true link. PnP judges own points by pixel direction, not depth. In our Unity
+houses depth is clean, and PnP did worse there: tools/reloc_unity_check.py on two seed-934 runs plus family_ranch gave
+pnp_sqpnp 23.7 % recall with 50/711 wrong, against ransac_rigid 26.0 % with 17/780 wrong (both 1/9000 false). That
+check used the looser thresholds without the dz gate and was not rerun.
+
+What ground truth enters: only the own camera tilt and height, the same values the 2D pipeline already uses. With one
+fixed mount (no per-frame truth at all), PnP still won on pioneer_360: 294 accepted with 14 wrong, against ours at 200
+with 51.
+
+Temporal consistency alone removes wrong poses (46 to 17) but costs 12 points of recall on held-out data. Our brain
+already requires a second agreeing match, so part of this protection is already in production. The brain's exact
+rule, which also needs the two partner keyframes at least 1 m apart, was not tested.
+
+Files: tools/reloc_compare.py (TUM harness), tools/reloc_unity_check.py (Unity check), handoff/reloc_pnp_place.patch
+(PnP in place.py behind a place_fit switch, 5 tests, perception.json keys). To rerun: git apply the patch, run
+nice -n 10 brain/.venv/bin/python -I tools/reloc_compare.py, then git apply -R. With place.py restored,
+tests/test_place_recognition.py gives 6 passed, 4 skipped (recordings missing).
+Commit: see the git log entry "Relocalization research" on overnight-25oct.
