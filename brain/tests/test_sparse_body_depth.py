@@ -39,7 +39,7 @@ def test_depth_in_only_one_part_cannot_certify_the_whole_warm_body(tmp_path, mon
 
 def test_recorded_bed_view_uses_camera_shape_without_bedside_lidar(tmp_path, monkeypatch):
     rec = Path(__file__).resolve().parents[2] / 'data/recordings/unity_house_onedoor_seed929_run1/robot_A'
-    if not rec.exists(): pytest.skip('local recording absent')
+    if not rec.exists() or next(rec.glob('**/rgb/*.png'), None) is None: pytest.skip('local recording absent or its image frames were removed')
     monkeypatch.setattr(V, 'detect_people_rgb', lambda frame: [])
     for scan in (True, False):
         f = copy(V.load_frame(rec, 38.21666666666667))

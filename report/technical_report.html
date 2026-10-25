@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smoke Rescue technical report</title>
+<style>
+  :root { --ink:#1d1f23; --dim:#5b616b; --rule:#d9dce1; --accent:#b8560f; --bg:#ffffff; --code:#f3f4f6; }
+  body { background:var(--bg); color:var(--ink); font:10.5pt/1.5 "Helvetica Neue", Arial, sans-serif; max-width:820px; margin:32px auto; padding:0 16px; }
+  h1 { font-size:22pt; margin:0 0 4px; }
+  h2 { font-size:14pt; margin:26px 0 8px; border-bottom:1px solid var(--rule); padding-bottom:4px; }
+  h3 { font-size:11.5pt; margin:16px 0 6px; }
+  .sub { color:var(--dim); margin:0 0 18px; }
+  table { border-collapse:collapse; width:100%; margin:8px 0 12px; font-size:9.5pt; }
+  th, td { border:1px solid var(--rule); padding:4px 6px; text-align:left; vertical-align:top; }
+  th { background:#f6f7f9; }
+  td.n { text-align:right; white-space:nowrap; }
+  code { background:var(--code); padding:0 3px; border-radius:3px; font-size:9.5pt; }
+  pre { background:var(--code); padding:8px 10px; border-radius:4px; font-size:9pt; overflow-x:auto; }
+  img { width:100%; border:1px solid var(--rule); margin:6px 0; }
+  .cap { color:var(--dim); font-size:9pt; margin:-2px 0 12px; }
+  .fail { color:#a1261b; font-weight:600; }
+  .todo { background:#fff4d6; padding:2px 4px; }
+  @media print { body { margin:0 auto; } h2 { break-after:avoid; } img, table { break-inside:avoid; } }
+</style>
+</head>
+<body>
+
+<h1>Smoke Rescue</h1>
+<p class="sub">Two quadruped robots search a burning, smoke-filled house with OpenCV 5 perception, live visual SLAM between
+the robots, and agents that act only on cited OpenCV evidence. OpenCV AI Competition 2026 technical report, 25 October 2026.
+<br>Team: <span class="todo">names and roles to be filled in by the team</span>.
+Repository branch <code>overnight-25oct</code>.</p>
+
+<h2>1. Problem</h2>
+<p>A search team in a burning house loses sight to smoke and time to heat, and two searchers who cannot share what
+they saw search the same rooms twice. We built a
+simulation of that search with the constraints a real robot team would have: each robot sees only through its own
+RGB-D camera, thermal camera and planar LiDAR; nobody gets a floor plan; the radio is lossy and short; and every
+result is scored against ground truth that no robot-side code can read.</p>
+<p>The system has to answer three questions live: where am I and where is my partner (visual SLAM), where have we
+already looked (shared room records over the radio), and is that a person (OpenCV 5 dnn with YOLO11m, never a
+heat blob alone).</p>
+
+<h2>2. Architecture</h2>
+<img src="../diagrams/architecture.png" alt="System architecture: Unity simulation, C# robot brain, Python agent layer with OpenCV 5, AWS">
+<p class="cap">Figure 1. Unity 6 HDRP simulates the house, fire, smoke and sensors. A C# brain per robot maps, plans and
+keeps the robot safe at 60 Hz. A Python service (FastAPI) runs the OpenCV 5 perception, place recognition and the 3D
+map, and hosts the GPT agents and the incident commander. The same service runs on AWS Fargate. Only the evaluator
+reads ground truth (Unity <code>SmokeRescue.Oracle</code> assembly and <code>oracle/</code> in each recording).</p>
+
+<h2>3. Where OpenCV 5 does the work</h2>
+<table>
+<tr><th>Component</th><th>OpenCV 5 API</th><th>What it decides</th><th>Measured</th></tr>
+<tr><td>Person detector</td><td><code>cv2.dnn</code>, YOLO11m ONNX, range from own depth</td><td>Only a YOLO detection confirms a person; a thermal shape alone never does</td><td>View recall 0.443, 0.024 false boxes per empty frame at conf 0.25, over 1212 recorded frames (729 person views, 500 negatives); 1266 ms per frame on the M5 CPU</td></tr>
+<tr><td>Place recognition (visual SLAM front end)</td><td>ORB (3000 detected, 200 kept with depth), <code>BFMatcher</code> Hamming kNN, ratio test 0.85, RANSAC rigid fit on 3D feature positions</td><td>Which partner camera view shows the same place as one of mine, and how our frames sit</td><td>200 features: cross-robot recall 11.7 %, same-robot 50 %, 0 false accepts in about 30,000 negative pairs (largest negative 8 inliers, threshold 10); payload 7,605 bytes</td></tr>
+<tr><td>3D map</td><td><code>cv2.Volume</code> HashTSDF per robot</td><td>Obstacle top heights for the planner</td><td>Live per robot; exported as <code>map3d.ply</code></td></tr>
+<tr><td>Agent perception tools</td><td>Thresholding, contours, morphology, Laplacian variance, dark channel on the robot's own frames</td><td><code>scan_thermal</code>, <code>inspect_candidate</code>, <code>check_indoors</code>, <code>assess_visibility</code>, <code>track_fire_spread</code>, <code>measure_opening</code>: every result gets an evidence id the agent must cite</td><td><code>assess_visibility</code> 8.6 ms on AWS Fargate ARM64</td></tr>
+<tr><td>Rejected</td><td><code>cv2.Odometry</code> as the pose source</td><td>none</td><td>Diverged 17 degrees in 4 s on our frames; the brain uses gyro plus LiDAR scan matching instead</td></tr>
+</table>
+
+<h2>4. Live visual SLAM between two robots</h2>
+<p>Both robots launch from pads at the one front door. The pads give a shared frame, but a pad placement error turns a
+robot's whole map: in seed 934 robot B's true heading was 2.39 degrees off its pad. Over a 15 m house that misplaces
+B's far walls by about 0.6 m, enough to put a door in a wall.</p>
+<p>Each robot stores ORB keyframes with depth and broadcasts them over the radio (7.6 KB each, under the 8 KB interface
+limit). A robot compares a partner keyframe only with its own views near where the shared-frame prior says the
+partner stood (3 m, 60 degrees). A match must pass RANSAC with 10 or more inliers. It is then checked a second way: the
+partner's LiDAR sweep from that moment is placed on the robot's own LiDAR map. Two matches that agree within 1 degree and
+0.15 m, taken at least 1 m apart, refine the link, bounded to 5 degrees and 0.5 m. The same matcher against the
+robot's own views 20 s or older measures drift (loop closure) and applies a correction only if the LiDAR fit does not
+get worse.</p>
+<img src="../data/evidence/visual_slam_moment_best_matches.png" alt="ORB matches between robot B's and robot A's camera frames">
+<p class="cap">Figure 2. Robot B at 11.9 s and robot A at 2.2 s see the foyer. 26 matches pass the ratio test; 24 agree on
+one rigid motion (green). Recomputed offline with the robot-side code from the recorded frames; the live event had 32 inliers.</p>
+<img src="../data/evidence/visual_slam_moment_best_after.png" alt="Robot B's walls aligned on robot A's map after the link">
+<p class="cap">Figure 3. Robot B's walls (blue) placed on robot A's map (amber) through the camera-measured link; white
+marks walls that agree. Agreement within one grid cell: 72 % with the launch-pad prior, 97 % with the link, and 52 % with
+the link reversed, which confirms the direction of the transform. Video segment: <code>tools/visual_slam_clip.py</code>.</p>
+<table>
+<tr><th>Live run (seed 934)</th><th>Link error before</th><th>After refine</th><th>Camera matches verified</th><th>Loop closures (median drift)</th></tr>
+<tr><td>vslam1, 24 Oct 23:36</td><td class="n">2.39 deg</td><td class="n">A 0.91, B 0.30 deg</td><td></td><td></td></tr>
+<tr><td>allfixes, 25 Oct 00:07</td><td class="n">2.39 deg</td><td class="n">A 0.02, B 0.30 deg</td><td></td><td></td></tr>
+<tr><td>full mission, 25 Oct 03:18</td><td class="n">2.39 deg</td><td class="n">A 0.235 at 16.1 s, B 0.12 deg</td><td class="n">A 4</td><td class="n">138 total; A median 3.1 cm, 0.25 deg; 0 needed a correction</td></tr>
+</table>
+<p>Limit, stated plainly: cross-robot recall per keyframe pair is 11.7 %. It works here because each robot sends many
+keyframes and only two agreeing matches are needed. Shared views happen at the entrance; robots that enter by
+different doors and never share a view would not link until they do.</p>
+
+<h2>5. Autonomy: brain, shared context and agents</h2>
+<h3>Robot brain (C#, 60 Hz, one per robot)</h3>
+<p>Occupancy grid from LiDAR and depth; gyro heading corrected by LiDAR scan matching. Room memory: a robot steps
+inside each room, marks it searched, and never returns to it. Door claims stop both robots taking the same doorway.
+Fire is handled in code with no agent override: hot air marks a room on fire; the brain sprays measured fire from 2 m
+or less (it used to fire from up to 4.6 m and the water landed short), then walks through and looks. When nothing
+reachable is left, both robots walk back out to their pads. Every constant has a written reason in
+<code>config/brain.json</code>, and no constant describes a particular house.</p>
+<h3>Distributed context (radio v10)</h3>
+<p>Map layers, room records, door claims, person confirmations and ORB keyframes travel over a lossy, range-limited
+radio. Partner data is converted through the measured frame link, never through ground truth.</p>
+<h3>Agents (GPT via Azure, tool use)</h3>
+<p>One agent per robot is woken by brain events (a survivor candidate, no frontier left, a goal reached) or every 20 s.
+It sees only its robot's own pose, offered frontiers, LiDAR summary and radio inbox. It calls the OpenCV tools above and
+must cite a matching evidence id to act. Python guardrails then check the evidence type and position, allow a
+confirmation only within 4 m, and refuse invented frontier ids. The C# brain applies a second check (indoors by its own
+evidence, heat, already leaving) and the refusal reason goes back to the model. An incident commander relays radio
+reports and approves risky actions. Every step is in <code>agent_trace.jsonl</code> and the robot's
+<code>decisions.jsonl</code>.</p>
+
+<h2>6. Cloud: AWS</h2>
+<p>CloudFormation stacks in us-east-1 (<code>deploy/aws</code>): the agent and OpenCV 5 API on ECS Fargate ARM64
+(1 vCPU, 2 GB) behind an ALB with a WAF rate limit of 2,000 requests per 5 minutes per IP; a Batch job for the offline
+SLAM container; and budget alarms. The account was not yet verified for CloudFront on 25 October, so the read-only
+OpenCV routes (<code>/health</code>, <code>/vision/*</code>, <code>/perceive/people</code>, <code>/place/*/match</code>) are open
+on the ALB. The model routes still require a secret origin header and return 403 without it, so nobody outside can spend
+the model budget.</p>
+<pre>./deploy/aws/smoke_test.sh http://smoke--LoadB-m7oFRuQ63UoE-1386562850.us-east-1.elb.amazonaws.com --direct
+PASS GET /health (HTTP 200)              opencv 5.0.0
+PASS POST /vision/assess_visibility      8.6 ms</pre>
+
+<h2>7. Evaluation, including failures</h2>
+<p>The evaluator scores each recording against hidden ground truth: rooms entered, floor seen by a camera, people
+confirmed (within 1.5 m of a real person) and false confirmations. Ten live Unity runs of the seed 934 house, in order,
+as the brain changed:</p>
+<table>
+<tr><th>Run</th><th>Rooms entered</th><th>Floor seen</th><th>People</th><th>False</th></tr>
+<tr><td>23 Oct 23:55</td><td class="n">4/10</td><td class="n">0 %*</td><td class="n">2/5</td><td class="n">0</td></tr>
+<tr><td>24 Oct 02:16</td><td class="n">5/10</td><td class="n">70 %</td><td class="n">4/5</td><td class="n">0</td></tr>
+<tr><td>24 Oct 04:53</td><td class="n">5/10</td><td class="n">71 %</td><td class="n">3/5</td><td class="n">0</td></tr>
+<tr><td>24 Oct 16:35</td><td class="n">4/10</td><td class="n">69 %</td><td class="n">3/5</td><td class="n">0</td></tr>
+<tr><td>24 Oct 19:54</td><td class="n">7/10</td><td class="n">81 %</td><td class="n">3/5</td><td class="n">0</td></tr>
+<tr><td>24 Oct 20:06</td><td class="n">7/10</td><td class="n">74 %</td><td class="n">2/5</td><td class="n fail">1</td></tr>
+<tr><td>25 Oct 00:07</td><td class="n">6/10</td><td class="n">90 %</td><td class="n">4/5</td><td class="n">0</td></tr>
+<tr><td>25 Oct 01:41</td><td class="n">6/10</td><td class="n">70 %</td><td class="n">3/5</td><td class="n">0</td></tr>
+<tr><td>25 Oct 02:36</td><td class="n">7/10</td><td class="n">74 %</td><td class="n">3/5</td><td class="n">0</td></tr>
+<tr><td>25 Oct 03:18, full mission (best)</td><td class="n">8/10</td><td class="n">93 %</td><td class="n">5/5</td><td class="n">0</td></tr>
+</table>
+<p class="cap">* Floor measured before the evaluator used the true floor. The one false confirmation (20:06) came from
+a thermal dwell; thermal-only confirmation was then switched off. The 03:18 run is our best, not our typical: the median of
+the last five runs is 7 rooms, 74 % floor, 3 of 5 people.</p>
+<h3>What failed, and what we did</h3>
+<ul>
+<li><span class="fail">No run so far ends with both robots outside.</span> On 25 Oct we found the cause: once inside, a
+robot locks the floor at its way in so it never wanders back out, and the end-of-search walk out planned against that
+lock, so no route existed at any fire margin. The fix makes that walk out plan to the start pad with the lock lifted; a
+regression test fails without it and passes with it (logic suite 274/274). <span class="todo">Live confirmation: run in
+progress.</span></li>
+<li>Under memory pressure the place service timed out (68 and 69 "Operation aborted" errors for robots A and B in the 25 Oct 11:25 run), and that
+run found 4 of 5 people with 82 % floor. Perception latency depends on the host.</li>
+<li>Room memory measured headless on 12 seeded houses: 79/110 rooms entered without it, 80/110 with it, 82/110 with door
+claims added; floor 76.8, 75.4 and 78.6 %. A small gain, not a solved problem.</li>
+<li>Recording is slow: about 5 simulated seconds per wall minute with live perception, so each full mission takes about
+two hours.</li>
+</ul>
+
+<h2>8. Reproduce</h2>
+<pre># Python 3.11, pinned in brain/uv.lock (opencv-python 5.0.0)
+cd brain && uv sync && uv run pytest -q              # 532 tests
+# C# brain logic without Unity (.NET from Unity 6000.6.6f1)
+./tools/headless/test.sh                               # 274 passed, 0 failed
+# Live: Unity 6000.6.6f1 HDRP, scene Assets/SmokeRescue/Scenes/House.unity
+#   Tools > Smoke Rescue > Record > House one-door seed 934 full mission
+cd brain && uv run uvicorn brain.agent.server:app --port 8080   # OpenCV 5 service
+# Score a recording against ground truth
+brain/.venv/bin/python tools/run_audit.py data/recordings/&lt;run&gt;
+brain/.venv/bin/python tools/visual_slam_eval.py data/recordings/&lt;run&gt;
+# AWS
+deploy/aws/deploy.sh --email &lt;you&gt; ...  then  deploy/aws/smoke_test.sh &lt;url&gt; --direct</pre>
+
+<h2>9. Responsible operation</h2>
+<ul>
+<li>Robots never read ground truth: Unity assembly definitions and a pytest check keep robot code away from the oracle.</li>
+<li>Agents cannot act without OpenCV evidence; risky actions need commander approval; refusals are logged and fed back.</li>
+<li>Cloud spend is capped by budget alarms, the WAF rate limit, and model routes that are closed to the public.</li>
+<li>This is a simulation. The fire model is an approximation for demonstration, not a validated fire-engineering solver
+(<code>config/fire.json</code> says so). No result here claims real-world rescue performance.</li>
+</ul>
+
+</body>
+</html>

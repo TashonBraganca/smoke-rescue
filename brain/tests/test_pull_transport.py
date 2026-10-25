@@ -183,7 +183,7 @@ def test_two_robots_pull_their_own_files_concurrently(local,monkeypatch):
 def test_real_history_preserves_every_measurement_without_rgb_history():
     from brain.agent.recording_transport import thermal_depth_frame
     folder=Path(__file__).resolve().parents[2]/'data/recordings/unity_house_onedoor_seed924_run1/robot_B'
-    if not folder.is_dir():pytest.skip('local seed 924 recording absent')
+    if not folder.is_dir() or next(folder.glob('**/rgb/*.png'), None) is None: pytest.skip('local seed 924 recording absent or its image frames were removed')
     times=[19.,19.5,20.]
     expected=vision.track_fire_spread([vision.load_frame(str(folder),t) for t in times])
     actual=vision.track_fire_spread([thermal_depth_frame(folder,t) for t in times])

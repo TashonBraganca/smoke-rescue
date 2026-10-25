@@ -88,7 +88,7 @@ def test_nonperson_time_counts_only_moves_the_brain_accepted():
 @pytest.mark.parametrize('seed,t',[(924,38.),(925,48.)])
 def test_recorded_colour_fallback_is_not_counted_as_a_wall_false_positive(seed,t,tmp_path):
     rec=Path(__file__).resolve().parents[2]/f'data/recordings/unity_house_onedoor_seed{seed}_run1'
-    if not rec.exists(): pytest.skip('local recording absent')
+    if not rec.exists() or next(rec.glob('**/rgb/*.png'), None) is None: pytest.skip('local recording absent or its image frames were removed')
     frame=F.V.load_frame(rec/'robot_A',t)
     pose=F.gt_pose_at(F.load_trajectory(rec,'robot_A'),t)
     rows=F.E.label_frame(frame,pose,F.load_survivors(rec),F.load_floorplan(rec),rec.name,'robot_A',t,tmp_path)

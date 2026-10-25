@@ -62,7 +62,7 @@ def test_clock_rewind_discards_previous_run(tmp_path, monkeypatch):
 
 def test_real_desk_person_two_partial_views_with_colour_disabled(tmp_path, monkeypatch):
     folder=ROOT/'data/recordings/unity_house_onedoor_seed925_run1/robot_A'
-    if not folder.exists(): pytest.skip('local recording absent')
+    if not folder.exists() or next(folder.glob('**/rgb/*.png'), None) is None: pytest.skip('local recording absent or its image frames were removed')
     monkeypatch.setattr(V, 'detect_people_rgb', lambda f: [])
     # This location comes from the first warm inspection, not a scene file.
     target=(-3.61,3.17)
@@ -95,7 +95,7 @@ def test_registry_remembers_evidence_between_decision_steps(tmp_path, monkeypatc
 
 def test_recorded_side_sliver_with_last_pixel_box_stays_uncertain(tmp_path):
     folder=ROOT/'data/recordings/unity_house_onedoor_seed923_run1/robot_A'
-    if not folder.exists(): pytest.skip('local recording absent')
+    if not folder.exists() or next(folder.glob('**/rgb/*.png'), None) is None: pytest.skip('local recording absent or its image frames were removed')
     frame=V.load_frame(folder,40.)
     comp=next(c for c in V.scan_thermal(frame)['people'] if c['bbox']==[270,209,50,47])
     assert V.inspect_candidate(frame,comp['bearing_deg'],comp['range_m'],output_dir=tmp_path)['verdict']=='uncertain'
