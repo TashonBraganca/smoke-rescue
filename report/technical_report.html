@@ -119,6 +119,11 @@ PASS GET /health (HTTP 200)              opencv 5.0.0
 PASS POST /vision/assess_visibility      8.6 ms</pre>
 
 <h2>7. Evaluation, including failures</h2>
+<p><strong>Headline numbers, all runs, not the best one.</strong> Across all 10 live Unity runs of the seed 934 house the robots
+confirmed 32 of 50 people (64 %, Wilson 95 % interval 50 to 76 %), with one false confirmation in 10 runs (since removed:
+thermal-only confirmation is off). Median rooms entered 6 of 10, median floor seen 74 % (n = 9 runs with the true-floor
+measure). On two houses the brain was never tuned on (headless, below) both robots entered every room and found 5 of 5 people
+with no false confirmation. The best single run (8 of 10 rooms, 93 %, 5 of 5) is listed with the rest, not instead of them.</p>
 <p>The evaluator scores each recording against hidden ground truth: rooms entered, floor seen by a camera, people
 confirmed (within 1.5 m of a real person) and false confirmations. Ten live Unity runs of the seed 934 house, in order,
 as the brain changed:</p>
@@ -138,15 +143,31 @@ as the brain changed:</p>
 <p class="cap">* Floor measured before the evaluator used the true floor. The one false confirmation (20:06) came from
 a thermal dwell; thermal-only confirmation was then switched off. The 03:18 run is our best, not our typical: the median of
 the last five runs is 7 rooms, 74 % floor, 3 of 5 people.</p>
-<h3>What failed, and what we did</h3>
+<h3>Two houses the robots were never tuned on</h3>
+<p>Codex built two more one-floor houses from scratch on 25 October: a family ranch (9 rooms, 165 m2) and a long ranch
+(11 spaces on a central hallway, 198 m2), each with one front door, five people and a bedroom fire. Nothing in the brain
+changed for them. Headless full missions (ray-cast sensors, fire-driven air, the same brain and radio; no rendered camera):</p>
+<table>
+<tr><th>House</th><th>Rooms entered</th><th>Floor seen</th><th>People</th><th>False</th><th>Both robots out</th></tr>
+<tr><td>Family ranch (final brain, 25 Oct 15:30)</td><td class="n">9/9</td><td class="n">98.2 %</td><td class="n">5/5</td><td class="n">0</td><td class="n">yes, 516 and 545 s</td></tr>
+<tr><td>Family ranch (Codex run)</td><td class="n">9/9</td><td class="n">97.9 %</td><td class="n">5/5</td><td class="n">0</td><td class="n">yes</td></tr>
+<tr><td>Long ranch (Codex run)</td><td class="n">11/11</td><td class="n">95.9 %</td><td class="n">5/5</td><td class="n">0</td><td class="n">yes</td></tr>
+</table>
+<p class="cap">Headless results are not live Unity results: the headless simulator has no rendered camera, so person
+confirmation there does not exercise YOLO. Live Unity missions with the Terra agents on both houses are recorded separately.</p>
+<h3>Where it fails</h3>
 <ul>
-<li><span class="fail">No run so far ends with both robots outside.</span> On 25 Oct we found the cause: once inside, a
-robot locks the floor at its way in so it never wanders back out, and the end-of-search walk out planned against that
-lock, so no route existed at any fire margin. The fix makes that walk out plan to the start pad with the lock lifted; a
-regression test fails without it and passes with it (logic suite 274/274). <span class="todo">Live confirmation: run in
-progress.</span></li>
+<li><span class="fail">Until 25 October no live run ended with both robots outside.</span> Three causes, each found in a
+recording and each fixed with a regression test that fails without the fix: (1) once inside, a robot locks the floor at its
+way in, and the end-of-search walk out planned against that lock, so no route existed at any fire margin; (2) room memory
+skips rooms the partner has claimed, so a robot with nothing of its own left walked out at 143 s while the team still had
+unentered rooms (it now waits until no remembered room is unentered by either robot); (3) the robot that finished first
+stopped on its pad in the front doorway, and its partner's map then showed a body across the only door (it now steps 1.5 m
+out and 1.5 m aside). Logic suite 279/279. <span class="todo">Live confirmation: run in progress.</span></li>
 <li>Under memory pressure the place service timed out (68 and 69 "Operation aborted" errors for robots A and B in the 25 Oct 11:25 run), and that
 run found 4 of 5 people with 82 % floor. Perception latency depends on the host.</li>
+<li>Person recall per camera view is 0.443 (YOLO11m on our rendered frames): people seen from far, from behind furniture or through smoke are often missed on a single view, and the robot must get closer.</li>
+<li>Cross-robot place recognition accepts 11.7 % of true same-place keyframe pairs; the link works because many keyframes are sent and only two agreeing matches are needed. Robots that never share a view do not link.</li>
 <li>Room memory measured headless on 12 seeded houses: 79/110 rooms entered without it, 80/110 with it, 82/110 with door
 claims added; floor 76.8, 75.4 and 78.6 %. A small gain, not a solved problem.</li>
 <li>Recording is slow: about 5 simulated seconds per wall minute with live perception, so each full mission takes about
