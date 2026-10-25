@@ -1,0 +1,15 @@
+Frames for brain/tests/test_mcp_server.py, copied byte for byte from the local recording
+data/recordings/unity_house_onedoor_seed934_full_1520_5of5/robot_A (seed 934, smoke level 0.15; the recording itself is
+git-ignored). Robot-side sensor files only; no ground truth was copied.
+
+person_*.png   t = 31.266667 s. A person lies on the kitchen floor at the bottom right of the colour image (checked by
+               eye, 25 Oct). The robot's own run confirmed this person at 31.27 s: YOLO11m confidence 0.93, range 2.06 m.
+               The person is outside the narrower thermal view; its thermal frame has no reading above 40 C.
+turn_*.png     t = 31.000000 s, the same robot 0.27 s earlier, turning right. Its leg odometry (odom.txt, noise and
+               slip included) between the two frames: 0.064 m forward, 0.004 m right, yaw -10.3 deg (counter-clockwise
+               positive). The same person is in view. turn_* and person_* are the place-match pair.
+fire_*.png     t = 151.000000 s. A corridor with a fire seen through a doorway on the left; no person in view. The
+               thermal frame reaches 323 C, with 1990 pixels at or above 200 C.
+
+rgb: 640x480 8-bit colour. depth: 640x480 16-bit, millimetres (camera.yaml RGBD.DepthMapFactor 1000).
+thermal: 320x256 16-bit, kelvin x 10. Intrinsics are those of config/sensors.json.

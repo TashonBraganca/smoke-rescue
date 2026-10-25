@@ -1,0 +1,194 @@
+Brief A report: Smoke Rescue MCP server and robot API (25 Oct 2026, 18:10 to 18:45 IST)
+
+Verdict
+-------
+Done and verified locally: an MCP server with four tools (stdio and streamable HTTP), an inline-frame robot route on
+the FastAPI service, OpenAPI docs with the public AWS routes written into them, a 27-line robot client, 8 pytest tests
+that fail when the behaviour they test is broken, and examples/README.txt. Every tool was called for real over both
+transports. One gap on AWS: the deployed service predates the inline-frame route, so detect_people with the remote
+backend answers HTTP 500 there until brain/brain/agent/server.py is redeployed. I did not deploy (not allowed). The
+same remote path works against a local instance of the updated server.
+
+Files
+-----
+brain/brain/mcp_server.py           MCP server (official SDK, mcp 2.3.0: MCPServer, the v2 name of FastMCP)
+brain/brain/agent/robot_frame.py    builds a vision.Frame from images a robot sends (shared by the route and MCP)
+brain/brain/agent/server.py         small edit: API description listing public AWS routes, OpenAPI request bodies for
+                                    /perceive/people and /vision/{tool}, and an inline-frame branch in /perceive/people
+                                    (taken only when the body has rgb_b64; recorded-frame and pull-v1 paths unchanged)
+brain/tests/test_mcp_server.py      8 tests, in-process MCP client
+brain/pyproject.toml, uv.lock       mcp>=2.3 added with uv (both files were clean before; the diff is only mcp)
+examples/robot_client.py            27 lines, standard library only
+examples/README.txt                 install, run, connect from an MCP desktop client and a coding agent, tools, limits
+data/fixtures/mcp_frames/           8 PNGs + SOURCE.txt, copied byte for byte from a local seed 934 recording
+handoff/mcp_api_report_25oct.txt    this file
+
+Tools
+-----
+detect_people(image, depth?, depth_scale, intrinsics?, min_conf, backend?)  vision.detect_people_rgb (YOLO11m, cv2.dnn)
+assess_visibility(image, depth?, depth_scale, backend?)                     vision.assess_visibility
+match_place(keyframe_a, keyframe_b, return_payloads)                        place.make_keyframe + place.match_keyframes
+describe_scene_heat(thermal, rgb?, depth?, depth_scale, backend?)           vision.scan_thermal + band statistics
+Backends: local (default) runs that code in the MCP process. remote posts to SMOKE_API_URL (default the public Lambda
+URL .../api): /perceive/people, /vision/assess_visibility, /vision/scan_thermal. match_place is always local because
+no public route takes two keyframes; its result says backend "local". Remote results are what the route returns, so
+their fields differ from local ones (remote visibility has no usable_rgb verdict and computes dark_channel as a mean;
+remote heat has pixel regions only). New constants each have a *_REASON sibling (DEFAULT_API_URL, REMOTE_TIMEOUT_S,
+DEFAULT_HTTP_PORT, DEFAULT_MIN_CONF in mcp_server.py; DEFAULT_DEPTH_SCALE in robot_frame.py). No config file changed.
+
+describe_scene_heat works with the data we have: the recordings carry 16-bit thermal frames (kelvin x 10), and the tool
+runs the robots' own scan_thermal. Hot-region ranges come from depth when the region has it; flames return no depth, so
+the fire fixture gets an upper bound from the floor geometry (9.45 m, range_source floor_upper_bound). I did not check
+that bound against ground truth.
+
+Fixture frames (data/fixtures/mcp_frames, from unity_house_onedoor_seed934_full_1520_5of5/robot_A)
+-----------------------------------------------------------------------------------------------
+person_*  31.266667 s. I looked at person_rgb.png: a person in a plaid shirt lies on the kitchen floor at the bottom
+          right, arm stretched out, next to a fridge. The robot's own run confirmed this person at 31.27 s (decisions.jsonl:
+          YOLO11m 0.93, range 2.06 m, floor gap 0.09 m).
+turn_*    31.000000 s, same robot 0.27 s earlier, turning right. Leg odometry between the two frames (odom.txt,
+          robot-side, slip and noise included): 0.064 m forward, 0.004 m right, -10.3 deg yaw.
+fire_*    151.000000 s. I looked at an RGB and false-colour thermal pair: a corridor, fire visible through a doorway on
+          the left, no person. Thermal max 322.75 C, 1990 pixels at or above 200 C.
+Sizes checked by opening each file: rgb 640x480x3 uint8, depth 640x480 uint16 (max 4753 to 7994 mm), thermal 320x256
+uint16 (2830 to 5959, i.e. 10 to 323 C).
+
+Test output (cd brain && .venv/bin/python -m pytest tests/test_mcp_server.py -v)
+--------------------------------------------------------------------------------
+tests/test_mcp_server.py::test_the_server_lists_its_four_tools PASSED    [ 12%]
+tests/test_mcp_server.py::test_detect_people_finds_the_person_on_the_floor PASSED [ 25%]
+tests/test_mcp_server.py::test_detect_people_finds_no_one_in_an_empty_corridor PASSED [ 37%]
+tests/test_mcp_server.py::test_assess_visibility_gives_real_numbers_and_rejects_a_blank_frame PASSED [ 50%]
+tests/test_mcp_server.py::test_match_place_recovers_the_turn_between_two_views PASSED [ 62%]
+tests/test_mcp_server.py::test_match_place_refuses_two_different_places PASSED [ 75%]
+tests/test_mcp_server.py::test_describe_scene_heat_finds_the_fire_and_nothing_hot_near_the_person PASSED [ 87%]
+tests/test_mcp_server.py::test_remote_backend_calls_the_http_routes_with_the_same_frames PASSED [100%]
+============================== 8 passed in 25.65s ==============================
+
+With the suites that touch server.py: test_mcp_server, test_agent_server, test_oracle_isolation, test_remote_forward,
+test_aws_backends: 43 passed in 23.70s. Full-suite result: see the end of this file.
+
+The tests fail when the behaviour is broken
+-------------------------------------------
+A throwaway pytest plugin (scratchpad, not committed) patched one thing per run, selected by env BREAK:
+
+BREAK=person_frame          person test pointed at the corridor frame (no person)
+  FAILED test_detect_people_finds_the_person_on_the_floor        E  assert 0 >= 1
+  FAILED test_match_place_recovers_the_turn_between_two_views    (the pair is no longer the same place)
+BREAK=detector_blind        detector returns []          -> FAILED ...finds_the_person_on_the_floor
+BREAK=detector_sees_ghosts  detector returns a person always -> FAILED ...finds_no_one_in_an_empty_corridor
+BREAK=visibility_constant   fixed numbers, always usable -> FAILED ...assess_visibility_gives_real_numbers...
+BREAK=place_never           match always false           -> FAILED ...recovers_the_turn..., ...refuses_two_different_places
+BREAK=place_always          match always true            -> FAILED ...refuses_two_different_places
+BREAK=place_swapped         own and partner swapped      -> FAILED ...recovers_the_turn...
+                                                            E  assert 21.11761460535165 < 2.0  (yaw +10.8 against -10.3)
+BREAK=heat_blind            hotspots emptied             -> FAILED ...finds_the_fire...   E  assert (0 >= 1)
+BREAK=tool_missing          no tools registered          -> all 8 FAILED
+BREAK=inline_route          server inline branch raises  -> FAILED ...remote_backend...
+                                                            remote /perceive/people answered HTTP 400: inline frames disabled
+Apart from tool_missing (which removes everything), the tests not aimed at a breakage kept passing, so each failure
+is specific to the behaviour broken.
+
+MCP over stdio, local backend (brain/.venv/bin/python -m brain.mcp_server, client = mcp.Client over stdio)
+-------------------------------------------------------------------------------------------------------
+transport stdio | SMOKE_BACKEND local | server smoke-rescue
+tools: ['detect_people', 'assess_visibility', 'match_place', 'describe_scene_heat']
+- detect_people(image=person_rgb.png, depth=person_depth.png) 5.8 s is_error=False
+   {"people": [{"confidence": 0.930799, "bbox_rgb": [407, 383, 142, 95], "bearing_deg": 17.470608, "range_m": 2.064002, "range_source": "depth", "range_evidence": null, "floor_gap_m": 0.086231}], "count": 1, "backend": "local", "ms": 4523.7}
+- detect_people(image=fire_rgb.png, depth=fire_depth.png) 2.8 s is_error=False
+   {"people": [], "count": 0, "backend": "local", "ms": 2801.0}
+- assess_visibility(image=person_rgb.png, depth=person_depth.png) 0.0 s is_error=False
+   {"laplacian_variance": 526.34001, "rms_contrast": 41.27312, "dark_channel_haze": 0.270588, "valid_depth_fraction": 0.977184, "usable_rgb": true, "backend": "local"}
+- match_place(keyframe_a={rgb,depth}, keyframe_b={rgb,depth}) 0.1 s is_error=False      (turn_* vs person_*)
+   {"matched": true, "dx_m": 0.0035516582864580926, "dy_m": 0.061545074919068465, "dyaw_deg": -10.868104023935558, "inliers": 68, "rmse_m": 0.01662869162282291, "backend": "local"}
+- match_place(keyframe_a={rgb,depth}, keyframe_b={rgb,depth}) 0.1 s is_error=False      (turn_* vs fire_*)
+   {"matched": false, "reason": "best candidate had 2 inliers, rmse 0.026 m; need 10 inliers and rmse <= 0.06 m", "backend": "local"}
+- describe_scene_heat(thermal=fire_thermal.png) 3.2 s is_error=False
+   {"hotspots": [{"bbox": [0, 48, 28, 79], "pixels": 1990, "max_c": 322.75, "range_m": 9.448282, "range_source": "floor_upper_bound", "bearing_deg": -23.239256}], "people": [], "rgb_people": null, "max_c": 322.75, "median_c": 52.95, "hot_fraction": 0.02429, "backend": "local"}
+- describe_scene_heat(thermal=fire_thermal.png, rgb=fire_rgb.png, depth=fire_depth.png) 2.8 s is_error=False
+   {"hotspots": [{"bbox": [0, 48, 28, 79], "pixels": 1990, "max_c": 322.75, "range_m": 9.448282, "range_source": "floor_upper_bound", "bearing_deg": -23.239256}], "people": [], "rgb_people": [], "max_c": 322.75, "median_c": 52.95, "hot_fraction": 0.02429, "backend": "local"}
+Server stderr: 0 lines; nothing leaked onto the stdio protocol stream.
+Place match against odometry: dx 0.004 m (odom 0.004), dy 0.062 m (odom 0.064), yaw -10.87 deg (odom -10.3).
+Odometry is noisy itself, so this is agreement with a second estimate, not ground truth.
+
+MCP over streamable HTTP, local backend (python -m brain.mcp_server --http --port 8096, client to /mcp)
+-----------------------------------------------------------------------------------------------------
+Same seven calls, same numbers as stdio (detect 3.2 s and 1.9 s, heat 2.1 s and 1.8 s); 9 POST /mcp 200 in the log.
+- detect_people(person) {"people": [{"confidence": 0.930799, "bbox_rgb": [407, 383, 142, 95], "bearing_deg": 17.470608, "range_m": 2.064002, ...}], "count": 1}
+- match_place(turn, person) {"matched": true, "dx_m": 0.00355, "dy_m": 0.06155, "dyaw_deg": -10.868, "inliers": 68}
+- describe_scene_heat(fire) {"hotspots": [{"bbox": [0, 48, 28, 79], "pixels": 1990, "max_c": 322.75, ...}]}
+Server stopped by PID afterwards; port 8096 free.
+
+MCP over streamable HTTP, remote backend pointed at my own updated FastAPI on 127.0.0.1:8095
+---------------------------------------------------------------------------------------------
+- detect_people(person) 2.5 s  {"people": [{"confidence": 0.930799, "bbox_rgb": [407, 383, 142, 95], "bearing_deg": 17.470608, "range_m": 2.064002, "range_source": "depth", "range_evidence": null, "floor_gap_m": 0.086231}], "ms": 2267.0, "backend": "remote", "url": "http://127.0.0.1:8095/perceive/people"}
+- detect_people(fire)   2.3 s  {"people": [], "ms": 2283.4, "backend": "remote", "url": "http://127.0.0.1:8095/perceive/people"}
+- assess_visibility     0.0 s  {"laplacian_var": 526.3, "rms_contrast": 41.3, "dark_channel": 0.201, "ms": 11.6, "backend": "remote", "url": "http://127.0.0.1:8095/vision/assess_visibility"}
+- match_place x2               same as local, backend "local"
+- describe_scene_heat   0.0 s  {"hot_regions": [{"bbox": [0, 48, 28, 79], "pixels": 1990, "centre": [12.2, 88.6]}], "human_band_regions": [], "ms": 1.5, "backend": "remote", "url": "http://127.0.0.1:8095/vision/scan_thermal"}
+
+MCP over stdio, remote backend at the public AWS Lambda URL (read-only calls to public routes)
+-----------------------------------------------------------------------------------------------
+- detect_people(person) 2.2 s is_error=True
+   Error executing tool detect_people: ValueError: remote /perceive/people answered HTTP 500: Internal Server Error. A deployment older than the inline-frame change to POST /perceive/people (25 Oct) answers 500 here.
+- detect_people(fire)   same HTTP 500
+- assess_visibility 1.8 s {"laplacian_var": 526.3, "rms_contrast": 41.3, "dark_channel": 0.201, "ms": 6.1, "backend": "remote", "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/vision/assess_visibility"}
+- match_place x2      same as local, backend "local"
+- describe_scene_heat 1.1 s {"hot_regions": [{"bbox": [0, 48, 28, 79], "pixels": 1990, "centre": [12.2, 88.6]}], "human_band_regions": [], "ms": 0.7, "backend": "remote", "url": "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api/vision/scan_thermal"}
+AWS and local agree on both routes: laplacian 526.3, contrast 41.3, dark channel 0.201, and the same 1990-pixel fire
+region at the same box. A direct curl of the inline body to /api/perceive/people: HTTP 500 in 1.7 s (the deployed code
+reads robot_dir, which an inline body does not have).
+
+Robot client (examples/robot_client.py) against my FastAPI on 8095
+------------------------------------------------------------------
+$ python3 examples/robot_client.py data/fixtures/mcp_frames/person_rgb.png data/fixtures/mcp_frames/person_depth.png --url http://127.0.0.1:8095
+1 people (4553.5 ms, OpenCV 5.0.0)
+  conf 0.93  bearing +17.5 deg  range 2.06 m  box [407, 383, 142, 95]
+$ python3 examples/robot_client.py data/fixtures/mcp_frames/person_rgb.png --url http://127.0.0.1:8095
+1 people (4647.9 ms, OpenCV 5.0.0)
+  conf 0.93  bearing +20.9 deg  range unknown  box [407, 383, 142, 95]
+$ python3 examples/robot_client.py data/fixtures/mcp_frames/fire_rgb.png data/fixtures/mcp_frames/fire_depth.png --url http://127.0.0.1:8095
+0 people (2608.1 ms, OpenCV 5.0.0)
+Bad input: {"rgb_b64":"notbase64!!"} -> 400 {"detail":"rgb_b64 is not valid base64"}; a 320x256 image as depth for a
+640x480 frame -> 400 {"detail":"depth is 320x256 but the colour image is 640x480"}.
+Without depth the bearing is the box-centre bearing (+20.9 deg); with depth it is the body cluster's (+17.5 deg).
+
+OpenAPI docs
+------------
+On my instance (127.0.0.1:8095): /docs 200, /redoc 200, /openapi.json 200 with title "Smoke Rescue agents", version
+2026.10.25, a description naming the public AWS routes, and request-body schemas for /perceive/people (inline frame or
+recorded frame) and /vision/{tool} (PNG or multipart). The running servers on 8080 and 8081 were not restarted and
+still serve the old code; /docs was already reachable on 8081 (200) before this change.
+On AWS: the Lambda front forwards only /api/health, /api/vision/<tool> and /api/perceive/people. /api/docs and
+/api/openapi.json answer 404 (checked with curl). Making docs public on AWS would need a change to
+deploy/aws/site_lambda.yaml and a deploy; I did neither.
+
+MCP config JSON (an MCP desktop client: your MCP client's config file; or .mcp.json)
+-----------------------------------------------------------------------------------------------------------
+{
+  "mcpServers": {
+    "smoke-rescue": {
+      "command": "/Volumes/Tashon/opencv/smoke-rescue/brain/.venv/bin/python",
+      "args": ["-m", "brain.mcp_server"],
+      "env": {"SMOKE_BACKEND": "local"}
+    }
+  }
+}
+a coding agent: <your-mcp-client> mcp add smoke-rescue -e SMOKE_BACKEND=local -- /Volumes/Tashon/opencv/smoke-rescue/brain/.venv/bin/python -m brain.mcp_server
+Checked by launching exactly that command (and the uv run --directory form) with cwd / over stdio: tools/list returned
+the four tools and assess_visibility answered (laplacian 420.7 on fire_rgb.png). I did not add the server to the assistant
+Desktop or a coding agent configs on this machine (that changes user settings); the check used the SDK client instead.
+
+Not done or not verified
+------------------------
+- detect_people through AWS: needs server.py redeployed; HTTP 500 today. Verified only against a local instance.
+- OpenAPI docs are not reachable through the public Lambda front (404); they are on any local instance.
+- match_place has no remote path (no stateless public route); it runs locally in both modes and says so.
+- Ranges, floor gaps and place keyframes assume our camera mast (1.6 m, 10 deg down); another robot gets biased ranges.
+  vision.py reads the mount from config/sensors.json directly, so the MCP tools cannot override it without editing
+  vision.py, which I left alone.
+- describe_scene_heat without rgb runs the colour detector on a black image inside scan_thermal (about 2 s, wasted);
+  rgb_people is reported as null in that case rather than an empty list.
+- The fire hotspot's 9.45 m floor upper bound was not compared with ground truth.
+- Detector times here (1.8 to 7 s) were measured while other jobs shared the machine; perception.json gives 1.3 s idle.
+- Not tested from a real ROS node or from an MCP desktop client itself.

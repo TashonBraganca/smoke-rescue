@@ -91,7 +91,37 @@ async def lifespan(app):
         place.close_all()
 
 
-app = FastAPI(title="Smoke Rescue agents", lifespan=lifespan)
+API_DESCRIPTION = """The robots' HTTP API: OpenCV 5 perception, place recognition, 3D maps and the LLM agents.
+
+Interactive docs: /docs (Swagger UI), /redoc, and the schema at /openapi.json, on any running instance.
+
+Public on AWS without a header, through the HTTPS Lambda front https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/api
+(paths below get the /api prefix there): GET /health, POST /vision/{tool}, POST /perceive/people. The ALB also forwards
+POST /place/{robot}/match publicly. Every other route (agent steps, commander, approvals, uploads, maps, trace) needs
+the deployment's X-Origin-Verify header and returns 403 without it. /docs and /openapi.json are not forwarded by the
+Lambda front; read them on a local instance.
+
+A robot that is not ours can post its own frame: POST /perceive/people with JSON {"rgb_b64": PNG or JPEG as base64,
+"depth_b64": optional 16-bit depth PNG, "depth_scale": depth units per metre (1000), "intrinsics": {"fx","fy","cx","cy"},
+"min_conf": 0.25}. See examples/robot_client.py and the MCP server in brain/mcp_server.py."""
+
+_INLINE_PEOPLE = {"requestBody": {"content": {"application/json": {"schema": {
+    "type": "object",
+    "description": "Either an inline frame (rgb_b64 ...) or a recorded frame on the server (robot_dir and t).",
+    "properties": {
+        "rgb_b64": {"type": "string", "description": "colour PNG or JPEG, base64"},
+        "depth_b64": {"type": "string", "description": "optional 16-bit single-channel depth PNG, base64, same size"},
+        "depth_scale": {"type": "number", "default": 1000, "description": "depth units per metre"},
+        "intrinsics": {"type": "object", "properties": {k: {"type": "number"} for k in ("fx", "fy", "cx", "cy")},
+                       "description": "pixels; default is the project camera scaled to the image"},
+        "min_conf": {"type": "number", "default": 0.25},
+        "robot_dir": {"type": "string", "description": "recorded frame: a recording folder or run:// id"},
+        "t": {"type": "number", "description": "recorded frame time, s"}}}}}}}
+_IMAGE_BODY = {"requestBody": {"content": {"image/png": {"schema": {"type": "string", "format": "binary"}},
+                                           "multipart/form-data": {"schema": {"type": "object", "properties": {
+                                               "file": {"type": "string", "format": "binary"}}}}}}}
+
+app = FastAPI(title="Smoke Rescue agents", description=API_DESCRIPTION, version="2026.10.25", lifespan=lifespan)
 _backend = None
 _approvals: dict[str, dict] = {}
 _ids = itertools.count(1)
@@ -220,7 +250,7 @@ async def answer_approval(aid: str, request: Request):
     return _approvals[aid]
 
 
-@app.post("/vision/{tool}")
+@app.post("/vision/{tool}", openapi_extra=_IMAGE_BODY)
 async def vision_tool(tool: str, request: Request):
     """Judge demo on one uploaded image: assess_visibility on an RGB PNG, or a thermal scan on a 16-bit thermal PNG
     (kelvin x 10). Full tools need registered depth, so this endpoint runs the image-only parts."""
@@ -258,13 +288,25 @@ async def vision_tool(tool: str, request: Request):
     return out
 
 
-@app.post("/perceive/people")
+@app.post("/perceive/people", openapi_extra=_INLINE_PEOPLE)
 async def perceive_people(request: Request):
     """The robots' live person detector: OpenCV 5 dnn running YOLO11m on the robot's own colour frame at t, with
     range from its own depth. Called by the recorder once per sim second per robot, with or without the LLM agents."""
     from brain.agent import vision
     req = await request.json()
     t0 = time.perf_counter()
+    if 'rgb_b64' in req:
+        # A frame sent inline by any robot (brain/agent/robot_frame.py); no recording is read and nothing is stored.
+        from brain.agent.robot_frame import frame_from_request
+        def detect_inline():
+            frame, meta = frame_from_request(req)
+            return meta, vision.detect_people_rgb(frame, min_conf=float(req.get('min_conf', 0.25)))
+        try:
+            meta, people = await run_in_threadpool(detect_inline)
+        except (ValueError, TypeError) as exc:
+            raise HTTPException(400, str(exc)) from exc
+        return {"t": float(req.get("t", 0.0)), "people": people, **meta, "opencv": cv2.__version__,
+                "ms": round((time.perf_counter() - t0) * 1000, 1)}
     if req.get('transport') == 'pull-v1':
         def pull_detect(job):
             job.require('rgb_depth', float(req['t']))
