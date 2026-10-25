@@ -1,0 +1,678 @@
+Smoke Rescue houses report, 25 October 2026.
+I built two furnished single-floor ranch layouts, their fire configurations and 600-second full-mission scenarios on houses-25oct. Family ranch has nine rooms and a 15 by 11 m footprint, 165 m2 gross. Long ranch has a central hallway and ten named rooms in an 18 by 11 m footprint, 198 m2 gross. The brief's long-ranch room list adds up to eleven spaces when the hallway is counted. I retained all named spaces, including four bedrooms and a separate family room.
+Each plan has one entrance, 1 m clear interior openings, a 1.6 m double front entrance, a 1.75 m hallway, five people in different rooms and one rear-bedroom bed fire origin. The scenarios retain the seed 934 full mission's 600-second cap, 480-second search deadline, 320-second fire head start, smoke densities, dark rooms adapted to the new IDs, local launch pads and B placement error. Both living-to-hall cased openings are also 1.6 m. People use the existing s1, s2, s3, s4 and s6 posed assets. Their checked positions are fixed so a later scene load preserves their room and furniture clearance. All numeric config choices have sibling reason strings. No brain source or config/brain.json changed.
+North is up in these sketches. Each D is a doorway to the hallway. The family entrance faces south through the living room. The long ranch also enters through its south living-room wall. The sketches show adjacency; the JSON has exact dimensions.
+Family ranch, 165 m2
++---------+---------+---------+-------+-------+
+| Bed 1   | Bed 2   | Bed 3   | Bath1 | Bath2 |
+|         |         | FIRE    |       |       |
++--D------+--D------+--D------+---D---+---D---+
+|                  HALLWAY                  |
++------D-----------+------D----------+---D---+
+| Living           | Kitchen/dining |Laundry|
+|                  |                |       |
++-------FRONT------+----------------+-------+
+        A pad
+        B pad
+Long ranch, 198 m2, ten rooms plus hallway
++--------+--------+--------+--------+------+------+ 
+| Bed 1  | Bed 2  | Bed 3  | Bed 4  |Bath1 |Bath2 |
+|        |        |        | FIRE   |      |      |
++--D-----+--D-----+--D-----+--D-----+--D---+--D---+
+|                      HALLWAY                  |
++-----D--------+-----D--------+-----D-----+---D---+
+| Living       | Kitchen/    | Family    |Utility|
+|              | dining      | room      |       |
++----FRONT-----+-------------+-----------+-------+
+     A pad
+     B pad
+HouseMenu.Rebuild accepts a floorplan basename. Build House keeps its default floorplan; the two added Build House menu entries select the ranches. Selection survives an assembly reload during the editor session. Returning to Build House replaces variant furniture as well as geometry. RecorderMenu has the requested brain-only menu names and run IDs unity_family_ranch_full and unity_long_ranch_full. Each run rebuilds its selected house and furniture before people are placed. The recording, fire, fluid smoke and oracle floorplan_used.json now all load that scenario's selected plan. The recorder copies floorplan_used.json before the first frame and refreshes it at checkpoints. Default-house restoration runs when a variant recording finishes or its iterator fails. A running recorder blocks a house rebuild.
+RanchExteriorBuilder generates a 22-degree pitched roof, 0.45 m eaves, fascia, gables, white siding cut around the openings, exterior sills, a flush porch slab and canopy, driveway, four lawn strips, shrubs, a tree and a mailbox. HouseBuilder supplies the framed glass windows. All materials already exist in Art/Materials. The exterior uses Unity primitives and generated gable meshes. Ground-level decoration stays outside the footprint and has no colliders. The original ground slab supports the robots. Roof parts sit above the ceilings on the cutaway layer. This preserves the evaluator's house-floor boundary. I did not open, launch or control Unity, import packages, download assets, or record a live run.
+The small validator checks room tiling, grid alignment, nonoverlap, the single entrance, doorway boundaries and widths, graph reachability, wall and furniture clearance, 0.9 m paths from each door to its room centre, people clear of furniture and doors, distinct survivor rooms, valid fire fuel, mission settings and numeric reasons. The furniture placer uses rectangular approach checks and the existing 0.1 m flood fill. The random generator's enclosing-circle approximation rejects ordinary beds in these smaller rooms, so it is not the acceptance rule here. Existing random-layout generation code remains unchanged.
+Four new C# tests exercise actual Scenario and FireSim loading, inheritance without early survivor placement, rejection of paths outside config and the default-house fallback. Those tests caught sibling smoke-density reason strings being parsed as room floats. Scenario.Load now excludes only the density map's reason annotations before typed deserialization. The file retains its annotations.
+family_ranch final headless result entered 9 of 9 spaces. Camera-searched usable floor was 97.85%, 11990 of 12253 samples. Gross room-floor coverage was 96.88%. The run confirmed 5 of 5 people and had 0 unmatched confirmation events. Both robots completed the walk out. robot_A ended in state 'complete' and was outside the house. It first logged a completed outside pose at 525.5 s. robot_B ended in state 'complete' and was outside the house. It first logged a completed outside pose at 508.5 s. 
+long_ranch final headless result entered 11 of 11 spaces. Camera-searched usable floor was 95.65%, 13715 of 14339 samples. Gross room-floor coverage was 94.91%. The run confirmed 5 of 5 people and had 0 unmatched confirmation events. Both robots completed the walk out. robot_A ended in state 'complete' and was outside the house. It first logged a completed outside pose at 514.0 s. robot_B ended in state 'complete' and was outside the house. It first logged a completed outside pose at 504.5 s. 
+These are headless measurements. The runner uses the unchanged brain with ray-cast sensors, a body capsule against walls and the other robot, fire-driven air temperature, the scenario's radio range and wall limit, and its 480-second deadline. Its person detector is idealized and does not model RGB errors, thermal images or smoke occlusion. Runtime collapse debris is not added to headless collision geometry. Zero false confirmations here does not measure a live detector's false-positive rate. The world file stays on the simulator/evaluator side. The request only maps the scenario deadline to mission_time_limit_s; it changes no search, navigation or confirmation setting.
+Coverage uses the union of both robots' own searched masks on a 0.1 m evaluator grid. Usable floor excludes furniture prisms and a conservative 0.125 m strip beside headless wall segments. The gross figure includes the whole room rectangles. These are sample-weighted house percentages, not an unweighted mean across rooms. The JSON metrics retain per-room counts. Confirmation matching uses the existing headless report's 1.05 m distance threshold. A walk-out requires actual room entry, a final pose outside every room and the complete state.
+The first full missions put the origin in the front living room. Family ranch entered 9/9 spaces, searched 98.19% of usable floor and confirmed 5/5 people with zero unmatched confirmation events. Long ranch entered 11/11 spaces, searched 97.31% and confirmed 5/5 with zero unmatched events. One robot in each run held inside on return while air temperature rose. I moved only the fire origin to a rear bedroom, preserving the head start, solver and material parameters, and ran both complete missions again. Initial fire files, scores and command output remain under handoff/houses_evidence with initial_ names. The rear-fire reruns repeated the same return stopping positions, so the origin move did not resolve the failure. I then widened the front entrances and the family living-to-hall opening from 1 m to 1.6 m. Furniture, people, pads and every robot setting stayed identical. The widened-opening long-ranch run still left robot A inside. I then moved its front entrance from the hall end to the living room, with a broad cased opening into the hall. Only living-room furniture was revised; people and the local launch protocol stayed identical. The final results above use the successful widened-opening family run and the final living-entry long run. The west-entry metrics remain in metrics_long_ranch_west_entry.json, and rear-fire metrics remain in metrics_family_ranch_rear_fire.json and metrics_long_ranch_rear_fire.json. The houses were revised after inspecting headless failures. Treat these runs as development checks.
+The first launch also caught an off-grid room edge at 5.20 m. I moved it to 5.25 m and added an off-grid rejection check. That failed launch ended before either mission stepped. Its output remains in initial_grid_failure.txt.
+The editor files were read twice and compile against the installed Unity managed APIs using tools/check_ranch_editor.py. Existing project collaborators and HDRP use compile-only stand-ins in that check. It does not compile the full Unity project or prove actual scene construction, imported furniture bounds, material appearance, roof shading, oracle export or default-house restoration in the editor. The headless build compiles the existing Brain, sensor types, FloorPlan, FireSim and simulator sources; the logic build also compiles Scenario and its new tests. Atmosphere and RecordingSession changes were source-reviewed. A live Unity build and recording remain untested because the brief forbids launching Unity while it is recording.
+the project notes and docs/INTERFACES.md were absent from this worktree because they are ignored. I read their source-checkout copies under /Volumes/Tashon/opencv/smoke-rescue, along with its referenced setup, build-order and simulation documents. I did not write there or change their interfaces. The existing LFS texture differences and untracked handoff brief/log were present at the start and remain outside the proposed commit.
+The exact verification commands and their captured output follow. The runner emits a macOS CSSM_ModuleLoad message before successful .NET builds. The compiler reports zero warnings and errors separately.
+$ tools/headless/test.sh
+CSSM_ModuleLoad(): One or more parameters passed to a function were not valid.
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:07.46
+PASS ABlankWallFillingTheViewIsNotSmokeButABlankViewWithNoDepthIs
+PASS ACameraMatchImplyingMoreThanThePadsAllowIsIgnored
+PASS ACandidateOutOfViewDuringTheApproachIsNotLostButOneInViewAndUnseenIs
+PASS ACarriedPersonGoesOutSlowlyAndTheRobotMayComeBack
+PASS ACarriedPersonIsSetDownClearOfTheWayOutAndTheRobotPlansBackInAroundThem
+PASS ACeilingSeenFromAnUnprovenDoorwayProvesTheFloorUnderItsSightLine
+PASS ACloserLookAtAnUnstandablePointUsesAStandableViewpointWithAClearView
+PASS ACorridorIsALongNarrowRegionWithSeveralRoomsOffIt
+PASS ACoveredCorridorKeepsItsTierBecauseItsFarEndIsUnknown
+PASS ACoveredRoomRanksLastOnlyOnceEntered
+PASS ACutOffRobotsAgentCannotDrawKeepOutAreas
+PASS ADeadlineReturnCutByFireRetreatsInsteadOfHolding
+PASS ADoorOutOfACoveredRoomRanksAsANewRoomButALeftoverDoesNot
+PASS ADoorwayCrossedAtAnAngleFromAHallwayIsTaken
+PASS ADoorwayFrontierReportsTheUnsearchedFloorMappedBeyondIt
+PASS ADoorwayInTheMapBecomesAGoalInsideItsRoom
+PASS AFarFireBesideANearJambIsNotPutOnTheJamb
+PASS AFireCutFrontierTheBrainBlacklistedIsStillReportedForWater
+PASS AFireHeatingTheRobotIsReportedForSprayingEvenWhenItBlocksNoRoute
+PASS AFireSeenOutForTwoSecondsIsNoLongerFireButFlickerAndPartnerHeatStay
+PASS AFlickerBetweenFramesIsNoFireForecastButASustainedRiseStillIs
+PASS AFollowThroughGoalWhoseRouteTheFireCutIsLeftAloneToo
+PASS AForecastOnlyRouteCutReplansWithoutExcludingTheGoal
+PASS AFrontierWhoseRouteTheFireCutIsLeftAloneWhileTheFlamesFlicker
+PASS AfterArrivingWhereTheAgentAskedTheRobotWaitsForItsNextOrder
+PASS AfterLeavingForHeatTheRobotWaitsBeforeGoingBackAndLeavesAgainAtTheFirstSign
+PASS AgentFrontierSearchStillTakesTheDoorwayLookAndKeepsItsTarget
+PASS AHighCeilingCountsAsCeiling
+PASS AHolderRadiosItsRoomAndYieldsItOnceToALowerBid
+PASS AirTemperatureRampTriggersRetreat
+PASS ALiveAgentOrderKeepsTheReflexOffAFreshCandidateForTheGraceOnly
+PASS AMeasuredCutWinsEvenWhenAForecastCellIsCloser
+PASS AMeasuredRouteCutStillExcludesTheGoal
+PASS AnAgentCannotKeepARobotInOnceNoFrontierIsLeftAndTheAirIsHeating
+PASS AnAgentFrontierInsideThePartnersClaimIsYieldedOnceAndDropped
+PASS AnAgentFrontierOnFloorThePartnerSearchedIsDroppedOnce
+PASS AnAgentGoalOffItsCellCentreEndsAtTheCellAndDoesNotReplanEveryTick
+PASS AnAgentGoToNeverSendsAnEmptyClaimAndABadPacketIsDropped
+PASS AnAgentGoToWithAFacePointTurnsToFaceItBeforeReportingArrival
+PASS AnAgentKeepOutAreaNeverContainsTheRobot
+PASS AnAgentKeepOutAreaNeverCutsTheWayOut
+PASS ANarrowCorridorIsNoDoorway
+PASS AnEnclosedRoomWithSomeProvenFloorBecomesSearchAreaButAnOpenYardNever
+PASS ANewDepthHitBlocksPreviouslyFreeSpaceAndInvalidatesAPath
+PASS AnExclusionCircleDoesNotReachThroughAWall
+PASS AnExhaustedRobotTakesAnEmergencyExitPastTheFire
+PASS AnExplorationOrderDuringADoorwayLookWaitsForTheLookToFinish
+PASS AnExteriorDoorGetsOnlyABoundedEvidenceMoveAndOpenGroundStaysUnproven
+PASS APartnerInTheDoorwayHasNotEnteredTheRoom
+PASS APartnerSettingOffFromStandingIsNotMappedAsWall
+PASS APartnersWallWhereThisRobotWalkedIsItsOwnBody
+PASS APartnerWalkingInIsNotMappedAsWallButAWallBesideItIs
+PASS APersonCarriedOutLeavesTheToRescueListHereAndOnThePartner
+PASS APersonConfirmedJustInsideTheOnlyDoorDoesNotCloseIt
+PASS APersonLyingInACorridorNoLongerSealsItWhenFloorBeyondIsCutOff
+PASS APersonThisRobotCarriedOutIsNotANewSurvivor
+PASS ArcRequiresKnownFreeTailSpaceAndKeepsTheHeatMargin
+PASS AReflexDoorwayLookGathersCeilingEvidenceBeforeItExploresBeyondTheWall
+PASS ARejectedWarmShapeIsNotRaisedAgainUntilSeenFromANewViewpoint
+PASS ARetreatWithNoRouteAtTheFullFireClearanceTakesASmallerMarginInsteadOfHolding
+PASS AReturnCutByFireBecomesARetreatNotAStandstill
+PASS AReturnEndsWithinHalfAMetreOfADoorwayStart
+PASS AReturnUsesALinkedPartnersEntryWhenItsOwnIsCutOff
+PASS ARobotBackInWarmButNotHotAirRecoversItsHeatBudgetAndSearchesAgain
+PASS ARobotCutOffIsToldWhereTheFireBlocksItsWayOut
+PASS ARobotGoesBackInOnlyWhereTheFireIsNotClosingOnTheWayIn
+PASS ARobotInAHeatMarginFollowsItsPathWithoutALoop
+PASS ARobotInsideAFireMarginCanAlwaysPlanItsWayOut
+PASS ARobotLeavesEarlyWhenFireClosesOnItsWayOutFasterThanItCouldWalkIt
+PASS ARobotLeavesInTimeToBeOutByTheMissionDeadline
+PASS ARobotLeavesWhileFireIsClosingOnItsWayOut
+PASS ARobotOutsideGoesBackInByAFrontierClearOfTheFireEvenWhenTheNearestIsNot
+PASS ARobotThatLeftEarlyGoesBackInWhenTheWayIsClear
+PASS ARobotThatLeftForLackOfFrontiersGoesBackInWhenATemporaryExclusionExpires
+PASS ARobotThatWalksBackInFromANewSpotCanLeaveThere
+PASS ARobotWaitingOutsideAtABlockedEntryFollowsTheWallToLookForAnotherWayIn
+PASS ARoomBidCountsOnlyThePathStillToWalk
+PASS ARoomBidIsTheWalkedLengthOverOpenSpeedNotThePlannerCost
+PASS ARoomIsFinishedWhileItStillGivesFloorAndLeftWhenItStalls
+PASS ARoomMappedOnlyByLidarIsSearchableButTheYardIsNot
+PASS ARoomStaysWalledInWhenItsLidarLooksOutOfAnOpenDoor
+PASS ARoomThePartnerStandsInOrWalkedThroughIsNotSearchedAgain
+PASS ARoomWithAnOpenOutsideDoorIsWalledInButNotTheGroundOutside
+PASS ARouteNeverPassesThroughAConfirmedPerson
+PASS ArrivingWhereTheAgentAskedTellsTheAgentWhy
+PASS ASmallRoomIsViewedFromCloserWhenTheViewingBandHasNoClearSpot
+PASS AStandingRobotIsNotCirclingSoTheProgressWatchdogLeavesTheNearbyDoorsAlone
+speed 0: goal=1, replan=27 state explore
+speed 0.3: goal=2, replan=27, no_progress=1 state explore
+PASS AStarGoesAroundWallsAndKeepsFireClearance
+PASS AStepInsideNeedsTheBodyPastTheDoorwayWhicheverWayTheRoomFaces
+PASS AStepJudgedByItsPointLeavesACellBoundaryAtADoorTheCellRuleHeldItOn
+cell rule moved 0.000 m; point rule moved 0.495 m, closest 0.312 m
+PASS AtAForkTheRobotTakesTheWayAwayFromItsPartner
+PASS ATeammateSeenStandingInTheDoorwayIsNotLeftAsAWall
+PASS AThermalShapeBesideAConfirmedPersonIsNotApproachedAgain
+PASS ATurnTheBodyCannotMakeIsTakenTheOtherWayRound
+PASS AViewingSpotIsFoundAnywhereInTheViewingBandWhenTheStandoffRingIsBlocked
+PASS AVisualLoopClosureMeasuresTheDriftSinceTheEarlierView
+PASS AWarmPatchOnALongWallIsFlaggedAndNotApproachedButABodyIs
+PASS AWarmShapeTheColourDetectorNeverSawIsNotConfirmedByDwell
+PASS AWarmSpotThePartnerRejectedStaysQuietUntilSeenFromANewSide
+PASS AWayOutIsAPlaceNotOneCell
+PASS AWholeColourPersonOnTheFloorIsConfirmedWithoutTheAgent
+PASS AWithdrawnConfirmationLeavesTheListAndAPartnerCannotPutItBack
+PASS BehindAPartnerJustAheadOnTheWayInARobotWaitsItsTurnForALimitedTime
+PASS BehindItsPartnerAtOneDoorARobotFollowsThroughInsteadOfStopping
+PASS BrainAssemblyHasOnlySensorDependency
+PASS CameraDropoutResetsThePoorHealthTimer
+PASS CameraKeyframesSurviveTheRadioFormat
+PASS CameraMatchCannotReplaceAnExistingFrameLink
+PASS CameraMatchesNeedSeparatedPartnerPlacesAndEnoughInliers
+PASS CameraMatchesWithoutALidarMapNeverBecomeLinkCandidates
+PASS CameraPacketsCarryANearbyLidarSweepWithinTheByteBudget
+PASS CameraRansacDisagreeingWithALidarCandidateCannotLink
+PASS CameraSwitchRequiresContinuousHysteresisDurations
+PASS CameraVerificationUsesTheSamePerStepBudgetAsLidar
+PASS CeilingCoverageAloneCannotCertifyAnUnpromotedRoom
+PASS CeilingPointsOnAWallFaceDoNotMakeTheYardIndoors
+PASS ColourPersonRangeIsAlreadyMeasuredFromTheRobotBody
+PASS ColourPersonSightingsBecomeACandidateWhereThePersonIs
+PASS ConfigurationLoadsThresholdsAndSensorMotionLimits
+PASS CorridorFirstWalksTheCorridorBeforeEnteringRoomsButStillFinishesTheRoomItIsIn
+PASS CutOffInHeatingAirTheRobotRetreatsInsteadOfObeyingAnOrderToStay
+PASS CutOffInWarmAirTheRobotTakesALastResortRouteWhenTheEmergencyOneIsShut
+PASS CutOffInWarmAirWithNoRouteOutTheRobotNeitherFlipsNorRefusesMoves
+PASS CutOffWithTheAirHeatingTheRobotLeavesByTheEmergencyRouteAtOnce
+PASS DeadReckoningUsesGyroYawAndBodyTranslation
+PASS DelayedDepthIsProjectedAtCapturePose
+PASS DenseFireSnapshotFitsTheEntireHouseWithoutDroppingHotspots
+Dense fire without camera = 28983 bytes.
+Dense fire full = 33412 bytes for 7000 hot cells.
+PASS DenseHeatWirePrecisionIsBoundedAndReencodingIsStable
+PASS DifferentRoomsNeverLinkAndHoldBackThePartnersMap
+PASS DoorsTravelInTheRadioMessage
+PASS EntryPoseProjectsFirstWallIntoBuildingCells
+PASS FireCuttingOffTheOnlyFrontierIsReportedWhereWaterWouldOpenIt
+PASS FloorBehindALowDeskIsAFrontierByTheLive3DMapButNotBehindATallCabinet
+PASS FloorBehindATableIsMappedButNotSearched
+PASS FloorBetweenAnIndoorCameraAndTheCeilingItSeesIsIndoors
+PASS FloorNotProvenIndoorsIsExploredOnlyWithAnOpenCvIndoorCheck
+PASS FloorOutsideAnOpenDoorIsNotIndoors
+PASS FloorSeenFromBeyondTheSearchRangeIsMappedButNotSearched
+PASS FreshDepthClearsAnInferredContactButOlderDepthDoesNot
+PASS FrontierSelectionIgnoresFrontiersCutOffByFire
+PASS GoingBackInCountsTheFireBesideTheDoor
+PASS GyroIntervalsDoNotDependOnBrainStepPhase
+PASS GyroIntervalsStayBoundedDuringAnOdometryOutage
+PASS HeadlessMotionErrorsAreOptInSeededAndApplyKnownHeadingAndBias
+PASS HeatStillCancelsADoorwayEvidenceMove
+PASS HeldCollisionLimitBecomesOneRecoveryWithoutPhantomWalls
+PASS IdenticalSensorStreamsProduceIdenticalCommandsAndEvents
+PASS InvalidVisualPoseOrOversizePayloadIsRejectedBeforeMatching
+PASS LeavingBecauseOfHeatDoesNotCrawlPastWalls
+PASS LidarFingerprintsLinkTwoRobotFramesWithoutAnyOperatorPose
+PASS LidarMapsWallsAndFloorButDoesNotCountAsSearched
+PASS LocalEvidenceApproachesStayProvenAndRespectClaimsAndWalls
+PASS LongUnsearchedEdgeOffersSeveralFrontiersAndClaimsStayLocal
+PASS LostDeltasRecoverFromAcknowledgementAndFromFullSnapshot
+PASS LowerIdKeepsAContestedGoalAndClaimsExpire
+PASS MessageByteLimitsUseActualBinaryRoundTripsAtHouseScale
+Without keyframes full = 3580, delta = 3012; visual payload = 3653 bytes. House full = 8009 bytes; delta = 7441 bytes.
+PASS MessageExchangeIsDeterministicAndSnapshotsAreDetached
+PASS MixedRateMotionIntegratesAConstantQuarterCircle
+PASS MotionAgentFaceAcceptsTheCentralCameraViewButStillTurnsForAnOffscreenPoint
+PASS MotionInspectionTimeoutLetsAnInProgressDwellFinish
+PASS MotionInspectionTimeoutReleasesAnUnsettledViewWithoutConfirmingIt
+PASS MotionKeepsTheNewAgentRouteWhenTheOldPathWasBlocked
+PASS MotionSweepDoesNotTurnForFloorBelowTheCameraView
+PASS MovingOdometryNeverTriggersStuck
+PASS NearbyUnprovenFloorGetsALookBeforeAnAgentFrontierLeavesTheArea
+PASS NewExteriorViewsCannotBecomeReentryAnchors
+PASS NewPeerDoesNotAcknowledgeAnUnseenDeltaBaseline
+PASS NextFullSnapshotRecoversAnObservationDroppedDuringAnOutage
+PASS NoReachableFrontierIsReportedOncePerScanSoAnAgentCanAct
+PASS NoReverseLimitUsesATurnAndDoesNotBackIntoUnknownSpace
+PASS OldAndTruncatedRadioPacketsAreDroppedAndLogged
+PASS OnAnEmergencyExitOnlyMeasuredFireShutsTheDoorNotAFastRisingReading
+PASS OnlyOwnViewsNearThePartnerOrAnEarlierVisitAreCandidates
+PASS OpenGroundAlongOneWallNeverLinks
+PASS OpenGroundTheLidarSawDoesNotWinAWideSlotForAnUnprovenFrontier
+PASS OutOfContactTooLongTheRobotWalksBackToWhereItLastHeardItsPartner
+PASS OutsideWithNothingToWalkToTheRobotFacesTheWayInInsteadOfScanning
+PASS PartnerVisualWorkIsBoundedAndRetriedWhenAnOwnViewArrives
+PASS PeerHotspotBlocksPlanningAndOldHeatArrivesAlreadyDecayed
+PASS PeerObstacleBlocksUnseenRoomsAndFreshDepthOverridesIt
+PASS PeerRoomsAreTraversableButNeverBecomeFrontierGoals
+PASS PeerSurvivorCancelsInspectionAndLogsOnlyOnce
+PASS PeerWallsNeverOverrideCellsThisRobotHasSeenFree
+PASS PlanningStartsFromASpotTighterThanThePlanningClearance
+PASS RanchFloorplanSelectionReadsInheritanceWithoutPlacingPeople
+PASS RanchFloorplanSelectionRejectsPathsOutsideConfig
+PASS RanchScenariosLoadPeopleAndFireAgainstTheirSelectedHouse
+PASS RanchSupportPreservesTheDefaultHouseSelection
+PASS RecoveryTimesOutWhenReverseAndTurningAlsoCannotMove
+PASS ReentryDoesNotChooseANeighboursFrontierEvenWhenItsYardRouteIsSafe
+PASS ReentryNeedsAnIndoorConnectionNotAFreePathAcrossTheYard
+PASS RepeatedStallsNearOnePlaceBlacklistTheGoalAndSelectAnotherFrontier
+PASS RepeatingCorridorCameraMatchesFailTheLidarUniquenessTest
+PASS ReturnUsesTheEnteredDoorInBuildingCoordinates
+PASS RisingHeatIsForbiddenBeforeItCrossesTheFireThreshold
+PASS RoomLedgerCountsPartnerSearchButNeverPartnerOnlyGeometry
+PASS RoomLedgerDoorwayFrontierCreditsOnlyFloorOnASensedSightline
+PASS RoomLedgerMergeAndSplitKeepVisitsOnTheCellsActuallyEntered
+PASS RoomLedgerMovesOnAfterCoverageOrDwellWhilePlainRankingLingers
+PASS RoomLedgerPreferredFrontierSurvivesTheAgentOptionLimit
+PASS RoomLedgerPreservesVisitTimeAcrossGrowthAndRecomputesOnItsPeriod
+PASS RoomLedgerRankingStillExcludesClaimsAndChargesTravel
+PASS RoomLedgerSplitsANarrowDoorButKeepsAWideOpeningConnected
+PASS RoomLedgerUsesOnlySensedGeometryAndNeverWritesIndoorOrSearchEvidence
+PASS ScanMatchingStopsOdometryDriftFromGrowing
+error at 3 s / 6 s: matched 0.072 / 0.064 m, control 0.180 / 0.360 m. [t 0 matched 0 fit 0.00 dy 0.000] [t 1 matched 10 fit 0.97 dy -0.008] [t 2 matched 10 fit 0.97 dy -0.072] [t 3 matched 10 fit 0.98 dy -0.048] [t 4 matched 10 fit 0.97 dy -0.072] [t 5 matched 10 fit 0.98 dy -0.048] [t 6 matched 10 fit 0.97 dy -0.072] || [t 0 matched 0 fit 0.00 dy 0.000] [t 1 matched 10 fit 0.71 dy 0.000] [t 2 matched 10 fit 0.69 dy 0.000] [t 3 matched 10 fit 0.75 dy 0.000] [t 4 matched 10 fit 0.71 dy 0.000] [t 5 matched 10 fit 0.69 dy 0.000] [t 6 matched 10 fit 0.79 dy 0.000] || 
+PASS SearchNeedsACeilingSeenByTheRobotsOwnCamera
+PASS SnapshotAndDrainedEventsDoNotExposeMutableBrainBuffers
+PASS SoftClearanceMovesDoorCrossingAwayFromTheJambWithoutClosingNarrowDoors
+Door crossing y changed from 0.35 m to 0.45 m; 0.8 m door remains reachable.
+PASS StaleSensorsStopMotionAndCommandsRespectMotionLimits
+PASS StalledForwardCommandEmitsOnceReversesAndReplansAroundOwnObstacle
+PASS StandingInACorridorItsFrontiersComeBeforePocketsInEnteredRoomsButAfterUnenteredRooms
+PASS StayingInsideARobotNeverGoesBackNearTheWayItCameIn
+PASS StayingInsideARobotNotYetInsideKeepsScanningInsteadOfHolding
+PASS StayingInsideARobotStopsAtTheDeadlineAndRetreatsInsteadOfLeaving
+PASS StayingInsideNoisyAirAtTheRiseThresholdSteersOnce
+PASS StayingInsideRisingHeatSteersTheSearchAwayWithoutStoppingIt
+PASS StayingInsideTheEntranceGetsNoDoorwayLook
+PASS StayingInsideTheRetreatGoesBackToAirTheRobotMeasuredCool
+PASS StayingInsideTheRetreatNeverPicksFloorOutside
+PASS StayingInsideTheRetreatTrustsAPartnersNewerAirReading
+PASS StayingInsideWarmAirWithNothingLeftDoesNotPingPongRetreats
+PASS StayInsidePreventsAnArcAcrossUnprovenFloorAndGoalsBehindStillPivot
+PASS StuckConfigurationRejectsInvalidThresholdsAndRecoveryBounds
+PASS StuckEvidenceResetsAcrossMotionAndSensorGaps
+PASS StuckRecoveryCommandsEventsAndMapsAreDeterministic
+PASS SurvivorApproachStopsFacesAndConfirmsOnlyOnce
+PASS SweepsSkipSearchedWallSectorsInACorridorButKeepAllThreeLooksInAnOpenRoom
+corridor: 1 look, 0.0 degrees, 2.00 s
+open room: 3 looks, 210.9 degrees, 11.60 s
+PASS SweptPathLimitsForwardSpeedOnlyForObstaclesAhead
+PASS TeamMapCameraFloorIntegrationRecordsSearchWithoutCountingWallHits
+PASS TeamMapCorrectionMovesPreviouslySharedEvidenceWithoutAnotherObservation
+PASS TeamMapCorrectionsRetainEvidenceWithoutGridAllocations
+20000 corrections allocated 0 bytes.
+20000 corrections took 2.5662 ms on the standalone runtime.
+PASS TeamMapFreshLocalFreeKeepsUncertainPartnerWallOutOfDoorway
+PASS TeamMapFusesEachSourceOnceAndNeverForwardsFusedBelief
+PASS TeamMapLostBatchesReturnAndNewerAbsoluteBeliefsReplaceOldOnes
+PASS TeamMapRadioCarriesPoseUncertaintyAndBoundsItsEvidenceBatch
+PASS TeamMapRobotCorrectionsAndScanMatchingUpdateTheSharedTransform
+PASS TeamMapSearchRequiresCameraFloorAndRetainsWhoAndWhen
+PASS TheAgentHearsTheAirItsHeatBudgetsTimeLeftAndTheNearestFireInItsOwnMap
+PASS TheAgentIsOfferedTheDoorwayOntoTheLargestUnsearchedAreaNotOnlyNearbyCorners
+wide 3: (0.3,1.6) cost 1.58 beyond 0.7 proven True; (1.3,1.2) cost 1.66 beyond 1.1 proven True; (1.9,0.4) cost 1.92 beyond 1.1 proven True; (2.0,-0.3) cost 2.07 beyond 1.1 proven True; (1.6,-1.5) cost 2.12 beyond 1.1 proven True; (0.4,-2.2) cost 2.37 beyond 1.1 proven True; (-1.7,-1.8) cost 2.50 beyond 0.7 proven True; (0.4,5.6) cost 5.65 beyond 21.8 proven True
+wide 0: (0.3,1.6) cost 1.58 beyond 0.7 proven True; (1.3,1.2) cost 1.66 beyond 1.1 proven True; (1.9,0.4) cost 1.92 beyond 1.1 proven True; (2.0,-0.3) cost 2.07 beyond 1.1 proven True; (1.6,-1.5) cost 2.12 beyond 1.1 proven True; (0.4,-2.2) cost 2.37 beyond 1.1 proven True; (-1.7,-1.8) cost 2.50 beyond 0.7 proven True; (-0.4,-2.3) cost 2.51 beyond 0.7 proven True
+PASS TheBodyIsTheCapsuleUnityCollidesNotARoundRobot
+PASS TheBurningAreaCountsMeasuredFireNearTheBlockNotForecastOrFarFire
+PASS TheEntranceLockLetsARouteCrossTheWayInOnlyIndoorsAndNeverStopsThere
+PASS TheLidarFindsAWayOutThroughAnOpeningInHeavySmoke
+PASS TheLidarSweepSuppliesThePrecisionOfACameraFoundPlace
+PASS ThermalBlobsRejectFireAndTwoPixelNoise
+PASS ThermalSizesAWarmBlobWithLidarRangeWhenSmokeRemovesDepth
+PASS TheRobotSpraysAMeasuredFireBlockingItsWayByItself
+PASS TheRoomAuctionGivesEachRoomToTheLowerBidForAnyNumberOfRobotsAndClaimsLapse
+PASS TheRoomMemoryKeepsARoomAcrossResegmentationsAndMarksItEnteredOnlyAtItsSeat
+PASS TheRoomMemoryNeverHandsOneRoomsFlagsToAnotherAcrossAMergeAndSplit
+PASS TheRoomWhereTheAirPassedTheRetreatLimitIsMarkedOnFireUntilItsFireIsOut
+PASS TheShippedConfigLocksTheWayInForRobotsThatStayInside
+PASS TheShippedViewingWindowLiesWhereTheCameraCanSeeALyingPerson
+PASS TheTopOfAWallFaceDrawsNoCeilingSightLines
+PASS TheViewingStopWaitsForAClearLineToThePerson
+PASS TheWalkOutWhenDoneCrossesTheEntranceLock
+PASS TheYardBesideAFacadeIsNotWalledInWhateverStandsThere
+PASS TimeLimitReturnsAndEmitsMissionCompleteOnlyOnce
+PASS TriggerFireConfigurationReachesHeatAndSurvivesARewind
+PASS TwoAgreeingCameraPlaceMatchesLinkTheFramesAndOneOrAConflictDoesNot
+PASS TwoCameraMatchesTwoDegreesApartDoNotRefineTheSharedFrame
+PASS UnsearchedFloorBehindAnObstacleIsReportedWithItsBearing
+PASS UnsearchedFloorBehindFurnitureThroughAGapTooTightToStandInIsAFrontier
+PASS VisualOnlyPacketsAreResentAndCallerPayloadsAreDetached
+PASS WalkingAnOpenQuarterTurnSpendsLessTimeStationaryAndAWallKeepsThePivot
+arc_limit=0, wall=False, stationary=0.85s, arrival=6.40s
+arc_limit=90, wall=False, stationary=0.00s, arrival=6.05s
+arc_limit=90, wall=True, stationary=0.55s, arrival=11.10s
+arc_limit=0, wall=True, stationary=1.30s, arrival=11.70s
+PASS WalkingIntoARoomTakesItsDoorwayAndWalkingOutClearsIt
+PASS WalkingTowardAStillFireIsNotAClosingFront
+PASS WallAndFloorProjectionRespectMountAndTopRowConvention
+PASS WideSlotsIncludeAnUnprovenDoorwayEvenWhenProvenPocketsFillTheList
+wide 3: (0.3,1.6) cost 1.58 beyond 0.7 proven True; (1.3,1.2) cost 1.66 beyond 1.1 proven True; (1.9,0.4) cost 1.92 beyond 1.1 proven True; (2.0,-0.3) cost 2.07 beyond 1.1 proven True; (1.6,-1.5) cost 2.12 beyond 1.1 proven True; (0.4,-2.2) cost 2.37 beyond 1.1 proven True; (-1.7,-1.8) cost 2.50 beyond 0.7 proven True; (0.4,5.6) cost 5.65 beyond 0.0 proven False
+wide 0: (0.3,1.6) cost 1.58 beyond 0.7 proven True; (1.3,1.2) cost 1.66 beyond 1.1 proven True; (1.9,0.4) cost 1.92 beyond 1.1 proven True; (2.0,-0.3) cost 2.07 beyond 1.1 proven True; (1.6,-1.5) cost 2.12 beyond 1.1 proven True; (0.4,-2.2) cost 2.37 beyond 1.1 proven True; (-1.7,-1.8) cost 2.50 beyond 0.7 proven True; (-0.4,-2.3) cost 2.51 beyond 0.7 proven True
+PASS WithAnAgentTheReflexOnlyBringsTheCamerasCloseAndNeverConfirms
+PASS WithCorridorFirstOneRobotHoldsTheHallAndAFollowThroughIgnoresRoomClaims
+PASS WithLaunchPadsTwoAgreeingCameraMatchesRefineTheSharedFrame
+PASS WithNothingLeftAtTheDoorARobotWalksInAfterItsPartner
+PASS WithNothingLeftToSearchInsideTheRobotWalksOut
+PASS WithOnlyUnprovenFloorPastADoorwayTheRobotGoesToLookThroughIt
+PASS WithoutAHeatBudgetHotAirMarksTheRoomAndTheRobotSearchesOn
+PASS WithTheTurnCostAFrontierAheadBeatsASlightlyNearerOneBehind
+PASS YardFrontiersOnOpenGroundGiveWayToProvenIndoorOptions
+278 passed, 0 failed
+
+$ python3 tools/validate_ranches.py
+family_ranch: PASS, 9 rooms, 165 m2, one entrance, all doors >= 0.9 m, all rooms reachable by 0.9 m paths, five people in separate rooms clear of furniture, numeric reasons present
+long_ranch: PASS, 11 rooms, 198 m2, one entrance, all doors >= 0.9 m, all rooms reachable by 0.9 m paths, five people in separate rooms clear of furniture, numeric reasons present
+
+$ /Volumes/Tashon/opencv/smoke-rescue/brain/.venv/bin/python -m pytest -p no:cacheprovider -q tools/test_random_layout.py tools/test_ranches.py
+........................................................................ [ 94%]
+....                                                                     [100%]
+76 passed in 19.19s
+
+$ tools/headless/run.sh handoff/houses_evidence/request_wide.json
+CSSM_ModuleLoad(): One or more parameters passed to a function were not valid.
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:01.88
+data/runs/houses_25oct/family_ranch_wide: 600 s simulated in 1591 s
+data/runs/houses_25oct/long_ranch_wide: 600 s simulated in 1681 s
+
+$ tools/headless/run.sh handoff/houses_evidence/request_front_living.json
+CSSM_ModuleLoad(): One or more parameters passed to a function were not valid.
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:08.59
+data/runs/houses_25oct/long_ranch_front_living: 600 s simulated in 1303 s
+
+$ python3 tools/check_ranch_editor.py
+CSSM_ModuleLoad(): One or more parameters passed to a function were not valid.
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:29.89
+
+$ git diff --exit-code -- unity/SmokeRescue/Assets/SmokeRescue/Brain config/brain.json
+git diff --exit-code -- unity/SmokeRescue/Assets/SmokeRescue/Brain config/brain.json
+exit code 0
+
+$ python3 tools/score_ranches.py _final
+{
+  "run": "data/runs/houses_25oct/family_ranch_wide",
+  "house": "family_ranch",
+  "duration_s": 600.0,
+  "rooms_entered": 9,
+  "rooms_total": 9,
+  "usable_floor_coverage_pct": 97.85,
+  "gross_floor_coverage_pct": 96.88,
+  "usable_samples_searched": 11990,
+  "usable_samples": 12253,
+  "people_confirmed": 5,
+  "people_total": 5,
+  "confirmed_ids": [
+    "s1",
+    "s2",
+    "s3",
+    "s4",
+    "s6"
+  ],
+  "false_confirmation_events": 0,
+  "both_walked_out": true,
+  "robots": {
+    "robot_A": {
+      "walked_out_at_s": 525.5,
+      "rooms_entered": [
+        "fr_bath1",
+        "fr_bath2",
+        "fr_bed2",
+        "fr_bed3",
+        "fr_hall",
+        "fr_kitchen",
+        "fr_laundry",
+        "fr_living"
+      ],
+      "final_pose_gate": [
+        -0.0668824,
+        0.43939933
+      ],
+      "final_state": "complete",
+      "outside_at_end": true,
+      "walked_out": true
+    },
+    "robot_B": {
+      "walked_out_at_s": 508.5,
+      "rooms_entered": [
+        "fr_bed1",
+        "fr_bed2",
+        "fr_bed3",
+        "fr_hall",
+        "fr_kitchen",
+        "fr_living"
+      ],
+      "final_pose_gate": [
+        0.13902119,
+        -0.67941785
+      ],
+      "final_state": "complete",
+      "outside_at_end": true,
+      "walked_out": true
+    }
+  },
+  "rooms": {
+    "fr_hall": {
+      "entered": true,
+      "gross_floor_pct": 100.0,
+      "usable_floor_pct": 100.0,
+      "usable_samples_searched": 2292,
+      "usable_samples": 2292
+    },
+    "fr_living": {
+      "entered": true,
+      "gross_floor_pct": 98.14,
+      "usable_floor_pct": 97.37,
+      "usable_samples_searched": 1442,
+      "usable_samples": 1481
+    },
+    "fr_kitchen": {
+      "entered": true,
+      "gross_floor_pct": 94.05,
+      "usable_floor_pct": 97.94,
+      "usable_samples_searched": 1668,
+      "usable_samples": 1703
+    },
+    "fr_laundry": {
+      "entered": true,
+      "gross_floor_pct": 89.71,
+      "usable_floor_pct": 97.72,
+      "usable_samples_searched": 813,
+      "usable_samples": 832
+    },
+    "fr_bed1": {
+      "entered": true,
+      "gross_floor_pct": 97.34,
+      "usable_floor_pct": 96.5,
+      "usable_samples_searched": 1323,
+      "usable_samples": 1371
+    },
+    "fr_bed2": {
+      "entered": true,
+      "gross_floor_pct": 98.92,
+      "usable_floor_pct": 98.4,
+      "usable_samples_searched": 1349,
+      "usable_samples": 1371
+    },
+    "fr_bed3": {
+      "entered": true,
+      "gross_floor_pct": 96.21,
+      "usable_floor_pct": 96.06,
+      "usable_samples_searched": 1317,
+      "usable_samples": 1371
+    },
+    "fr_bath1": {
+      "entered": true,
+      "gross_floor_pct": 96.63,
+      "usable_floor_pct": 97.49,
+      "usable_samples_searched": 893,
+      "usable_samples": 916
+    },
+    "fr_bath2": {
+      "entered": true,
+      "gross_floor_pct": 96.55,
+      "usable_floor_pct": 97.49,
+      "usable_samples_searched": 893,
+      "usable_samples": 916
+    }
+  }
+}
+{
+  "run": "data/runs/houses_25oct/long_ranch_front_living",
+  "house": "long_ranch",
+  "duration_s": 600.0,
+  "rooms_entered": 11,
+  "rooms_total": 11,
+  "usable_floor_coverage_pct": 95.65,
+  "gross_floor_coverage_pct": 94.91,
+  "usable_samples_searched": 13715,
+  "usable_samples": 14339,
+  "people_confirmed": 5,
+  "people_total": 5,
+  "confirmed_ids": [
+    "s1",
+    "s2",
+    "s3",
+    "s4",
+    "s6"
+  ],
+  "false_confirmation_events": 0,
+  "both_walked_out": true,
+  "robots": {
+    "robot_A": {
+      "walked_out_at_s": 514.0,
+      "rooms_entered": [
+        "lr_bath1",
+        "lr_bath2",
+        "lr_bed1",
+        "lr_bed3",
+        "lr_bed4",
+        "lr_family",
+        "lr_hall",
+        "lr_kitchen",
+        "lr_living",
+        "lr_utility"
+      ],
+      "final_pose_gate": [
+        0.02353859,
+        0.4593977
+      ],
+      "final_state": "complete",
+      "outside_at_end": true,
+      "walked_out": true
+    },
+    "robot_B": {
+      "walked_out_at_s": 504.5,
+      "rooms_entered": [
+        "lr_bed1",
+        "lr_bed2",
+        "lr_bed4",
+        "lr_hall",
+        "lr_living"
+      ],
+      "final_pose_gate": [
+        0.21959014,
+        -0.7822873
+      ],
+      "final_state": "complete",
+      "outside_at_end": true,
+      "walked_out": true
+    }
+  },
+  "rooms": {
+    "lr_hall": {
+      "entered": true,
+      "gross_floor_pct": 100.0,
+      "usable_floor_pct": 100.0,
+      "usable_samples_searched": 2756,
+      "usable_samples": 2756
+    },
+    "lr_living": {
+      "entered": true,
+      "gross_floor_pct": 97.66,
+      "usable_floor_pct": 96.61,
+      "usable_samples_searched": 1112,
+      "usable_samples": 1151
+    },
+    "lr_kitchen": {
+      "entered": true,
+      "gross_floor_pct": 86.0,
+      "usable_floor_pct": 90.46,
+      "usable_samples_searched": 1242,
+      "usable_samples": 1373
+    },
+    "lr_family": {
+      "entered": true,
+      "gross_floor_pct": 92.23,
+      "usable_floor_pct": 91.25,
+      "usable_samples_searched": 1032,
+      "usable_samples": 1131
+    },
+    "lr_utility": {
+      "entered": true,
+      "gross_floor_pct": 90.0,
+      "usable_floor_pct": 97.84,
+      "usable_samples_searched": 814,
+      "usable_samples": 832
+    },
+    "lr_bed1": {
+      "entered": true,
+      "gross_floor_pct": 97.73,
+      "usable_floor_pct": 98.47,
+      "usable_samples_searched": 1350,
+      "usable_samples": 1371
+    },
+    "lr_bed2": {
+      "entered": true,
+      "gross_floor_pct": 95.07,
+      "usable_floor_pct": 94.53,
+      "usable_samples_searched": 1296,
+      "usable_samples": 1371
+    },
+    "lr_bed3": {
+      "entered": true,
+      "gross_floor_pct": 92.86,
+      "usable_floor_pct": 91.76,
+      "usable_samples_searched": 1258,
+      "usable_samples": 1371
+    },
+    "lr_bed4": {
+      "entered": true,
+      "gross_floor_pct": 96.01,
+      "usable_floor_pct": 95.99,
+      "usable_samples_searched": 1316,
+      "usable_samples": 1371
+    },
+    "lr_bath1": {
+      "entered": true,
+      "gross_floor_pct": 96.55,
+      "usable_floor_pct": 96.65,
+      "usable_samples_searched": 779,
+      "usable_samples": 806
+    },
+    "lr_bath2": {
+      "entered": true,
+      "gross_floor_pct": 94.14,
+      "usable_floor_pct": 94.29,
+      "usable_samples_searched": 760,
+      "usable_samples": 806
+    }
+  }
+}
+
+The six final config files have these SHA-256 hashes.
+e49ab0376c61739385b5167cb4b08db42204ff20f279dd28795e4dbf2945230c  config/floorplan_family_ranch.json
+2466162edfce95c40268f3bf9cfa459edfb1f1af8691391617a2874580407fef  config/fire_family_ranch.json
+118f04a09be24a735e59d365da97e691ea41326ac27c440cd61c7092eb5d2470  config/scenario_family_ranch_full.json
+f503b5b0f8f54d987b7639c8c2e00ce780cc3277580a9f1c9219dad78d46b665  config/floorplan_long_ranch.json
+978fdb3127aa8290a33dcc5f5eaaab14ed61558a4d5956c91e9260f587fcfcc4  config/fire_long_ranch.json
+8a59fe50aaf33c411375d536a0d3e639e2db65aead45b35e4f794ac139e90587  config/scenario_long_ranch_full.json
+
+Git status at report generation is houses-25oct. No push, main checkout or overnight-25oct change was made. The report and code are uncommitted because the sandbox cannot write the worktree metadata at /Volumes/Tashon/opencv/smoke-rescue/.git/worktrees/wt_houses. The actual Git attempt follows.
+
+$ git add -- config/floorplan_family_ranch.json config/fire_family_ranch.json config/scenario_family_ranch_full.json config/floorplan_long_ranch.json config/fire_long_ranch.json config/scenario_long_ranch_full.json tools/build_ranch_configs.py tools/validate_ranches.py tools/test_ranches.py tools/score_ranches.py tools/check_ranch_editor.py tools/headless/LogicTests.csproj tools/headless/RanchEditorStubs.txt unity/SmokeRescue/Assets/SmokeRescue/Editor/HouseMenu.cs unity/SmokeRescue/Assets/SmokeRescue/Editor/RecorderMenu.cs unity/SmokeRescue/Assets/SmokeRescue/Editor/RanchExteriorBuilder.cs unity/SmokeRescue/Assets/SmokeRescue/Editor/RanchExteriorBuilder.cs.meta unity/SmokeRescue/Assets/SmokeRescue/World/Scenario.cs unity/SmokeRescue/Assets/SmokeRescue/World/Atmosphere.cs unity/SmokeRescue/Assets/SmokeRescue/Recording/RecordingSession.cs unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/RanchWorldTests.cs unity/SmokeRescue/Assets/SmokeRescue/Tests/EditMode/RanchWorldTests.cs.meta handoff/houses_report_25oct.txt handoff/houses_evidence
+fatal: Unable to create '/Volumes/Tashon/opencv/smoke-rescue/.git/worktrees/wt_houses/index.lock': Operation not permitted
+exit code 128
+Intended commit message: Add ranch houses and scenario-aware recording builders
+git commit was not run because staging failed.

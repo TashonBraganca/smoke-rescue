@@ -17,12 +17,41 @@ namespace SmokeRescue.Editor
         [MenuItem("Tools/Smoke Rescue/Build House (Grey Box)")]
         public static void BuildGreyBox() => Rebuild(greyBox: true);
 
-        public static GameObject Rebuild(bool greyBox)
+        public static string ActiveFloorplanFile
         {
+            get => SessionState.GetString("SmokeRescue.ActiveFloorplanFile", "floorplan.json");
+            private set => SessionState.SetString("SmokeRescue.ActiveFloorplanFile", value);
+        }
+
+        [MenuItem("Tools/Smoke Rescue/Build House (family ranch)")]
+        public static void BuildFamilyRanch() => Rebuild(false, "floorplan_family_ranch.json");
+
+        [MenuItem("Tools/Smoke Rescue/Build House (long ranch)")]
+        public static void BuildLongRanch() => Rebuild(false, "floorplan_long_ranch.json");
+
+        public static GameObject Rebuild(bool greyBox, string floorplanFile = "floorplan.json")
+        {
+            if (RecorderMenu.IsRecording) throw new System.InvalidOperationException("Stop the recording before rebuilding its house.");
+            var selection = new Scenario { floorplan_file = floorplanFile };
+            var plan = FloorPlan.Load(selection.FloorPlanPath);
             var old = GameObject.Find(HouseBuilder.RootName);
+            bool changedPlan = ActiveFloorplanFile != floorplanFile ||
+                (floorplanFile == "floorplan.json" && old != null && old.transform.Find("RanchExterior") != null);
             if (old != null) Object.DestroyImmediate(old);
-            var plan = FloorPlan.Load();
             var house = HouseBuilder.Build(plan, greyBox ? MaterialLibrary.GreyBox : MaterialLibrary.Get);
+            if (floorplanFile == "floorplan_family_ranch.json" || floorplanFile == "floorplan_long_ranch.json")
+                RanchExteriorBuilder.Build(plan, house);
+            ActiveFloorplanFile = floorplanFile;
+            if (changedPlan || floorplanFile != "floorplan.json")
+            {
+                FurnitureBuilder.Place(plan);
+                Scenario.ForgetRandomPlacements();
+                foreach (string name in new[] { ScenePreview.SurvivorsRoot, "Robots", "Atmosphere" })
+                {
+                    var stale = GameObject.Find(name);
+                    if (stale != null) Object.DestroyImmediate(stale);
+                }
+            }
             foreach (var t in house.GetComponentsInChildren<Transform>())
                 GameObjectUtility.SetStaticEditorFlags(t.gameObject, StaticEditorFlags.ContributeGI | StaticEditorFlags.OccluderStatic | StaticEditorFlags.OccludeeStatic | StaticEditorFlags.BatchingStatic);
             EditorSceneManager.MarkSceneDirty(house.scene);
@@ -51,7 +80,7 @@ namespace SmokeRescue.Editor
         [MenuItem("Tools/Smoke Rescue/Capture Top-Down")]
         public static void CaptureTopDown()
         {
-            var plan = FloorPlan.Load();
+            var plan = FloorPlan.Load(System.IO.Path.Combine(FloorPlan.ConfigDir, ActiveFloorplanFile));
             float w = plan.footprint[2] - plan.footprint[0], d = plan.footprint[3] - plan.footprint[1];
             var go = new GameObject("TopDownCapture");
             // The roof would shadow the whole interior from the sun; switch ceiling shadows off for the capture.

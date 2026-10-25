@@ -1,0 +1,618 @@
+{
+  "version": 1,
+  "units": "m",
+  "origin": "South-west outer corner at Unity world (0,0,0), x east and z north.",
+  "footprint": [
+    0,
+    0,
+    18,
+    11
+  ],
+  "wall_height": 2.8,
+  "exterior_wall_thickness": 0.25,
+  "interior_wall_thickness": 0.15,
+  "door_height": 2.1,
+  "rooms": [
+    {
+      "id": "lr_hall",
+      "name": "Hallway",
+      "kind": "corridor",
+      "rect": [
+        0,
+        3.5,
+        18,
+        5.25
+      ],
+      "rect_reason": "Selected 18 by 1.75 m bay in a tiled 18 by 11 m single-floor ranch. Hallway is 1.75 m before wall deductions.",
+      "floor": "wood_oak_planks",
+      "walls": "paint_warm_grey_textured",
+      "ceiling": "plaster_white"
+    },
+    {
+      "id": "lr_living",
+      "name": "Living room",
+      "kind": "living",
+      "rect": [
+        0,
+        0,
+        5,
+        3.5
+      ],
+      "rect_reason": "Selected 5 by 3.5 m bay in a tiled 18 by 11 m single-floor ranch. Hallway is 1.75 m before wall deductions.",
+      "floor": "wood_oak_planks",
+      "walls": "paint_warm_grey_textured",
+      "ceiling": "plaster_white"
+    },
+    {
+      "id": "lr_kitchen",
+      "name": "Kitchen and dining",
+      "kind": "kitchen",
+      "rect": [
+        5,
+        0,
+        10,
+        3.5
+      ],
+      "rect_reason": "Selected 5 by 3.5 m bay in a tiled 18 by 11 m single-floor ranch. Hallway is 1.75 m before wall deductions.",
+      "floor": "wood_oak_planks",
+      "walls": "paint_warm_grey_textured",
+      "ceiling": "plaster_white"
+    },
+    {
+      "id": "lr_family",
+      "name": "Family room",
+      "kind": "living",
+      "rect": [
+        10,
+        0,
+        15,
+        3.5
+      ],
+      "rect_reason": "Selected 5 by 3.5 m bay in a tiled 18 by 11 m single-floor ranch. Hallway is 1.75 m before wall deductions.",
+      "floor": "wood_oak_planks",
+      "walls": "paint_warm_grey_textured",
+      "ceiling": "plaster_white"
+    },
+    {
+      "id": "lr_utility",
+      "name": "Utility",
+      "kind": "laundry",
+      "rect": [
+        15,
+        0,
+        18,
+        3.5
+      ],
+      "rect_reason": "Selected 3 by 3.5 m bay in a tiled 18 by 11 m single-floor ranch. Hallway is 1.75 m before wall deductions.",
+      "floor": "ceramic_tiles_checker",
+      "walls": "ceramic_tiles_large_white",
+      "ceiling": "plaster_white"
+    },
+    {
+      "id": "lr_bed1",
+      "name": "Bedroom 1",
+      "kind": "bedroom",
+      "rect": [
+        0.0,
+        5.25,
+        3.5,
+        11
+      ],
+      "rect_reason": "Selected 3.5 by 5.75 m bay in a tiled 18 by 11 m single-floor ranch. Hallway is 1.75 m before wall deductions.",
+      "floor": "wood_oak_planks",
+      "walls": "paint_warm_grey_textured",
+      "ceiling": "plaster_white"
+    },
+    {
+      "id": "lr_bed2",
+      "name": "Bedroom 2",
+      "kind": "bedroom",
+      "rect": [
+        3.5,
+        5.25,
+        7.0,
+        11
+      ],
+      "rect_reason": "Selected 3.5 by 5.75 m bay in a tiled 18 by 11 m single-floor ranch. Hallway is 1.75 m before wall deductions.",
+      "floor": "wood_oak_planks",
+      "walls": "paint_warm_grey_textured",
+      "ceiling": "plaster_white"
+    },
+    {
+      "id": "lr_bed3",
+      "name": "Bedroom 3",
+      "kind": "bedroom",
+      "rect": [
+        7.0,
+        5.25,
+        10.5,
+        11
+      ],
+      "rect_reason": "Selected 3.5 by 5.75 m bay in a tiled 18 by 11 m single-floor ranch. Hallway is 1.75 m before wall deductions.",
+      "floor": "wood_oak_planks",
+      "walls": "paint_warm_grey_textured",
+      "ceiling": "plaster_white"
+    },
+    {
+      "id": "lr_bed4",
+      "name": "Bedroom 4",
+      "kind": "bedroom",
+      "rect": [
+        10.5,
+        5.25,
+        14.0,
+        11
+      ],
+      "rect_reason": "Selected 3.5 by 5.75 m bay in a tiled 18 by 11 m single-floor ranch. Hallway is 1.75 m before wall deductions.",
+      "floor": "wood_oak_planks",
+      "walls": "paint_warm_grey_textured",
+      "ceiling": "plaster_white"
+    },
+    {
+      "id": "lr_bath1",
+      "name": "Bathroom 1",
+      "kind": "bathroom",
+      "rect": [
+        14,
+        5.25,
+        16,
+        11
+      ],
+      "rect_reason": "Selected 2 by 5.75 m bay in a tiled 18 by 11 m single-floor ranch. Hallway is 1.75 m before wall deductions.",
+      "floor": "ceramic_tiles_checker",
+      "walls": "ceramic_tiles_large_white",
+      "ceiling": "plaster_white"
+    },
+    {
+      "id": "lr_bath2",
+      "name": "Bathroom 2",
+      "kind": "bathroom",
+      "rect": [
+        16,
+        5.25,
+        18,
+        11
+      ],
+      "rect_reason": "Selected 2 by 5.75 m bay in a tiled 18 by 11 m single-floor ranch. Hallway is 1.75 m before wall deductions.",
+      "floor": "ceramic_tiles_checker",
+      "walls": "ceramic_tiles_large_white",
+      "ceiling": "plaster_white"
+    }
+  ],
+  "doors": [
+    {
+      "id": "d_lr_living",
+      "between": [
+        "lr_hall",
+        "lr_living"
+      ],
+      "wall": "z",
+      "at": [
+        2.5,
+        3.5
+      ],
+      "width": 1.0,
+      "state": "removed",
+      "at_reason": "Hall opening centred in service and living bays, offset 0.8 m from the bedroom bay edge to leave a bed along the opposite wall. Door-to-centre paths stay clear.",
+      "width_reason": "1 m clear opening exceeds the requested 0.9 m and avoids an open leaf narrowing the approach."
+    },
+    {
+      "id": "d_lr_kitchen",
+      "between": [
+        "lr_hall",
+        "lr_kitchen"
+      ],
+      "wall": "z",
+      "at": [
+        7.5,
+        3.5
+      ],
+      "width": 1.0,
+      "state": "removed",
+      "at_reason": "Hall opening centred in service and living bays, offset 0.8 m from the bedroom bay edge to leave a bed along the opposite wall. Door-to-centre paths stay clear.",
+      "width_reason": "1 m clear opening exceeds the requested 0.9 m and avoids an open leaf narrowing the approach."
+    },
+    {
+      "id": "d_lr_family",
+      "between": [
+        "lr_hall",
+        "lr_family"
+      ],
+      "wall": "z",
+      "at": [
+        12.5,
+        3.5
+      ],
+      "width": 1.0,
+      "state": "removed",
+      "at_reason": "Hall opening centred in service and living bays, offset 0.8 m from the bedroom bay edge to leave a bed along the opposite wall. Door-to-centre paths stay clear.",
+      "width_reason": "1 m clear opening exceeds the requested 0.9 m and avoids an open leaf narrowing the approach."
+    },
+    {
+      "id": "d_lr_utility",
+      "between": [
+        "lr_hall",
+        "lr_utility"
+      ],
+      "wall": "z",
+      "at": [
+        16.5,
+        3.5
+      ],
+      "width": 1.0,
+      "state": "removed",
+      "at_reason": "Hall opening centred in service and living bays, offset 0.8 m from the bedroom bay edge to leave a bed along the opposite wall. Door-to-centre paths stay clear.",
+      "width_reason": "1 m clear opening exceeds the requested 0.9 m and avoids an open leaf narrowing the approach."
+    },
+    {
+      "id": "d_lr_bed1",
+      "between": [
+        "lr_hall",
+        "lr_bed1"
+      ],
+      "wall": "z",
+      "at": [
+        0.8,
+        5.25
+      ],
+      "width": 1.0,
+      "state": "removed",
+      "at_reason": "Hall opening centred in service and living bays, offset 0.8 m from the bedroom bay edge to leave a bed along the opposite wall. Door-to-centre paths stay clear.",
+      "width_reason": "1 m clear opening exceeds the requested 0.9 m and avoids an open leaf narrowing the approach."
+    },
+    {
+      "id": "d_lr_bed2",
+      "between": [
+        "lr_hall",
+        "lr_bed2"
+      ],
+      "wall": "z",
+      "at": [
+        4.3,
+        5.25
+      ],
+      "width": 1.0,
+      "state": "removed",
+      "at_reason": "Hall opening centred in service and living bays, offset 0.8 m from the bedroom bay edge to leave a bed along the opposite wall. Door-to-centre paths stay clear.",
+      "width_reason": "1 m clear opening exceeds the requested 0.9 m and avoids an open leaf narrowing the approach."
+    },
+    {
+      "id": "d_lr_bed3",
+      "between": [
+        "lr_hall",
+        "lr_bed3"
+      ],
+      "wall": "z",
+      "at": [
+        7.8,
+        5.25
+      ],
+      "width": 1.0,
+      "state": "removed",
+      "at_reason": "Hall opening centred in service and living bays, offset 0.8 m from the bedroom bay edge to leave a bed along the opposite wall. Door-to-centre paths stay clear.",
+      "width_reason": "1 m clear opening exceeds the requested 0.9 m and avoids an open leaf narrowing the approach."
+    },
+    {
+      "id": "d_lr_bed4",
+      "between": [
+        "lr_hall",
+        "lr_bed4"
+      ],
+      "wall": "z",
+      "at": [
+        11.3,
+        5.25
+      ],
+      "width": 1.0,
+      "state": "removed",
+      "at_reason": "Hall opening centred in service and living bays, offset 0.8 m from the bedroom bay edge to leave a bed along the opposite wall. Door-to-centre paths stay clear.",
+      "width_reason": "1 m clear opening exceeds the requested 0.9 m and avoids an open leaf narrowing the approach."
+    },
+    {
+      "id": "d_lr_bath1",
+      "between": [
+        "lr_hall",
+        "lr_bath1"
+      ],
+      "wall": "z",
+      "at": [
+        15.0,
+        5.25
+      ],
+      "width": 1.0,
+      "state": "removed",
+      "at_reason": "Hall opening centred in service and living bays, offset 0.8 m from the bedroom bay edge to leave a bed along the opposite wall. Door-to-centre paths stay clear.",
+      "width_reason": "1 m clear opening exceeds the requested 0.9 m and avoids an open leaf narrowing the approach."
+    },
+    {
+      "id": "d_lr_bath2",
+      "between": [
+        "lr_hall",
+        "lr_bath2"
+      ],
+      "wall": "z",
+      "at": [
+        17.0,
+        5.25
+      ],
+      "width": 1.0,
+      "state": "removed",
+      "at_reason": "Hall opening centred in service and living bays, offset 0.8 m from the bedroom bay edge to leave a bed along the opposite wall. Door-to-centre paths stay clear.",
+      "width_reason": "1 m clear opening exceeds the requested 0.9 m and avoids an open leaf narrowing the approach."
+    },
+    {
+      "id": "d_front",
+      "between": [
+        "outside",
+        "lr_hall"
+      ],
+      "wall": "x",
+      "at": [
+        0,
+        4.375
+      ],
+      "width": 1.6,
+      "state": "removed",
+      "at_reason": "Only entrance, on the south living-room wall for family ranch and west hallway end for long ranch.",
+      "width_reason": "A 1.6 m double front entrance, or living-to-hall cased opening, provides passing and turning room. Earlier 1 m openings passed static path checks but left one robot inside during full return tests. All other interior openings remain 1 m."
+    }
+  ],
+  "landmarks": [
+    {
+      "room": "lr_living",
+      "kind": "apartment_modern_sofa",
+      "at": [
+        4.03,
+        1.85
+      ],
+      "yaw": 270,
+      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
+      "yaw_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+    },
+    {
+      "room": "lr_living",
+      "kind": "console_table_with_vase",
+      "at": [
+        1.4715,
+        0.7147
+      ],
+      "yaw": 0,
+      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
+      "yaw_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+    },
+    {
+      "room": "lr_kitchen",
+      "kind": "stove_and_hood",
+      "at": [
+        8.55,
+        0.77
+      ],
+      "yaw": 0,
+      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
+      "yaw_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+    },
+    {
+      "room": "lr_kitchen",
+      "kind": "tall_steel_fridge",
+      "at": [
+        9.18,
+        1.9882
+      ],
+      "yaw": 270,
+      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
+      "yaw_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+    },
+    {
+      "room": "lr_family",
+      "kind": "apartment_modern_sofa",
+      "at": [
+        10.97,
+        1.65
+      ],
+      "yaw": 90,
+      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
+      "yaw_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+    },
+    {
+      "room": "lr_family",
+      "kind": "console_table_with_vase",
+      "at": [
+        14.2853,
+        2.2715
+      ],
+      "yaw": 270,
+      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
+      "yaw_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+    },
+    {
+      "room": "lr_utility",
+      "kind": "utility_washer",
+      "at": [
+        16.5,
+        0.795
+      ],
+      "yaw": 0,
+      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
+      "yaw_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+    },
+    {
+      "room": "lr_bed1",
+      "kind": "blue_double_bed",
+      "at": [
+        2.03,
+        9.65
+      ],
+      "yaw": 270,
+      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
+      "yaw_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+    },
+    {
+      "room": "lr_bed2",
+      "kind": "blue_double_bed",
+      "at": [
+        5.53,
+        9.65
+      ],
+      "yaw": 270,
+      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
+      "yaw_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+    },
+    {
+      "room": "lr_bed3",
+      "kind": "blue_double_bed",
+      "at": [
+        9.03,
+        9.65
+      ],
+      "yaw": 270,
+      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
+      "yaw_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+    },
+    {
+      "room": "lr_bed4",
+      "kind": "blue_double_bed",
+      "at": [
+        12.53,
+        9.65
+      ],
+      "yaw": 270,
+      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
+      "yaw_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+    },
+    {
+      "room": "lr_bath1",
+      "kind": "clawfoot_bathtub",
+      "at": [
+        15.18,
+        9.65
+      ],
+      "yaw": 270,
+      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
+      "yaw_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+    },
+    {
+      "room": "lr_bath2",
+      "kind": "clawfoot_bathtub",
+      "at": [
+        17.18,
+        9.65
+      ],
+      "yaw": 270,
+      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
+      "yaw_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+    }
+  ],
+  "fires": [
+    {
+      "id": "f1",
+      "room": "lr_bed4",
+      "at": [
+        12.53,
+        9.65
+      ],
+      "intensity": 1,
+      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
+      "intensity_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+    }
+  ],
+  "emergency_lights": [
+    {
+      "at": [
+        9.0,
+        4.375
+      ],
+      "note": "lr_hall",
+      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+    },
+    {
+      "at": [
+        2.5,
+        1.75
+      ],
+      "note": "lr_living",
+      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+    },
+    {
+      "at": [
+        7.5,
+        1.75
+      ],
+      "note": "lr_kitchen",
+      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+    },
+    {
+      "at": [
+        12.5,
+        1.75
+      ],
+      "note": "lr_family",
+      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+    },
+    {
+      "at": [
+        16.5,
+        1.75
+      ],
+      "note": "lr_utility",
+      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+    },
+    {
+      "at": [
+        1.75,
+        8.125
+      ],
+      "note": "lr_bed1",
+      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+    },
+    {
+      "at": [
+        5.25,
+        8.125
+      ],
+      "note": "lr_bed2",
+      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+    },
+    {
+      "at": [
+        8.75,
+        8.125
+      ],
+      "note": "lr_bed3",
+      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+    },
+    {
+      "at": [
+        12.25,
+        8.125
+      ],
+      "note": "lr_bed4",
+      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+    },
+    {
+      "at": [
+        15.0,
+        8.125
+      ],
+      "note": "lr_bath1",
+      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+    },
+    {
+      "at": [
+        17.0,
+        8.125
+      ],
+      "note": "lr_bath2",
+      "at_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+    }
+  ],
+  "clear_path_rule": "0.9 m door-to-centre path and 1.2 m door keepout, checked with conservative furniture mesh bounds.",
+  "footprint_reason": "198 m2 gross area chosen within the brief range; walls are inside this rectangle.",
+  "generator_notes": [
+    "lr_hall (corridor) has no furniture: none fits clear of its doors"
+  ],
+  "version_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
+  "wall_height_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
+  "exterior_wall_thickness_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
+  "interior_wall_thickness_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres.",
+  "door_height_reason": "Simulation construction choice inherited from floorplan.json: metre units, 2.8 m walls, 0.25/0.15 m wall thicknesses and 2.1 m door height. Furniture positions use measured conservative bounds and clear door approaches; light positions are room centres."
+}

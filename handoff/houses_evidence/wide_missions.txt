@@ -1,0 +1,9 @@
+CSSM_ModuleLoad(): One or more parameters passed to a function were not valid.
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:01.88
+data/runs/houses_25oct/family_ranch_wide: 600 s simulated in 1591 s
+data/runs/houses_25oct/long_ranch_wide: 600 s simulated in 1681 s
