@@ -41,6 +41,16 @@ namespace SmokeRescue.Brain
             }
         }
 
+        /// <summary>leave_waits_for_team: a remembered room that neither robot has entered or finished, whoever claims it.</summary>
+        bool TeamHasUnenteredRoom()
+        {
+            if (!c.room_memory || !c.room_ledger) return false;
+            foreach (var r in planner.Rooms.Records)
+                if (r.label >= 0 && !r.entered && !r.partnerEntered && !r.done && !r.corridor && r.floorM2 >= c.room_walk_in_min_m2 && InSearchArea(r.seat))
+                    return true;
+            return false;
+        }
+
         /// <summary>The next room to walk into, as a route to its seat; false while the room this robot stands in is being
         /// finished, or when no remembered room is waiting.</summary>
         bool NextRoom(double t, out List<Vector2> route)

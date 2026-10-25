@@ -2267,6 +2267,42 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void ARobotWithNothingOfItsOwnLeftWaitsWhileTheTeamHasAnUnenteredRoom()
+        {
+            // leave_waits_for_team. Seed 934 full mission (25 Oct 14:15): robot A walked out at 143 s with bedroom_1 and laundry
+            // unentered by either robot. The searched 4 x 4 m room of the walk-out test, plus a second walled room beside it that
+            // no route reaches (as when fire or a partner's claim keeps it from this robot) and nobody has entered: the robot holds
+            // inside. Control: without the second room it walks out.
+            List<BrainEvent> Run(bool secondRoom, out string rooms)
+            {
+                var c = Settings(); c.grid_size_m = 14; c.search_requires_ceiling = false; c.stay_inside = true; c.leave_when_done = true;
+                c.leave_waits_for_team = true; c.room_memory = true; c.room_ledger = true; c.mission_time_limit_s = 1000;
+                var b = new RobotBrain(Calibration(), c, "A", 0); var g = Map(b);
+                var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+                var searched = (bool[])typeof(OccupancyGrid).GetField("observed", flags).GetValue(g);
+                for (int i = 0; i < g.Count; i++)
+                {
+                    var p = g.Centre(i);
+                    if (Mathf.Abs(p.x) <= 2 && Mathf.Abs(p.y) <= 2) { g.ObserveFree(i); searched[i] = true; }
+                    else if (Mathf.Abs(p.x) <= 2.3f && Mathf.Abs(p.y) <= 2.3f) g.ObserveOccupied(i);
+                    else if (secondRoom && p.x >= 3 && p.x <= 6 && Mathf.Abs(p.y) <= 2) g.ObserveFree(i);
+                    else if (secondRoom && p.x >= 2.7f && p.x <= 6.3f && Mathf.Abs(p.y) <= 2.3f) g.ObserveOccupied(i);
+                }
+                var events = new List<BrainEvent>();
+                for (int i = 0; i <= 20 * 25; i++) { DriveTick(b, i); events.AddRange(b.DrainEvents()); }
+                var ledger = ((GridPlanner)typeof(RobotBrain).GetField("planner", flags).GetValue(b)).Rooms;
+                rooms = string.Join("; ", ledger.Records.Select(r => $"label {r.label} seat {r.seat} {r.floorM2:F1} m2 entered {r.entered} done {r.done} corridor {r.corridor}"));
+                return events;
+            }
+            bool Left(List<BrainEvent> e) => e.Any(x => x.kind == "goal" && x.reason.StartsWith("No reachable frontier remains after a full scan. Return"));
+            var waiting = Run(true, out var roomsWaiting);
+            Assert.That(Left(waiting), Is.False, roomsWaiting + " || " + string.Join(" | ", waiting.Where(e => e.kind == "goal").Select(e => e.reason).Distinct()));
+            Assert.That(waiting.Any(e => e.kind == "goal" && e.reason.StartsWith("Nothing reachable is left to search")), Is.True, "holds inside: " + roomsWaiting);
+            var control = Run(false, out var roomsControl);
+            Assert.That(Left(control), Is.True, "control: with every room entered it walks out: " + roomsControl);
+        }
+
+        [Test]
         public void TheWalkOutWhenDoneCrossesTheEntranceLock()
         {
             // Seed 934 full mission (25 Oct 11:25): with the floor at the way in locked, the leave-when-done return found no
