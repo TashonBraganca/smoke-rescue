@@ -50,6 +50,11 @@ Parameters:
     Type: String
     Default: smoke-rescue/origin-verify
     Description: Secrets Manager name created here. CloudFront sends it in X-Origin-Verify and the ALB rejects requests without it.
+  PublicOpenCvRoutes:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: Open port 80 and forward the read-only OpenCV routes (/health, /vision/*, /perceive/people, /place/*/match) without the origin header, for judges when CloudFront is unavailable (25 Oct 2026, the account was not yet verified for CloudFront). Model routes still require the header; the WAF rate limit still applies.
   EnableWaf:
     Type: String
     Default: "true"
@@ -71,6 +76,8 @@ Conditions:
   UseAzure: !Equals [!Ref AgentBackend, azure]
   UsePrefixList: !Not [!Equals [!Ref CloudFrontPrefixListId, ""]]
   NoPrefixList: !Equals [!Ref CloudFrontPrefixListId, ""]
+  PublicRoutes: !Equals [!Ref PublicOpenCvRoutes, "true"]
+  OpenIngress: !Or [!Condition NoPrefixList, !Condition PublicRoutes]
   WafOn: !Equals [!Ref EnableWaf, "true"]
 
 Resources:
@@ -203,14 +210,14 @@ Resources:
 
   AlbIngressOpen:
     Type: AWS::EC2::SecurityGroupIngress
-    Condition: NoPrefixList
+    Condition: OpenIngress
     Properties:
       GroupId: !Ref AlbSecurityGroup
       IpProtocol: tcp
       FromPort: 80
       ToPort: 80
       CidrIp: 0.0.0.0/0
-      Description: Open because no prefix list was given. The ALB still requires the origin secret header.
+      Description: Open because no prefix list was given or the OpenCV routes are public. Model routes still need the origin header.
 
   AlbEgressToTasks:
     Type: AWS::EC2::SecurityGroupEgress
@@ -477,6 +484,20 @@ Resources:
             HttpHeaderName: X-Origin-Verify
             Values:
               - !Sub "{{resolve:secretsmanager:${OriginSecretName}:SecretString}}"
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+
+  PublicOpenCvRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Condition: PublicRoutes
+    Properties:
+      ListenerArn: !Ref Listener
+      Priority: 2
+      Conditions:
+        - Field: path-pattern
+          PathPatternConfig:
+            Values: [/health, /vision/*, /perceive/people, /place/*/match]
       Actions:
         - Type: forward
           TargetGroupArn: !Ref TargetGroup
