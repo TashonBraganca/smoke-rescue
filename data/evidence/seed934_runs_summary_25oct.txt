@@ -1,0 +1,13 @@
+Seed 934 one-door live Unity runs, scored by the evaluator (ground truth): rooms entered, floor seen, people confirmed, false confirmations, idle share.
+Image frames of the runs marked [frames removed 25 Oct] were deleted to free disk; logs, oracle and maps are kept locally.
+unity_house_onedoor_seed934_run_2355_23oct | rooms 4/10 | floor 0% | people 2/5 | false 0 | idle A/B 39/24/ %
+unity_house_onedoor_seed934_phase3_0216_24oct | rooms 5/10 | floor 70% | people 4/5 | false 0 | idle A/B 48/30/ %
+unity_house_onedoor_seed934_allfixes_0453_24oct | rooms 5/10 | floor 71% | people 3/5 | false 0 | idle A/B 26/45/ %
+unity_house_onedoor_seed934_before_live_24oct1635 | rooms 4/10 | floor 69% | people 3/5 | false 0 | idle A/B 34/34/ %
+unity_house_onedoor_seed934_brain_final_1954 | rooms 7/10 | floor 81% | people 3/5 | false 0 | idle A/B 46/26/ %
+unity_house_onedoor_seed934_brain_spraythrough_2006 | rooms 7/10 | floor 74% | people 2/5 | false 1 | idle A/B 23/33/ %
+unity_house_onedoor_seed934_brain_allfixes_0007 | rooms 6/10 | floor 90% | people 4/5 | false 0 | idle A/B 22/23/ %
+unity_house_onedoor_seed934_brain_final_0141 | rooms 6/10 | floor 70% | people 3/5 | false 0 | idle A/B 79/25/ %
+unity_house_onedoor_seed934_brain_loopfix_0236 | rooms 7/10 | floor 74% | people 3/5 | false 0 | idle A/B 58/22/ %
+unity_house_onedoor_seed934_full | rooms 8/10 | floor 93% | people 5/5 | false 0 | idle A/B 37/56/ %
+unity_house_onedoor_seed932_nolimit_run1 | rooms 3/10 | floor 0% | people 3/5 | false 0 | idle A/B 74/71/ %
