@@ -1,0 +1,41 @@
+Brief: deep bug hunt across the failed and imperfect runs, with a proposed fix for each (from opencv-a2, 26 Oct 16:40 IST).
+Report to handoff/codex_deep_bugs_report.txt. Plain text, no em dashes, no .md files.
+
+READ-ONLY: do not edit code, config/, unity/ (a Unity recording runs; RobotBrain.cs may be mid-test for a few minutes, so
+read Brain code from `git show HEAD:<path>` plus `git diff` for the uncommitted return fixes), do not kill processes you did
+not start, no RunPod, no AWS, no commits except your report. Run at most 2 headless sims at once if you must, at the
+sandbox's nice level; prefer reading traces. Image work paced, one thread.
+
+Goal: every bug that can stop a perfect full-loop video (enter, search every room, confirm every person with 0 false,
+both robots walk out) on the three video houses: one-door seed 934 (config/scenario_house_onedoor_seed934_full.json),
+family ranch, long ranch. Robust means general: no house constants, every fix must hold on unseen layouts.
+
+Already found and fixed (do not re-report, but say if a fix is incomplete or wrong):
+- exit_watch_inside made B leave mid-search on a fire-rate estimate (now false, commit 8ebf32b8).
+- enter_first + entry_keep_out (8ebf32b8): walk straight in along the launch line; front yard never search floor.
+- Uncommitted (git diff): YieldStep now runs while returning; breadcrumb trail kept (checked only for walls/fire, densified,
+  time-limited), no trail recording while returning. Your three-robot report found these.
+- Codex ranch report (handoff/codex_ranch_failure_report.txt): eave ceiling admission, window depth, wall drift,
+  false room certificates, exit/water defects.
+
+Runs to mine (data/recordings/<name>/robot_*/decisions.jsonl, brain_state.jsonl, oracle/, tools/run_audit.py):
+1. unity_house_onedoor_seed934_full_1520_5of5: 5/5 but both robots NOT out at 600 s. Why exactly? (end return, fire
+   on the route, water, breadcrumbs, squeeze, return_blocked, step-aside at pad.)
+2. unity_house_onedoor_seed934_full_BEST_0318: same questions; anything that went right here and wrong later.
+3. unity_house_onedoor_seed934_full_1505_B_exitwatch and unity_family_ranch_full_1222_B_outside (frames deleted; logs
+   remain): anything beyond the known causes.
+4. unity_house_onedoor_seed934_full (RUNNING, partial; read only): early problems in the new code (enter_first, keep-out).
+5. /Volumes/Tashon/opencv/smoke-rescue-ryor/data/runs/ryor-judge/e49251258d1a/*__easy headless runs: rooms not entered
+   (one-door 8/30 rooms counts 20 outside rooms; ignore those), ranch 7/9 and 9/12 rooms entered with 2 robots.
+6. data/evidence/perception_diag_26oct.txt: perception misses and ghosts.
+
+Deliver:
+A. A bug table first: id, run, sim time, robot, symptom, root cause (file:line), severity for the videos (blocker / costs a
+   person / cosmetic), proposed general fix (exact change), a test that fails today, confidence.
+B. Perception section: every missed person and every false or misplaced confirmation in these runs: never in view vs in
+   view and missed vs rejected by a rule, with the rule and numbers.
+C. Memory and coordinates: room ledger records (stale, duplicate, false certificates, partner-entered flags), shared
+   frame link and pose error vs oracle ground truth over time for each robot (max, median), any time the shared map
+   placed a wall or person more than 0.5 m off. Use oracle/robot_*_groundtruth.txt.
+D. Ranked list: the 5 fixes that most raise the chance of three perfect videos tonight, smallest first.
+Lead with blockers. Keep token use lean; if you hit a usage limit, write what you have first.

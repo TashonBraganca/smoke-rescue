@@ -1,0 +1,23 @@
+Codex brief: diagnose the failed three-bed ranch live run (owner, 26 Oct 15:10). READ-ONLY diagnosis plus a report; do
+not edit brain code, configs or Unity, do not run Unity, do not restart servers. Work from
+/Volumes/Tashon/opencv/smoke-rescue (read files only); write only handoff/codex_ranch_failure_report.txt and scripts under
+tools/diag/. Keep CPU light (nice -n 10): a live Unity recording is running.
+
+Run: data/recordings/unity_family_ranch_full_1222_B_outside (live Unity, brain only, 600 s, current brain at commit
+998132b3). Result (tools/run_audit.py): 2 of 5 people; robot B was OUTSIDE the house for all 600 s (truth), walked 200 m,
+entered 0 rooms, yet logged room_searched 12 times; robot A entered 4 of 9 rooms; s6 (kitchen) within 2.5 m of a robot
+for 43 s and never confirmed; s1 (bathroom 2) within 2.5 m for 156 s, never confirmed.
+Known so far: B's pose estimate (robot_B/brain_state.jsonl x,y) vs truth (oracle/robot_B_groundtruth.txt; Unity x,z)
+diverged about 1 m by 40 s and about 3 m by 100 s while it walked east along the OUTSIDE of the front wall; B's frame at
+100 s (robot_B/rgb/100.000000.png) shows an exterior wall lit by its torch. The ranch exterior (RanchExteriorBuilder.cs:
+windows with glass, 0.45 m eaves, porch canopy) is new and was never tested live before today.
+Find, with evidence (times, events, images, map snapshots robot_B/brain_map/*.png, depth frames):
+1. Why B chose goals outside instead of entering the front door right after launch (frontier list, what its map showed
+   beyond windows: does the depth camera see through window glass, does LiDAR, are window panes in the depth image).
+2. Why its localization drifted outside (scan matching along long blank walls, wrong matches through windows).
+3. Why its map counted rooms as searched while outside (indoor rule: ceiling seen overhead under the eaves/canopy?).
+4. Why A missed s6 and s1 (camera direction, occlusion, YOLO: use tools/diag/perception_diag.py approach).
+5. Anything else wrong in this run (stuck, loops, water, exit).
+For each: root cause with file:line, the evidence, a proposed general fix (cardinal rule: no house-specific constants),
+whether it also explains the earlier failed ranch runs (data/recordings/unity_family_ranch_*), and confidence.
+Report in handoff/codex_ranch_failure_report.txt, plain text, no em dashes. Keep it lean; finish within 90 minutes.

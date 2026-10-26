@@ -221,6 +221,10 @@ namespace SmokeRescue.Brain
             }
             if (returning)
             {
+                // A yield set while returning (Pinned) runs first: it used to run only below this block, so a returning robot
+                // announced pinned_yield and never stepped aside (Codex three-robot report, 26 Oct).
+                var returnYield = YieldStep(t, dt);
+                if (returnYield.HasValue) return returnYield.Value;
                 // The start is usually a doorway, which is narrower than the planning clearance, so the return path ends at
                 // the nearest walkable cell short of it (house reflex check: robot B stopped 0.3 m from its start and replanned
                 // the same 3-point path for 45 s). Within return_arrive_m of the start counts as back.
@@ -295,7 +299,7 @@ namespace SmokeRescue.Brain
                 {
                     var fresh = PlanOut(); lastPlan = t;
                     // A margin that shuts for a moment does not stop an emergency exit: keep the route while nothing on it burns.
-                    if (!(fresh.Count == 0 && EmergencyRoute && path.Count > 0 && EmergencyPathOk(path, cursor))) SetPath(fresh);
+                    if (!(fresh.Count == 0 && path.Count > 0 && (EmergencyRoute ? EmergencyPathOk(path, cursor) : trailRoute && TrailPathOk(path, cursor) && !TrailExpired(t)))) SetPath(fresh);
                     if (path.Count == 0 && returnReason == EmergencyExit && grid.FireClearance > c.emergency_fire_clearance_m)
                     {
                         // The exit route at normal clearance was cut on the way out (2x2 attempt 5: robot A held still with its
@@ -367,15 +371,15 @@ namespace SmokeRescue.Brain
                         return Command(0, 0, dt, true);
                     // A deadline return cut on the way is the same: retreat and search on, never hold (held-out seed 919,
                     // robot B held 20 s in cool air when fire cut its route home after a deadline return began).
-                    if (path.Count > 0) returnBlockedSince = double.NaN;
-                    if (path.Count == 0 && EndReturn && c.end_return_breadcrumbs)
+                    if (path.Count > 0 && !trailRoute) returnBlockedSince = double.NaN;
+                    if (path.Count == 0 && EndReturn && c.end_return_breadcrumbs && t >= trailRetryAt)
                     {
                         // end_return_breadcrumbs (owner, 26 Oct): no planned route home, so walk back over the floor this body
                         // already walked in on, minus any cell now on fire.
                         var crumbs = BreadcrumbRoute();
                         if (crumbs.Count > 0)
                         {
-                            SetPath(crumbs, false); lastPlan = t; returnBlockedSince = double.NaN;
+                            SetPath(crumbs, false); trailRoute = true; trailUntil = t + PathLength(crumbs) / c.near_speed_mps * 3 + 20; lastPlan = t;
                             Emit(t, "return_via_trail", "No planned route home: walk back along this robot's own trail.", "points", crumbs.Count,
                                 "length_m", PathLength(crumbs));
                         }
@@ -1147,7 +1151,28 @@ namespace SmokeRescue.Brain
         /// heat_recover_below_c, none at heat_drain_start_c). A house burning for 320 s held robot A at 37 C with its budget
         /// frozen at 0.20 for the rest of seed 934 (24 Oct 18:53), because recovery needed air below 35 C.</summary>
         float RecoverBelowC => c.heat_recover_scaled ? c.heat_drain_start_c : c.heat_recover_below_c;
-        bool NeedPlan(double t) => t - lastPlan >= c.replan_s || (path.Count > 0 && !(EmergencyRoute ? EmergencyPathOk(path, cursor) : planner.PathSafe(path, cursor)));
+        bool NeedPlan(double t) => t - lastPlan >= c.replan_s || (path.Count > 0 && !(EmergencyRoute ? EmergencyPathOk(path, cursor) : trailRoute ? TrailPathOk(path, cursor) : planner.PathSafe(path, cursor)));
+        /// <summary>A trail home (end_return_breadcrumbs) is floor this body walked, so only a wall or fire on it breaks it, not the
+        /// planner's inflated margins (Codex three-robot report, 26 Oct: trails were rejected by PathSafe and rebuilt 5000+ times,
+        /// each rebuild resetting the blocked timer). It gets three times its walk at near speed plus 20 s; then the blocked
+        /// handling takes over and no trail is tried for end_return_retry_s.</summary>
+        bool trailRoute; double trailUntil, trailRetryAt = double.NegativeInfinity;
+        /// <summary>The body walked every cell of its trail, so a mapped wall on it is map noise; only fire within the body radius
+        /// breaks it. A real new obstacle shows as a stall (stuck recovery) and the trail's time limit.</summary>
+        bool TrailPathOk(List<Vector2> route, int from)
+        {
+            for (int i = Math.Max(0, from); i < route.Count; i++)
+            {
+                int cell = grid.Cell(route[i]);
+                if (cell < 0 || grid.FireDistance(cell) <= c.robot_radius_m) return false;
+            }
+            return true;
+        }
+        bool TrailExpired(double t)
+        {
+            if (!trailRoute || t < trailUntil) return false;
+            trailRetryAt = t + c.end_return_retry_s; return true;
+        }
         bool EmergencyRoute => returning && returnReason == EmergencyExit;
         /// <summary>On an emergency exit only a burning or occupied cell on the rest of the route breaks it; the fire margin
         /// is already reduced and flickers with the flames (held-out seed 914, robot B, 148 to 163 s: the route flipped between
@@ -1208,14 +1233,21 @@ namespace SmokeRescue.Brain
                 k = j;
             }
             if (Vector2.Distance(route[route.Count - 1], home) > c.breadcrumb_spacing_m) route.Add(home);
-            return route;
+            // One point per map cell, so the follower and the wall/fire check see every cell between trail points.
+            var dense = new List<Vector2> { route[0] };
+            for (int i = 1; i < route.Count; i++)
+            {
+                int n = Mathf.Max(1, Mathf.CeilToInt(Vector2.Distance(route[i - 1], route[i]) / grid.CellM));
+                for (int s2 = 1; s2 <= n; s2++) dense.Add(Vector2.Lerp(route[i - 1], route[i], s2 / (float)n));
+            }
+            return dense;
         }
         void NoteBodyTrack()
         {
             var pose = motion.Pose;
             if (bodyTrack.Count > 0 && Vector2.Distance(bodyTrack[bodyTrack.Count - 1].position, pose.position) < grid.CellM) return;
             bodyTrack.Add(pose); if (bodyTrack.Count > c.body_track_poses) bodyTrack.RemoveAt(0);
-            if (breadcrumbs.Count == 0 || Vector2.Distance(breadcrumbs[breadcrumbs.Count - 1], pose.position) >= c.breadcrumb_spacing_m)
+            if (!returning && (breadcrumbs.Count == 0 || Vector2.Distance(breadcrumbs[breadcrumbs.Count - 1], pose.position) >= c.breadcrumb_spacing_m))
                 breadcrumbs.Add(pose.position);
         }
         /// <summary>p lies inside this robot's body (the capsule, body_half_length_m and body_radius_m) at a pose it has held.</summary>
@@ -1434,8 +1466,8 @@ namespace SmokeRescue.Brain
                 "path_points", path.Count);
             return Command(0, 0, dt, true);
         }
-        void SetPath(List<Vector2> value, bool isFrontier = false) { frontierGoal = isFrontier && value.Count > 0; throughCentre = null; path = value; cursor = 0; goal = path.Count > 0 ? path[path.Count - 1] : (Vector2?)null; }
-        void ClearPath() { frontierGoal = false; throughCentre = null; path.Clear(); cursor = 0; goal = null; lastPlan = double.NegativeInfinity; }
+        void SetPath(List<Vector2> value, bool isFrontier = false) { trailRoute = false; frontierGoal = isFrontier && value.Count > 0; throughCentre = null; path = value; cursor = 0; goal = path.Count > 0 ? path[path.Count - 1] : (Vector2?)null; }
+        void ClearPath() { trailRoute = false; frontierGoal = false; throughCentre = null; path.Clear(); cursor = 0; goal = null; lastPlan = double.NegativeInfinity; }
         Vector2? throughCentre;   // the frontier a follow-through path leads to, when the path is one
         Vector2? entryPoint; bool entranceLocked, lockLifted; double nextLockRefresh;
         /// <summary>Staying inside, the first point where this robot stands on floor it has proven indoors is its way in. Once
@@ -2320,7 +2352,7 @@ namespace SmokeRescue.Brain
                 target = path[i]; remain -= distance; previous = path[i];
             }
             if (!planner.SegmentSafe(position, target)) target = path[cursor];
-            if (!planner.SegmentSafe(position, target))
+            if (!trailRoute && !planner.SegmentSafe(position, target))
             {
                 // The planned cells are checked by PathSafe; when they are still safe, only the straight line from the exact
                 // position grazes a margin cell on the way to the next waypoint, about one cell away: steer to it. Clearing the
