@@ -45,6 +45,7 @@ namespace SmokeRescue.Brain
         public float room_ledger_min_core_m2 = .4f, room_ledger_min_room_m2 = 1.5f, room_ledger_split_min_m = .35f, room_ledger_split_max_m = 1.5f,
             room_ledger_split_step_m = .1f;
         public float person_rgb_single_confirm = 0f;   // see config/brain.json
+        public bool code_spray_spot_inside = false; public int code_spray_max_approaches = 0;   // see config/brain.json
         public bool end_return_breadcrumbs = false; public float breadcrumb_spacing_m = .5f, breadcrumb_join_m = 1.5f;   // see config/brain.json
         public float person_rgb_strong_confidence = 1.01f, person_glance_min_confidence = .25f, person_glance_s = 2f, person_glance_repeat_s = 15f,
             person_rgb_boost_period_s = .2f;

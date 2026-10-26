@@ -41,6 +41,10 @@ namespace SmokeRescue.Brain
         /// <summary>code_spray_retry_s: spray spots the robot could not reach, with the time they may be tried again.</summary>
         readonly List<(Vector2 spot, double until)> unreachableSpraySpots = new List<(Vector2, double)>();
         Vector2? spraySpotGoal;   // the spot of the code spray approach now driving as the agent goal
+        /// <summary>code_spray_max_approaches: approaches per spray spot since the last spray; a spot walked to that often without
+        /// a spray goes on the unreachable list (three-bed ranch live, 26 Oct: robot B walked to the same spot outside the house
+        /// 35 times without spraying and never entered).</summary>
+        readonly List<(Vector2 spot, int count)> sprayApproaches = new List<(Vector2, int)>();
         void NoteSpraySpotFailed(Vector2 spot, double t)
         {
             if (c.code_spray_retry_s <= 0) return;
@@ -541,6 +545,7 @@ namespace SmokeRescue.Brain
                 bearingDegRight = b.bearingDegRight;
                 seconds = Mathf.Min(waterS, n.maxSprayS, (float)here.Value + c.code_spray_margin_s);
                 nextCodeSpray = t + seconds + c.code_spray_repeat_s;
+                sprayApproaches.Clear();
                 Emit(t, "code_spray", why + " and one stream knocks it down: spray it.",
                     "x_m", b.blockAt.x, "y_m", b.blockAt.y, "burning_m2", b.burningM2, "distance_m", b.distanceM, "bearing_deg", b.bearingDegRight,
                     "seconds", seconds, "knock_down_s", here.Value, "water_l", waterL);
@@ -555,6 +560,15 @@ namespace SmokeRescue.Brain
                 Vector2 from = motion.Pose.position, dir = (b.blockAt - from).normalized, spot = b.blockAt - dir * standoff;
                 nextCodeSpray = t + c.replan_s;
                 if (SpraySpotUnreachable(spot, t)) return false;
+                // A spray spot outside the search area only for fire on the way out; never leave the house to chase a fire.
+                if (c.code_spray_spot_inside && !exitBlocked && !InSearchArea(spot)) return false;
+                int k = sprayApproaches.FindIndex(a => Vector2.Distance(a.spot, spot) <= 1f);
+                int n2 = k < 0 ? 1 : sprayApproaches[k].count + 1;
+                if (k < 0) sprayApproaches.Add((spot, 1)); else sprayApproaches[k] = (sprayApproaches[k].spot, n2);
+                if (c.code_spray_max_approaches > 0 && n2 > c.code_spray_max_approaches)
+                {
+                    NoteSpraySpotFailed(spot, t); if (k >= 0) sprayApproaches.RemoveAt(k); return false;
+                }
                 if (!GoTo(spot, t, c.code_spray_repeat_s * 2, "walk to the spray spot of the fire blocking the way", b.blockAt, false, true))
                 {
                     NoteSpraySpotFailed(spot, t); return false;

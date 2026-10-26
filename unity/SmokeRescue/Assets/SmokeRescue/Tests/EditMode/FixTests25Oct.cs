@@ -156,6 +156,29 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void ASpraySpotReachedTwiceWithoutASprayIsSetAside()
+        {
+            // code_spray_max_approaches (26 Oct, three-bed ranch live: robot B walked to one spray spot 35 times, 0 sprays, and
+            // never entered). Each approach order is reached (the agent goal is cleared as on arrival) and no spray follows.
+            // With the cap the spot is set aside after 2 approaches; control: without it the approach repeats every time.
+            int Approaches(int cap)
+            {
+                var b = BurningCorridor(c => { c.code_spray_retry_s = 30; c.code_spray_max_approaches = cap; c.code_spray_spot_inside = false; c.code_spray_ignores_leave_refusal = true; });
+                Hot(b);
+                int n = 0;
+                for (int t = 0; t <= 20; t++)
+                {
+                    Hot(b, t); b.CodeSpray(t, 12, out _, out _);
+                    n += b.DrainEvents().Count(e => e.kind == "code_spray_approach");
+                    typeof(RobotBrain).GetField("agentGoal", NP).SetValue(b, null);   // arrived; the order is done
+                }
+                return n;
+            }
+            Assert.That(Approaches(2), Is.EqualTo(2), "two approaches, then the spot is set aside");
+            Assert.That(Approaches(0), Is.GreaterThan(10), "control: without the cap it repeats");
+        }
+
+        [Test]
         public void ASpraySpotWithNoFreePathIsRememberedAsUnreachable()
         {
             // F4. Seed 934 (25 Oct), robot B: 22 "Agent goal has no known free path; back to exploring." for the same spray spot.
