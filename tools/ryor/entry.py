@@ -200,4 +200,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as error:
+        # Validation and configuration failures before process launch still need a public
+        # failed status and the same CloudWatch failure marker as a stopped simulator.
+        fail('entry %s: %s' % (type(error).__name__, str(error)[:300]))

@@ -95,7 +95,7 @@ def replay():
 def test_replay_validation_catches_corruption(api, monkeypatch):
     data = replay()
     monkeypatch.setattr(api, 'chunks', lambda *a: data)
-    rec, status = {'setup': 'family_ranch__r1__easy'}, {'sim_t': 180, 'chunks': 19, 'score': {
+    rec, status = {'setup': 'family_ranch__r1__easy'}, {'setup': 'family_ranch__r1__easy', 'sim_t': 180, 'chunks': 19, 'score': {
         'people_found': 0, 'people_total': 5, 'robots_out': 1, 'false_confirmations': 0, 'time_s': 180, 'coverage_pct': 50}}
     assert api.validate(rec, status, '') is None
     data[0]['frames'].pop(2)

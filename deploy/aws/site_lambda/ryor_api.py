@@ -82,7 +82,7 @@ def cache_setups():
 def running_tasks():
     arns, tok = [], None
     while True:
-        kw = {'cluster': CLUSTER, 'family': FAMILY, 'desiredStatus': 'RUNNING'}
+        kw = {'cluster': CLUSTER, 'family': FAMILY.rsplit('/', 1)[-1].split(':', 1)[0], 'desiredStatus': 'RUNNING'}
         if tok:
             kw['nextToken'] = tok
         r = ecs.list_tasks(**kw)
@@ -451,6 +451,8 @@ def validate(rec, st, prefix):
     house = g and g['houses'].get(m.group(1))
     if not house:
         return 'house not in gallery'
+    if st.get('setup') != rec['setup']:
+        return 'recording belongs to a different setup'
     mission_s = g['mission_s']
     n = int(st.get('chunks', 0))
     sim_t = float(st.get('sim_t') or 0)
@@ -507,6 +509,20 @@ def validate(rec, st, prefix):
     placement = st.get('placement')
     if m.group(4) and not isinstance(placement, dict):
         return 'custom placement is missing'
+    if m.group(4):
+        try:
+            layout = st.get('layout')
+            edited = room_layout.build(house, layout) if layout is not None else house
+            canonical = validate_placement(edited, placement)
+            engine = st.get('engine', {}).get('image', '')
+            base = rec['setup'].split('__p', 1)[0]
+            expected = room_layout.key(base, layout, canonical, engine) if layout is not None else setup_key(base, canonical, engine)
+            if expected != rec['setup']:
+                return 'recording does not match the scene bytes and engine'
+            if layout is not None and any(st.get('house', {}).get(field) != edited[field] for field in ('walls', 'furniture', 'rooms_poly', 'placement_geometry')):
+                return 'recording geometry does not match the edited layout'
+        except (ValueError, KeyError, TypeError):
+            return 'recording has an invalid custom layout or placement'
     expected_people = len(placement['people']) if m.group(4) else int(house['people'])
     if score['people_total'] != expected_people:
         return 'score has the wrong number of people'

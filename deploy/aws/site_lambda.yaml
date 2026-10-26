@@ -7,6 +7,10 @@ Description: >-
   (tools/ryor/CONTRACT.txt; resources in stack smoke-rescue-ryor). Deploy with deploy/aws/deploy_site_lambda.sh.
 
 Parameters:
+  RyorFamily:
+    Type: String
+    Default: smoke-rescue-ryor
+    Description: Immutable task definition revision paired with RyorEngine, so a deployment cannot mix engine versions.
   AlbUrl:
     Type: String
     Default: http://smoke--LoadB-m7oFRuQ63UoE-1386562850.us-east-1.elb.amazonaws.com
@@ -129,7 +133,7 @@ Resources:
           RYOR_BUCKET: !Ref RyorBucket
           RYOR_TABLE: !Ref RyorTable
           RYOR_CLUSTER: !Ref RyorCluster
-          RYOR_FAMILY: smoke-rescue-ryor
+          RYOR_FAMILY: !Ref RyorFamily
           RYOR_SUBNETS: !Ref RyorSubnets
           RYOR_SG: !Ref RyorSecurityGroup
           RYOR_ENGINE: !Ref RyorEngine

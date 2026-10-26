@@ -25,6 +25,7 @@ aws cloudformation deploy --region "$REGION" --stack-name "$STACK" --template-fi
   --parameter-overrides CodeBucket="$RB" CodeKey="$KEY" \
     RyorPolicyArn="$(out smoke-rescue-ryor LambdaPolicyArn)" RyorBucket="$RB" \
     RyorTable="$(out smoke-rescue-ryor TableName)" RyorCluster="$(out smoke-rescue-ryor ClusterName)" \
+    RyorFamily="$(out smoke-rescue-ryor TaskDefinitionArn)" \
     RyorSecurityGroup="$(out smoke-rescue-ryor TaskSecurityGroupId)" RyorEngine="$(out smoke-rescue-ryor ImageLabel)" \
     RyorEnabled="${RYOR_ENABLED:-1}" RyorCap="${RYOR_CAP:-2}" RyorDailyCap="${RYOR_DAILY_CAP:-150}" RyorIpLimit="${RYOR_IP_LIMIT:-6}"
 BUCKET="$(out "$STACK" SiteBucketName)"
