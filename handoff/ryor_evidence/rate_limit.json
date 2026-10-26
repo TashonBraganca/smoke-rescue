@@ -4,22 +4,20 @@
    "request": 1,
    "http": 200,
    "body": {
-    "mission": "6ade67c06ac93ab279",
+    "mission": "cache:family_ranch__r2__medium",
     "setup": "family_ranch__r2__medium",
-    "source": "live",
-    "preparing": false,
-    "poll": "/api/mission/6ade67c06ac93ab279"
+    "source": "recorded",
+    "reason": "rate_limited"
    }
   },
   {
    "request": 2,
    "http": 200,
    "body": {
-    "mission": "6ade67c160b09bc9fc",
+    "mission": "cache:family_ranch__r2__medium",
     "setup": "family_ranch__r2__medium",
-    "source": "live",
-    "preparing": false,
-    "poll": "/api/mission/6ade67c160b09bc9fc"
+    "source": "recorded",
+    "reason": "rate_limited"
    }
   },
   {
@@ -29,7 +27,7 @@
     "mission": "cache:family_ranch__r2__medium",
     "setup": "family_ranch__r2__medium",
     "source": "recorded",
-    "reason": "busy"
+    "reason": "rate_limited"
    }
   },
   {
@@ -73,8 +71,5 @@
    }
   }
  ],
- "test_runs_stopped": [
-  "6ade67c06ac93ab279",
-  "6ade67c160b09bc9fc"
- ]
+ "test_runs_stopped": []
 }

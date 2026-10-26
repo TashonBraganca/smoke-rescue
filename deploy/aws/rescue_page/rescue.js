@@ -1096,7 +1096,7 @@
   window.RescueLayout = {
     selection: function () { return { house: houseById(sel.house), robots: sel.robots, difficulty: sel.difficulty, layout: roomLayout }; },
     validate: function (layout) { return fetchJSON(API + '/validate', 30000, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({house:sel.house,robots:sel.robots,difficulty:sel.difficulty,layout:layout})}); },
-    accept: function (reply) { editedHouse = reply.house; roomLayout = reply.layout; scene = reply.placement; layoutValid = true; invalidateScene(); updateStartAvailability(); drawPreview(); $('scene-summary').textContent = scene.people.length + ' people on clear floor in your edited layout. Prepare its exact fallback before starting.'; },
+    accept: function (reply) { if (!reply.house || reply.house.id !== sel.house) return; editedHouse = reply.house; roomLayout = reply.layout; scene = reply.placement; layoutValid = true; invalidateScene(); updateStartAvailability(); drawPreview(); $('scene-summary').textContent = scene.people.length + ' people on clear floor in your edited layout. Prepare its exact fallback before starting.'; },
     invalid: function () { layoutValid = false; updateStartAvailability(); },
     valid: function () { layoutValid = true; updateStartAvailability(); },
     prepare: function () { openEditor(); $('prepare-scene').click(); },

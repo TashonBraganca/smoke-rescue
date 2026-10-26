@@ -154,3 +154,19 @@ def test_sweep_counts_a_stop_from_the_reserved_slot_pass(api, monkeypatch):
     monkeypatch.setattr(api, 'fail', lambda *a: True)
     monkeypatch.setattr(api, 'running_tasks', lambda: [])
     assert api.sweep()['stopped'] == 1
+
+
+def test_replay_identity_rejects_a_different_scene_or_engine(api, monkeypatch, scene):
+    data = replay()
+    monkeypatch.setattr(api, 'chunks', lambda *a: data)
+    base = 'family_ranch__r1__easy'
+    key = setup_key(base, validate(api.gallery()['houses']['family_ranch'], scene), 'test')
+    rec = {'setup': key}
+    status = {'setup': key, 'sim_t': 180, 'chunks': 19, 'placement': scene, 'engine': {'image': 'test'},
+              'score': {'people_found': 0, 'people_total': 3, 'robots_out': 1,
+                        'false_confirmations': 0, 'time_s': 180, 'coverage_pct': 50}}
+    assert api.validate(rec, status, '') is None
+    status['engine']['image'] = 'other'
+    assert 'scene bytes and engine' in api.validate(rec, status, '')
+    status['setup'] = base
+    assert 'different setup' in api.validate(rec, status, '')

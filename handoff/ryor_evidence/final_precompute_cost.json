@@ -1,0 +1,9 @@
+{
+ "tasks": 243,
+ "completed": 243,
+ "launch_to_observed_stop_seconds": 48732,
+ "engine_seconds": 33840.9,
+ "compute_planning_usd": 2.1388,
+ "ipv4_planning_usd": 0.0677,
+ "note": "Launch-to-observed-stop time is a conservative billing proxy, not AWS billing duration."
+}

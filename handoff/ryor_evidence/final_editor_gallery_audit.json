@@ -1,0 +1,129 @@
+{
+ "family_ranch": {
+  "accepted": true,
+  "doors": 14,
+  "people": 4
+ },
+ "long_ranch": {
+  "accepted": false,
+  "error": "Every room needs a reachable door at least 0.9 m wide with clear approaches."
+ },
+ "onedoor_934": {
+  "accepted": false,
+  "error": "Furniture blocks the fixed front door or its 0.9 m path."
+ },
+ "hx_cb9d3d6726": {
+  "accepted": true,
+  "doors": 11,
+  "people": 5
+ },
+ "hx_035feb0125": {
+  "accepted": true,
+  "doors": 9,
+  "people": 2
+ },
+ "hx_dad1851b27": {
+  "accepted": true,
+  "doors": 8,
+  "people": 5
+ },
+ "hx_ce454d45fe": {
+  "accepted": true,
+  "doors": 8,
+  "people": 5
+ },
+ "hx_dd7d4beea2": {
+  "accepted": false,
+  "error": "Every room needs a reachable door at least 0.9 m wide with clear approaches."
+ },
+ "hx_6b22fe6c3f": {
+  "accepted": true,
+  "doors": 6,
+  "people": 5
+ },
+ "hx_46bfe067cc": {
+  "accepted": true,
+  "doors": 9,
+  "people": 3
+ },
+ "hx_3f05f244a0": {
+  "accepted": false,
+  "error": "Every room needs a reachable door at least 0.9 m wide with clear approaches."
+ },
+ "hx_63f9e6a422": {
+  "accepted": true,
+  "doors": 9,
+  "people": 5
+ },
+ "hx_92b9dc40cf": {
+  "accepted": true,
+  "doors": 11,
+  "people": 5
+ },
+ "hx_6e10635d7c": {
+  "accepted": true,
+  "doors": 11,
+  "people": 5
+ },
+ "hx_e3a17f7182": {
+  "accepted": true,
+  "doors": 6,
+  "people": 5
+ },
+ "hx_9e870de851": {
+  "accepted": true,
+  "doors": 11,
+  "people": 5
+ },
+ "hx_974eb4297e": {
+  "accepted": false,
+  "error": "Every room needs a reachable door at least 0.9 m wide with clear approaches."
+ },
+ "hx_b0e22f086d": {
+  "accepted": true,
+  "doors": 8,
+  "people": 5
+ },
+ "hx_0e6ea164a9": {
+  "accepted": true,
+  "doors": 10,
+  "people": 5
+ },
+ "hx_ea02e5378a": {
+  "accepted": false,
+  "error": "Every room needs a reachable door at least 0.9 m wide with clear approaches."
+ },
+ "hx_da3eec59ac": {
+  "accepted": true,
+  "doors": 11,
+  "people": 5
+ },
+ "hx_9515d4a230": {
+  "accepted": false,
+  "error": "Every room needs a reachable door at least 0.9 m wide with clear approaches."
+ },
+ "hx_2f1f4383e4": {
+  "accepted": true,
+  "doors": 23,
+  "people": 5
+ },
+ "hx_eeb51537a0": {
+  "accepted": true,
+  "doors": 6,
+  "people": 5
+ },
+ "hx_0839153e91": {
+  "accepted": true,
+  "doors": 8,
+  "people": 5
+ },
+ "hx_612f77ec9d": {
+  "accepted": false,
+  "error": "Every room needs a reachable door at least 0.9 m wide with clear approaches."
+ },
+ "hx_d56de8c558": {
+  "accepted": true,
+  "doors": 14,
+  "people": 5
+ }
+}

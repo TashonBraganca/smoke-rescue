@@ -1,0 +1,90 @@
+{
+ "live": {
+  "setup": "family_ranch__r2__medium__p65717273c0b5f0bc9948",
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "score": {
+   "people_found": 4,
+   "people_total": 4,
+   "time_s": 180.0,
+   "all_out": false,
+   "coverage_pct": 90.5,
+   "robots_out": 1,
+   "robots": 2,
+   "false_confirmations": 0,
+   "first_person_s": 3.0
+  },
+  "wall": {
+   "started": 1792977503.6794038,
+   "first_frame_s": 8.9,
+   "total_s": 129.8
+  },
+  "engine": {
+   "git": "004e0c5f",
+   "image": "004e0c5f"
+  },
+  "decisions": 8,
+  "orders": 8,
+  "confirmations": 4,
+  "bedrooms": {
+   "fr_bed1": [
+    0.5,
+    6.45,
+    4,
+    12.2
+   ],
+   "fr_bed2": [
+    -3,
+    6.45,
+    0.5,
+    12.2
+   ]
+  },
+  "validation": "Every frame passed time, bounds, confirmation provenance, score and exact-geometry identity checks."
+ },
+ "fallback": {
+  "setup": "family_ranch__r2__medium__p65717273c0b5f0bc9948",
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "score": {
+   "people_found": 4,
+   "people_total": 4,
+   "time_s": 180.0,
+   "all_out": false,
+   "coverage_pct": 85.2,
+   "robots_out": 1,
+   "robots": 2,
+   "false_confirmations": 0,
+   "first_person_s": 3.0
+  },
+  "wall": {
+   "started": 1792977253.882778,
+   "first_frame_s": 69.0,
+   "total_s": 125.0
+  },
+  "engine": {
+   "git": "004e0c5f",
+   "image": "004e0c5f"
+  },
+  "decisions": 0,
+  "orders": 0,
+  "confirmations": 4,
+  "bedrooms": {
+   "fr_bed1": [
+    0.5,
+    6.45,
+    4,
+    12.2
+   ],
+   "fr_bed2": [
+    -3,
+    6.45,
+    0.5,
+    12.2
+   ]
+  },
+  "validation": "Every frame passed time, bounds, confirmation provenance, score and exact-geometry identity checks."
+ }
+}

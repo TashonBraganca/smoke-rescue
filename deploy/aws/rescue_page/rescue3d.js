@@ -3,7 +3,7 @@
 (function () {
   'use strict';
   const $ = id => document.getElementById(id);
-  const clone = value => JSON.parse(JSON.stringify(value));
+  const clone = value => JSON.parse(JSON.stringify(value,(key,item)=>key.startsWith('_')?undefined:item)); // Leave the plan replay's cached typed-array floor mask out of room-drag copies.
   const ROBOT = {robot_A:0x40bfff,robot_B:0xff65bb,robot_C:0xb6ce68}; // Match the plan replay's robot colours.
   const FLOOR = {bedroom:0x7c8274,bathroom:0x789599,kitchen:0x9b886b,living:0xa28d79,corridor:0x747a80,laundry:0x827f98,study:0x9b876f}; // Room kinds follow the existing viewer's material colours.
   let editor = null, player = null, draft = null, house = null, lastValid = null, history = [], revision = 0, selected = null, pending = false;
@@ -25,7 +25,7 @@
   }
   class View {
     constructor(host) {
-      this.host=host;this.renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
+      this.host=host;this.renderer=new THREE.WebGLRenderer({antialias:true});
       this.renderer.setPixelRatio(Math.min(devicePixelRatio,2));host.appendChild(this.renderer.domElement);
       this.scene=new THREE.Scene();this.scene.background=new THREE.Color(0x151c20);
       this.camera=new THREE.PerspectiveCamera(48,1,.05,300); // Same perspective/orbit construction as the existing viewer.
@@ -37,7 +37,9 @@
       new ResizeObserver(()=>this.resize()).observe(host);
       const animate=()=>{requestAnimationFrame(animate);if(!this.host.offsetWidth||!this.host.offsetHeight||!this.active)return;this.orbit.update();this.renderer.render(this.scene,this.camera);};animate();
     }
-    resize(){const w=this.host.clientWidth,h=this.host.clientHeight;if(!w||!h)return;this.renderer.setSize(w,h,false);this.camera.aspect=w/h;this.camera.updateProjectionMatrix();}
+    resize(){const w=this.host.clientWidth,h=this.host.clientHeight;if(!w||!h||this.width===w&&this.height===h)return;this.width=w;this.height=h;this.renderer.setSize(w,h,false);this.camera.aspect=w/h;this.camera.updateProjectionMatrix();if(this.fitBounds)this.fit();}
+    fit(){const b=this.fitBounds;if(!b)return;const direction=this.camera.position.clone().sub(this.orbit.target).normalize();const corners=[];for(const x of [b[0],b[2]])for(const y of [b[1],b[3]])for(const z of [0,1])corners.push(new THREE.Vector3(x,z,-y));let lo=1,hi=150;for(let step=0;step<24;step++){const distance=(lo+hi)/2;this.camera.position.copy(this.orbit.target).addScaledVector(direction,distance);this.camera.lookAt(this.orbit.target);this.camera.updateMatrixWorld();const edge=Math.max(...corners.flatMap(p=>{const v=p.clone().project(this.camera);return [Math.abs(v.x),Math.abs(v.y)];}));if(edge>.84)lo=distance;else hi=distance;}this.orbit.update();}
+
     build(h, editing, reset) {
       dispose(this.base);dispose(this.dynamic);dispose(this.search);this.pick=[];this.roomMeshes={};
       const rooms=h.placement_geometry.rooms;
@@ -47,7 +49,7 @@
       h.furniture.forEach(poly=>{const xs=poly.map(p=>p[0]),ys=poly.map(p=>p[1]);box(this.base,(Math.min(...xs)+Math.max(...xs))/2,.30,-(Math.min(...ys)+Math.max(...ys))/2,Math.max(...xs)-Math.min(...xs),.60,Math.max(...ys)-Math.min(...ys),0x454e54);}); // Furniture boxes show exact footprints; their 0.6 m illustration height is not sensor geometry.
       const door=h.door;if(door){box(this.base,door[0],.03,-door[1],1.25,.06,.16,0xffb866);label(this.base,'Fixed front door',door[0],.65,-door[1]+.6,3.0);}
       (h.pads||[]).forEach((p,i)=>box(this.base,p[0],-.02,-p[1],.55,.05,.55,ROBOT['robot_'+'ABC'[i]],.65));
-      if(reset){const b=h.bounds,cx=(b[0]+b[2])/2,cy=(b[1]+b[3])/2,span=Math.max(b[2]-b[0],b[3]-b[1]);this.orbit.target.set(cx,0,-cy);this.camera.position.set(cx+(editing?span*.12:span*.65),span*(editing?.95:1.05),-cy+span*(editing?.35:.85));this.orbit.update();}
+      if(reset){const rects=h.placement_geometry.rooms.map(r=>r.rect);const b=editing?[Math.min(...rects.map(r=>r[0])),Math.min(...rects.map(r=>r[1])),Math.max(...rects.map(r=>r[2])),Math.max(...rects.map(r=>r[3]))]:h.bounds,cx=(b[0]+b[2])/2,cy=(b[1]+b[3])/2,span=Math.max(b[2]-b[0],b[3]-b[1]);this.orbit.target.set(cx,0,-cy);this.camera.position.set(cx+(editing?span*.12:span*.65),span*(editing?.95:1.05),-cy+span*(editing?.35:.85));this.fitBounds=b;this.resize();this.fit();}
       this.resize();
     }
     tint(id,bad){Object.values(this.roomMeshes).forEach(m=>{m.material.emissive.setHex(m.userData.room===id?(bad?0x8b1f16:0x253644):0x000000);});}
@@ -88,18 +90,19 @@
   $('reset-layout').addEventListener('click',()=>{revision++;window.RescueLayout.reset();const selection=window.RescueLayout.selection();house=clone(selection.house);draft=house.placement_geometry.rooms.map(r=>({id:r.id,rect:r.rect}));history=[];editor.build(house,true,true);fillRooms();validate();});
   $('move-mode').addEventListener('click',()=>{moveMode=true;editor.orbit.enabled=false;$('move-mode').setAttribute('aria-pressed','true');$('orbit-mode').setAttribute('aria-pressed','false');});
   $('orbit-mode').addEventListener('click',()=>{moveMode=false;editor.orbit.enabled=true;$('move-mode').setAttribute('aria-pressed','false');$('orbit-mode').setAttribute('aria-pressed','true');});
-  $('close-layout').addEventListener('click',()=>{$('layout-editor').close();});
+  $('close-layout').addEventListener('click',()=>{revision++;pending=false;$('layout-editor').close();});
+  $('layout-editor').addEventListener('cancel',()=>{revision++;pending=false;});
   $('prepare-layout').addEventListener('click',()=>{if(pending||$('prepare-layout').disabled)return;$('layout-editor').close();window.RescueLayout.prepare();});
-  function toggle(on){window.Rescue3D.replayEnabled=on;$('replay-3d').hidden=!on;$('replay').hidden=on;$('three-caption').hidden=!on;$('terra-caption').hidden=!on;$('view-plan').setAttribute('aria-pressed',String(!on));$('view-3d').setAttribute('aria-pressed',String(on));if(on){ensurePlayer();player&&player.resize();}}
+  function toggle(on){window.Rescue3D.replayEnabled=on;$('stage').classList.toggle('three-mode',on);$('replay-3d').hidden=!on;$('replay').hidden=on;$('three-caption').hidden=!on;$('terra-caption').hidden=!on;$('view-plan').setAttribute('aria-pressed',String(!on));$('view-3d').setAttribute('aria-pressed',String(on));if(on){ensurePlayer();player&&player.resize();}}
   $('view-plan').addEventListener('click',()=>toggle(false));$('view-3d').addEventListener('click',()=>toggle(true));
-  window.Rescue3D={replayEnabled:false,replay(h,f,m){if(!ensurePlayer())return;if(h!==replayHouse||m!==replayMission){player.build(h,false,true);replayHouse=h;replayMission=m;lastFrame=null;textures={};Object.entries(m.layers||{}).forEach(([id,cv])=>{const texture=new THREE.CanvasTexture(cv);texture.magFilter=THREE.NearestFilter;const mesh=new THREE.Mesh(new THREE.PlaneGeometry(m.gw*.1,m.gh*.1),new THREE.MeshBasicMaterial({map:texture,transparent:true,opacity:.5,depthWrite:false,side:THREE.DoubleSide}));mesh.rotation.x=-Math.PI/2;mesh.position.set(-25+(m.gx0+m.gw/2)*.1,.012,-(-25+(m.gy0+m.gh/2)*.1));player.search.add(mesh);textures[id]=texture;});}
+  window.Rescue3D={replayEnabled:false,replay(h,f,m){if(!f&&m.resumeAt&&replayHouse){$('terra-caption').textContent='Loading the exact recorded fallback. The last live frame stays visible until it is ready.';return;}if(!ensurePlayer())return;$('three-caption').textContent=(m.source==='live'?'Live simulation of your layout':m.source==='saved'?'Saved simulation of this layout':'Recorded run of this exact layout')+'; the camera-and-smoke version is in the films on the main site. Replay positions and fire are simulator truth. Furniture is shown as boxes.';if(h!==replayHouse||m!==replayMission){player.build(h,false,true);replayHouse=h;replayMission=m;lastFrame=null;textures={};Object.entries(m.layers||{}).forEach(([id,cv])=>{const texture=new THREE.CanvasTexture(cv);texture.magFilter=THREE.NearestFilter;const mesh=new THREE.Mesh(new THREE.PlaneGeometry(m.gw*.1,m.gh*.1),new THREE.MeshBasicMaterial({map:texture,transparent:true,opacity:.5,depthWrite:false,side:THREE.DoubleSide}));mesh.rotation.x=-Math.PI/2;mesh.position.set(-25+(m.gx0+m.gw/2)*.1,.012,-(-25+(m.gy0+m.gh/2)*.1));player.search.add(mesh);textures[id]=texture;});}
     if(!f){player.resize();return;}if(lastFrame===f&&player.dynamic.children.length)return;lastFrame=f;dispose(player.dynamic);Object.values(textures).forEach(t=>t.needsUpdate=true);
-    f.robots.forEach(r=>{const robot=new THREE.Group();robot.position.set(r.x,.14,-r.y);robot.rotation.y=(r.yaw||0)*Math.PI/180;const col=ROBOT[r.id]||0xffffff;const mesh=new THREE.Mesh(new THREE.CylinderGeometry(.24,.27,.22,20),new THREE.MeshLambertMaterial({color:col}));robot.add(mesh);box(robot,0,.17,0,.26,.10,.28,0x192327);for(const x of [-.25,.25])box(robot,x,-.02,0,.10,.18,.30,0x1d2125);box(robot,0,.09,-.24,.10,.08,.12,0xf2eee2);player.dynamic.add(robot);label(player.dynamic,r.id.replace('robot_',''),r.x,.8,-r.y,.65);});
+    f.robots.forEach(r=>{const robot=new THREE.Group();robot.position.set(r.x,.14,-r.y);robot.rotation.y=((m.yawMap?m.yawMap.fn(r.yaw):(r.yaw||90))-90)*Math.PI/180;const col=ROBOT[r.id]||0xffffff;const mesh=new THREE.Mesh(new THREE.CylinderGeometry(.24,.27,.22,20),new THREE.MeshLambertMaterial({color:col}));robot.add(mesh);box(robot,0,.17,0,.26,.10,.28,0x192327);for(const x of [-.25,.25])box(robot,x,-.02,0,.10,.18,.30,0x1d2125);box(robot,0,.09,-.24,.10,.08,.12,0xf2eee2);player.dynamic.add(robot);label(player.dynamic,r.id.replace('robot_',''),r.x,.8,-r.y,.65);});
     (m.found||[]).forEach(p=>{const mesh=new THREE.Mesh(new THREE.SphereGeometry(.18,12,8),new THREE.MeshLambertMaterial({color:0xf3f0dc}));mesh.position.set(p.x,.3,-p.y);player.dynamic.add(mesh);const ring=new THREE.Mesh(new THREE.TorusGeometry(.28,.045,6,20),new THREE.MeshBasicMaterial({color:ROBOT[p.by]||0xffffff}));ring.rotation.x=Math.PI/2;ring.position.set(p.x,.08,-p.y);player.dynamic.add(ring);});
     const links=(m.events||[]).filter(e=>e.kind==='map_shared'&&e.t<=m.t&&m.t-e.t<8);
     if(links.length&&f.robots.length>1){const points=f.robots.slice(0,2).map(r=>new THREE.Vector3(r.x,.6,-r.y));const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints(points),new THREE.LineDashedMaterial({color:0xf3eddd,dashSize:.25,gapSize:.18}));line.computeLineDistances();player.dynamic.add(line);const a=f.robots[0],b=f.robots[1];label(player.dynamic,'Maps joined',(a.x+b.x)/2,1.0,-(a.y+b.y)/2,2.0);}
     let fire=null;for(let i=m.lastIdx;i>=0&&!fire;i--)if(m.frames[i]&&Array.isArray(m.frames[i].fire))fire=m.frames[i].fire;(fire||[]).forEach(p=>{const flame=new THREE.Mesh(new THREE.ConeGeometry(Math.max(.10,p[2]),.7,10),new THREE.MeshBasicMaterial({color:0xff783a,transparent:true,opacity:.78}));flame.position.set(p[0],.35,-p[1]);player.dynamic.add(flame);});
-    const event=(m.events||[]).filter(e=>e.t<=m.t&&(e.kind==='agent_decision'||e.kind==='agent_unavailable')).slice(-1)[0];$('terra-caption').textContent=event?event.text:'The brain keeps moving while Terra reads the robots\' reports.';
+    const event=(m.events||[]).filter(e=>e.t<=m.t&&(e.kind==='agent_decision'||e.kind==='agent_unavailable')).slice(-1)[0];$('terra-caption').textContent=event?event.text:m.source==='recorded'?'Recorded brain-only run. Terra is not called during playback.':m.status&&m.status.terra===false?'Brain-only simulation. Terra is off for this run.':'The brain keeps moving while Terra reads the robots\' reports.';
     Object.keys(ROBOT).forEach(id=>{const points=[];for(let i=0;i<=m.lastIdx;i++){const frame=m.frames[i];if(!frame)continue;const r=frame.robots.find(r=>r.id===id);if(r)points.push(new THREE.Vector3(r.x,.035,-r.y));}if(points.length>1)player.dynamic.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points),new THREE.LineBasicMaterial({color:ROBOT[id],transparent:true,opacity:.7})));});player.resize();
   }};
 })();

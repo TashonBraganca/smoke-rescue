@@ -1,0 +1,95 @@
+{
+  "mission": "6adeaa48548633fae1",
+  "at60": {
+    "t": 60,
+    "people": 2,
+    "frames": 361,
+    "layout": [
+      {
+        "id": "fr_bath1",
+        "rect": [
+          7.5,
+          6.45,
+          9.75,
+          12.2
+        ]
+      },
+      {
+        "id": "fr_bath2",
+        "rect": [
+          9.75,
+          6.45,
+          12,
+          12.2
+        ]
+      },
+      {
+        "id": "fr_bed1",
+        "rect": [
+          0.5,
+          6.45,
+          4,
+          12.2
+        ]
+      },
+      {
+        "id": "fr_bed2",
+        "rect": [
+          -3,
+          6.45,
+          0.5,
+          12.2
+        ]
+      },
+      {
+        "id": "fr_bed3",
+        "rect": [
+          4,
+          6.45,
+          7.5,
+          12.2
+        ]
+      },
+      {
+        "id": "fr_hall",
+        "rect": [
+          -3,
+          4.7,
+          12,
+          6.45
+        ]
+      },
+      {
+        "id": "fr_kitchen",
+        "rect": [
+          3,
+          1.2,
+          9,
+          4.7
+        ]
+      },
+      {
+        "id": "fr_laundry",
+        "rect": [
+          9,
+          1.2,
+          12,
+          4.7
+        ]
+      },
+      {
+        "id": "fr_living",
+        "rect": [
+          -3,
+          1.2,
+          3,
+          4.7
+        ]
+      }
+    ],
+    "caption": "Terra for Robot B. Enter nearby unsearched room 7 to cover remaining indoor floor.",
+    "badge": "Saved live run"
+  },
+  "overflow": false,
+  "errors": []
+}

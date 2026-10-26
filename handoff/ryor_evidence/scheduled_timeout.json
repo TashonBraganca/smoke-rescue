@@ -1,63 +1,39 @@
 {
  "test": "Artificially age this mission by 601 seconds; no mission GET during the wait.",
- "mission": "6ade74c7b51d0edf94",
+ "mission": "6adea9c8fb93547a9a",
  "observations": [
   {
-   "s": 1.8,
+   "s": 1.56,
    "mission_state": "starting",
    "task_state": "RUNNING",
    "task_desired": "RUNNING"
   },
   {
-   "s": 5.4,
+   "s": 5.22,
    "mission_state": "starting",
    "task_state": "RUNNING",
    "task_desired": "RUNNING"
   },
   {
-   "s": 8.99,
+   "s": 8.92,
    "mission_state": "starting",
    "task_state": "RUNNING",
    "task_desired": "RUNNING"
   },
   {
-   "s": 12.58,
+   "s": 12.6,
    "mission_state": "starting",
    "task_state": "RUNNING",
    "task_desired": "RUNNING"
   },
   {
-   "s": 16.17,
+   "s": 16.21,
    "mission_state": "starting",
    "task_state": "RUNNING",
    "task_desired": "RUNNING"
   },
   {
-   "s": 19.77,
-   "mission_state": "starting",
-   "task_state": "RUNNING",
-   "task_desired": "RUNNING"
-  },
-  {
-   "s": 23.36,
-   "mission_state": "starting",
-   "task_state": "RUNNING",
-   "task_desired": "RUNNING"
-  },
-  {
-   "s": 26.96,
-   "mission_state": "starting",
-   "task_state": "RUNNING",
-   "task_desired": "RUNNING"
-  },
-  {
-   "s": 30.56,
-   "mission_state": "starting",
-   "task_state": "RUNNING",
-   "task_desired": "RUNNING"
-  },
-  {
-   "s": 34.15,
+   "s": 19.86,
    "mission_state": "failed",
    "task_state": "RUNNING",
    "task_desired": "STOPPED"
@@ -65,21 +41,21 @@
  ],
  "public_result": {
   "v": 1,
-  "mission": "6ade74c7b51d0edf94",
+  "mission": "6adea9c8fb93547a9a",
   "setup": "family_ranch__r1__medium",
   "state": "failed",
   "source": "live",
-  "chunks": 7,
-  "sim_t": 70.0,
-  "updated": "2026-10-25T21:30:45+00:00",
-  "error": "hard time limit: running 633 s > 600 s",
+  "chunks": 5,
+  "sim_t": 50.0,
+  "updated": "2026-10-26T01:16:44+00:00",
+  "error": "hard time limit: running 620 s > 600 s",
   "score": null,
   "engine": {
-   "git": "84455305",
-   "image": "84455305"
+   "git": "004e0c5f",
+   "image": "004e0c5f"
   },
   "wall": {
-   "started": 1792963803.8475835,
+   "started": 1792977376.247962,
    "first_frame_s": 6.3,
    "total_s": null
   },

@@ -35,7 +35,7 @@ OUT = ROOT / "data/runs/ryor"
 MISSION_S = 180
 LEAVE_BY_S = 140
 LEAVE_BY_REASON = ("The brain searches until mission_time_limit_s and only then walks out (return_home_early off, owner 24 Oct). "
-                   "140 s of a 180 s mission leaves 40 s for the walk out, so the replay ends with robots leaving. Family ranch, "
+                   "140 s of a 180 s mission leaves 40 s for the walk out, so the replay ends with robots leaving. Three-bed ranch, "
                    "medium, 2 robots, limit 170 s: both were still inside at 180 s.")
 DIFFICULTIES = {
     "easy": {"head_start_s": 0, "visibility_m": 6.0, "label": "Fire just started. Light smoke: people visible up to 6 m."},
