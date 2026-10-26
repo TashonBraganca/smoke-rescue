@@ -1,4 +1,4 @@
-"""After HOUSES8_MERGED.txt, snapshot overnight-25oct and rebuild fifteen EASY missions.
+"""Snapshot overnight-25oct and rebuild the five current houses at EASY.
 
 Runs in an isolated /tmp copy. The recording checkout is read-only. Failed runs
 remain in the evidence directory and never replace a site's checked fallbacks.
@@ -15,14 +15,15 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT.parent / 'smoke-rescue'
-EVIDENCE = ROOT / 'handoff/judge_flow_evidence'
+EVIDENCE = ROOT / 'handoff/backend_evidence'
 DATA = ROOT / 'data/runs/ryor-judge'
 HOUSES = [('family_ranch', 'Three-bed ranch', 'scenario_family_ranch_full.json'),
           ('long_ranch', 'L-shaped ranch', 'scenario_long_ranch_full.json'),
-          ('split_ranch', 'Split ranch', 'scenario_split_ranch_full.json')]
+          ('onedoor_934', 'One-door house', 'scenario_house_onedoor_seed934_full.json')]
 EXTRAS = [('hx_46bfe067cc', 'Bungalow'), ('hx_cb9d3d6726', 'Corner house')]
 DOTNET = '/Applications/Unity/Hub/Editor/6000.6.6f1/Unity.app/Contents/Resources/Scripting/DotNetSdk/dotnet'
 
@@ -32,11 +33,9 @@ def write(path, obj):
     path.write_text(json.dumps(obj, separators=(',', ':')))
 
 
-def snapshot(require_merge=True):
+def snapshot():
     marker = SOURCE / 'handoff/HOUSES8_MERGED.txt'
-    if require_merge and not marker.is_file():
-        raise SystemExit('Waiting for ' + str(marker))
-    commit = subprocess.check_output(['git', '-C', str(SOURCE), 'rev-parse', 'HEAD'], text=True).strip()
+    commit = subprocess.check_output(['git', '-C', str(SOURCE), 'rev-parse', 'overnight-25oct'], text=True).strip()
     stage = Path(tempfile.mkdtemp(prefix='ryor-judge-'))
     archive = stage / 'source.tar'
     with archive.open('wb') as out:
@@ -55,6 +54,17 @@ def snapshot(require_merge=True):
     return stage, commit
 
 
+def record_engine(stage):
+    meta=json.loads((EVIDENCE/'engine_snapshot.json').read_text())
+    files=['config/brain.json','tools/ryor/entry.py','tools/ryor/patch_headless.py',
+           'tools/ryor/replay.py','tools/ryor/engine/bin/RyorRunner.dll']
+    files += [str(p.relative_to(stage)) for p in sorted((stage/'unity/SmokeRescue/Assets/SmokeRescue/Brain').glob('*.cs'))]
+    meta['sha256']={f:hashlib.sha256((stage/f).read_bytes()).hexdigest() for f in files}
+    meta['local_precompute_hard_limit_s']=3600
+    meta['batch_started_unix_s']=time.time()
+    write(EVIDENCE/'engine_snapshot.json',meta)
+
+
 def gallery(stage):
     sys.path[:0] = [str(stage / 'tools'), str(stage / 'tools/bench'), str(ROOT / 'tools/ryor')]
     import headless_world
@@ -69,16 +79,15 @@ def gallery(stage):
     for hid, name, scenario in HOUSES:
         p = stage / 'config' / scenario
         if not p.exists():
-            # Split-ranch filename is discovered rather than silently reusing the retired house.
-            candidates = sorted((stage / 'config').glob('scenario*split*ranch*.json'))
-            if hid != 'split_ranch' or not candidates:raise FileNotFoundError(p)
-            p = next((c for c in candidates if c.stem.endswith('_full')), candidates[0])
+            raise FileNotFoundError(p)
         sc = headless_world.load_scenario(p)
+        sc.setdefault('floorplan_file', 'floorplan.json')
+        sc['fire'] = {'config_file': 'fire.json', **sc.get('fire', {})}
         world = headless_world.compile_world(p)
         fp = make_requests.fire_grid_plan(sc, out, hid)
         if fp:world['fire']['floorplan'] = fp
         h = mod.house_entry(hid, name, 'ours', p.name, 'ours', world)
-        if len(world['rooms']) != 8:raise ValueError(f'{hid}: expected 8 rooms, got {len(world["rooms"])}')
+        # The merge marker cancels the eight-room replacement. Keep the committed current houses.
         entries.append(h);worlds[hid] = world
     for hid, name in EXTRAS:
         h = dict(next(h for h in original['houses'] if h['id'] == hid));h['name'] = name
@@ -114,7 +123,7 @@ def gallery(stage):
 def simulate(stage, commit, key):
     dest = DATA / commit[:12] / key
     env = dict(os.environ, SETUP=key, MISSION_ID='cache', LOCAL_OUT=str(dest), RUN_DIR=str(dest/'run'), BUCKET='',
-               ENGINE_GIT=commit, ENGINE_TAG=commit[:12], DOTNET=DOTNET, HARD_LIMIT_S='540', TERRA_ENABLED='0')
+               ENGINE_GIT=commit, ENGINE_TAG=commit[:12], DOTNET=DOTNET, HARD_LIMIT_S='3600', TERRA_ENABLED='0')
     dest.mkdir(parents=True,exist_ok=True)
     with (dest/'engine.log').open('w') as log:
         p=subprocess.run([sys.executable,str(stage/'tools/ryor/entry.py')],env=env,stdout=log,stderr=subprocess.STDOUT)
@@ -130,10 +139,22 @@ def inspect_run(g, commit, key, code, dest):
     house=next(h for h in g['houses'] if key.startswith(h['id']+'__'))
     chunks=[json.loads((dest/f'chunk_{i:04d}.json').read_text()) for i in range(status['chunks'])]
     frames=[f for c in chunks for f in c['frames']]
-    result=gate(house,frames,status,commit,house['source']=='HouseExpo')
+    result=gate(house,frames,status,commit)
     if len(frames)!=int(g['mission_s']*2)+1 or [f['t'] for f in frames]!=[i*.5 for i in range(int(g['mission_s']*2)+1)]:
         result.update(passed=False,error='Incomplete frame sequence')
     result['score']=status['score'];result['path']=str(dest)
+    result['rooms_total']=len(house['rooms_poly'])
+    result['final_robots']=frames[-1]['robots']
+    result['frames']=len(frames)
+    result['causes']=[]
+    result['never_entered_robots']=[p['id'] for p in frames[-1]['robots'] if not any(
+        inside(room['poly'],q['x'],q['y']) for f in frames for q in f['robots'] if q['id']==p['id'] for room in house['rooms_poly'])]
+    result['inside_at_end']=[p['id'] for p in frames[-1]['robots'] if any(inside(room['poly'],p['x'],p['y']) for room in house['rooms_poly'])]
+    if result['missing_rooms']:result['causes'].append('Rooms never entered: '+', '.join(result['missing_rooms']))
+    if result['inside_at_end']:result['causes'].append('Robots still inside at mission end: '+', '.join(result['inside_at_end']))
+    if result['never_entered_robots']:result['causes'].append('No verified return because the robot never entered: '+', '.join(result['never_entered_robots']))
+    if result['false_confirmations']:result['causes'].append(str(result['false_confirmations'])+' false confirmations')
+    if not result['engine_matches']:result['causes'].append('Engine source does not match the pinned commit')
     if not result['passed']:return result,None
     seen=set();mapped=[]
     cells=[room_grid(room['poly'],g['grid'],inside) for room in house['rooms_poly']]
@@ -150,17 +171,30 @@ def inspect_run(g, commit, key, code, dest):
 
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--prepare-only',action='store_true');p.add_argument('--site',type=Path,default=Path('/Volumes/Tashon/opencv/showcase/site-next'));args=p.parse_args()
-    stage,commit=snapshot(not args.prepare_only)
-    if not args.prepare_only:g=gallery(stage)
-    subprocess.run([str(stage/'tools/ryor/build_engine.sh')],check=True)
+    p=argparse.ArgumentParser();p.add_argument('--prepare-only',action='store_true');p.add_argument('--resume',action='store_true');p.add_argument('--site',type=Path,default=Path('/Volumes/Tashon/opencv/showcase/site-next'));args=p.parse_args()
+    if args.resume:
+        meta=json.loads((EVIDENCE/'engine_snapshot.json').read_text())
+        stage,commit=Path(meta['stage']),meta['commit']
+        g=json.loads((stage/'data/runs/ryor/gallery.json').read_text())
+    else:
+        stage,commit=snapshot()
+        if not args.prepare_only:g=gallery(stage)
+        subprocess.run([str(stage/'tools/ryor/build_engine.sh')],check=True)
+        record_engine(stage)
     if args.prepare_only:
         print('Current source engine compiled at',stage,flush=True);return
     results={};recordings={}
     keys=g['setups']
+    def run(key):
+        dest=DATA/commit[:12]/key
+        status=dest/'status.json'
+        if args.resume and status.exists():
+            st=json.loads(status.read_text())
+            if st['state']=='done' and st['engine']['git']==commit:return key,0,dest
+        return simulate(stage,commit,key)
     # Three workers bound local CPU use; each team already parallelizes sensing.
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
-        futures=[pool.submit(simulate,stage,commit,key) for key in keys]
+        futures=[pool.submit(run,key) for key in keys]
         for future in concurrent.futures.as_completed(futures):
             key,code,dest=future.result();result,recording=inspect_run(g,commit,key,code,dest)
             results[key]=result
@@ -178,6 +212,13 @@ def main():
     for key,r in recordings.items():write(dest/(key+'.json'),r)
     write(dest/'gallery.json',dict(houses=g['houses'],mission_s=g['mission_s'],difficulty='easy',citation=g['citation']))
     config=json.loads((dest/'missions.json').read_text());config['engine']=commit;write(dest/'missions.json',config)
+    # Keep a versioned copy of data only. The UI source belongs to its owner.
+    saved=ROOT/'tools/ryor/site-next/public/rescue-data'
+    if saved.resolve() != dest.resolve():
+        saved.mkdir(parents=True,exist_ok=True)
+        for old in saved.glob('*__r*__easy.json'):old.unlink()
+        for name in ['gallery.json','missions.json']+[key+'.json' for key in recordings]:
+            shutil.copyfile(dest/name,saved/name)
     print(f'{len(recordings)}/15 passed; failed runs withheld. Snapshot {stage}',flush=True)
     write(EVIDENCE/'rebuild_summary.json',dict(commit=commit,stage=str(stage),passed=len(recordings),total=15))
 

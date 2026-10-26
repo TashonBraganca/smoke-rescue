@@ -1,0 +1,261 @@
+{
+  "engine": "e49251258d1a5b3f020c007fa54c85c0056026f1",
+  "houses": {
+    "family_ranch": {
+      "scene_without_robots_sha256": "d0f996b99d114de0e25986f1f36ded13283c291af7364e924df00ccec43310a3",
+      "setups": {
+        "family_ranch__r1__easy": {
+          "head_start_s": 0,
+          "visibility_m": 6,
+          "duration_s": 360,
+          "brain_overrides": {},
+          "robots": 1,
+          "world_sha256": "dceb619c30bb971b5d49badd5cc501715c0a6304387f66a5c93f437729b7393a",
+          "request_sha256": "ca41071a90bb965947cf3a70a0e748c613a46269febcf2659aa8a2433c94ab85"
+        },
+        "family_ranch__r2__easy": {
+          "head_start_s": 0,
+          "visibility_m": 6,
+          "duration_s": 360,
+          "brain_overrides": {},
+          "robots": 2,
+          "world_sha256": "ac2a8ea5ae0ec5ad2c1fc05218f18dfffc80a8a0e68b34cbd34accffd98b769f",
+          "request_sha256": "62fe8793607b1ccdd8a1b5bfd8c87447832bc589dc92676a3718f0233c9bb888"
+        },
+        "family_ranch__r3__easy": {
+          "head_start_s": 0,
+          "visibility_m": 6,
+          "duration_s": 360,
+          "brain_overrides": {},
+          "robots": 3,
+          "world_sha256": "d63b0358e909c1570bb4ecd66712b2464046874fe3ba7bf8d3b50f0900624fd7",
+          "request_sha256": "bdf0802f4da7f9f5b57e37366e1f6aa80d9421b372fbcf6538011a84e98bf70b"
+        }
+      }
+    },
+    "hx_46bfe067cc": {
+      "scene_without_robots_sha256": "7c722e941466cd708c8214a8d150f82cd1ee5c58a105168f004bb670cc14a9d7",
+      "setups": {
+        "hx_46bfe067cc__r1__easy": {
+          "head_start_s": 0,
+          "visibility_m": 6,
+          "duration_s": 360,
+          "brain_overrides": {},
+          "robots": 1,
+          "world_sha256": "2882487566f4e6e7d5fbdfcacc598ff6d0596512a4a0781a3c603f0dc2b6cb82",
+          "request_sha256": "9968cd45baea3d32fe9b83e29f581dec7d582b67533543a3bb162b062e8437e2"
+        },
+        "hx_46bfe067cc__r2__easy": {
+          "head_start_s": 0,
+          "visibility_m": 6,
+          "duration_s": 360,
+          "brain_overrides": {},
+          "robots": 2,
+          "world_sha256": "5c4aa9f2b3ac1896d3034644f72b275c43efbe3b4caf446c28773afdb4c56db0",
+          "request_sha256": "6f5d2f0a822ba1b8a29caca2b04fe69bc0d7db487a36adfa03b932d537218f11"
+        },
+        "hx_46bfe067cc__r3__easy": {
+          "head_start_s": 0,
+          "visibility_m": 6,
+          "duration_s": 360,
+          "brain_overrides": {},
+          "robots": 3,
+          "world_sha256": "ff956398b13d053c9460d843de74e88b6c1d8d3166a1d03ded8e92d9274ed02e",
+          "request_sha256": "6ef22632502f5a8591aa69427dcc2279361ac80fd6452c6a393f6df106250b21"
+        }
+      }
+    },
+    "hx_cb9d3d6726": {
+      "scene_without_robots_sha256": "2a88aa7089632a6e16bd045d653628df479d5e9e646adb8970ae37c375e35d5c",
+      "setups": {
+        "hx_cb9d3d6726__r1__easy": {
+          "head_start_s": 0,
+          "visibility_m": 6,
+          "duration_s": 360,
+          "brain_overrides": {},
+          "robots": 1,
+          "world_sha256": "cd221e4780853cc84f48bfb293ac983dc99ad7bc663a9ebb3b824ee39fb99e7b",
+          "request_sha256": "2ec41507b89971ef10b5dc64891b1ecd0a3832f385d896be2b0353862e0ecd73"
+        },
+        "hx_cb9d3d6726__r2__easy": {
+          "head_start_s": 0,
+          "visibility_m": 6,
+          "duration_s": 360,
+          "brain_overrides": {},
+          "robots": 2,
+          "world_sha256": "7302245034f262243ae1b23f89f3bc6a4aa51e5db540f5d5e76fcfe6c6168f93",
+          "request_sha256": "7e87191bba133e2517169a151d1e7c0e674c436db8df083d763d015e10b4ed12"
+        },
+        "hx_cb9d3d6726__r3__easy": {
+          "head_start_s": 0,
+          "visibility_m": 6,
+          "duration_s": 360,
+          "brain_overrides": {},
+          "robots": 3,
+          "world_sha256": "570eea416ec5d750592e9119c7917b90d8d3efd81393d7d4284046467743173e",
+          "request_sha256": "826d77a5ec88b4ec63315766952681cd252016e02dba4a2ec29d7e79d4fa1f31"
+        }
+      }
+    },
+    "long_ranch": {
+      "scene_without_robots_sha256": "3787ce67c2e693dcc6b5fb0c7328aa542a228cfa2fe8dc3e6e80cd9e40b21824",
+      "setups": {
+        "long_ranch__r1__easy": {
+          "head_start_s": 0,
+          "visibility_m": 6,
+          "duration_s": 360,
+          "brain_overrides": {},
+          "robots": 1,
+          "world_sha256": "7546d719f6602f672ee49e850bfaa21dd106bbe9b6efb1f6ee97ea21a86df4f8",
+          "request_sha256": "581e2f9688e582934e6d6d220363486fd2c6da5e2676fb37a9e6d46d7b1aed70"
+        },
+        "long_ranch__r2__easy": {
+          "head_start_s": 0,
+          "visibility_m": 6,
+          "duration_s": 360,
+          "brain_overrides": {},
+          "robots": 2,
+          "world_sha256": "aa6f74ad9326efbaed282d9097d3b853dd27103bd3baede7ec43b4a5c2d578bc",
+          "request_sha256": "d7e7c918060b0a34d2868efd752ec1f264ea971a57855480b8c4bc17f883b174"
+        },
+        "long_ranch__r3__easy": {
+          "head_start_s": 0,
+          "visibility_m": 6,
+          "duration_s": 360,
+          "brain_overrides": {},
+          "robots": 3,
+          "world_sha256": "0ba124b5cdc1baabd5895b58f64b6d85752005302e07438ad7512664243f73a8",
+          "request_sha256": "2fc12050437aee05a192e854ef8109f0ca77accb6bea3bf9e60fa229f312a85e"
+        }
+      }
+    },
+    "onedoor_934": {
+      "scene_without_robots_sha256": "4ed3d167743ea51cc1a1bdb833067fc6e182645e15b79c3df5148c110e8a9f4b",
+      "setups": {
+        "onedoor_934__r1__easy": {
+          "head_start_s": 0,
+          "visibility_m": 6,
+          "duration_s": 360,
+          "brain_overrides": {},
+          "robots": 1,
+          "world_sha256": "8e6f4ffff76a3105801e087bab5e5d52bd8a9d08894d0c5b935f205587821d1a",
+          "request_sha256": "7d9e9678aa335f4fdfbef709f6e04772e98b5eafd3679cdd58c629855e07b817"
+        },
+        "onedoor_934__r2__easy": {
+          "head_start_s": 0,
+          "visibility_m": 6,
+          "duration_s": 360,
+          "brain_overrides": {},
+          "robots": 2,
+          "world_sha256": "bae0e9a0531cc3226924fbbe622cbc3b0beb5d84cd006bb0f191e662556f6cf3",
+          "request_sha256": "01799461575eacc8cd136faf37b13609c04df0b6161ecb341d327ad61362976e"
+        },
+        "onedoor_934__r3__easy": {
+          "head_start_s": 0,
+          "visibility_m": 6,
+          "duration_s": 360,
+          "brain_overrides": {},
+          "robots": 3,
+          "world_sha256": "fa8804790f893d09ad52c2d737b22ef07565e6a9f57b86965d7af98446251f58",
+          "request_sha256": "e935f9f7fc06e9df90b6d04559ea5267eea35f795bdf3966f9866a3c6ae25dfe"
+        }
+      }
+    }
+  },
+  "scenario_scope": {
+    "scenario_family_ranch_full.json": {
+      "search_area": [
+        0,
+        0,
+        15,
+        11
+      ],
+      "total_rooms": 9,
+      "search_area_rooms": [
+        "fr_bath1",
+        "fr_bath2",
+        "fr_bed1",
+        "fr_bed2",
+        "fr_bed3",
+        "fr_hall",
+        "fr_kitchen",
+        "fr_laundry",
+        "fr_living"
+      ],
+      "outside_search_area": [],
+      "scenario_sha256": "118f04a09be24a735e59d365da97e691ea41326ac27c440cd61c7092eb5d2470",
+      "floorplan_sha256": "e49ab0376c61739385b5167cb4b08db42204ff20f279dd28795e4dbf2945230c"
+    },
+    "scenario_long_ranch_full.json": {
+      "search_area": [
+        0,
+        0,
+        18,
+        16.5
+      ],
+      "total_rooms": 12,
+      "search_area_rooms": [
+        "lr_bath",
+        "lr_bed2",
+        "lr_bed3",
+        "lr_bed4",
+        "lr_closet",
+        "lr_ensuite",
+        "lr_family",
+        "lr_great",
+        "lr_hall",
+        "lr_primary",
+        "lr_sidehall",
+        "lr_utility"
+      ],
+      "outside_search_area": [],
+      "scenario_sha256": "88d023c32500a9c44dbc018209eefb063d4615bc2666189bb0ab9e7d3dc9a430",
+      "floorplan_sha256": "7423338321ba0a8bfacc65b74cdf30aba7a3b6e2bd84948d54bc766bc254c902"
+    },
+    "scenario_house_onedoor_seed934_full.json": {
+      "search_area": [
+        0,
+        0,
+        20,
+        14
+      ],
+      "total_rooms": 30,
+      "search_area_rooms": [
+        "bathroom",
+        "bedroom_1",
+        "bedroom_2",
+        "closet",
+        "foyer",
+        "hallway",
+        "kitchen",
+        "laundry",
+        "living",
+        "study"
+      ],
+      "outside_search_area": [
+        "apt_living",
+        "apt_kitchen",
+        "apt_hall",
+        "apt_link",
+        "apt_bed_1",
+        "apt_bed_2",
+        "apt_bath",
+        "office_reception",
+        "office_meeting",
+        "office_link",
+        "office_corridor",
+        "office_open",
+        "office_store",
+        "office_wash",
+        "workshop_bay",
+        "workshop_utility",
+        "workshop_corridor",
+        "workshop_tools",
+        "workshop_parts",
+        "workshop_wash"
+      ],
+      "scenario_sha256": "b7309b7a71957bc2d103d7910a9b5f85407d430e577673332297a92c0f68593b",
+      "floorplan_sha256": "b27f430a4d2d3b6916a61923d2f6b12613152c4a18bf2d1afab0f6b3f41c9b22"
+    }
+  }
+}

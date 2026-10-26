@@ -1,0 +1,514 @@
+{
+  "family_ranch__r3__easy": {
+    "inside_at_end": [
+      "robot_B"
+    ],
+    "never_entered_robots": [],
+    "return_events_after_240s": {
+      "robot_B": {
+        "counts": {
+          "return_via_trail": 5057,
+          "body_swing_blocked": 1,
+          "turn_stall": 5,
+          "pinned": 7
+        },
+        "last_by_kind": {
+          "return_via_trail": {
+            "t": 354.1333333333333,
+            "kind": "return_via_trail",
+            "robot": "robot_B",
+            "reason": "No planned route home: walk back along this robot's own trail.",
+            "numbers": {
+              "length_m": 11.952704429626465,
+              "points": 23.0
+            }
+          },
+          "body_swing_blocked": {
+            "t": 240.28333333333333,
+            "kind": "body_swing_blocked",
+            "robot": "robot_B",
+            "reason": "Turning here would swing the body into a mapped wall; back off first.",
+            "numbers": {
+              "heading_error_deg": -179.6708984375
+            }
+          },
+          "turn_stall": {
+            "t": 256.3333333333333,
+            "kind": "turn_stall",
+            "robot": "robot_B",
+            "reason": "The body did not turn as commanded: turn the other way round.",
+            "numbers": {
+              "direction": 1.0,
+              "heading_error_deg": -178.65866088867188
+            }
+          },
+          "pinned": {
+            "t": 354.1333333333333,
+            "kind": "pinned",
+            "robot": "robot_B",
+            "reason": "Following a route, the body moved less than pinned_move_m in pinned_window_s: back up, turn and choose another route.",
+            "numbers": {
+              "commanded_speed_mps": 0.0,
+              "duration_s": 0.0,
+              "marked_cells": 0.0,
+              "measured_speed_mps": 0.0,
+              "repeats": 6.0,
+              "x_m": -1.887636423110962,
+              "y_m": 7.111630439758301
+            }
+          }
+        }
+      }
+    },
+    "confirmation_markers": [
+      {
+        "id": "c1",
+        "x": 2.51,
+        "y": 8.48,
+        "by": "robot_A",
+        "t": 21.0,
+        "nearest_true_person": "s2",
+        "distance_m": 0.098
+      },
+      {
+        "id": "c2",
+        "x": 1.23,
+        "y": 8.43,
+        "by": "robot_C",
+        "t": 37.98,
+        "nearest_true_person": "s2",
+        "distance_m": 1.274
+      },
+      {
+        "id": "c3",
+        "x": 5.12,
+        "y": 2.29,
+        "by": "robot_C",
+        "t": 61.15,
+        "nearest_true_person": "s6",
+        "distance_m": 1.082
+      },
+      {
+        "id": "c4",
+        "x": -2.34,
+        "y": 8.16,
+        "by": "robot_B",
+        "t": 65.0,
+        "nearest_true_person": "s4",
+        "distance_m": 0.31
+      },
+      {
+        "id": "c5",
+        "x": 4.84,
+        "y": 8.93,
+        "by": "robot_C",
+        "t": 86.23,
+        "nearest_true_person": "s3",
+        "distance_m": 1.343
+      },
+      {
+        "id": "c6",
+        "x": 10.04,
+        "y": 8.95,
+        "by": "robot_C",
+        "t": 135.32,
+        "nearest_true_person": "s1",
+        "distance_m": 1.32
+      },
+      {
+        "id": "c7",
+        "x": 6.22,
+        "y": 8.81,
+        "by": "robot_A",
+        "t": 142.1,
+        "nearest_true_person": "s3",
+        "distance_m": 0.083
+      },
+      {
+        "id": "c8",
+        "x": 6.25,
+        "y": 2.15,
+        "by": "robot_A",
+        "t": 160.18,
+        "nearest_true_person": "s6",
+        "distance_m": 0.102
+      }
+    ],
+    "distinct_markers": 8,
+    "matched_people": 5,
+    "false_confirmations": 3
+  },
+  "long_ranch__r3__easy": {
+    "inside_at_end": [
+      "robot_A",
+      "robot_B"
+    ],
+    "never_entered_robots": [],
+    "return_events_after_240s": {
+      "robot_A": {
+        "counts": {
+          "return_via_trail": 5772,
+          "pinned": 6
+        },
+        "last_by_kind": {
+          "return_via_trail": {
+            "t": 357.0833333333333,
+            "kind": "return_via_trail",
+            "robot": "robot_A",
+            "reason": "No planned route home: walk back along this robot's own trail.",
+            "numbers": {
+              "length_m": 2.8145065307617188,
+              "points": 6.0
+            }
+          },
+          "pinned": {
+            "t": 357.0833333333333,
+            "kind": "pinned",
+            "robot": "robot_A",
+            "reason": "Following a route, the body moved less than pinned_move_m in pinned_window_s: back up, turn and choose another route.",
+            "numbers": {
+              "commanded_speed_mps": 0.0,
+              "duration_s": 0.0,
+              "marked_cells": 0.0,
+              "measured_speed_mps": 0.0,
+              "repeats": 4.0,
+              "x_m": -0.479065477848053,
+              "y_m": 2.4390296936035156
+            }
+          }
+        }
+      },
+      "robot_B": {
+        "counts": {
+          "return_via_trail": 6150,
+          "pinned": 5
+        },
+        "last_by_kind": {
+          "return_via_trail": {
+            "t": 360.0,
+            "kind": "return_via_trail",
+            "robot": "robot_B",
+            "reason": "No planned route home: walk back along this robot's own trail.",
+            "numbers": {
+              "length_m": 7.244476318359375,
+              "points": 14.0
+            }
+          },
+          "pinned": {
+            "t": 344.3,
+            "kind": "pinned",
+            "robot": "robot_B",
+            "reason": "Following a route, the body moved less than pinned_move_m in pinned_window_s: back up, turn and choose another route.",
+            "numbers": {
+              "commanded_speed_mps": 0.0,
+              "duration_s": 0.0,
+              "marked_cells": 0.0,
+              "measured_speed_mps": 0.0,
+              "repeats": 2.0,
+              "x_m": 1.7180057764053345,
+              "y_m": 4.387942314147949
+            }
+          }
+        }
+      }
+    }
+  },
+  "onedoor_934__r3__easy": {
+    "inside_at_end": [
+      "robot_A",
+      "robot_B",
+      "robot_C"
+    ],
+    "never_entered_robots": [],
+    "return_events_after_240s": {
+      "robot_A": {
+        "counts": {
+          "return_via_trail": 7023,
+          "pinned": 1
+        },
+        "last_by_kind": {
+          "return_via_trail": {
+            "t": 360.0,
+            "kind": "return_via_trail",
+            "robot": "robot_A",
+            "reason": "No planned route home: walk back along this robot's own trail.",
+            "numbers": {
+              "length_m": 16.469886779785156,
+              "points": 32.0
+            }
+          },
+          "pinned": {
+            "t": 251.45,
+            "kind": "pinned",
+            "robot": "robot_A",
+            "reason": "Following a route, the body moved less than pinned_move_m in pinned_window_s: back up, turn and choose another route.",
+            "numbers": {
+              "commanded_speed_mps": 0.010000000707805157,
+              "duration_s": 0.0,
+              "marked_cells": 0.0,
+              "measured_speed_mps": 0.010000000707805157,
+              "repeats": 1.0,
+              "x_m": -9.234044075012207,
+              "y_m": 12.785412788391113
+            }
+          }
+        }
+      },
+      "robot_B": {
+        "counts": {
+          "return_via_trail": 4758,
+          "pinned": 7
+        },
+        "last_by_kind": {
+          "return_via_trail": {
+            "t": 360.0,
+            "kind": "return_via_trail",
+            "robot": "robot_B",
+            "reason": "No planned route home: walk back along this robot's own trail.",
+            "numbers": {
+              "length_m": 19.785823822021484,
+              "points": 37.0
+            }
+          },
+          "pinned": {
+            "t": 345.81666666666666,
+            "kind": "pinned",
+            "robot": "robot_B",
+            "reason": "Following a route, the body moved less than pinned_move_m in pinned_window_s: back up, turn and choose another route.",
+            "numbers": {
+              "commanded_speed_mps": 0.0,
+              "duration_s": 0.0,
+              "marked_cells": 0.0,
+              "measured_speed_mps": 0.0,
+              "repeats": 7.0,
+              "x_m": 7.516495227813721,
+              "y_m": 9.869297981262207
+            }
+          }
+        }
+      },
+      "robot_C": {
+        "counts": {
+          "return_via_trail": 6763,
+          "body_swing_blocked": 2,
+          "pinned": 2,
+          "pinned_yield": 10
+        },
+        "last_by_kind": {
+          "return_via_trail": {
+            "t": 360.0,
+            "kind": "return_via_trail",
+            "robot": "robot_C",
+            "reason": "No planned route home: walk back along this robot's own trail.",
+            "numbers": {
+              "length_m": 22.783723831176758,
+              "points": 44.0
+            }
+          },
+          "body_swing_blocked": {
+            "t": 251.18333333333334,
+            "kind": "body_swing_blocked",
+            "robot": "robot_C",
+            "reason": "Turning here would swing the body into a mapped wall; back off first.",
+            "numbers": {
+              "heading_error_deg": 131.8538818359375
+            }
+          },
+          "pinned": {
+            "t": 262.1666666666667,
+            "kind": "pinned",
+            "robot": "robot_C",
+            "reason": "Following a route, the body moved less than pinned_move_m in pinned_window_s: back up, turn and choose another route.",
+            "numbers": {
+              "commanded_speed_mps": 0.0,
+              "duration_s": 0.0,
+              "marked_cells": 0.0,
+              "measured_speed_mps": 0.0,
+              "repeats": 2.0,
+              "x_m": -5.412376880645752,
+              "y_m": 12.749935150146484
+            }
+          },
+          "pinned_yield": {
+            "t": 357.9,
+            "kind": "pinned_yield",
+            "robot": "robot_C",
+            "reason": "Pinned against the partner, which has right of way: back straight away from it, then step clear and choose again.",
+            "numbers": {
+              "partner_x_m": -7.072117328643799,
+              "partner_y_m": 8.322141647338867
+            }
+          }
+        }
+      }
+    }
+  },
+  "hx_46bfe067cc__r3__easy": {
+    "inside_at_end": [
+      "robot_A",
+      "robot_B"
+    ],
+    "never_entered_robots": [],
+    "return_events_after_240s": {
+      "robot_A": {
+        "counts": {
+          "return_via_trail": 7201
+        },
+        "last_by_kind": {
+          "return_via_trail": {
+            "t": 360.0,
+            "kind": "return_via_trail",
+            "robot": "robot_A",
+            "reason": "No planned route home: walk back along this robot's own trail.",
+            "numbers": {
+              "length_m": 8.247590065002441,
+              "points": 16.0
+            }
+          }
+        }
+      },
+      "robot_B": {
+        "counts": {
+          "return_via_trail": 3171,
+          "pinned": 1,
+          "stuck": 11
+        },
+        "last_by_kind": {
+          "return_via_trail": {
+            "t": 357.71666666666664,
+            "kind": "return_via_trail",
+            "robot": "robot_B",
+            "reason": "No planned route home: walk back along this robot's own trail.",
+            "numbers": {
+              "length_m": 9.181852340698242,
+              "points": 18.0
+            }
+          },
+          "pinned": {
+            "t": 249.98333333333332,
+            "kind": "pinned",
+            "robot": "robot_B",
+            "reason": "Following a route, the body moved less than pinned_move_m in pinned_window_s: back up, turn and choose another route.",
+            "numbers": {
+              "commanded_speed_mps": 0.0,
+              "duration_s": 0.0,
+              "marked_cells": 0.0,
+              "measured_speed_mps": 0.0,
+              "repeats": 1.0,
+              "x_m": -4.811303615570068,
+              "y_m": 6.53782320022583
+            }
+          },
+          "stuck": {
+            "t": 357.73333333333335,
+            "kind": "stuck",
+            "robot": "robot_B",
+            "reason": "Forward commands produced negligible forward odometry for the detection window.",
+            "numbers": {
+              "commanded_speed_mps": 0.30000001192092896,
+              "duration_s": 1.200000062584877,
+              "marked_cells": 10.0,
+              "measured_speed_mps": 0.0,
+              "repeats": 11.0,
+              "x_m": -3.1192381381988525,
+              "y_m": 3.985565185546875
+            }
+          }
+        }
+      }
+    },
+    "confirmation_markers": [
+      {
+        "id": "c1",
+        "x": -1.33,
+        "y": 2.92,
+        "by": "robot_A",
+        "t": 1.0,
+        "nearest_true_person": "s5",
+        "distance_m": 0.059
+      },
+      {
+        "id": "c2",
+        "x": 4.69,
+        "y": 3.55,
+        "by": "robot_A",
+        "t": 14.1,
+        "nearest_true_person": "s3",
+        "distance_m": 0.111
+      },
+      {
+        "id": "c3",
+        "x": -4.24,
+        "y": 3.45,
+        "by": "robot_B",
+        "t": 22.0,
+        "nearest_true_person": "s1",
+        "distance_m": 0.488
+      },
+      {
+        "id": "c4",
+        "x": -5.65,
+        "y": 3.41,
+        "by": "robot_C",
+        "t": 59.12,
+        "nearest_true_person": "s1",
+        "distance_m": 0.928
+      },
+      {
+        "id": "c5",
+        "x": 3.48,
+        "y": 6.97,
+        "by": "robot_A",
+        "t": 63.27,
+        "nearest_true_person": "s4",
+        "distance_m": 0.073
+      },
+      {
+        "id": "c6",
+        "x": -0.33,
+        "y": 7.97,
+        "by": "robot_C",
+        "t": 79.72,
+        "nearest_true_person": "s2",
+        "distance_m": 0.948
+      },
+      {
+        "id": "c7",
+        "x": 1.06,
+        "y": 7.97,
+        "by": "robot_B",
+        "t": 172.1,
+        "nearest_true_person": "s2",
+        "distance_m": 0.444
+      }
+    ],
+    "distinct_markers": 7,
+    "matched_people": 5,
+    "false_confirmations": 2
+  },
+  "hx_cb9d3d6726__r3__easy": {
+    "inside_at_end": [],
+    "never_entered_robots": [
+      "robot_B"
+    ],
+    "return_events_after_240s": {
+      "robot_B": {
+        "counts": {
+          "mission_complete": 1
+        },
+        "last_by_kind": {
+          "mission_complete": {
+            "t": 248.81666666666666,
+            "kind": "mission_complete",
+            "robot": "robot_B",
+            "reason": "Mission time is nearly up: leave now to be out by the deadline. Reached a known way out.",
+            "numbers": {
+              "distance_to_exit_m": 0.49650347232818604,
+              "distance_to_start_m": 1.6725339889526367
+            }
+          }
+        }
+      }
+    }
+  }
+}

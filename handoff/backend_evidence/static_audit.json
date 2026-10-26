@@ -1,0 +1,32 @@
+{
+  "engine": "e49251258d1a5b3f020c007fa54c85c0056026f1",
+  "evaluated": 15,
+  "published": {
+    "hx_46bfe067cc__r2__easy": {
+      "frames": 721,
+      "sha256": "22840d2235cdd378b743a97b7f52ba3d4bb0d4ebc02ebc204c557c3ae8a98572"
+    },
+    "hx_cb9d3d6726__r1__easy": {
+      "frames": 721,
+      "sha256": "f246fc5ede3b2821499d6428cdbc9c490ef1e1a2fd2c701494450bcce74fd57a"
+    },
+    "hx_cb9d3d6726__r2__easy": {
+      "frames": 721,
+      "sha256": "98f92eb557bd54bc3a4063056a6f0e3f486f1f03cd5a7b99b6b32c8766bf2fed"
+    }
+  },
+  "withheld": [
+    "family_ranch__r1__easy",
+    "family_ranch__r2__easy",
+    "family_ranch__r3__easy",
+    "long_ranch__r1__easy",
+    "long_ranch__r2__easy",
+    "long_ranch__r3__easy",
+    "onedoor_934__r1__easy",
+    "onedoor_934__r2__easy",
+    "onedoor_934__r3__easy",
+    "hx_46bfe067cc__r1__easy",
+    "hx_46bfe067cc__r3__easy",
+    "hx_cb9d3d6726__r3__easy"
+  ]
+}

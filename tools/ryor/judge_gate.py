@@ -2,7 +2,7 @@
 from replay import inside
 
 
-def gate(house, frames, status, engine_git, require_rooms):
+def gate(house, frames, status, engine_git, require_rooms=True):
     score = status['score']
     n = len(frames[-1]['robots'])
     entered = {room['id'] for room in house['rooms_poly']
@@ -13,5 +13,6 @@ def gate(house, frames, status, engine_git, require_rooms):
     false = score.get('false_confirmations')
     result = dict(all_rooms_entered=not missing, missing_rooms=missing, rooms_entered=len(entered),
                   all_out=all_out, false_confirmations=false, engine_git=engine_git, engine_matches=engine_matches)
-    result['passed'] = all_out and false == 0 and engine_matches and (not require_rooms or not missing)
+    # All five houses use the same room-entry requirement.
+    result['passed'] = all_out and false == 0 and engine_matches and not missing
     return result

@@ -1,0 +1,127 @@
+{
+  "browser": "156.0.8078.4",
+  "url": "http://host.docker.internal:8204",
+  "liveTransport": "controlled refusal; no AWS tasks launched",
+  "checks": [
+    {
+      "key": "family_ranch__r1__easy",
+      "available": false,
+      "check": "static HTTP and payload"
+    },
+    {
+      "key": "family_ranch__r2__easy",
+      "available": false,
+      "check": "static HTTP and payload"
+    },
+    {
+      "key": "family_ranch__r3__easy",
+      "available": false,
+      "check": "static HTTP and payload"
+    },
+    {
+      "key": "long_ranch__r1__easy",
+      "available": false,
+      "check": "static HTTP and payload"
+    },
+    {
+      "key": "long_ranch__r2__easy",
+      "available": false,
+      "check": "static HTTP and payload"
+    },
+    {
+      "key": "long_ranch__r3__easy",
+      "available": false,
+      "check": "static HTTP and payload"
+    },
+    {
+      "key": "onedoor_934__r1__easy",
+      "available": false,
+      "check": "static HTTP and payload"
+    },
+    {
+      "key": "onedoor_934__r2__easy",
+      "available": false,
+      "check": "static HTTP and payload"
+    },
+    {
+      "key": "onedoor_934__r3__easy",
+      "available": false,
+      "check": "static HTTP and payload"
+    },
+    {
+      "key": "hx_46bfe067cc__r1__easy",
+      "available": false,
+      "check": "failed replay withheld; unavailable message displayed"
+    },
+    {
+      "key": "hx_46bfe067cc__r2__easy",
+      "available": true,
+      "check": "3D frame drawn; clock advanced; scrubbed to result",
+      "advanced": 2,
+      "result": "Both robots are out.\n\n5 / 5 people found. 4:27 mission time. 7 / 7 rooms searched.\n\nA room counts as searched when the robot maps cover at least 80% of its floor.\n\nTry another house\nHow it works"
+    },
+    {
+      "key": "hx_46bfe067cc__r3__easy",
+      "available": false,
+      "check": "failed replay withheld; unavailable message displayed"
+    },
+    {
+      "key": "hx_cb9d3d6726__r1__easy",
+      "available": true,
+      "check": "3D frame drawn; clock advanced; scrubbed to result",
+      "advanced": 2,
+      "result": "The robot is out.\n\n4 / 5 people found. 4:30 mission time. 6 / 7 rooms searched.\n\nA room counts as searched when the robot maps cover at least 80% of its floor.\n\nTry another house\nHow it works"
+    },
+    {
+      "key": "hx_cb9d3d6726__r2__easy",
+      "available": true,
+      "check": "3D frame drawn; clock advanced; scrubbed to result",
+      "advanced": 2.5,
+      "result": "Both robots are out.\n\n5 / 5 people found. 4:36 mission time. 7 / 7 rooms searched.\n\nA room counts as searched when the robot maps cover at least 80% of its floor.\n\nTry another house\nHow it works"
+    },
+    {
+      "key": "hx_cb9d3d6726__r3__easy",
+      "available": false,
+      "check": "failed replay withheld; unavailable message displayed"
+    }
+  ],
+  "refusals": [
+    {
+      "house": "hx_46bfe067cc",
+      "robots": 1,
+      "difficulty": "easy",
+      "terra": true
+    },
+    {
+      "house": "hx_46bfe067cc",
+      "robots": 2,
+      "difficulty": "easy",
+      "terra": true
+    },
+    {
+      "house": "hx_46bfe067cc",
+      "robots": 3,
+      "difficulty": "easy",
+      "terra": true
+    },
+    {
+      "house": "hx_cb9d3d6726",
+      "robots": 1,
+      "difficulty": "easy",
+      "terra": true
+    },
+    {
+      "house": "hx_cb9d3d6726",
+      "robots": 2,
+      "difficulty": "easy",
+      "terra": true
+    },
+    {
+      "house": "hx_cb9d3d6726",
+      "robots": 3,
+      "difficulty": "easy",
+      "terra": true
+    }
+  ],
+  "errors": []
+}

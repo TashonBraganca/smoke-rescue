@@ -22,8 +22,8 @@ class JudgeGateTest(unittest.TestCase):
     def test_final_poses_override_an_optimistic_score(self):
         self.frames[-1]['robots'][1]['out']=False
         self.assertFalse(gate(self.house,self.frames,self.status,'new',True)['passed'])
-    def test_main_houses_require_exit_and_false_gate_without_extra_room_gate(self):
+    def test_main_houses_cannot_bypass_room_entry_gate(self):
         self.frames[0]['robots'][1]['x']=1
-        self.assertTrue(gate(self.house,self.frames,self.status,'new',False)['passed'])
+        self.assertFalse(gate(self.house,self.frames,self.status,'new',False)['passed'])
 
 if __name__=='__main__':unittest.main()
