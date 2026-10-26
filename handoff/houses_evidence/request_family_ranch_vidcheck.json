@@ -1,0 +1,16 @@
+{
+ "runs": [
+  {
+   "world": "handoff/houses_evidence/world_family_ranch_wide.json",
+   "out": "data/runs/vidcheck_26oct/family_ranch",
+   "duration_s": 600,
+   "time_limit": true,
+   "fire": true,
+   "robot_collision": true,
+   "capsule_walls": true,
+   "settings": {
+    "mission_time_limit_s": 480
+   }
+  }
+ ]
+}

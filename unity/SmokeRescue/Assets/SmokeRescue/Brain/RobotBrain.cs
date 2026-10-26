@@ -1314,6 +1314,17 @@ namespace SmokeRescue.Brain
         /// <summary>markContact: the body stalled against something the map does not show (low debris under the LiDAR
         /// plane, a leaf in the camera's blind zone), so mark a contact strip ahead. A stop for a mapped obstacle must
         /// not: repeated strips used to ring the robot in phantom walls until no route existed.</summary>
+        float recoveryReverseM;
+        /// <summary>reverse_along_trail: the segment a to b lies on floor this body has already held, so backing along it is safe even where the
+        /// map shows the cells as not known free.</summary>
+        bool ReverseOk(Vector2 a, Vector2 b)
+        {
+            if (planner.ReverseSafe(a, b)) return true;
+            if (!c.reverse_along_trail) return false;
+            int steps = Math.Max(1, Mathf.CeilToInt(Vector2.Distance(a, b) / (grid.CellM * .5f)));
+            for (int i = 1; i <= steps; i++) if (!OwnBodyWasAt(Vector2.Lerp(a, b, i / (float)steps))) return false;
+            return true;
+        }
         void BeginRecovery(double t, string kind, string reason, Vector2? target, bool markContact)
         {
             contactPose = motion.Pose; recoveryGoal = target; recoveryFrontier = frontierGoal;
@@ -1323,6 +1334,7 @@ namespace SmokeRescue.Brain
             var place = stuckPlaces.Find(p => Vector2.Distance(p.position, contactPose.position) <= c.stuck_repeat_radius_m);
             if (place == null) { place = new StuckPlace { position = contactPose.position }; stuckPlaces.Add(place); }
             place.repeats++; place.lastAt = t;
+            recoveryReverseM = c.stuck_reverse_m * (c.stuck_escalate ? Mathf.Min(4, place.repeats) : 1);
             int marked = markContact ? grid.MarkStuckStrip(contactPose) : 0;
             Emit(t, kind, reason,
                 "commanded_speed_mps", commandedSpeed, "measured_speed_mps", motion.ForwardSpeed,
@@ -1351,13 +1363,13 @@ namespace SmokeRescue.Brain
             if (recoveryPhase == 1)
             {
                 float backed = Mathf.Max(0, Vector2.Dot(contactPose.position - motion.Pose.position, contactPose.Forward));
-                float remaining = c.stuck_reverse_m - backed;
+                float remaining = recoveryReverseM - backed;
                 float speed = Mathf.Min(c.stuck_reverse_mps, c.limits.max_reverse_mps, Mathf.Max(0, remaining) / dt);
                 // A rear camera is not assumed. Reverse only through the mapped free footprint.
                 float nextSpeed = Mathf.MoveTowards(commandedSpeed, -speed, c.limits.max_accel_mps2 * dt);
                 if (remaining > grid.CellM * .05f && speed > 0 && -nextSpeed * dt <= remaining &&
-                    t - recoverySince < c.stuck_reverse_timeout_s &&
-                    planner.ReverseSafe(motion.Pose.position, motion.Pose.position - motion.Pose.Forward * remaining))
+                    t - recoverySince < c.stuck_reverse_timeout_s * recoveryReverseM / c.stuck_reverse_m &&
+                    ReverseOk(motion.Pose.position, motion.Pose.position - motion.Pose.Forward * remaining))
                     return Command(-speed, 0, dt, false);
                 recoveryPhase = 2; recoverySince = t; recoveryYaw = motion.Pose.yawRad;
                 return Command(0, 0, dt, true);
@@ -2326,7 +2338,7 @@ namespace SmokeRescue.Brain
                 {
                     if (!swingBlocked) { swingBlocked = true; Emit(t, "body_swing_blocked", "Turning here would swing the body into a mapped wall; back off first.", "heading_error_deg", error); }
                     float back = Mathf.Min(c.stuck_reverse_mps, c.limits.max_reverse_mps);
-                    if (back > 0 && planner.ReverseSafe(position, position - motion.Pose.Forward * c.body_half_length_m))
+                    if (back > 0 && ReverseOk(position, position - motion.Pose.Forward * c.body_half_length_m))
                         return Command(-back, 0, dt, false);
                 }
                 else swingBlocked = false;
