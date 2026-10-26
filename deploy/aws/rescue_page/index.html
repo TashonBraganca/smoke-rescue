@@ -43,6 +43,7 @@
         <div class="scene-actions">
           <button id="edit-scene" class="ghost small" type="button">Place people and fire</button>
           <button id="random-scene" class="ghost small" type="button">Random</button>
+          <button id="edit-layout" class="ghost small" type="button">Rearrange in 3D</button>
         </div>
         <p id="scene-summary" class="fine">People and fire follow this house's fixed generator seed.</p>
 
@@ -88,8 +89,12 @@
 
     <div class="mission-grid">
       <div class="stage-col">
+        <div class="scene-actions" role="group" aria-label="Replay view"><button id="view-plan" class="chip" aria-pressed="true" type="button">Plan</button><button id="view-3d" class="chip" aria-pressed="false" type="button">3D replay</button></div>
+        <p id="three-caption" class="fine" hidden>Live simulation of your layout; the camera-and-smoke version is in the films on the main site. Replay positions and fire are simulator truth. Furniture is shown as boxes.</p>
         <div id="stage" class="stage" tabindex="0" aria-label="Replay of the mission. Press space to play or pause.">
           <canvas id="replay" aria-hidden="true"></canvas>
+          <div id="replay-3d" hidden></div>
+          <p id="terra-caption" hidden aria-live="polite"></p>
           <div id="moment" class="moment" aria-hidden="true" hidden></div>
         </div>
 
@@ -183,10 +188,26 @@
   <div class="scene-actions"><button id="prepare-scene" class="primary" type="button">Prepare this scene</button><button id="watch-prepared" class="ghost" type="button" hidden>Watch the prepared run</button></div>
 </dialog>
 
+<dialog id="layout-editor" aria-labelledby="layout-heading">
+  <div class="editor-top"><h2 id="layout-heading">Rearrange the house</h2><button id="close-layout" class="ghost" type="button">Back to setup</button></div>
+  <p>Drag a room to slide it in 0.5 m steps. Drop it on a matching block to swap. The outline and front door stay fixed. Furniture moves with its room. Doors rebuild after each accepted edit.</p>
+  <div class="scene-actions"><button id="move-mode" class="chip" aria-pressed="true" type="button">Move rooms</button><button id="orbit-mode" class="chip" aria-pressed="false" type="button">Orbit view</button><button id="undo-layout" class="ghost" type="button">Undo move</button><button id="reset-layout" class="ghost" type="button">Original layout</button></div>
+  <div id="layout-3d" aria-label="3D room editor. The controls below also move or swap rooms."></div>
+  <div class="coordinate-controls"><label>Room <select id="layout-room"></select></label><label>Right, metres <input id="room-x" type="number" step="0.5"></label><label>Forward, metres <input id="room-y" type="number" step="0.5"></label><button id="move-room" class="ghost" type="button">Move room</button></div>
+  <div class="coordinate-controls"><label>Swap with <select id="swap-room"></select></label><button id="swap-rooms" class="ghost" type="button">Swap rooms</button></div>
+  <p id="room-dimensions" class="fine"></p>
+  <p id="layout-message" role="status">The server checks the fixed outline, room overlap, every doorway and clear paths.</p>
+  <p class="fine">Rooms keep their existing generator sizes. People and a fire origin are placed on checked clear floor after each accepted room move. You can change them with Place people and fire. A new layout needs its own recorded fallback before a live run.</p>
+  <button id="prepare-layout" class="primary" type="button" disabled>Prepare this layout</button>
+</dialog>
+
 <footer class="foot">
   <p><strong>What you are watching.</strong> The real robot brain, running headless on AWS. There is no rendered camera. The simulator models sightings using distance, line of sight and smoke. Fire and true robot positions are drawn for the viewer only. Coloured floor comes from each robot's own map. Person markers show the brain's confirmations. The final score compares those reports with hidden person positions and counts each person once.</p>
   <p id="citation">Residential dataset plans come from HouseExpo, Li et al., IROS 2020, <a href="https://github.com/TeaganLi/HouseExpo">source</a>. These are synthetic SUNCG-derived layouts converted to our floor plan format. <a href="houseexpo-license.txt">MIT licence and copyright notice</a>.</p>
 </footer>
+<script src="vendor/three.min.js"></script>
+<script src="vendor/OrbitControls.js"></script>
 <script src="rescue.js"></script>
+<script src="rescue3d.js"></script>
 </body>
 </html>

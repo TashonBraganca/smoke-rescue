@@ -12,12 +12,12 @@ REGION="${AWS_REGION:-us-east-1}"; STACK=smoke-rescue-site
 out() { aws cloudformation describe-stacks --region "$REGION" --stack-name "$1" --query "Stacks[0].Outputs[?OutputKey=='$2'].OutputValue" --output text; }
 
 RB="$(out smoke-rescue-ryor RunsBucketName)"
-SUM="$(cat "$HERE"/site_lambda/*.py "$HERE/../../tools/ryor/placement.py" "$HERE/../../tools/validate_ranches.py" "$HERE/../../tools/validate_building.py" | shasum -a 256 | cut -c1-16)"
+SUM="$(cat "$HERE"/site_lambda/*.py "$HERE/../../tools/ryor/placement.py" "$HERE/../../tools/ryor/layout.py" "$HERE/../../tools/validate_ranches.py" "$HERE/../../tools/validate_building.py" | shasum -a 256 | cut -c1-16)"
 KEY="deploy/site_lambda/$SUM.zip"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 cp "$HERE/site_lambda/index.py" "$HERE/site_lambda/ryor_api.py" "$TMP/"
-cp "$HERE/../../tools/ryor/placement.py" "$HERE/../../tools/validate_ranches.py" "$HERE/../../tools/validate_building.py" "$TMP/"
-(cd "$TMP" && zip -q -X code.zip index.py ryor_api.py placement.py validate_ranches.py validate_building.py)
+cp "$HERE/../../tools/ryor/placement.py" "$HERE/../../tools/ryor/layout.py" "$HERE/../../tools/validate_ranches.py" "$HERE/../../tools/validate_building.py" "$TMP/"
+(cd "$TMP" && zip -q -X code.zip index.py ryor_api.py placement.py layout.py validate_ranches.py validate_building.py)
 aws s3 cp --region "$REGION" --quiet "$TMP/code.zip" "s3://$RB/$KEY"
 
 aws cloudformation deploy --region "$REGION" --stack-name "$STACK" --template-file "$HERE/site_lambda.yaml" \

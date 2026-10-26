@@ -96,10 +96,20 @@ def main():
         else:
             scene = json.loads(s3.get_object(Bucket=BUCKET, Key='ryor/requests/' + SETUP + '.json')['Body'].read())
         house = next(h for h in gallery['houses'] if h['id'] == base.split('__')[0])
+        layout = scene.get('layout')
+        if layout is not None:
+            import layout as room_layout
+            edited = room_layout.build(house, layout)
+            house.clear(); house.update(edited)
         placement = validate(house, scene['placement'])
-        if setup_key(base, placement, ENGINE_TAG) != SETUP:
+        expected_key = room_layout.key(base, layout, placement, ENGINE_TAG) if layout is not None else setup_key(base, placement, ENGINE_TAG)
+        if expected_key != SETUP:
             fail('placement key does not match its content and engine')
         world = json.loads((ROOT / req['runs'][0]['world']).read_text())
+        if layout is not None:
+            world = room_layout.apply_world(ROOT, run_dir, world, house)
+            status['layout'] = layout
+            status['house'] = house
         world['people'] = [{'id': 'p%d' % (i + 1), 'at': p} for i, p in enumerate(placement['people'])]
         fire = json.loads((ROOT / 'config' / world['fire']['config']).resolve().read_text())
         from validate_building import inside

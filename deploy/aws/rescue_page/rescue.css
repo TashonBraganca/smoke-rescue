@@ -252,3 +252,13 @@ legend { font-weight: 650; font-size: .9rem; margin-bottom: .4rem; padding: 0; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+/* The 3D editor uses the existing house viewer's orbit camera and cut walls. */
+#layout-editor { width:min(1120px,96vw); max-height:94dvh; }
+#layout-3d { height:48vh; min-height:300px; position:relative; background:var(--paper); border:1px solid var(--line); overflow:hidden; }
+#layout-3d canvas,#replay-3d canvas { display:block; width:100%; height:100%; touch-action:none; }
+#replay-3d { position:absolute; inset:0; }
+#terra-caption { position:absolute; left:12px; right:12px; bottom:12px; margin:0; padding:10px 14px; border:1px solid var(--line); background:var(--paper); color:var(--ink); font-size:14px; z-index:2; }
+#layout-editor select { max-width:100%; min-height:44px; padding:8px; color:var(--ink); background:var(--paper); border:1px solid var(--line); font:inherit; }
+#layout-message.bad { color:var(--fire); }
+#layout-editor .coordinate-controls label { min-width:110px; }
+@media(max-width:600px) { #layout-editor { padding:14px; } #layout-3d { height:42vh; min-height:260px; } #layout-editor .coordinate-controls { display:flex; flex-wrap:wrap; } #layout-editor select { max-width:240px; } }

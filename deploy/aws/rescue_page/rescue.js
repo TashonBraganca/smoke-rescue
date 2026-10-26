@@ -13,6 +13,7 @@
   var LIMIT_STALL_S = 150;      // running but no new data for this long
   var LIMIT_TOTAL_S = 660;      // contract hard limit is 600 s wall on the server
   var MAX_NET_FAILS = 6; // Retry temporary network failures before loading the recording.
+  var editedHouse = null, roomLayout = null, layoutValid = true;
   var scene = null, preparedSceneKey = null, preparing = false, placementTool = 'person', prepGeneration = 0, readySetups = null;
   if (/[?&]devlimits=1/.test(location.search)) { LIMIT_STARTING_S = 15; LIMIT_STALL_S = 15; LIMIT_TOTAL_S = 60; } // dev server tests only
   var IDS = ["robot_A", "robot_B", "robot_C"];
@@ -152,7 +153,7 @@
   /* ---------- gallery and setup ---------- */
   var G = null, houses = [], sel = { house: null, robots: 2, difficulty: "medium" }, filter = "all";
   var DIFF_FALLBACK = { easy: { head_start_s: 0, visibility_m: 6.0 }, medium: { head_start_s: 90, visibility_m: 4.0 }, hard: { head_start_s: 180, visibility_m: 2.5 } };
-  function houseById(id) { for (var i = 0; i < houses.length; i++) if (houses[i].id === id) return houses[i]; return null; }
+  function houseById(id) { if (editedHouse && editedHouse.id === id) return editedHouse; for (var i = 0; i < houses.length; i++) if (houses[i].id === id) return houses[i]; return null; }
   function diffInfo(d) { return (G && G.difficulties && G.difficulties[d]) || DIFF_FALLBACK[d] || {}; }
   function diffSentence(d) {
     var i = diffInfo(d), hs = i.head_start_s, vis = i.visibility_m;
@@ -297,6 +298,7 @@
         pickHouse(h.id, false); sel.robots = +parts[1].slice(1); sel.difficulty = parts[2];
         setSeg('robots', 'n', sel.robots); setSeg('difficulty', 'd', sel.difficulty); renderDiffLine();
         scene = status.placement || null; preparedSceneKey = status.setup;
+        roomLayout = status.layout || null; editedHouse = status.house || null; if (editedHouse) h = editedHouse;
         $('terra').checked = !!status.terra;
         startMission(h, +parts[1].slice(1), parts[2], false, shared, status.state === 'done');
       }).catch(function (error) { $('gallery-error').hidden = false; $('gallery-error').textContent = 'This replay could not be loaded. ' + error.message; });
@@ -319,7 +321,7 @@
     if (!sel.house) return;
     var key = sel.house + '__r' + sel.robots + '__' + sel.difficulty;
     var missing = !scene && readySetups && !readySetups.has(key);
-    $('start').disabled = !!missing;
+    $('start').disabled = !!missing || !layoutValid;
     $('start').textContent = missing ? 'Recording is preparing' : scene && !preparedSceneKey ? 'Prepare my scene' : 'Start the rescue';
     if (missing) $('scene-summary').textContent = 'The recording for this setup is still preparing. Choose another robot count or house, or place your own scene.';
     else if (!scene) $('scene-summary').textContent = "People and fire follow this house's fixed generator seed.";
@@ -349,6 +351,7 @@
     $('prepare-scene').disabled = false; $('watch-prepared').hidden = true;
   }
   function resetScene() {
+    editedHouse = null; roomLayout = null; layoutValid = true;
     scene = null; invalidateScene();
     $('start').textContent = 'Start the rescue';
     $('scene-summary').textContent = "People and fire follow this house's fixed generator seed.";
@@ -439,7 +442,7 @@
     if (!scene || !scene.fire) return placementMessage('Place one fire origin before preparing the scene.', true);
     var my = ++prepGeneration, started = performance.now(); preparing = true; $('prepare-scene').disabled = true;
     placementMessage('Checking the scene and starting its recorded fallback on AWS.');
-    var body = { house: sel.house, robots: sel.robots, difficulty: sel.difficulty, placement: scene, prepare: true, terra: false };
+    var body = { house: sel.house, robots: sel.robots, difficulty: sel.difficulty, placement: scene, layout: roomLayout, prepare: true, terra: false };
     fetchJSON(API, 30000, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(function (result) {
       if (my !== prepGeneration) return;
       function ready() {
@@ -483,6 +486,7 @@
   }
 
   $("start").addEventListener("click", function () {
+    if (!layoutValid) return;
     var h = houseById(sel.house); if (!h) return;
     if (scene && !preparedSceneKey) { openEditor(); return; }
     startMission(h, sel.robots, sel.difficulty);
@@ -506,6 +510,7 @@
     if (scene) h = Object.assign({}, h, { people: scene.people.length, people_truth: scene.people.map(function (p, i) { return { id: 'p' + (i + 1), x: p[0], y: p[1] }; }) });
     M = newMission(h, robots, difficulty);
     M.scene = scene ? JSON.parse(JSON.stringify(scene)) : null;
+    M.layout = roomLayout ? JSON.parse(JSON.stringify(roomLayout)) : null;
     M.key = preparedSceneKey || M.key;
     M.terra = $('terra').checked;
     $("choose").hidden = true; $("mission").hidden = false;
@@ -530,7 +535,7 @@
     }
     if (recordedOnly) { M.id = 'cache:' + M.key; updateMissionLink(); setSource('recorded', 'This is the scene you prepared.'); poll(my); tick(); return; }
     fetchJSON(API, 30000, { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ house: h.id, robots: robots, difficulty: difficulty, placement: M.scene, terra: M.terra }) })
+      body: JSON.stringify({ house: h.id, robots: robots, difficulty: difficulty, placement: M.scene, layout: M.layout, terra: M.terra }) })
       .then(function (r) {
         if (my !== gen) return;
         if (!r || !r.mission) throw new Error("no mission id");
@@ -573,10 +578,10 @@
   function fallback(my, reason) {
     if (my !== gen || !M) return;
     if (M.source === "recorded") return showError("Neither the live run nor the recorded run could be loaded. " + reason);
-    var keep = { house: M.house, robots: M.robots, difficulty: M.difficulty, key: M.key, scene: M.scene, compare: M.compare, t: M.ready >= 0 ? M.t : 0, speed: M.speed };
+    var keep = { house: M.house, robots: M.robots, difficulty: M.difficulty, key: M.key, scene: M.scene, layout: M.layout, compare: M.compare, t: M.ready >= 0 ? M.t : 0, speed: M.speed };
     gen++; my = gen;
     M = newMission(keep.house, keep.robots, keep.difficulty);
-    M.key = keep.key; M.scene = keep.scene;
+    M.key = keep.key; M.scene = keep.scene; M.layout = keep.layout;
     M.compare = keep.compare; M.resumeAt = keep.t; M.speed = keep.speed;
     M.id = "cache:" + M.key;
     updateMissionLink();
@@ -607,6 +612,8 @@
       if (!st) throw new Error("answer had no status");
       M.status = st;
       if (st.setup) M.key = st.setup;
+      if (st.house && !M.layout) M.house = st.house;
+      if (st.layout) M.layout = st.layout;
       if (st.placement && !M.scene) {
         M.scene = st.placement; M.house = Object.assign({}, M.house, { people: st.placement.people.length });
       }
@@ -911,6 +918,7 @@
 
   function frameAt() { return M && M.lastIdx >= 0 ? M.frames[M.lastIdx] : null; }
   function draw() {
+    if (M && window.Rescue3D && window.Rescue3D.replayEnabled) window.Rescue3D.replay(M.house, frameAt(), M);
     if (!M || !cx) return;
     var ctx = cx;
     ctx.clearRect(0, 0, cssW, cssH);
@@ -1085,6 +1093,16 @@
   });
 
   /* ---------- score card ---------- */
+  window.RescueLayout = {
+    selection: function () { return { house: houseById(sel.house), robots: sel.robots, difficulty: sel.difficulty, layout: roomLayout }; },
+    validate: function (layout) { return fetchJSON(API + '/validate', 30000, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({house:sel.house,robots:sel.robots,difficulty:sel.difficulty,layout:layout})}); },
+    accept: function (reply) { editedHouse = reply.house; roomLayout = reply.layout; scene = reply.placement; layoutValid = true; invalidateScene(); updateStartAvailability(); drawPreview(); $('scene-summary').textContent = scene.people.length + ' people on clear floor in your edited layout. Prepare its exact fallback before starting.'; },
+    invalid: function () { layoutValid = false; updateStartAvailability(); },
+    valid: function () { layoutValid = true; updateStartAvailability(); },
+    prepare: function () { openEditor(); $('prepare-scene').click(); },
+    reset: function () { resetScene(); drawPreview(); },
+    mission: function () { return M; }
+  };
   function renderScore() {
     var st = M.status || {}, s = st.score;
     var last = M.frames[M.ready];

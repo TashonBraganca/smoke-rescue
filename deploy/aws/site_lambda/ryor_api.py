@@ -10,6 +10,7 @@ import boto3
 from botocore.exceptions import ClientError
 from botocore.config import Config
 from placement import validate as validate_placement, setup_key
+import layout as room_layout
 
 E = os.environ
 RB, TABLE, CLUSTER, FAMILY = E['RYOR_BUCKET'], E['RYOR_TABLE'], E['RYOR_CLUSTER'], E['RYOR_FAMILY']
@@ -246,7 +247,7 @@ def post(event, validate_only=False):
         import base64
         raw = base64.b64decode(raw).decode('utf-8', 'replace')
     try:
-        if len(raw) > 8192:  # Five points and one origin require far less than this.
+        if len(raw) > 24576:  # Room rectangles plus five points fit below this bounded public input.
             return j(400, {'error': 'The scene request is too large.'})
         body = json.loads(raw)
         house, robots, diff = body.get('house'), body.get('robots'), body.get('difficulty')
@@ -265,15 +266,25 @@ def post(event, validate_only=False):
     key = '%s__r%d__%s' % (house, robots, diff)
     base = key
     placement = None
+    layout = None
+    edited_house = None
     prepare = body.get('prepare') is True
-    if body.get('placement') is not None:
+    if body.get('layout') is not None:
+        try:
+            edited_house = room_layout.build(g['houses'][house], body['layout'])
+            layout = sorted(body['layout'], key=lambda r: r['id'])
+            placement = validate_placement(edited_house, body['placement']) if body.get('placement') is not None else room_layout.generated_placement(edited_house)
+            key = room_layout.key(base, layout, placement, ENGINE)
+        except (ValueError, KeyError) as e:
+            return j(400, {'error': str(e)})
+    elif body.get('placement') is not None:
         try:
             placement = validate_placement(g['houses'][house], body['placement'])
         except (ValueError, KeyError) as e:
             return j(400, {'error': str(e)})
         key = setup_key(base, placement, ENGINE)
     if validate_only:
-        return j(200, {'valid': True, 'placement': placement, 'setup': key})
+        return j(200, {'valid': True, 'placement': placement, 'layout': layout, 'house': edited_house, 'setup': key})
     cached = ready_cache(key)
     if prepare and cached:
         return j(200, {'mission': 'cache:' + key, 'setup': key, 'source': 'recorded', 'prepared': True})
@@ -311,7 +322,7 @@ def post(event, validate_only=False):
         if placement:
             # The task revalidates these bytes before using them. No user-controlled path or URL enters its request.
             s3.put_object(Bucket=RB, Key='ryor/requests/' + key + '.json',
-                          Body=json.dumps({'base': base, 'setup': key, 'placement': placement, 'engine': ENGINE}).encode(),
+                          Body=json.dumps({'base': base, 'setup': key, 'placement': placement, 'layout': layout, 'engine': ENGINE}).encode(),
                           ContentType='application/json')
         env = [{'name': 'MISSION_ID', 'value': mid}, {'name': 'SETUP', 'value': key},
                {'name': 'BUCKET', 'value': RB}, {'name': 'PREFIX', 'value': prefix},

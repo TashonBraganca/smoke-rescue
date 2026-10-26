@@ -6,7 +6,7 @@ here=$(cd "$(dirname "$0")" && pwd); root=$(cd "$here/../.." && pwd); tag=${1:?t
 "$here/build_engine.sh"
 ctx=$(mktemp -d "${TMPDIR:-/tmp}/ryor_ctx.XXXXXX"); mkdir -p "$ctx/ctx/tools/ryor" "$ctx/ctx/data/runs"
 cp "$here/Dockerfile" "$ctx/"
-cp "$here/entry.py" "$here/replay.py" "$here/placement.py" "$here/terra.py" "$ctx/ctx/tools/ryor/"
+cp "$here/entry.py" "$here/replay.py" "$here/placement.py" "$here/terra.py" "$here/layout.py" "$ctx/ctx/tools/ryor/"
 cp "$root/tools/validate_ranches.py" "$root/tools/validate_building.py" "$ctx/ctx/tools/ryor/"
 cp "$root/brain/brain/agent/llm.py" "$ctx/ctx/tools/ryor/agent_backend.py"
 cp -R "$here/engine/bin" "$ctx/ctx/tools/ryor/engine_bin"; mkdir -p "$ctx/ctx/tools/ryor/engine"; mv "$ctx/ctx/tools/ryor/engine_bin" "$ctx/ctx/tools/ryor/engine/bin"
