@@ -696,7 +696,7 @@ namespace SmokeRescue.Brain
         bool[] entranceLock, entranceHard; int[] entranceCells; Vector2 entranceEntry; float entranceRadius;
         /// <summary>Walkable and allowed as a goal: not on the entrance lock's passage (SetEntranceLock).</summary>
         internal bool Standable(int i) => Walkable(i) && (entranceLock == null || !entranceLock[i]);
-        internal void PrepareNavigation()
+        public void PrepareNavigation()
         {
             if (!dirty) return;
             if (obstacleDistance == null) { obstacleDistance = new float[Count]; fireDistance = new float[Count]; }
