@@ -1,0 +1,48 @@
+Codex brief: the judge flow on the main site (owner, 26 Oct 10:40 IST), do AFTER codex_ryor_v2_brief.txt is done and
+verified. Due 26 Oct 18:00 IST. Same folders, rules and verification standard as codex_ryor_v2_brief.txt.
+In site-next (Next.js, /Volumes/Tashon/opencv/showcase/site-next; owner deploys with scripts/deploy.sh, do not run it):
+1. Landing: keep the film hero; one clear primary button "Choose a mission" that goes to the picker.
+2. Mission picker, site style: the same 5 house cards as the Try-it page (Three-bed ranch, L-shaped ranch, One-door house,
+   your two named real plans), each a clean top view plus one line ("9 rooms, 5 people inside, fire in the back bedroom").
+   Robots 1/2/3, 2 as default. Three houses carry a "Full film" badge: Three-bed ranch, L-shaped ranch, One-door house
+   (each has a real Unity mission recording with 2 robots). Button "Send them in".
+3. Full film path (badged house AND 2 robots): (a) a short generic film intro labelled "Cinematic intro" cut from the
+   existing film (robots arrive and walk to the door; reuse what site-next already plays, ~15 s), (b) the real recorded
+   Unity mission video of that house (robot views, shared map, radio), (c) both robots out and a short outro, (d) end card:
+   people found, mission time, both out, plus "On 39 real floor plans it never saw, two robots sharing one map found 99 %
+   of people; one robot found 92 % (p = 0.002)" (source /Volumes/Tashon/opencv/smoke-rescue/data/evidence/
+   real_layouts_25oct_score.txt). End card buttons: "Watch it as a live simulation on AWS" (opens your Try-it with the same
+   house and robot count), "Try another house", "How it works".
+4. Any other choice goes straight to your Try-it replay for that house and robot count.
+Videos: One-door house = /Volumes/Tashon/opencv/smoke-rescue/data/evidence/video1_family_ranch_seed934_5of5.mp4 (already
+re-encoded copy exists in site-next public/); Three-bed ranch and L-shaped ranch videos land later today in
+/Volumes/Tashon/opencv/smoke-rescue/data/evidence/ as video2_*.mp4 and video3_*.mp4: build with clearly marked
+placeholders and a single config entry per house so they drop in. Re-encode to H.264 web size, lazy-load, no layout
+jumps, works on phone. Verify each step and the full path with headless Chrome screenshots, `npx next build`, and report
+in handoff/codex_judge_flow_report.txt.
+
+UPDATE (owner, 26 Oct 10:55): every house has at most 7 to 8 rooms. The three filmed houses are being rebuilt in worktree
+/Volumes/Tashon/opencv/wt_houses8 (branch houses8-26oct): Three-bed ranch trimmed to 8 rooms, L-shaped ranch redesigned
+to 8 rooms, and a NEW 8-room "Split ranch" replacing the 30-room one-door house (config/floorplan_split_ranch.json etc).
+Before the judge flow: (1) your two extra real plans must be 7 to 8 rooms; (2) once houses8 is merged into
+overnight-25oct (I will write handoff/HOUSES8_MERGED.txt in /Volumes/Tashon/opencv/smoke-rescue when it is), rebuild the
+Try-it gallery and precomputed replays for these three houses from the new configs (5 houses x 1/2/3 robots, easy).
+The Full film badge goes on Three-bed ranch, L-shaped ranch and Split ranch.
+
+UPDATE 2 (26 Oct 11:05): your v2 replays came from engine image 58dc33c3, an older brain without the 26 Oct fixes, and
+9 of 15 end without every robot out. When rebuilding the replays (after HOUSES8_MERGED.txt appears), rebuild the engine
+from the current overnight-25oct brain (git -C /Volumes/Tashon/opencv/smoke-rescue log -1 shows the commit to use; it
+has F1-F9, step-aside, 4.5 m confirm range, single-frame rule) and require every one of the 15 to end with all robots
+out and 0 false confirmations; report any that do not, with the cause, instead of shipping them. Until the new houses
+land, build the judge flow (landing button, picker, film path, end card) with the current houses as placeholders.
+
+UPDATE 3 (owner, 26 Oct 11:15), this overrides the flow above where they differ:
+- Our 3 houses (Three-bed ranch, L-shaped ranch, Split ranch; 8 rooms each) ALWAYS play our pre-recorded Unity mission
+  film when chosen: cinematic intro, the real recorded mission, robots exit, end card. No live run for them. Robot count
+  choice is hidden for these three (the films have 2 robots).
+- Only the 2 extra houses run as live simulations on AWS (1/2/3 robots). While the cloud machine starts (about a minute),
+  play the cinematic intro (arrival, robots walk to the door) instead of the "Getting the mission ready" checklist; start
+  the replay when the intro ends or the first frames are ready, whichever is later; if the live run fails or times out,
+  play the precomputed replay of the same setup with an honest label.
+- Precomputed fallbacks for the 2 extra houses (1/2/3 robots, easy) must come from the current brain and pass the gate:
+  all rooms entered, every robot out, 0 false confirmations.

@@ -89,14 +89,14 @@ function World(props: Props) {
     return best;
   }, [run]);
   const t = props.time;
-  const index = Math.min(360, Math.floor(t * 2));
+  const index = Math.max(0, Math.min((run?.frames.length || 1) - 1, Math.floor(t * 2)));
   const frame = run?.frames[index];
   const found = run?.frames.slice(0, index + 1).flatMap(f => f.found) || [];
   useFrame((_, rawDt) => {
     const scratch = scratchRef.current;
     const dt = Math.min(rawDt, 0.05), sim = clock.current;
-    const i = Math.min(360, Math.floor(sim * 2));
-    const a = run?.frames[i], b = run?.frames[Math.min(i + 1, 360)];
+    const i = Math.max(0, Math.min((run?.frames.length || 1) - 1, Math.floor(sim * 2)));
+    const a = run?.frames[i], b = run?.frames[Math.min(i + 1, (run?.frames.length || 1) - 1)];
     const alpha = sim * 2 - i;
     const points = [];
     for (let k = 0; k < robots; k++) {
@@ -113,7 +113,7 @@ function World(props: Props) {
       points.push(new THREE.Vector3(x, 0.3, -y));
     }
     scratch.target.set(0, 0, 0); points.forEach(p => scratch.target.add(p)); scratch.target.divideScalar(robots);
-    if (overview || !running || sim >= 180 || reduced) {
+    if (overview || !running || sim >= (run?.duration_s || 180) || reduced) {
       scratch.target.copy(centre); scratch.want.copy(overviewCamera);
     } else {
       const spread = Math.max(...points.map(p => p.distanceTo(scratch.target)));
@@ -153,8 +153,8 @@ function World(props: Props) {
 function RobotLabel({ index, run, house, clock }: { index: number; run: Recording | null; house: House; clock: MutableRefObject<number> }) {
   const group = useRef<THREE.Group>(null);
   useFrame(() => {
-    const i = Math.max(0, Math.min(360, Math.floor(clock.current * 2)));
-    const p = run?.frames[i].robots[index], q = run?.frames[Math.min(i + 1, 360)].robots[index];
+    const i = Math.max(0, Math.min((run?.frames.length || 1) - 1, Math.floor(clock.current * 2)));
+    const p = run?.frames[i].robots[index], q = run?.frames[Math.min(i + 1, (run?.frames.length || 1) - 1)].robots[index];
     const a = clock.current * 2 - i;
     group.current?.position.set(p && q ? THREE.MathUtils.lerp(p.x, q.x, a) : house.pads[index][0], 1.15, -(p && q ? THREE.MathUtils.lerp(p.y, q.y, a) : house.pads[index][1]));
   });

@@ -362,6 +362,14 @@ def ready_cache(key):
         st = s3_json(cache_prefix(key) + 'status.json')
         if not st or st.get('state') != 'done' or not st.get('validated'):
             return None
+        if st.get('engine', {}).get('image') != ENGINE:
+            return None
+        proof = st.get('gate') or {}
+        if not proof.get('all_out') or proof.get('false_confirmations') != 0 or proof.get('engine_git') != st.get('engine', {}).get('git'):
+            return None
+        h = (gallery() or {}).get('houses', {}).get(key.split('__')[0], {})
+        if h.get('source') == 'HouseExpo' and not proof.get('all_rooms_entered'):
+            return None
         return st
     return memo('cache:' + key, 10, read)  # Brief negative caching lets a prepared scene become ready promptly.
 
@@ -458,7 +466,7 @@ def validate(rec, st, prefix):
     sim_t = float(st.get('sim_t') or 0)
     if not math.isfinite(sim_t) or sim_t != mission_s:
         return 'sim_t %.1f < %.0f' % (sim_t, mission_s)
-    if not 1 <= n <= 19:  # 180 s, 10 s chunks, inclusive final frame.
+    if not 1 <= n <= int(math.ceil(mission_s / 10)) + 1:  # 180 s, 10 s chunks, inclusive final frame.
         return 'invalid chunk count'
     got = chunks(prefix, 0, n)
     if len(got) != n or n == 0:

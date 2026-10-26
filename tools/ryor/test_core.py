@@ -170,3 +170,10 @@ def test_replay_identity_rejects_a_different_scene_or_engine(api, monkeypatch, s
     assert 'scene bytes and engine' in api.validate(rec, status, '')
     status['setup'] = base
     assert 'different setup' in api.validate(rec, status, '')
+
+
+def test_judge_cache_rejects_a_completed_recording_from_an_old_image(api, monkeypatch):
+    old = {'state': 'done', 'validated': True, 'engine': {'image': 'old'},
+           'score': {'all_out': True, 'robots_out': 2, 'false_confirmations': 0}}
+    monkeypatch.setattr(api, 's3_json', lambda key: old)
+    assert api.ready_cache('family_ranch__r2__easy') is None

@@ -10,7 +10,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 COPY = ROOT / 'tools/ryor/site-next'
 FILES = ['src/app/rescue/page.tsx', 'src/components/Nav.tsx', 'src/rescue/data.ts',
-         'src/rescue/Rescue.tsx', 'src/rescue/Scene.tsx']
+         'src/rescue/Rescue.tsx', 'src/rescue/Scene.tsx', 'src/rescue/Picker.tsx',
+         'src/rescue/FilmPlayer.tsx', 'src/rescue/LiveMission.tsx', 'src/rescue/missions.ts',
+         'src/rescue/live.ts', 'src/sections/Mission.tsx']
 
 
 def main():
@@ -20,7 +22,11 @@ def main():
     args = parser.parse_args()
     source, dest = (COPY, args.site) if args.install else (args.site, COPY)
     paths = FILES + [str(p.relative_to(source)) for p in (source / 'public/rescue-data').glob('*') if p.is_file()]
-    assert len(paths) == 22, f'Expected 5 source files and 17 data/license files, got {len(paths)}'
+    paths += [str(p.relative_to(source)) for p in (source / 'public/film/judge').glob('*') if p.is_file()]
+    # Remove withdrawn old-engine files from the receiving rescue-data directory.
+    for old in (dest / 'public/rescue-data').glob('*__r*__easy.json'):
+        if str(old.relative_to(dest)) not in paths:
+            old.unlink()
     for name in paths:
         target = dest / name
         target.parent.mkdir(parents=True, exist_ok=True)

@@ -2,9 +2,9 @@ export type Pose = { id: string; x: number; y: number; yaw: number; state: strin
 export type Event = { robot: string; kind: string; text: string; t: number };
 export type Found = { id: string; x: number; y: number; by: string; t: number };
 export type Frame = { t: number; robots: Pose[]; fire: number[][]; found: Found[]; events: Event[]; mapped: number[] };
-export type Score = { people_found: number; people_total: number; time_s: number; robots_out: number; robots: number; all_out: boolean; coverage_pct: number; rooms_searched: number };
-export type House = { id: string; name: string; rooms: number; people: number; source: string; bounds: number[]; walls: number[][]; furniture: number[][][]; pads: number[][]; people_truth: { id: string; x: number; y: number }[]; rooms_poly: { id: string; name: string; kind: string; poly: number[][] }[]; scores: Record<string, Score> };
-export type Recording = { setup: string; difficulty: 'easy'; frames: Frame[]; score: Score; rooms_searched: number; validated: boolean };
+export type Score = { people_found: number; people_total: number; time_s: number; robots_out: number; robots: number; all_out: boolean; coverage_pct: number; rooms_searched: number; false_confirmations?: number };
+export type House = { id: string; name: string; rooms: number; people: number; source: string; bounds: number[]; walls: number[][]; furniture: number[][][]; pads: number[][]; people_truth: { id: string; x: number; y: number }[]; rooms_poly: { id: string; name: string; kind: string; poly: number[][] }[]; mission_s?: number; available_replays?: number[]; placeholder?: boolean; fire_origins?: number[][]; scores: Record<string, Score> };
+export type Recording = { setup: string; difficulty: 'easy'; frames: Frame[]; score: Score; rooms_searched: number; duration_s?: number; validated: boolean; engine?: { git: string; image: string }; gate?: { all_rooms_entered: boolean; all_out: boolean; false_confirmations: number; engine_git: string }; };
 export const keyFor = (house: House, n: number) => `${house.id}__r${n}__easy`;
 const recordings = new Map<string, Promise<Recording>>();
 export function loadRecording(key: string) {
@@ -13,7 +13,8 @@ export function loadRecording(key: string) {
     promise = fetch(`/rescue-data/${key}.json`).then(async r => {
       if (!r.ok) throw new Error('The recording could not load. Please try again.');
       const data: Recording = await r.json();
-      if (!data.validated || data.difficulty !== 'easy' || data.setup !== key || data.frames.length !== 361) throw new Error('This recording failed its checks. Please try again.');
+      if (!data.gate?.all_rooms_entered || !data.gate.all_out || data.gate.false_confirmations !== 0 || !data.gate.engine_git || data.engine?.git !== data.gate.engine_git) throw new Error('A checked replay for this setup is not ready yet.');
+      if (!data.validated || data.difficulty !== 'easy' || data.setup !== key || data.frames.length !== (data.duration_s || 180) * 2 + 1) throw new Error('This recording failed its checks. Please try again.');
       return data;
     }).catch(e => { recordings.delete(key); throw e; });
     recordings.set(key, promise);
@@ -40,7 +41,7 @@ export function exitCaption(n: number, out: number) {
 }
 // Captions use recorded events and poses. Internal brain reasons never enter the page.
 export function caption(house: House, run: Recording, t: number) {
-  if (t >= 180) return exitCaption(run.score.robots, run.score.robots_out);
+  if (run.validated && t >= (run.duration_s || 180)) return exitCaption(run.score.robots, run.score.robots_out);
   const frames = run.frames.slice(0, Math.floor(t * 2) + 1);
   const events = frames.flatMap(f => f.events.map(e => ({ e, f }))).filter(({ e }) => e.t <= t);
   const meaningful = events.filter(({ e }) => ['survivor_confirmed', 'mission_complete', 'room_searched', 'room_marked_fire', 'agent_decision', 'agent_unavailable', 'agent_order'].includes(e.kind));
@@ -65,4 +66,4 @@ export function caption(house: House, run: Recording, t: number) {
 }
 
 // An animation frame timestamp can precede the effect that scheduled it.
-export const advanceClock = (t: number, elapsed: number, rate: number) => Math.min(180, Math.max(0, t) + Math.max(0, Math.min(elapsed, 0.1)) * rate);
+export const advanceClock = (t: number, elapsed: number, rate: number, duration = 180) => Math.min(duration, Math.max(0, t) + Math.max(0, Math.min(elapsed, 0.1)) * rate);

@@ -1,0 +1,32 @@
+{
+  "intro": "/film/judge/intro.mp4",
+  "outro": "/film/judge/outro.mp4",
+  "poster": "/film/judge/poster.jpg",
+  "engine": null,
+  "films": {
+    "family_ranch": {
+      "src": null,
+      "peopleFound": null,
+      "peopleTotal": 5,
+      "missionSeconds": null,
+      "allOut": null,
+      "note": "The new eight-room mission recording is being prepared."
+    },
+    "long_ranch": {
+      "src": null,
+      "peopleFound": null,
+      "peopleTotal": 5,
+      "missionSeconds": null,
+      "allOut": null,
+      "note": "The new eight-room mission recording is being prepared."
+    },
+    "split_ranch": {
+      "src": null,
+      "peopleFound": null,
+      "peopleTotal": 5,
+      "missionSeconds": null,
+      "allOut": null,
+      "note": "The new eight-room mission recording is being prepared."
+    }
+  }
+}
