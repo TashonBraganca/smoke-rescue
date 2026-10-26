@@ -25,8 +25,8 @@ DIFF = {
 }
 HOUSES = [
     # id, name, source, cols, rows, room w, room d, people, seed
-    ("family_ranch", "Family ranch", "ours", 3, 2, 4.2, 3.8, 3, 11),
-    ("long_ranch", "Long ranch", "ours", 5, 1, 3.6, 4.4, 3, 12),
+    ("family_ranch", "Three-bed ranch", "ours", 3, 2, 4.2, 3.8, 3, 11),
+    ("long_ranch", "L-shaped ranch", "ours", 5, 1, 3.6, 4.4, 3, 12),
     ("onedoor_934", "One-door house 934", "ours", 3, 3, 3.4, 3.2, 4, 13),
     ("hx_035feb0125", "HouseExpo 035feb0125", "HouseExpo", 2, 2, 4.6, 4.0, 2, 14),
     ("hx_0a1b2c3d4e", "HouseExpo 0a1b2c3d4e", "HouseExpo", 4, 2, 3.2, 3.6, 4, 15),

@@ -44,8 +44,8 @@ DIFFICULTIES = {
 }
 VISIBILITY_REASON = ("6 m is the brain's own detection limit (person_rgb_max_range_m), so easy adds no smoke limit. 4 and 2.5 m are "
                      "illustrative smoke levels, not measured from a smoke model: headless has no rendered camera.")
-OURS = [("family_ranch", "Family ranch", "scenario_family_ranch_full.json"),
-        ("long_ranch", "Long ranch", "scenario_long_ranch_full.json"),
+OURS = [("family_ranch", "Three-bed ranch", "scenario_family_ranch_full.json"),
+        ("long_ranch", "L-shaped ranch", "scenario_long_ranch_full.json"),
         ("onedoor_934", "One-door house", "scenario_house_onedoor_seed934_full.json")]
 HOUSEEXPO_LICENCE = "MIT (HouseExpo, Copyright (c) 2019 Tingguang Li)"
 CITATION = ("HouseExpo: T. Li, D. Ho, C. Li, D. Zhu, C. Wang, M. Q.-H. Meng, \"HouseExpo: A Large-scale 2D Indoor Layout Dataset for "

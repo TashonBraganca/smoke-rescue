@@ -158,16 +158,16 @@
   "last_t": 180.0,
   "markers": 6,
   "sha256": "58640b76f88520ca0e3051338324fa238b7f25bb268a83a76473ba33952f6c1e",
-  "status_digest": "85e8cf9a1613eb2f51a290fd678df69554a186c17feaadf40a6e132998d6a372",
+  "status_digest": "647af5f93d31654b99a2bc010f54fdefd25e1805c69bfd963164395150d36fa2",
   "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
   "wall": {
-   "started": 1792961884.1653996,
-   "first_frame_s": 14.1,
-   "total_s": 219.6
+   "started": 1792965386.2080743,
+   "first_frame_s": 10.5,
+   "total_s": 155.5
   },
   "engine": {
-   "git": "84455305",
-   "image": "84455305"
+   "git": "58dc33c3",
+   "image": "58dc33c3"
   }
  },
  "hx_035feb0125__r1__easy": {
@@ -3705,210 +3705,915 @@
   }
  },
  "hx_dd7d4beea2__r3__easy": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 5,
+  "sha256": "649f647cdbb277ea6adc4c8341a63ac0fe81fdf4b2ac7323306cebcfd3947651",
+  "status_digest": "cf7858a6455cf0033f6a850ca8c7ca5aceb60dbbadf2ff7d70fd680503234c4d",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792963658.6263387,
+   "first_frame_s": 9.6,
+   "total_s": 142.4
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "hx_dd7d4beea2__r3__hard": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 5,
+  "sha256": "c45098e0295585a06cb6bc4c755917bfda6ca5c5ad429157010723c8fa1fc945",
+  "status_digest": "22448e71e6e38994b08e3b547de1be19ffcc71e7d9d3dc3c11e7e9f6aa40a8fe",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792963694.3319066,
+   "first_frame_s": 11.8,
+   "total_s": 192.9
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "hx_dd7d4beea2__r3__medium": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 5,
+  "sha256": "9f034074be54ca7416ef9f227b6a030e6323126c0225680958bfe2c73d8f0bfa",
+  "status_digest": "f62d18d94c339bbdb03604df3e34da2cacffc2a0fde90a9a5eca6d01d781b746",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792963693.5252836,
+   "first_frame_s": 11.6,
+   "total_s": 178.2
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "hx_e3a17f7182__r1__easy": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 4,
+  "sha256": "522dd9755500da8a5816eb365f27eb10f6d02f9ab6225ad46f29d315052e4534",
+  "status_digest": "e44fb14528707aab20afb17ac944b12952891e90615ef61f68c82a39bdc73c91",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792963753.558196,
+   "first_frame_s": 6.2,
+   "total_s": 97.9
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "hx_e3a17f7182__r1__hard": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 2,
+  "sha256": "9ff7b1b5377d3917bcc110026a0d0e6f307dceb3c9e4fa165f2882d910c3d1a6",
+  "status_digest": "26369e8af2db0c1b6086bd86b9135f0cc79b5310e04fd7240bc31a6f897d51e9",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792963801.3997715,
+   "first_frame_s": 7.5,
+   "total_s": 108.2
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "hx_e3a17f7182__r1__medium": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 4,
+  "sha256": "a13ff2b20ec2773d1d8aab0b85e30bb8ce77d84bb8dccabef06ef18c068e1110",
+  "status_digest": "f732c23f478605c0b403166e36744e06d73762dd840e83a3ff6ef5cce8701721",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792963837.091711,
+   "first_frame_s": 6.8,
+   "total_s": 101.3
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "hx_e3a17f7182__r2__easy": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 5,
+  "sha256": "5cff752137dae83dff6248ff6b27927924d35def4a93838e4f56d9f8bebae94b",
+  "status_digest": "696c2ab429607d5a8b4852543cdd292ad11557f68e095712cc512028fddf0266",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792963865.754739,
+   "first_frame_s": 9.0,
+   "total_s": 139.3
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "hx_e3a17f7182__r2__hard": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 4,
+  "sha256": "50c4e447f9bb5ea6094870d83cf634dee015bddf14652c035db2190d417007fd",
+  "status_digest": "a081db0b2bf930cd136a69c80a5da575f3f86b114af491de9b81df07481bdc8e",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792963909.18116,
+   "first_frame_s": 8.1,
+   "total_s": 111.5
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "hx_e3a17f7182__r2__medium": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 4,
+  "sha256": "d9b7e621b9e24ceae3ae8eb16c588fe70ef0ff9ff3c40517077c83e98f4e5675",
+  "status_digest": "a11369f23ed7d04c0aeb15b7ece930fa4167bc15ec07cab7a7e9a0d6e874f63a",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792963931.3790698,
+   "first_frame_s": 8.2,
+   "total_s": 125.0
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "hx_e3a17f7182__r3__easy": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 4,
+  "sha256": "2195cf5748dfd1876f54ce965bb74b3ed44d08ec8273f76f734d4e25968a442b",
+  "status_digest": "4400e4716612e91dcca037c8d8fecec0a3686af8c286724dd0d43117092b95d2",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792963973.4098842,
+   "first_frame_s": 12.0,
+   "total_s": 181.9
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "hx_e3a17f7182__r3__hard": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 4,
+  "sha256": "5dd4f2c312482e0755d6bcd076c36a6fc792fb70c0425b110c804ba945fb2f9a",
+  "status_digest": "ef6e7b907d53fb2a6f342db9bd1d45a7b4c87cfe858a4b09e61b377a9eddc972",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792963967.7209299,
+   "first_frame_s": 10.6,
+   "total_s": 137.7
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "hx_e3a17f7182__r3__medium": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 4,
+  "sha256": "9a11340a3fc8cef1c907d3ce5cbd1340fea4b672074995b91ee56265192a72c6",
+  "status_digest": "89f444b2ce0b4bcdd8df0aa9bd63cf36f469dc11881c73c13312451e67414849",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792963994.9411294,
+   "first_frame_s": 13.8,
+   "total_s": 171.7
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "hx_ea02e5378a__r1__easy": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 3,
+  "sha256": "b949446367cc2ae97bd174db678ff38d8c48751b3b4b611aae1f94f05083c878",
+  "status_digest": "50babc8c8af7a1ecc256ac2a12b643708d9357bc15f8cf38046288278eff45f8",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792964057.122665,
+   "first_frame_s": 7.1,
+   "total_s": 116.1
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "hx_ea02e5378a__r1__hard": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 3,
+  "sha256": "deca27e854a6e8737f330c8e8597fc8e24fdf93d3bf9b86d1aa1cf1b3773c911",
+  "status_digest": "20da4f771de9130c537bebeac56183b9761f4b9eb340179d6dc1f5a50794ff4f",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792964086.847863,
+   "first_frame_s": 5.7,
+   "total_s": 81.6
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "hx_ea02e5378a__r1__medium": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 2,
+  "sha256": "a0e391686aa4dc4496b8ce478aa384fa9120d476234802fa5362ac47c1d49bfe",
+  "status_digest": "f041e0a7c72c69b81a3a0ab7f8acba74f5d74463320336fadf8435f00e42ce96",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792964113.1437747,
+   "first_frame_s": 5.7,
+   "total_s": 87.6
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "hx_ea02e5378a__r2__easy": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 5,
+  "sha256": "d88685cca1eb7e0d3b68124c914388e8fb2429a41c1bdcd7d3c926f0a0440605",
+  "status_digest": "623cadd3aaf6e68bc1ba38d9bbfe21aec0111e906197c19bd750c5cdbfb7396d",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792964175.7477891,
+   "first_frame_s": 6.9,
+   "total_s": 105.6
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "hx_ea02e5378a__r2__hard": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 4,
+  "sha256": "62d058a48765efdab33da367960661b59ccaca88ac33a904a6c1398a43aa1fc5",
+  "status_digest": "bf2fb60163a2bc88ec4ff39be7e4baaf08eb7eca1317215630e0197031c02e36",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792964216.8776138,
+   "first_frame_s": 9.0,
+   "total_s": 125.8
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "hx_ea02e5378a__r2__medium": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 5,
+  "sha256": "1cdf160d754d36831b6485e2adf00168fe0ca194aaa6ce805f64a984810c5913",
+  "status_digest": "865f8b2c328e537f0f9a23b0c21f57938bd7d081058f01d85ff2be35b5619c9c",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792964260.8568788,
+   "first_frame_s": 7.2,
+   "total_s": 114.6
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "hx_ea02e5378a__r3__easy": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 5,
+  "sha256": "2bfc981bfe81371cdfe3e00b0c282e76de8e78052f35713747e31a1968e59934",
+  "status_digest": "88bf91fab098a792400cfaad82be702872540eca741116a447fb3a79b5559171",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792964258.3553169,
+   "first_frame_s": 12.0,
+   "total_s": 170.2
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "hx_ea02e5378a__r3__hard": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 4,
+  "sha256": "93ea39744816ca1ead30ab65e8d05669fe1be5c1f1204e694a4d99ea1ee9896e",
+  "status_digest": "4534f68e94349a1e7d266807031023e5e2a03f1d02f585680a378cbc862e1610",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792964262.5309894,
+   "first_frame_s": 11.1,
+   "total_s": 168.8
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "hx_ea02e5378a__r3__medium": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 2,
+  "sha256": "a81d6c9a1aefb0efd2b6fcd74a2f7fa96a6af02ccd3b8d787404429c99fa7d4b",
+  "status_digest": "49512bc23f9d26ab1e22df97ddcc8a8fb5d5d13fcec3f955e176da5020b592d2",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792964287.5674877,
+   "first_frame_s": 12.9,
+   "total_s": 188.3
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "hx_eeb51537a0__r1__easy": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 5,
+  "sha256": "b65e26b2f6b5f5f34c924fcf4e0dc047676c863fcd497b52487982ee46c50b66",
+  "status_digest": "ef9807db45bde1f16c512d015ae36259ae0bd407e81bf5dd130d892f6c5a8fe6",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792964349.8479369,
+   "first_frame_s": 5.4,
+   "total_s": 81.0
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "hx_eeb51537a0__r1__hard": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 5,
+  "sha256": "8d547dab5f9acfeacbe22f9bb9823b7280b47e91b9e00a5d170e39627a53d24e",
+  "status_digest": "a1310ee1d01ddcb0b50bfe69f15bbc85bf4b0fea26e6557e6f5efbc62624dbb2",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792964408.9490907,
+   "first_frame_s": 7.2,
+   "total_s": 110.6
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "hx_eeb51537a0__r1__medium": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 5,
+  "sha256": "ac72e8ff03e6a7c7c5417b3660351b7eb9915cf10a5c573b1f4084ba84307145",
+  "status_digest": "893cefaac3dbfe0a9e0f9a9a9c1a57c3a94d3ef8b259ab70b4ec9bf76e63ac7f",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792964438.7665503,
+   "first_frame_s": 6.9,
+   "total_s": 98.1
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "hx_eeb51537a0__r2__easy": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 5,
+  "sha256": "9578b4861fd6a0e392ee846e758e8bf10228b5a1f36d2efa3a4d71dbdc6cf650",
+  "status_digest": "7dd4a91f41c56ed70474cf7551c69a0816a112dc57165fa42d79c6175ce81dfe",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792964512.2033334,
+   "first_frame_s": 6.9,
+   "total_s": 115.8
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "hx_eeb51537a0__r2__hard": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 5,
+  "sha256": "1fc4f224a13a798f0d3cf1d8a0f65c39f127e1e869cf517bca6335e2468c5883",
+  "status_digest": "d2d64783923ba7380bb2b5601c4307674f88ed1fcaeddd17c805dadddecc472d",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792964521.333799,
+   "first_frame_s": 9.6,
+   "total_s": 150.2
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "hx_eeb51537a0__r2__medium": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 5,
+  "sha256": "6bf217c1c024786a5cb8161eac032a5b15dc1caf0d9a921830a7bde3bce7e3c0",
+  "status_digest": "ef2c39ac20e46d74fdbfb78f9ecc3149039a19c2350a0338fd70f6b23e691a0b",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792964516.0522807,
+   "first_frame_s": 9.3,
+   "total_s": 134.8
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "hx_eeb51537a0__r3__easy": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 5,
+  "sha256": "4612f199804ab8b1364443940748e3c98c9ef3db0fb666bd57f558f0407a1d26",
+  "status_digest": "e543fcf767fae9451d321552258031a9d298288b275429fba27ec729b58d3260",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792964543.3279111,
+   "first_frame_s": 10.2,
+   "total_s": 167.5
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "hx_eeb51537a0__r3__hard": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 5,
+  "sha256": "c5c6d47a0b8cd2603e8ed1b9c7d61002349dc150e731085b98b5c5bd25eaa8d5",
+  "status_digest": "96ff700bfbcfbb06d0e06d4819bbc12f7a26cdb65965f56c9249373730721e6e",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792964583.2733157,
+   "first_frame_s": 11.1,
+   "total_s": 211.1
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "hx_eeb51537a0__r3__medium": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 5,
+  "sha256": "50f1718782b2c8379b6f328d0c9c3abd296d0eb3e07a1f20aee3da66261fe291",
+  "status_digest": "c52b6a775bb6506ad567cc7885ea42efc8e4725acbbd14fc791a5f145237bd30",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792964609.885711,
+   "first_frame_s": 12.6,
+   "total_s": 170.8
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "long_ranch__r1__easy": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 2,
+  "sha256": "f83f8e343dc43428843ca857d110729a2f101281ff905a80ad184cfb26f7ffd2",
+  "status_digest": "3f1222c12e87d6fb8650fdd9d23421ff91a7bd3d3c180f27e39205554b89f314",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792964688.5175025,
+   "first_frame_s": 7.2,
+   "total_s": 133.2
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "long_ranch__r1__hard": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 2,
+  "sha256": "5e715821bc5f5c2d821af2c6620a2921ba4c527777ef79e610ff789f6156547c",
+  "status_digest": "5acbdb4683643bfc40b12654ff2f6e2a0adb51c7278b4a6b14968d2ae791797e",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792964745.024689,
+   "first_frame_s": 6.6,
+   "total_s": 109.8
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "long_ranch__r1__medium": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 2,
+  "sha256": "215f9f9268af8738e438ace9bc8c56410fe3d94cddcf4f6e0011b8fba738c7de",
+  "status_digest": "34c8ef11abcd8f29e3049198959e01d8e5a4f3874a2d8c98cb617b91802adbd1",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792964769.791317,
+   "first_frame_s": 6.3,
+   "total_s": 110.0
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "long_ranch__r2__easy": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 2,
+  "sha256": "6ebeb50b7115bb6360fbf94d3651f7d83be75497a22f8757cbdad882fd140c59",
+  "status_digest": "0e618622c3b16a2de18c0fb09417a10eedabfe00c9e036b3150aca0ba3111332",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792964779.0949447,
+   "first_frame_s": 7.8,
+   "total_s": 134.3
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "long_ranch__r2__hard": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 2,
+  "sha256": "9ddfb270af0d75b28941bfde0f911892dbf9a3f93f990e00d7b7b40071d65bc6",
+  "status_digest": "2dc72f6d7b3b6cb752d5d75e4f31bc8445fb3eb0df49c24d50f72ee7f5feae7c",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792964858.293965,
+   "first_frame_s": 10.5,
+   "total_s": 162.2
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "long_ranch__r2__medium": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 2,
+  "sha256": "1fea831d2069843426c1dd5f56712229c3015aa57982b3e5c724182346de3830",
+  "status_digest": "2f63525ab881d84094fe24ed296b94883a32399df522cd5f8d3f362cdd124006",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792964862.0245907,
+   "first_frame_s": 7.9,
+   "total_s": 133.6
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "long_ranch__r3__easy": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 5,
+  "sha256": "100cb62b777266fee4879f2aa738ad37f002fede7fdf1bf1110f237d293e8bdd",
+  "status_digest": "85d1dd0c6cc95b58b70cfe700805162361c14a28045215b13223b4dc9eee2440",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792964883.551709,
+   "first_frame_s": 9.9,
+   "total_s": 155.6
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "long_ranch__r3__hard": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 3,
+  "sha256": "d59a739f1ccf4db110943b6c6421c5059204020ac9d81728ab5a6b6b5752eff7",
+  "status_digest": "b7066a7548cbeaba5ced790b72cb9f955b7f1665243b58623ab6f0870df1626c",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792964911.7317946,
+   "first_frame_s": 10.5,
+   "total_s": 151.5
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "long_ranch__r3__medium": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 4,
+  "sha256": "b0777f86338cbf62d84338f9907e1b67f29900d9331c7ef9f70bbd8a4e63d321",
+  "status_digest": "1e7950fe0486f0cdb0d3111059e688516d32a45cb3027315edd0244efac108ab",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792964962.4534671,
+   "first_frame_s": 12.3,
+   "total_s": 183.7
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "onedoor_934__r1__easy": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 1,
+  "sha256": "1239e7cd02c935de0aba5a3647ec521e13a4cb135c5143dc7a41aa75f580f5d5",
+  "status_digest": "67a423f09d15a91d0a985a1f2eb54e359e2b32d787bc8aa24178333efc4a0b91",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792964966.750078,
+   "first_frame_s": 9.6,
+   "total_s": 139.2
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "onedoor_934__r1__hard": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 1,
+  "sha256": "390663a67186e9853bffd03a884f86280bdcdf52f215c0ab94ee2e68391980a5",
+  "status_digest": "3ea8a041dcfafe89efe524aa1dc6277f644cd4ccd94971b354555fa85fa9e5f1",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792965061.0767882,
+   "first_frame_s": 10.3,
+   "total_s": 137.0
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "onedoor_934__r1__medium": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 1,
+  "sha256": "379874a4212b1b62a1457a5c8eaa76d88c782c6fdda74fe57675b7aea6b03d93",
+  "status_digest": "d40ed138a597726618e6b09d5726bf2e4ff330aeadff67a11a765e16a661a9ce",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792965089.9581606,
+   "first_frame_s": 7.9,
+   "total_s": 108.1
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "onedoor_934__r2__easy": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 2,
+  "sha256": "adac523f4b0022cf8ecaa86dda7e82d2cd29a476e0ca4b511f04354714a767de",
+  "status_digest": "13707fd3a5040ea3219cef2a7b80949e2da81c8a75b78788589af8a00b2322d1",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792965116.4133673,
+   "first_frame_s": 13.0,
+   "total_s": 196.2
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "onedoor_934__r2__hard": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 2,
+  "sha256": "b44ed4e3294d6724baac3fcd3f2ac955144cbae458bd13d249e037b03842e71b",
+  "status_digest": "75c179b02467bee89dc667492869160c7ad8ed3ccccc2b19ca71047a2a54f574",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792965146.3157008,
+   "first_frame_s": 14.3,
+   "total_s": 203.3
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "onedoor_934__r2__medium": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 2,
+  "sha256": "878f04f9e03b5053a2c5d8b61cbb78343182e8dea6716d10cd89ee28fd984c61",
+  "status_digest": "ee4a689f02103fdc6829791b6646dccfbadce6754ef2f56c2a348c66c1d48470",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792965169.6450152,
+   "first_frame_s": 13.6,
+   "total_s": 202.6
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "onedoor_934__r3__easy": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 4,
+  "sha256": "8654af10d68eaa8581e3802c5bcc2eff8d276652bfe12fd2522681f33165b078",
+  "status_digest": "a941ee9da259950ae5e08cb9588f8f22601af60785648ccfb9fab7efeb127867",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792965217.115242,
+   "first_frame_s": 18.9,
+   "total_s": 274.4
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  },
  "onedoor_934__r3__hard": {
   "valid": true,
   "frames": 361,
   "first_t": 0.0,
   "last_t": 180.0,
-  "markers": 3,
-  "sha256": "beb1a2d36a34d7d6f675f57672a03e3a5d5a4af7901f7b29d8ccf16b2e653044",
-  "status_digest": "1f00abb58c606404eb8dbfd8d32a9be7e5e04884cab2399da34bb30cfaa8422a",
+  "markers": 2,
+  "sha256": "e351de7154e91daae80bc1bb4d847d29f06efeeaa1839fd4d07dc6d6435a2705",
+  "status_digest": "e9f098f3285845cfb712f0f0a8d105c81d65379ad58ab800232e43bd7df7538a",
   "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
   "wall": {
-   "started": 1792955810.9352684,
-   "first_frame_s": 34.0,
-   "total_s": 552.3
+   "started": 1792965265.0984488,
+   "first_frame_s": 19.0,
+   "total_s": 272.2
   },
   "engine": {
-   "git": "747295a3",
-   "image": "747295a3"
+   "git": "58dc33c3",
+   "image": "58dc33c3"
   }
  },
  "onedoor_934__r3__medium": {
-  "valid": false,
-  "error": "not ready"
+  "valid": true,
+  "frames": 361,
+  "first_t": 0.0,
+  "last_t": 180.0,
+  "markers": 2,
+  "sha256": "ecc0133846af951b0c47aa8c50915741ae06f85bf66719ef4aecfb570eda4892",
+  "status_digest": "be7ce1d0205b420859ddc4963023566eeff4e71c43eea84604dae94dd4279574",
+  "validator": "59b89d673ac9d97c39f8e22869b391440f2ff555817b651138f7b50c0b620c9b",
+  "wall": {
+   "started": 1792965271.081338,
+   "first_frame_s": 14.5,
+   "total_s": 206.1
+  },
+  "engine": {
+   "git": "58dc33c3",
+   "image": "58dc33c3"
+  }
  }
 }
