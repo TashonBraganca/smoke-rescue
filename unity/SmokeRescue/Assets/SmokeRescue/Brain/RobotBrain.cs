@@ -655,7 +655,12 @@ namespace SmokeRescue.Brain
                 }
                 // An agent replacement above has already repaired the old blocked route. Test the new path before fallback.
                 bool fallback = path.Count == 0 || (blocked && (!c.motion_keep_agent_route || !planner.PathSafe(path, cursor)));
-                if (fallback && c.room_memory && NextRoom(t, out var roomRoute))
+                if (fallback && EnterFirst(t, out var inRoute))
+                {
+                    SetPath(inRoute, false); scanSince = double.NaN; noFrontierAt = double.NaN; lastPlan = t;
+                    Emit(t, "goal", "Enter first: walk straight in along the launch line through the door, before any other goal.", "x_m", goal.Value.x, "y_m", goal.Value.y);
+                }
+                else if (fallback && c.room_memory && NextRoom(t, out var roomRoute))
                 {
                     // room_memory: walk to the centre of the next remembered room on the tour; the room this robot stands in is
                     // finished first (NextRoom returns false while it is), and the room it chose is kept (RoomMemory.cs).
@@ -2794,7 +2799,45 @@ namespace SmokeRescue.Brain
             }
             return false;
         }
-        public bool InSearchArea(Vector2 p) => InSearchAreaOwn(p) || (c.room_ledger && c.room_indoor_promotion && planner.Rooms.Promoted(p));
+        public bool InSearchArea(Vector2 p) => !BehindEntryDoor(p) && (InSearchAreaOwn(p) || (c.room_ledger && c.room_indoor_promotion && planner.Rooms.Promoted(p)));
+        /// <summary>entry_keep_out (owner, 26 Oct): floor short of the line just past the door the robots launch at is never search
+        /// floor. The launch convention puts the door entry_door_ahead_m ahead of the gate origin (robot A's pad) on the launch
+        /// heading, the same for every house; nothing about the building beyond that is used. Family ranch 12:22 (Codex report):
+        /// eaves read as ceiling, so robot B took the yard along the front wall for indoor floor and never went in.</summary>
+        bool BehindEntryDoor(Vector2 p) => c.entry_keep_out && Vector2.Dot(p, GateForward) < c.entry_door_ahead_m + c.entry_keep_out_margin_m;
+        Vector2 GateForward => new Vector2(-Mathf.Sin(entryYaw), Mathf.Cos(entryYaw));
+        bool enteredFirst;
+        /// <summary>enter_first (owner, 26 Oct: "when the robot starts it has to go straight forward inside"): before any other
+        /// goal, walk along the launch line through the door to enter_first_past_door_m beyond it. The deepest point on the
+        /// line that the planner reaches is the target; done there, or past it, or after enter_first_max_s.</summary>
+        bool EnterFirst(double t, out List<Vector2> route)
+        {
+            route = null;
+            if (!c.enter_first || enteredFirst || returning) return false;
+            var fwd = GateForward; var side = new Vector2(fwd.y, -fwd.x); var at = motion.Pose.position;
+            float inside = c.entry_door_ahead_m + c.entry_keep_out_margin_m + c.robot_radius_m, depth = c.entry_door_ahead_m + c.enter_first_past_door_m;
+            float progress = Vector2.Dot(at, fwd);
+            if (progress >= depth || t >= c.enter_first_max_s)
+            {
+                enteredFirst = true;
+                Emit(t, "enter_first_done", progress >= depth ? "Walked straight in through the door ahead of the launch pad: search from here."
+                    : "Could not walk straight in within the time allowed: search from here.", "progress_m", progress, "depth_m", depth);
+                return false;
+            }
+            float lateral = Vector2.Dot(home, side), step = Mathf.Max(c.cell_m * 2, .2f);
+            for (float d = depth; d >= inside - 1e-3f; d -= step)
+            {
+                var target = side * lateral + fwd * d;
+                if (d <= progress + c.goal_tolerance_m)
+                {
+                    if (progress >= inside) { enteredFirst = true; Emit(t, "enter_first_done", "Inside past the door and no deeper point on the launch line is reachable: search from here.", "progress_m", progress, "depth_m", d); }
+                    return false;
+                }
+                var r = planner.Plan(at, target);
+                if (r.Count > 0) { route = r; return true; }
+            }
+            return false;
+        }
         bool InSearchAreaOwn(Vector2 p) => !c.search_requires_ceiling || grid.Indoors(p);
         /// <summary>Seconds until the robot's operating limit (mission_time_limit_s), for the agent.</summary>
         public double MissionTimeLeft(double t) => Math.Max(0, c.mission_time_limit_s - t);
