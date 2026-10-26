@@ -24,6 +24,45 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(e.t, Is.GreaterThanOrEqualTo(2.95), "stamped with the brain's clock (3.0 s), not 0.0");
         }
 
+        [Test]
+        public void TheRobotWalksStraightInThroughTheDoorAndNeverCountsTheYardAsSearchFloor()
+        {
+            // enter_first and entry_keep_out (owner, 26 Oct). Family ranch 12:22 (Codex report): eaves read as ceiling, so robot B
+            // took the yard along the front wall for indoor floor and spent 600 s outside. Here every free cell counts as indoors
+            // (no ceiling test), the door is 1.2 m ahead of the pad and a wide yard lies either side of it. With both switches the
+            // first goal is straight ahead past the door and no yard point is search floor. Control: off, the yard is search floor
+            // and no enter-first goal is chosen.
+            List<BrainEvent> Run(bool on, out RobotBrain b)
+            {
+                var c = Settings(); c.grid_size_m = 16; c.search_requires_ceiling = false; c.robot_radius_m = .25f;
+                c.enter_first = on; c.entry_keep_out = on;
+                b = new RobotBrain(Calibration(), c, "A", 0, new EntryPose(0, 0, 0)); var g = Map(b);
+                var searched = (bool[])typeof(OccupancyGrid).GetField("observed", NP).GetValue(g);
+                for (int i = 0; i < g.Count; i++)
+                {
+                    var q = g.Centre(i);
+                    bool wall = q.y >= 1.1f && q.y <= 1.35f && Mathf.Abs(q.x) <= 6;
+                    if (wall && Mathf.Abs(q.x) > .45f) g.ObserveOccupied(i);
+                    else if (q.y > 1.35f && q.y <= 6 && Mathf.Abs(q.x) <= 3) { g.ObserveFree(i); searched[i] = true; }
+                    else if ((q.y >= -2 && q.y < 1.1f && Mathf.Abs(q.x) <= 6) || wall) g.ObserveFree(i);
+                }
+                var events = new List<BrainEvent>();
+                for (int i = 0; i <= 60; i++) { DriveTick(b, i); events.AddRange(b.DrainEvents()); }
+                return events;
+            }
+            var onEvents = Run(true, out var bOn);
+            var firstGoal = onEvents.First(e => e.kind == "goal" && e.numbers.ContainsKey("y_m"));
+            Assert.That(firstGoal.reason, Does.StartWith("Enter first"), "the first goal is the walk in");
+            Assert.That(firstGoal.numbers["y_m"], Is.GreaterThan(2.4).And.LessThan(2.9), "1.5 m past the door line at 1.2 m");
+            Assert.That(Mathf.Abs((float)firstGoal.numbers["x_m"]), Is.LessThan(.2f), "straight ahead of the pad");
+            Assert.That(onEvents.Where(e => e.kind == "goal" && e.numbers.ContainsKey("y_m")).All(e => e.numbers["y_m"] >= 1.5), "no goal short of the door");
+            Assert.That(bOn.InSearchArea(new Vector2(4, 0)), Is.False, "the yard beside the door is never search floor");
+            Assert.That(bOn.InSearchArea(new Vector2(0, 3)), Is.True, "floor past the door is");
+            var offEvents = Run(false, out var bOff);
+            Assert.That(bOff.InSearchArea(new Vector2(4, 0)), Is.True, "control: without the keep-out the yard counts");
+            Assert.That(offEvents.Any(e => e.reason != null && e.reason.StartsWith("Enter first")), Is.False);
+        }
+
         const System.Reflection.BindingFlags NP = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
 
         [Test]

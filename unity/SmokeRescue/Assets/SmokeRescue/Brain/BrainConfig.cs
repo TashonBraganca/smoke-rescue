@@ -47,6 +47,7 @@ namespace SmokeRescue.Brain
         public float person_rgb_single_confirm = 0f;   // see config/brain.json
         public bool code_spray_spot_inside = false; public int code_spray_max_approaches = 0;   // see config/brain.json
         public bool end_return_breadcrumbs = false; public float breadcrumb_spacing_m = .5f, breadcrumb_join_m = 1.5f;   // see config/brain.json
+        public bool enter_first = false, entry_keep_out = false; public float entry_door_ahead_m = 1.2f, entry_keep_out_margin_m = .3f, enter_first_past_door_m = 1.5f, enter_first_max_s = 60f;   // see config/brain.json
         public float person_rgb_strong_confidence = 1.01f, person_glance_min_confidence = .25f, person_glance_s = 2f, person_glance_repeat_s = 15f,
             person_rgb_boost_period_s = .2f;
         public bool rgb_person_confirms = false, partner_rooms = false, no_frontier_scan_once = false, follow_through_before_leftovers = false, frontier_beyond_room = false, room_progress_dwell = false, code_sprays_fire = false, code_spray_goal_room = false, heat_marks_room = false, heat_spray_through = false, thermal_dwell_confirms = true, outside_faces_in = false, leave_when_done = false, leave_waits_for_team = false, person_before_spray = false, room_memory_same_space = false, walk_out_past_fire = false, partner_territory = false, room_walk_in_any_coverage = false, door_tour = false, room_entered_near_seat = false, room_memory = false;
