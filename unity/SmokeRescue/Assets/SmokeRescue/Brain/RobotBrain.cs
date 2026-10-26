@@ -1219,6 +1219,7 @@ namespace SmokeRescue.Brain
         readonly List<BlockedGoal> blockedGoals = new List<BlockedGoal>();
         double stalledFor, recoverySince;
         int recoveryPhase, recoveryTurnSign;
+        bool recoveryFlipped; Vector2? failedTurnAt; int failedTurnSign;   // recovery_turn_flip
         BrainPose contactPose;
         float recoveryYaw;
         Vector2? recoveryGoal;
@@ -1429,6 +1430,10 @@ namespace SmokeRescue.Brain
             contactPose = motion.Pose; recoveryGoal = target; recoveryFrontier = frontierGoal;
             ObstacleAhead(c.near_cone_deg, out float side);
             recoveryTurnSign = Mathf.Abs(side) < 1e-5f ? scanSign : side > 0 ? -1 : 1;
+            recoveryFlipped = false;
+            // recovery_turn_flip: a turn that did not rotate the body here before starts the other way this time.
+            if (c.recovery_turn_flip && failedTurnAt.HasValue && Vector2.Distance(failedTurnAt.Value, motion.Pose.position) <= c.stuck_repeat_radius_m)
+                recoveryTurnSign = -failedTurnSign;
             stuckPlaces.RemoveAll(p => t - p.lastAt >= c.stuck_blacklist_s);
             var place = stuckPlaces.Find(p => Vector2.Distance(p.position, contactPose.position) <= c.stuck_repeat_radius_m);
             if (place == null) { place = new StuckPlace { position = contactPose.position }; stuckPlaces.Add(place); }
@@ -1474,6 +1479,16 @@ namespace SmokeRescue.Brain
                 return Command(0, 0, dt, true);
             }
             float turned = recoveryTurnSign * Mathf.DeltaAngle(recoveryYaw * Mathf.Rad2Deg, motion.Pose.yawRad * Mathf.Rad2Deg);
+            // recovery_turn_flip (Codex return diagnosis, 27 Oct, Corner house r2): wedged against a low box, robot A turned the same
+            // way in nine recoveries and never rotated; the other way was clear. A turn that has not rotated the body after half its
+            // time flips once, and the place is remembered so the next recovery there starts the other way.
+            if (c.recovery_turn_flip && !recoveryFlipped && t - recoverySince >= c.stuck_turn_timeout_s * .5f && Mathf.Abs(turned) < c.recovery_turn_min_deg)
+            {
+                failedTurnAt = motion.Pose.position; failedTurnSign = recoveryTurnSign;
+                recoveryTurnSign = -recoveryTurnSign; recoveryFlipped = true; recoverySince = t; recoveryYaw = motion.Pose.yawRad;
+                Emit(t, "recovery_turn_flip", "The recovery turn did not rotate the body: turn the other way.", "x_m", motion.Pose.position.x, "y_m", motion.Pose.position.y);
+                return Command(0, 0, dt, true);
+            }
             if (turned < c.stuck_turn_deg && t - recoverySince < c.stuck_turn_timeout_s)
             {
                 float yaw = Mathf.Min(c.scan_yaw_dps, (c.stuck_turn_deg - turned) / dt);

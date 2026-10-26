@@ -60,6 +60,24 @@ namespace SmokeRescue.Tests.EditMode
    Assert.That(tried&&b.Snapshot().state=="complete",Is.False,"A failed step-aside plan must remain pending so later mapping can permit a retry.");
   }
 
+  // recovery_turn_flip (Codex return diagnosis, 27 Oct): a recovery turn that does not rotate the body flips direction.
+  [Test] public void ARecoveryTurnThatDoesNotRotateFlipsDirection()
+  {
+   float Sign(bool on)
+   {
+    var c=Settings(); c.grid_size_m=12; c.recovery_turn_flip=on; c.recovery_turn_min_deg=3; c.stuck_turn_timeout_s=2; c.stuck_turn_deg=45;
+    var b=new RobotBrain(Calibration(),c,"A",0); Room(b,-4,4,-4,4);
+    for(int i=0;i<=10;i++) DriveTick(b,i);
+    var f=BindingFlags.Instance|BindingFlags.NonPublic;
+    typeof(RobotBrain).GetField("recoveryPhase",f).SetValue(b,2); typeof(RobotBrain).GetField("recoveryTurnSign",f).SetValue(b,1);
+    typeof(RobotBrain).GetField("recoverySince",f).SetValue(b,0.55); typeof(RobotBrain).GetField("recoveryYaw",f).SetValue(b,0f);
+    float last=0;
+    for(int i=11;i<=40;i++){ var cmd=DriveTick(b,i); if(Mathf.Abs(cmd.yawRateDeg)>0.01f) last=Mathf.Sign(cmd.yawRateDeg); }
+    return last;
+   }
+   Assert.That(Sign(true),Is.EqualTo(-1f),"the body never rotated, so the turn flips");
+   Assert.That(Sign(false),Is.EqualTo(1f),"control: without the switch it keeps turning the same way");
+  }
  }
 }
 
