@@ -2137,6 +2137,9 @@ namespace SmokeRescue.Tests.EditMode
             // person_rgb_single_confirm (26 Oct, three-bed ranch live: a one-frame ghost at 0.545 was confirmed 5.5 m from anyone).
             Assert.That(Confirmed(true, -.2f, .55f, false), Is.Zero, "one weak frame alone does not confirm");
             Assert.That(Confirmed(true, -.2f, .75f, false), Is.EqualTo(1), "one strong frame confirms");
+            // person_confirm_max_range_m 4.5 (26 Oct): 3 of 15 confirmations at 4.5 to 5.1 m were 2.4 to 2.8 m off.
+            var cfg = BrainConfig.Load();
+            Assert.That(cfg.person_confirm_max_range_m, Is.LessThanOrEqualTo(4.5f), "shipped confirmation range");
         }
 
         [Test]
