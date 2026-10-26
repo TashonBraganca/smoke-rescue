@@ -40,7 +40,7 @@ namespace SmokeRescue.Brain
         readonly List<Vector2> survivors = new List<Vector2>();
         float entryYaw;   // the launch heading: robots are placed facing the way in
         double leaveRetryAt = double.NegativeInfinity, wayOutBlockedAt = double.NegativeInfinity;   // walk_out_past_fire
-        Vector2? clearWayGoal; bool clearWayTried;   // end_clear_way_out_m: where a finished robot stands clear of the way in
+        Vector2? clearWayGoal; bool clearWayTried; int clearWayAttempts; double clearWayRetryAt = double.NegativeInfinity;   // end_clear_way_out_m: where a finished robot stands clear of the way in
         List<Vector2> path = new List<Vector2>();
         Track active;
         Vector2? goal;
@@ -235,12 +235,26 @@ namespace SmokeRescue.Brain
                 if (EndReturn && !clearWayTried && toExit <= Mathf.Max(c.goal_tolerance_m, c.return_arrive_m) && c.end_clear_way_out_m > 0)
                 {
                     // At the pad, which can stand in the way in: walk clear of it before finishing (end_clear_way_out_m).
-                    clearWayTried = true; var route = ClearOfWayIn(out var spot);
+                    if (t < clearWayRetryAt) return Command(0, scanSign * c.scan_yaw_dps, dt, true);
+                    var route = ClearOfWayIn(out var spot); clearWayAttempts++;
                     if (route.Count > 0)
                     {
-                        clearWayGoal = spot; SetPath(route); lastPlan = t; toExit = Vector2.Distance(motion.Pose.position, spot);
+                        clearWayTried = true; clearWayGoal = spot; SetPath(route); lastPlan = t; toExit = Vector2.Distance(motion.Pose.position, spot);
                         Emit(t, "clear_way_in", "At the start pad, which can stand in the way in: step out and aside so the partner can still walk out.",
                             "x_m", spot.x, "y_m", spot.y, "route_points", route.Count);
+                    }
+                    else if (clearWayAttempts < 10)
+                    {
+                        // No mapped spot aside yet (Codex deep-bug report DB02: one failed try used to finish the mission on the
+                        // pad, which can be in the partner's way): turn in place to map the sides and try again in 1 s.
+                        clearWayRetryAt = t + 1;
+                        if (clearWayAttempts == 1) Emit(t, "clear_way_retry", "No mapped spot aside from the pad yet: turn to map the sides and try again.");
+                        return Command(0, scanSign * c.scan_yaw_dps, dt, true);
+                    }
+                    else
+                    {
+                        clearWayTried = true;
+                        Emit(t, "clear_way_failed", "No spot aside from the pad after 10 tries: finish here; the partner may need to pass this body.", "attempts", clearWayAttempts);
                     }
                 }
                 bool clearing = !float.IsNaN(carryClearFrom.x);
@@ -299,7 +313,9 @@ namespace SmokeRescue.Brain
                 {
                     var fresh = PlanOut(); lastPlan = t;
                     // A margin that shuts for a moment does not stop an emergency exit: keep the route while nothing on it burns.
-                    if (!(fresh.Count == 0 && path.Count > 0 && (EmergencyRoute ? EmergencyPathOk(path, cursor) : trailRoute && TrailPathOk(path, cursor) && !TrailExpired(t)))) SetPath(fresh);
+                    bool trailHolds = trailRoute && !TrailExpired(t) && TrailPathOk(path, cursor);
+                    if (trailRoute && !trailHolds && t >= trailRetryAt) trailRetryAt = t + 2;   // a broken trail is not rebuilt at once
+                    if (!(fresh.Count == 0 && path.Count > 0 && (EmergencyRoute ? EmergencyPathOk(path, cursor) : trailHolds))) SetPath(fresh);
                     if (path.Count == 0 && returnReason == EmergencyExit && grid.FireClearance > c.emergency_fire_clearance_m)
                     {
                         // The exit route at normal clearance was cut on the way out (2x2 attempt 5: robot A held still with its
@@ -377,6 +393,9 @@ namespace SmokeRescue.Brain
                         // end_return_breadcrumbs (owner, 26 Oct): no planned route home, so walk back over the floor this body
                         // already walked in on, minus any cell now on fire.
                         var crumbs = BreadcrumbRoute();
+                        // The whole filled-in trail must clear fire, not only its sparse points (Codex deep-bug report DB01: fire
+                        // between two points made a trail that was installed, rejected and reinstalled 40 times in 2 s).
+                        if (crumbs.Count > 0 && !TrailPathOk(crumbs, 0)) { crumbs.Clear(); trailRetryAt = t + 2; }
                         if (crumbs.Count > 0)
                         {
                             SetPath(crumbs, false); trailRoute = true; trailUntil = t + PathLength(crumbs) / c.near_speed_mps * 3 + 20; lastPlan = t;
@@ -1245,7 +1264,8 @@ namespace SmokeRescue.Brain
                 int n = Mathf.Max(1, Mathf.CeilToInt(Vector2.Distance(route[i - 1], route[i]) / grid.CellM));
                 for (int s2 = 1; s2 <= n; s2++) dense.Add(Vector2.Lerp(route[i - 1], route[i], s2 / (float)n));
             }
-            return dense;
+            // Fire between two sparse points breaks the trail too (Codex deep-bug report DB01).
+            return TrailPathOk(dense, 0) ? dense : new List<Vector2>();
         }
         void NoteBodyTrack()
         {

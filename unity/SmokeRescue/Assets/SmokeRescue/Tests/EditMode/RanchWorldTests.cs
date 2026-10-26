@@ -20,7 +20,7 @@ namespace SmokeRescue.Tests.EditMode
                 Assert.AreEqual(5, scenario.survivors.Select(s => s.room).Distinct().Count());
                 Assert.IsTrue(scenario.survivors.All(s => plan.FindRoom(s.room) != null));
                 Assert.AreEqual(600f, scenario.duration_s);
-                Assert.AreEqual(480f, scenario.search_s);
+                Assert.AreEqual(330f, scenario.search_s);   // owner, 26 Oct: ranch search deadline 330 s (scenario search_s_reason)
                 Assert.IsTrue(scenario.time_limit);
                 Assert.AreEqual($"fire_{name}.json", scenario.fire.config_file);
                 Assert.DoesNotThrow(() => FireSim.Load(plan, scenario.fire.ConfigPath, scenario.seed));

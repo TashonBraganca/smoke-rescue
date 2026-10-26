@@ -5,8 +5,8 @@
   "duration_s": 600,
   "duration_s_reason": "Owner, 25 Oct 03:00: demo videos end with the house searched and both robots walked out; the recording stops when both are out (one second after both finish) or at 600 s.",
   "time_limit": true,
-  "search_s": 480,
-  "search_s_reason": "Owner, 25 Oct 03:00: every demo video ends with both robots out. With the search deadline at 480 s, return_home_at_end starts each robot's walk out in time to be out by then; leave_when_done takes them out sooner if nothing is left to search.",
+  "search_s": 330,
+  "search_s_reason": "Owner, 26 Oct: 4 of 5 people found is acceptable; both robots walking out is not optional. Headless long ranch with the beds moved found all five by 183 s; 330 s leaves margin and halves the take.",
   "search_area": [
     0,
     0,
