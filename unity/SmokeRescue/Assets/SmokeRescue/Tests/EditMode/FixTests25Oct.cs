@@ -63,6 +63,29 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(offEvents.Any(e => e.reason != null && e.reason.StartsWith("Enter first")), Is.False);
         }
 
+        [Test]
+        public void AColourCandidateBesideProvenFloorIsInspected()
+        {
+            // rgb_candidate_near_search (26 Oct 16:41 take, seed 934): a YOLO person against a wall sits on a cell her body hides,
+            // never proven floor, so the candidate was skipped. Here the front keep-out line (y < 1.5) stands in for unproven
+            // floor: a colour sighting 0.25 m short of it is inspected; control: off, it is skipped as before.
+            bool Inspects(bool on)
+            {
+                var c = Settings(); c.grid_size_m = 12; c.search_requires_ceiling = false; c.entry_keep_out = true; c.rgb_candidate_near_search = on;
+                c.person_rgb_sightings = 1; c.person_rgb_strong_confidence = .6f; c.person_glance = false;
+                var b = new RobotBrain(Calibration(), c, "A", 0, new EntryPose(0, 0, 0)); Room(b, -4, 4, -2, 6);
+                for (int i = 0; i <= 10; i++) DriveTick(b, i);
+                b.DrainEvents();
+                float r = 1.25f - Calibration().camera.mount.forward_offset_m;
+                b.OnPersonSighting(.55, 0, r, .9f);
+                var all = new List<BrainEvent>();
+                for (int i = 11; i <= 40; i++) { DriveTick(b, i); all.AddRange(b.DrainEvents()); }
+                return all.Any(e => e.kind == "goal" && e.reason.StartsWith("Inspect the nearest recent survivor candidate"));
+            }
+            Assert.That(Inspects(true), Is.True, "with proven floor 0.25 m away the colour candidate is inspected");
+            Assert.That(Inspects(false), Is.False, "control: the single-cell rule skips it");
+        }
+
         const System.Reflection.BindingFlags NP = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
 
         [Test]

@@ -468,8 +468,13 @@ namespace SmokeRescue.Brain
                     if (!track.rgb && c.thermal_near_person_m > 0 && survivors.Exists(s => Vector2.Distance(s, track.position) <= c.thermal_near_person_m)) continue;
                     if (PartnerTakesCandidate(track.position, t)) continue;
                     if (AgentOrderHolds(t, track)) continue;
-                    // A warm shape outside the ceilinged floor is beyond a window or door: not a person inside.
-                    if (!InSearchArea(track.position)) continue;
+                    // A warm shape outside the ceilinged floor is beyond a window or door: not a person inside. A colour person
+                    // lies on her own floor cell, which her body hides from the camera, so that one cell is never proven floor
+                    // when she lies against a wall or on furniture; proven floor within survivor_merge_m of her is enough
+                    // (rgb_candidate_near_search). Seed 934 (26 Oct 16:41 take): robot B's YOLO candidate for the living-room
+                    // person at 26 s (0.79, 5.9 m, 0.27 m from her) sat on an unproven cell with proven floor around it and
+                    // was skipped for 150 s; past person_confirm_max_range_m nothing else could confirm her.
+                    if (track.rgb && c.rgb_candidate_near_search ? !NearSearchArea(track.position, c.survivor_merge_m) : !InSearchArea(track.position)) continue;
                     float range = Vector2.Distance(track.position, motion.Pose.position);
                     if (range < best) { best = range; active = track; }
                 }
@@ -2829,6 +2834,18 @@ namespace SmokeRescue.Brain
                 int n = roomRetries.TryGetValue(room.id, out int k) ? k : 0; if (n >= 2) continue;
                 roomRetries[room.id] = n + 1; retry = f; return true;
             }
+            return false;
+        }
+        /// <summary>Some search floor lies within radius of p (cell centres on the map grid).</summary>
+        bool NearSearchArea(Vector2 p, float radius)
+        {
+            int n = Mathf.CeilToInt(radius / grid.CellM);
+            for (int dx = -n; dx <= n; dx++)
+                for (int dy = -n; dy <= n; dy++)
+                {
+                    var q = p + new Vector2(dx, dy) * grid.CellM;
+                    if (Vector2.Distance(p, q) <= radius && grid.Cell(q) >= 0 && InSearchArea(q)) return true;
+                }
             return false;
         }
         public bool InSearchArea(Vector2 p) => !BehindEntryDoor(p) && (InSearchAreaOwn(p) || (c.room_ledger && c.room_indoor_promotion && planner.Rooms.Promoted(p)));

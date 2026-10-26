@@ -236,11 +236,11 @@
     "blue_double_bed": {
       "material": "upholstery",
       "size_m": [
-        2.0,
-        2.3
+        1.5,
+        2.05
       ],
       "justification": "Estimated local footprint; no mesh bounds are read. Fuel density and ignition follow upholstery.",
-      "size_m_reason": "Conservative envelope of measured mesh and baseline fuel bounds in tools/random_layout_assets.json."
+      "size_m_reason": "Measured mesh bounds of models/GothicBed_01.glb (tools/random_layout_assets.json: 1.494 x 2.040 m), rounded up to 0.05 m. Owner, 26 Oct: the earlier 2.0 x 2.3 m estimate made the bed span a 3 m deep bedroom in the validator and the headless world, hiding s6 (long ranch 4/5)."
     },
     "tall_wardrobe": {
       "material": "furniture_wood",
