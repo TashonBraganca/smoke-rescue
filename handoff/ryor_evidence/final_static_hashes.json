@@ -1,0 +1,43 @@
+{
+ "index.html": {
+  "sha256": "7af9ceb84ef705ed010d663fe77cd717bbae8a7d6a7e052f9805e4b8747abb2a",
+  "bytes": 14146,
+  "matches_local": true
+ },
+ "rescue.js": {
+  "sha256": "18bb38c0a65c90ea3f8a59bf524fa4f020dc3cf0a70b4f82c570416025d66f0c",
+  "bytes": 68414,
+  "matches_local": true
+ },
+ "rescue.css": {
+  "sha256": "c17ea09f15951c1b9e67504e982b38aef56267863aa5f537754e35480dae877f",
+  "bytes": 20987,
+  "matches_local": true
+ },
+ "rescue3d.js": {
+  "sha256": "2e844af1afac3f10bbc2f88a7e19f2702b70cd408e0782900c7d9ebf32c307bd",
+  "bytes": 20196,
+  "matches_local": true
+ },
+ "gallery_names": {
+  "family_ranch": "Three-bed ranch",
+  "long_ranch": "L-shaped ranch"
+ },
+ "health": {
+  "ok": true,
+  "running": 0,
+  "cap": 2,
+  "cache_setups": 243,
+  "engine": "004e0c5f",
+  "cache_expected": 243,
+  "enabled": true,
+  "ip_limit_per_hour": 6,
+  "daily_cap": 150,
+  "hard_limit_s": 600,
+  "terra_steps_per_mission": 20,
+  "terra_steps_per_utc_day": 100,
+  "pair_vcpu": 2,
+  "trio_vcpu": 4
+ },
+ "mission_tasks": []
+}
