@@ -2347,12 +2347,32 @@ namespace SmokeRescue.Tests.EditMode
                 var events = new List<BrainEvent>(); int points = 0;
                 for (int i = 0; i <= 20 * 25; i++) { DriveTick(b, i); events.AddRange(b.DrainEvents()); points = Math.Max(points, b.Snapshot().path.Length); }
                 viaTrail = events.Any(e => e.kind == "return_via_trail");
+                if (crumbs) Assert.That(events.Count(e => e.kind == "return_via_trail"), Is.LessThanOrEqualTo(2), "the trail is kept, not rebuilt every tick (Codex, 26 Oct: 5000+ rebuilds)");
                 return points;
             }
             Assert.That(Points(true, out bool via), Is.GreaterThan(0), "walks out along its trail");
             Assert.That(via, Is.True, "return_via_trail is logged");
             Assert.That(Points(false, out bool viaOff), Is.Zero, "control: no route without the fallback");
             Assert.That(viaOff, Is.False);
+        }
+
+        [Test]
+        public void AReturningRobotWithAYieldBacksAwayFromItsPartner()
+        {
+            // Codex three-robot report (26 Oct): YieldStep ran only below the return block, so a returning robot announced
+            // pinned_yield and never stepped aside. Control: the same brain not returning backs away too.
+            float Speed(bool returning)
+            {
+                var c = Settings(); c.grid_size_m = 12; c.search_requires_ceiling = false; c.pinned_yield_back_s = 3; c.pinned_yield_m = 2;
+                var b = new RobotBrain(Calibration(), c, "B", 0); Room(b, -4, 4, -4, 4);
+                for (int i = 0; i <= 20; i++) DriveTick(b, i);
+                if (returning) typeof(RobotBrain).GetMethod("BeginReturn", NP).Invoke(b, new object[] { 1.0, "Mission time is nearly up." });
+                typeof(RobotBrain).GetField("yieldFrom", NP).SetValue(b, (Vector2?)new Vector2(0, .5f));
+                typeof(RobotBrain).GetField("yieldUntil", NP).SetValue(b, 3.0);
+                return Mathf.Abs(DriveTick(b, 21).forwardMps);
+            }
+            Assert.That(Speed(false), Is.GreaterThan(0), "control: searching, it backs away");
+            Assert.That(Speed(true), Is.GreaterThan(0), "returning, it backs away too");
         }
 
         [Test]

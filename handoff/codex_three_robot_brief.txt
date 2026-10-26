@@ -1,0 +1,23 @@
+Brief: why do 3-robot missions make false confirmations and fail to return? (from opencv-a2, 26 Oct 16:20 IST)
+Report to handoff/codex_three_robot_report.txt. Plain text, no em dashes, no .md files. READ-ONLY on code and config:
+do not edit Brain code, config/, unity/ (a Unity recording runs), do not kill processes you did not start, no RunPod,
+no AWS, no git commits except your report. CPU is shared with a recording: run at most 2 headless sims at once, at
+whatever nice level the sandbox allows (nice 5 is fine), and only if replaying existing traces is not enough.
+
+Evidence: /Volumes/Tashon/opencv/smoke-rescue-ryor/handoff/codex_backend_report.txt and its backend_evidence/
+(rebuild_gate.json, failure_diagnostics.json). Failing 3-robot EASY runs at engine e4925125:
+- Three-bed ranch r3: 3 false confirmations (8 markers for 5 people), 2/3 returns.
+- Bungalow (hx_46bfe067cc) r3: 2 false confirmations, 1/3 returns.
+- Corner house (hx_cb9d3d6726) r3: 2/3 returns, robot B never entered.
+- L-shaped ranch r3 and one-door r3: 1/3 and 0/3 returns.
+2-robot runs of the same houses had 0 false confirmations.
+
+Answer, with file:line and trace times for each:
+1. Each false confirmation: which robot, time, position vs nearest true person, and the mechanism (duplicate of a
+   person already confirmed by another robot whose shared position differs? frame link error with the third robot?
+   single-frame detector hit?). Say whether the dedup radius or the shared-frame handling for robot C is the cause.
+2. Each robot that did not return: where it ended, the last return/plan events, and why (door blocked by a partner,
+   no route, return never started, time).
+3. Corner house robot B never entered: why (launch order, pad C, door blocked).
+4. For each cause, the smallest general fix (no house constants) and a test that would fail today. Do not implement.
+Lead with the causes, then evidence. Keep token use lean; if you hit a usage limit, write what you have first.

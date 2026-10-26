@@ -1,0 +1,32 @@
+Brief: headless A/B of enter_first + entry_keep_out (from opencv-a2, 26 Oct 2026 16:10 IST). Report to
+handoff/codex_enterfirst_ab_report.txt. Plain text, no em dashes, no .md files.
+
+Repo /Volumes/Tashon/opencv/smoke-rescue, branch overnight-25oct at 8ebf32b8. Read the project notes first.
+DO NOT touch unity/ (a Unity recording is running), do not edit Brain code or config/brain.json, do not kill
+any process you did not start, do not use RunPod, do not commit anything except your report and new files under
+data/runs/enterfirst_ab/ (git-ignored) and tools/bench/ if you add a script. Run every process at nice 10, at most
+6 in parallel. The disk has ~10 GB free: keep traces small, delete only files you created.
+
+What changed (commit 8ebf32b8): enter_first (walk straight along the launch line to 1.5 m past the door line
+before any other goal), entry_keep_out (floor short of door line + 0.3 m on the launch heading is never search
+floor), exit_watch_inside false. Settings override per run via the request "settings" object.
+
+Job:
+1. Build: tools/headless/run.sh builds; or the dotnet line inside it. Request format: see
+   data/runs/fix26oct/req_off.json (world, out, duration_s 600, time_limit true, fire true, robot_collision true,
+   capsule_walls true, settings {...}).
+2. Worlds: handoff/houses_evidence/world_family_ranch.json, handoff/houses_evidence/world_long_ranch_v2_final.json
+   (check which long ranch world matches config/scenario_long_ranch_full.json; compile fresh with
+   tools/headless_world.py config/scenario_<name>.json <out> if unsure, and say which you used),
+   data/runs/fix26oct/world_934.json, and 6 random houses data/runs/headless/world_5001..5006.json.
+3. Variants per world: NEW (repo config as is) and OLD (settings enter_first false, entry_keep_out false,
+   exit_watch_inside true). 9 worlds x 2 = 18 runs.
+4. Score each with tools/run_audit.py-equivalent for headless or tools/bench/score_bench.py score_run: people
+   found of total, false confirmations, rooms entered, seconds each robot spent outside, both robots out at the
+   end (yes/no), time of each robot's first indoor step, and for NEW the enter_first_done time and progress_m.
+   Check every run reached its end (600 s or both out); a crashed or short run is a failure to report, not to drop.
+5. Report: a table NEW vs OLD per world, then totals, paired differences, and a plain verdict. Flag any NEW run
+   where a robot got stuck at the door (enter_first_done after 30 s, or a goal short of the door line), any new
+   false confirmation, or any robot that never left at the end. Lead with problems. Sanity-check: NEW and OLD
+   must differ in trace bytes; if any pair is byte-identical, the setting did not apply: say so.
+Keep token use lean. If you hit a usage limit, write what is done and what is left into the report first.
