@@ -1,0 +1,27 @@
+{
+  "family_ranch": {
+    "identical_scene_across_robots": true,
+    "people": 5,
+    "room_count": 9
+  },
+  "long_ranch": {
+    "identical_scene_across_robots": true,
+    "people": 5,
+    "room_count": 12
+  },
+  "onedoor_934": {
+    "identical_scene_across_robots": true,
+    "people": 5,
+    "room_count": 30
+  },
+  "hx_035feb0125": {
+    "identical_scene_across_robots": true,
+    "people": 5,
+    "room_count": 6
+  },
+  "hx_cb9d3d6726": {
+    "identical_scene_across_robots": true,
+    "people": 5,
+    "room_count": 7
+  }
+}

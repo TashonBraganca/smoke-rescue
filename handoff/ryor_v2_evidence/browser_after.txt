@@ -1,0 +1,41 @@
+Opened family_ranch__r1__easy
+Opened family_ranch__r2__easy
+Opened family_ranch__r3__easy
+Opened long_ranch__r1__easy
+Opened long_ranch__r2__easy
+Opened long_ranch__r3__easy
+Opened onedoor_934__r1__easy
+Opened onedoor_934__r2__easy
+Opened onedoor_934__r3__easy
+Opened hx_035feb0125__r1__easy
+Opened hx_035feb0125__r2__easy
+Opened hx_035feb0125__r3__easy
+Opened hx_cb9d3d6726__r1__easy
+Opened hx_cb9d3d6726__r2__easy
+Opened hx_cb9d3d6726__r3__easy
+{
+  "browser": "156.0.8078.4",
+  "url": "http://host.docker.internal:8202/rescue/",
+  "firstFrameMs": 1619,
+  "middle": "Robot B finished a room search.",
+  "end": "RESCUE RESULT\n\nBoth robots are out.\n\n3 / 5\n\nPeople found\n\n2:56\n\nTime to exit\n\n4 / 9\n\nRooms searched\n\nThe same house with 1 robot\n\n2 / 5\n\nPeople found\n\n2:36\n\nTime to exit\n\n3 / 9\n\nRooms searched\n\nThe robot is out. Same people, fire and EASY setting.\n\nA room counts as searched when the robot maps cover at least 80% of its floor. Finding someone records their location for the crew.",
+  "setups": [
+    "family_ranch__r1__easy",
+    "family_ranch__r2__easy",
+    "family_ranch__r3__easy",
+    "long_ranch__r1__easy",
+    "long_ranch__r2__easy",
+    "long_ranch__r3__easy",
+    "onedoor_934__r1__easy",
+    "onedoor_934__r2__easy",
+    "onedoor_934__r3__easy",
+    "hx_035feb0125__r1__easy",
+    "hx_035feb0125__r2__easy",
+    "hx_035feb0125__r3__easy",
+    "hx_cb9d3d6726__r1__easy",
+    "hx_cb9d3d6726__r2__easy",
+    "hx_cb9d3d6726__r3__easy"
+  ],
+  "missionRequests": [],
+  "errors": []
+}

@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/Volumes/Tashon/opencv/smoke-rescue-ryor/tools/ryor/test_export_v2.py", line 3, in <module>
+    from export_v2 import room_grid
+ImportError: cannot import name 'room_grid' from 'export_v2' (/Volumes/Tashon/opencv/smoke-rescue-ryor/tools/ryor/export_v2.py)

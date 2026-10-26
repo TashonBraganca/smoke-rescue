@@ -1,0 +1,32 @@
+Codex brief v2: simplify and restyle "Run your own rescue" (owner, 26 Oct 10:15 IST). Due 26 Oct 16:00 IST.
+Work in /Volumes/Tashon/opencv/smoke-rescue-ryor (branch ryor-26oct) and /Volumes/Tashon/opencv/showcase/site-next.
+Commit and push ryor-26oct as before. Do not run deploy.sh (owner does). Do not touch /Volumes/Tashon/opencv/smoke-rescue.
+
+The owner rejected the current page: too many houses, confusing placement, slow, looks like a CAD tool, not like our site.
+New spec, exactly:
+1. FIVE houses only: Three-bed ranch, L-shaped ranch, One-door house (the 30-room main house), plus two real plans you pick
+   from the HouseExpo set that look clean and distinct (6 to 9 rooms), renamed plainly (e.g. "Bungalow", "Corner house") with
+   a one-line credit "floor plan from HouseExpo (MIT)" in small print. No dataset gallery, no filters, no 27 cards.
+2. The judge chooses ONLY a house and the number of robots (1, 2 or 3). Remove: difficulty selector (always the current
+   "hard" setting), place people and fire, coordinates, Prepare Scene, Random, Rearrange in 3D, Terra checkbox (Terra
+   decisions still appear if the run has them). People (4 or 5) and fire are pre-placed per house by the existing
+   generator, the same every time.
+3. Instant: precompute all 15 setups (5 houses x 1/2/3 robots, hard), validated as before. Start plays the recorded run at
+   once (default 4x). A live AWS run may be triggered quietly in the background but the viewer never waits for it.
+4. Look and feel: it must use the main site's design (site-next: same fonts, colours, spacing, header, components; read its
+   src/ and copy its styles, do not invent a new look). Replay presentation: the real robot model
+   (assets_cache/.../source.glb Spot, or the model site-next already uses; check showcase memory notes in
+   /Volumes/Tashon/opencv/showcase for which GLB renders correctly), furniture as simple shaded shapes, smoke haze and fire
+   glow (fire from the simulator), a camera that follows the robots (with a toggle to the full house), people as figures
+   that light up when found, both robots walking out at the end. Captions in plain English, written from the events
+   ("Robot B found someone in the bedroom", "Robot A sprayed the fire blocking the hall", "Both robots are out"), never raw
+   brain reasons. A short end card: people found, time, rooms searched, and for 2 or 3 robots the same house with 1 robot
+   for comparison.
+5. Integrate as a section/route in site-next linked from its nav ("Try it"), replacing the earlier wrapper; keep the film
+   and other sections intact; `npx next build` must pass.
+Verify: headless Chrome screenshots of the picker, a playing replay at the start, middle and end (people found, robots
+out) for one house with 2 robots, and phone width; console free of errors; time from click to first frame (target under
+2 s). Report in handoff/codex_ryor_v2_report.txt with screenshots paths. No em dashes in user-facing text.
+
+CORRECTION (owner, 26 Oct 10:20): the fixed difficulty is EASY, not hard. Precompute and play all 15 setups at the easy
+setting; no difficulty selector.

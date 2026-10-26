@@ -1,0 +1,1 @@
+PASS native navigation, keyboard selection, reduced motion, 320 px and 768 px, no console errors

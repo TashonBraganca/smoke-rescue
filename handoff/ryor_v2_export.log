@@ -1,0 +1,16 @@
+family_ranch__r1__easy {'people_found': 2, 'people_total': 5, 'time_s': 156.5, 'all_out': True, 'coverage_pct': 46.2, 'robots_out': 1, 'robots': 1, 'false_confirmations': 0, 'first_person_s': 27.216666666666665} 83209
+family_ranch__r2__easy {'people_found': 3, 'people_total': 5, 'time_s': 176.0, 'all_out': True, 'coverage_pct': 62.2, 'robots_out': 2, 'robots': 2, 'false_confirmations': 0, 'first_person_s': 33.21666666666667} 112936
+family_ranch__r3__easy {'people_found': 4, 'people_total': 5, 'time_s': 180.0, 'all_out': False, 'coverage_pct': 65.4, 'robots_out': 1, 'robots': 3, 'false_confirmations': 0, 'first_person_s': 21.0} 144457
+long_ranch__r1__easy {'people_found': 2, 'people_total': 5, 'time_s': 173.0, 'all_out': True, 'coverage_pct': 48.1, 'robots_out': 1, 'robots': 1, 'false_confirmations': 0, 'first_person_s': 32.0} 87367
+long_ranch__r2__easy {'people_found': 2, 'people_total': 5, 'time_s': 180.0, 'all_out': False, 'coverage_pct': 38.6, 'robots_out': 1, 'robots': 2, 'false_confirmations': 0, 'first_person_s': 59.0} 116167
+long_ranch__r3__easy {'people_found': 4, 'people_total': 5, 'time_s': 180.0, 'all_out': False, 'coverage_pct': 68.0, 'robots_out': 1, 'robots': 3, 'false_confirmations': 0, 'first_person_s': 14.0} 150147
+onedoor_934__r1__easy {'people_found': 1, 'people_total': 5, 'time_s': 162.0, 'all_out': True, 'coverage_pct': 13.0, 'robots_out': 1, 'robots': 1, 'false_confirmations': 0, 'first_person_s': 10.0} 98984
+onedoor_934__r2__easy {'people_found': 2, 'people_total': 5, 'time_s': 180.0, 'all_out': False, 'coverage_pct': 22.0, 'robots_out': 1, 'robots': 2, 'false_confirmations': 0, 'first_person_s': 18.0} 129856
+onedoor_934__r3__easy {'people_found': 4, 'people_total': 5, 'time_s': 180.0, 'all_out': False, 'coverage_pct': 29.3, 'robots_out': 0, 'robots': 3, 'false_confirmations': 0, 'first_person_s': 18.0} 162336
+hx_035feb0125__r1__easy {'people_found': 4, 'people_total': 5, 'time_s': 163.0, 'all_out': True, 'coverage_pct': 91.3, 'robots_out': 1, 'robots': 1, 'false_confirmations': 0, 'first_person_s': 0.0} 83485
+hx_035feb0125__r2__easy {'people_found': 5, 'people_total': 5, 'time_s': 180.0, 'all_out': False, 'coverage_pct': 96.6, 'robots_out': 1, 'robots': 2, 'false_confirmations': 0, 'first_person_s': 0.0} 113366
+hx_035feb0125__r3__easy {'people_found': 4, 'people_total': 5, 'time_s': 180.0, 'all_out': False, 'coverage_pct': 94.3, 'robots_out': 0, 'robots': 3, 'false_confirmations': 0, 'first_person_s': 0.0} 141745
+hx_cb9d3d6726__r1__easy {'people_found': 3, 'people_total': 5, 'time_s': 156.0, 'all_out': True, 'coverage_pct': 58.6, 'robots_out': 1, 'robots': 1, 'false_confirmations': 0, 'first_person_s': 18.0} 79938
+hx_cb9d3d6726__r2__easy {'people_found': 4, 'people_total': 5, 'time_s': 180.0, 'all_out': False, 'coverage_pct': 91.9, 'robots_out': 1, 'robots': 2, 'false_confirmations': 0, 'first_person_s': 21.0} 110315
+hx_cb9d3d6726__r3__easy {'people_found': 5, 'people_total': 5, 'time_s': 180.0, 'all_out': False, 'coverage_pct': 80.8, 'robots_out': 2, 'robots': 3, 'false_confirmations': 0, 'first_person_s': 15.0} 139284
+15/15 EASY recordings validated and exported

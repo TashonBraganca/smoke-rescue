@@ -1,0 +1,467 @@
+{
+  "family_ranch__r1__easy": {
+    "valid": true,
+    "frames": 361,
+    "first_t": 0.0,
+    "last_t": 180.0,
+    "score": {
+      "people_found": 2,
+      "people_total": 5,
+      "time_s": 156.5,
+      "all_out": true,
+      "coverage_pct": 46.2,
+      "robots_out": 1,
+      "robots": 1,
+      "false_confirmations": 0,
+      "first_person_s": 27.216666666666665
+    },
+    "rooms_searched": 3,
+    "settings": {
+      "head_start_s": 0,
+      "visibility_m": 6.0
+    },
+    "source": "s3://smoke-rescue-ryor-runs-968000946565/ryor/cache/family_ranch__r1__easy/",
+    "source_sha256": "31b97b9fcd355f54a79cca78365a16ec5d9f5011645c79eb49eb3daf78ff82e8",
+    "validator_sha256": "815794ab43c3a7e6a0f769228c053b4098b9fc463de07b34c62da68d7287a317",
+    "sha256": "7d9502474229268bf671cc1ef08cbc54451b0743e3f71016111ad5ab8bfd0a17",
+    "bytes": 83209,
+    "engine": {
+      "git": "58dc33c3",
+      "image": "58dc33c3"
+    }
+  },
+  "family_ranch__r2__easy": {
+    "valid": true,
+    "frames": 361,
+    "first_t": 0.0,
+    "last_t": 180.0,
+    "score": {
+      "people_found": 3,
+      "people_total": 5,
+      "time_s": 176.0,
+      "all_out": true,
+      "coverage_pct": 62.2,
+      "robots_out": 2,
+      "robots": 2,
+      "false_confirmations": 0,
+      "first_person_s": 33.21666666666667
+    },
+    "rooms_searched": 4,
+    "settings": {
+      "head_start_s": 0,
+      "visibility_m": 6.0
+    },
+    "source": "s3://smoke-rescue-ryor-runs-968000946565/ryor/cache/family_ranch__r2__easy/",
+    "source_sha256": "94a123a18286d7028ad3402a996575fc117e26ea8ffae7283e40d35dc0061356",
+    "validator_sha256": "815794ab43c3a7e6a0f769228c053b4098b9fc463de07b34c62da68d7287a317",
+    "sha256": "b7a5a77bd0624d44d42447d29c31d4a03aacdd0c15d0b5997ee47753e2306ade",
+    "bytes": 112936,
+    "engine": {
+      "git": "58dc33c3",
+      "image": "58dc33c3"
+    }
+  },
+  "family_ranch__r3__easy": {
+    "valid": true,
+    "frames": 361,
+    "first_t": 0.0,
+    "last_t": 180.0,
+    "score": {
+      "people_found": 4,
+      "people_total": 5,
+      "time_s": 180.0,
+      "all_out": false,
+      "coverage_pct": 65.4,
+      "robots_out": 1,
+      "robots": 3,
+      "false_confirmations": 0,
+      "first_person_s": 21.0
+    },
+    "rooms_searched": 4,
+    "settings": {
+      "head_start_s": 0,
+      "visibility_m": 6.0
+    },
+    "source": "s3://smoke-rescue-ryor-runs-968000946565/ryor/cache/family_ranch__r3__easy/",
+    "source_sha256": "7928684630b123dcb7cdbadc80f4c205d6c2bd551cd6daf562f1ea9b3e4c1ff7",
+    "validator_sha256": "815794ab43c3a7e6a0f769228c053b4098b9fc463de07b34c62da68d7287a317",
+    "sha256": "0806e2f8c1cae46505f7f17ae7a63e950144fe452b1c1bd624e192b010d9a444",
+    "bytes": 144457,
+    "engine": {
+      "git": "58dc33c3",
+      "image": "58dc33c3"
+    }
+  },
+  "long_ranch__r1__easy": {
+    "valid": true,
+    "frames": 361,
+    "first_t": 0.0,
+    "last_t": 180.0,
+    "score": {
+      "people_found": 2,
+      "people_total": 5,
+      "time_s": 173.0,
+      "all_out": true,
+      "coverage_pct": 48.1,
+      "robots_out": 1,
+      "robots": 1,
+      "false_confirmations": 0,
+      "first_person_s": 32.0
+    },
+    "rooms_searched": 3,
+    "settings": {
+      "head_start_s": 0,
+      "visibility_m": 6.0
+    },
+    "source": "s3://smoke-rescue-ryor-runs-968000946565/ryor/cache/long_ranch__r1__easy/",
+    "source_sha256": "f83f8e343dc43428843ca857d110729a2f101281ff905a80ad184cfb26f7ffd2",
+    "validator_sha256": "815794ab43c3a7e6a0f769228c053b4098b9fc463de07b34c62da68d7287a317",
+    "sha256": "5d38e234ec526908dcf4b5db59a018ae9df6eefdbe43d471b00d21814472822c",
+    "bytes": 87367,
+    "engine": {
+      "git": "58dc33c3",
+      "image": "58dc33c3"
+    }
+  },
+  "long_ranch__r2__easy": {
+    "valid": true,
+    "frames": 361,
+    "first_t": 0.0,
+    "last_t": 180.0,
+    "score": {
+      "people_found": 2,
+      "people_total": 5,
+      "time_s": 180.0,
+      "all_out": false,
+      "coverage_pct": 38.6,
+      "robots_out": 1,
+      "robots": 2,
+      "false_confirmations": 0,
+      "first_person_s": 59.0
+    },
+    "rooms_searched": 2,
+    "settings": {
+      "head_start_s": 0,
+      "visibility_m": 6.0
+    },
+    "source": "s3://smoke-rescue-ryor-runs-968000946565/ryor/cache/long_ranch__r2__easy/",
+    "source_sha256": "6ebeb50b7115bb6360fbf94d3651f7d83be75497a22f8757cbdad882fd140c59",
+    "validator_sha256": "815794ab43c3a7e6a0f769228c053b4098b9fc463de07b34c62da68d7287a317",
+    "sha256": "1bf17393920f5cd46322e4db8356c9f9ba1c4a6c952320592110e963315776e2",
+    "bytes": 116167,
+    "engine": {
+      "git": "58dc33c3",
+      "image": "58dc33c3"
+    }
+  },
+  "long_ranch__r3__easy": {
+    "valid": true,
+    "frames": 361,
+    "first_t": 0.0,
+    "last_t": 180.0,
+    "score": {
+      "people_found": 4,
+      "people_total": 5,
+      "time_s": 180.0,
+      "all_out": false,
+      "coverage_pct": 68.0,
+      "robots_out": 1,
+      "robots": 3,
+      "false_confirmations": 0,
+      "first_person_s": 14.0
+    },
+    "rooms_searched": 6,
+    "settings": {
+      "head_start_s": 0,
+      "visibility_m": 6.0
+    },
+    "source": "s3://smoke-rescue-ryor-runs-968000946565/ryor/cache/long_ranch__r3__easy/",
+    "source_sha256": "100cb62b777266fee4879f2aa738ad37f002fede7fdf1bf1110f237d293e8bdd",
+    "validator_sha256": "815794ab43c3a7e6a0f769228c053b4098b9fc463de07b34c62da68d7287a317",
+    "sha256": "3de900363eaf205542f4e9f36976ae1e75752eff222dc8d2fc75233408eb4af9",
+    "bytes": 150147,
+    "engine": {
+      "git": "58dc33c3",
+      "image": "58dc33c3"
+    }
+  },
+  "onedoor_934__r1__easy": {
+    "valid": true,
+    "frames": 361,
+    "first_t": 0.0,
+    "last_t": 180.0,
+    "score": {
+      "people_found": 1,
+      "people_total": 5,
+      "time_s": 162.0,
+      "all_out": true,
+      "coverage_pct": 13.0,
+      "robots_out": 1,
+      "robots": 1,
+      "false_confirmations": 0,
+      "first_person_s": 10.0
+    },
+    "rooms_searched": 2,
+    "settings": {
+      "head_start_s": 0,
+      "visibility_m": 6.0
+    },
+    "source": "s3://smoke-rescue-ryor-runs-968000946565/ryor/cache/onedoor_934__r1__easy/",
+    "source_sha256": "1239e7cd02c935de0aba5a3647ec521e13a4cb135c5143dc7a41aa75f580f5d5",
+    "validator_sha256": "815794ab43c3a7e6a0f769228c053b4098b9fc463de07b34c62da68d7287a317",
+    "sha256": "d77c4b633d867127473c8a81b789585461a9cda1d7b7ee052c4dd8552dd5bda1",
+    "bytes": 98984,
+    "engine": {
+      "git": "58dc33c3",
+      "image": "58dc33c3"
+    }
+  },
+  "onedoor_934__r2__easy": {
+    "valid": true,
+    "frames": 361,
+    "first_t": 0.0,
+    "last_t": 180.0,
+    "score": {
+      "people_found": 2,
+      "people_total": 5,
+      "time_s": 180.0,
+      "all_out": false,
+      "coverage_pct": 22.0,
+      "robots_out": 1,
+      "robots": 2,
+      "false_confirmations": 0,
+      "first_person_s": 18.0
+    },
+    "rooms_searched": 4,
+    "settings": {
+      "head_start_s": 0,
+      "visibility_m": 6.0
+    },
+    "source": "s3://smoke-rescue-ryor-runs-968000946565/ryor/cache/onedoor_934__r2__easy/",
+    "source_sha256": "adac523f4b0022cf8ecaa86dda7e82d2cd29a476e0ca4b511f04354714a767de",
+    "validator_sha256": "815794ab43c3a7e6a0f769228c053b4098b9fc463de07b34c62da68d7287a317",
+    "sha256": "b4d5adcc09e923484c6a18dfe126cebe771880194a3d58ac16447e2f7f432134",
+    "bytes": 129856,
+    "engine": {
+      "git": "58dc33c3",
+      "image": "58dc33c3"
+    }
+  },
+  "onedoor_934__r3__easy": {
+    "valid": true,
+    "frames": 361,
+    "first_t": 0.0,
+    "last_t": 180.0,
+    "score": {
+      "people_found": 4,
+      "people_total": 5,
+      "time_s": 180.0,
+      "all_out": false,
+      "coverage_pct": 29.3,
+      "robots_out": 0,
+      "robots": 3,
+      "false_confirmations": 0,
+      "first_person_s": 18.0
+    },
+    "rooms_searched": 7,
+    "settings": {
+      "head_start_s": 0,
+      "visibility_m": 6.0
+    },
+    "source": "s3://smoke-rescue-ryor-runs-968000946565/ryor/cache/onedoor_934__r3__easy/",
+    "source_sha256": "8654af10d68eaa8581e3802c5bcc2eff8d276652bfe12fd2522681f33165b078",
+    "validator_sha256": "815794ab43c3a7e6a0f769228c053b4098b9fc463de07b34c62da68d7287a317",
+    "sha256": "d97199789ea04b94a6298ddc69625d1b699aa5899860c43250844ca1956d9cb0",
+    "bytes": 162336,
+    "engine": {
+      "git": "58dc33c3",
+      "image": "58dc33c3"
+    }
+  },
+  "hx_035feb0125__r1__easy": {
+    "valid": true,
+    "frames": 361,
+    "first_t": 0.0,
+    "last_t": 180.0,
+    "score": {
+      "people_found": 4,
+      "people_total": 5,
+      "time_s": 163.0,
+      "all_out": true,
+      "coverage_pct": 91.3,
+      "robots_out": 1,
+      "robots": 1,
+      "false_confirmations": 0,
+      "first_person_s": 0.0
+    },
+    "rooms_searched": 5,
+    "settings": {
+      "head_start_s": 0,
+      "visibility_m": 6.0
+    },
+    "source": "s3://smoke-rescue-ryor-runs-968000946565/ryor/cache/hx_035feb0125__r1__easy/",
+    "source_sha256": "d8ff32ce4935ebfd13260d9b14fbb8850f22b5396d502e1d17bd222fcb395532",
+    "validator_sha256": "815794ab43c3a7e6a0f769228c053b4098b9fc463de07b34c62da68d7287a317",
+    "sha256": "533145f87c9cd232925521ff963600e891e5ab412e50197d8731960f74a076a0",
+    "bytes": 83485,
+    "engine": {
+      "git": "58dc33c3",
+      "image": "58dc33c3"
+    }
+  },
+  "hx_035feb0125__r2__easy": {
+    "valid": true,
+    "frames": 361,
+    "first_t": 0.0,
+    "last_t": 180.0,
+    "score": {
+      "people_found": 5,
+      "people_total": 5,
+      "time_s": 180.0,
+      "all_out": false,
+      "coverage_pct": 96.6,
+      "robots_out": 1,
+      "robots": 2,
+      "false_confirmations": 0,
+      "first_person_s": 0.0
+    },
+    "rooms_searched": 6,
+    "settings": {
+      "head_start_s": 0,
+      "visibility_m": 6.0
+    },
+    "source": "s3://smoke-rescue-ryor-runs-968000946565/ryor/cache/hx_035feb0125__r2__easy/",
+    "source_sha256": "ae4c4725bd69152742463b254ef8b72785599bc471eba95c331ccbd4ec95e88d",
+    "validator_sha256": "815794ab43c3a7e6a0f769228c053b4098b9fc463de07b34c62da68d7287a317",
+    "sha256": "59fea2b1e15b2a295c6630f747bd5696f8b2492f464653de32066cb0762f02da",
+    "bytes": 113366,
+    "engine": {
+      "git": "58dc33c3",
+      "image": "58dc33c3"
+    }
+  },
+  "hx_035feb0125__r3__easy": {
+    "valid": true,
+    "frames": 361,
+    "first_t": 0.0,
+    "last_t": 180.0,
+    "score": {
+      "people_found": 4,
+      "people_total": 5,
+      "time_s": 180.0,
+      "all_out": false,
+      "coverage_pct": 94.3,
+      "robots_out": 0,
+      "robots": 3,
+      "false_confirmations": 0,
+      "first_person_s": 0.0
+    },
+    "rooms_searched": 5,
+    "settings": {
+      "head_start_s": 0,
+      "visibility_m": 6.0
+    },
+    "source": "s3://smoke-rescue-ryor-runs-968000946565/ryor/cache/hx_035feb0125__r3__easy/",
+    "source_sha256": "6c4d943e50f9a9be4d9edff19525b19e61ac86666812ff284580bc91e8b04075",
+    "validator_sha256": "815794ab43c3a7e6a0f769228c053b4098b9fc463de07b34c62da68d7287a317",
+    "sha256": "1ab90de3b2a97b5f4b8427c652d7f612887f8690afadc9bfad74f0770e5fe440",
+    "bytes": 141745,
+    "engine": {
+      "git": "58dc33c3",
+      "image": "58dc33c3"
+    }
+  },
+  "hx_cb9d3d6726__r1__easy": {
+    "valid": true,
+    "frames": 361,
+    "first_t": 0.0,
+    "last_t": 180.0,
+    "score": {
+      "people_found": 3,
+      "people_total": 5,
+      "time_s": 156.0,
+      "all_out": true,
+      "coverage_pct": 58.6,
+      "robots_out": 1,
+      "robots": 1,
+      "false_confirmations": 0,
+      "first_person_s": 18.0
+    },
+    "rooms_searched": 2,
+    "settings": {
+      "head_start_s": 0,
+      "visibility_m": 6.0
+    },
+    "source": "s3://smoke-rescue-ryor-runs-968000946565/ryor/cache/hx_cb9d3d6726__r1__easy/",
+    "source_sha256": "15e5cb3df092cfe1d603c237603e86ad2b0e9e1d272987d66171fdf6ba434e0b",
+    "validator_sha256": "815794ab43c3a7e6a0f769228c053b4098b9fc463de07b34c62da68d7287a317",
+    "sha256": "87051d4d6bff4565056cd8b9a901280d217b658b93531de90ee567bbd0c55076",
+    "bytes": 79938,
+    "engine": {
+      "git": "58dc33c3",
+      "image": "58dc33c3"
+    }
+  },
+  "hx_cb9d3d6726__r2__easy": {
+    "valid": true,
+    "frames": 361,
+    "first_t": 0.0,
+    "last_t": 180.0,
+    "score": {
+      "people_found": 4,
+      "people_total": 5,
+      "time_s": 180.0,
+      "all_out": false,
+      "coverage_pct": 91.9,
+      "robots_out": 1,
+      "robots": 2,
+      "false_confirmations": 0,
+      "first_person_s": 21.0
+    },
+    "rooms_searched": 6,
+    "settings": {
+      "head_start_s": 0,
+      "visibility_m": 6.0
+    },
+    "source": "s3://smoke-rescue-ryor-runs-968000946565/ryor/cache/hx_cb9d3d6726__r2__easy/",
+    "source_sha256": "56c94d0cb21a1313c0810102f7ccd03df6e0ec1bed95980516cf4d832058f23c",
+    "validator_sha256": "815794ab43c3a7e6a0f769228c053b4098b9fc463de07b34c62da68d7287a317",
+    "sha256": "dcfbbff2b5301f941c00be007e8ee0ffcbf42721a57f3a0a4967df129596d77e",
+    "bytes": 110315,
+    "engine": {
+      "git": "58dc33c3",
+      "image": "58dc33c3"
+    }
+  },
+  "hx_cb9d3d6726__r3__easy": {
+    "valid": true,
+    "frames": 361,
+    "first_t": 0.0,
+    "last_t": 180.0,
+    "score": {
+      "people_found": 5,
+      "people_total": 5,
+      "time_s": 180.0,
+      "all_out": false,
+      "coverage_pct": 80.8,
+      "robots_out": 2,
+      "robots": 3,
+      "false_confirmations": 0,
+      "first_person_s": 15.0
+    },
+    "rooms_searched": 6,
+    "settings": {
+      "head_start_s": 0,
+      "visibility_m": 6.0
+    },
+    "source": "s3://smoke-rescue-ryor-runs-968000946565/ryor/cache/hx_cb9d3d6726__r3__easy/",
+    "source_sha256": "517e51166dd4786e7b79a5b0ae3249fe6324a98242515c04e7620830df8efce1",
+    "validator_sha256": "815794ab43c3a7e6a0f769228c053b4098b9fc463de07b34c62da68d7287a317",
+    "sha256": "8647560c52bd81b5eb931fa049aa77421cc59335010b4e38b4661f5a45b3b604",
+    "bytes": 139284,
+    "engine": {
+      "git": "58dc33c3",
+      "image": "58dc33c3"
+    }
+  }
+}

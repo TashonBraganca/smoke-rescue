@@ -1,0 +1,5 @@
+page.waitForSelector: Timeout 15000ms exceeded.
+Call log:
+[2m  - waiting for locator('[data-house]') to be visible[22m
+
+    at /Volumes/Tashon/opencv/smoke-rescue-ryor/tools/ryor/browser_v2.cjs:16:16
