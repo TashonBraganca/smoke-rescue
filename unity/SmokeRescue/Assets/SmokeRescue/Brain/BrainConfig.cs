@@ -44,6 +44,7 @@ namespace SmokeRescue.Brain
         public float reject_area_m = 1.5f, reject_area_s = 120f;
         public float room_ledger_min_core_m2 = .4f, room_ledger_min_room_m2 = 1.5f, room_ledger_split_min_m = .35f, room_ledger_split_max_m = 1.5f,
             room_ledger_split_step_m = .1f;
+        public float person_rgb_single_confirm = 0f;   // see config/brain.json
         public float person_rgb_strong_confidence = 1.01f, person_glance_min_confidence = .25f, person_glance_s = 2f, person_glance_repeat_s = 15f,
             person_rgb_boost_period_s = .2f;
         public bool rgb_person_confirms = false, partner_rooms = false, no_frontier_scan_once = false, follow_through_before_leftovers = false, frontier_beyond_room = false, room_progress_dwell = false, code_sprays_fire = false, code_spray_goal_room = false, heat_marks_room = false, heat_spray_through = false, thermal_dwell_confirms = true, outside_faces_in = false, leave_when_done = false, leave_waits_for_team = false, person_before_spray = false, room_memory_same_space = false, walk_out_past_fire = false, partner_territory = false, room_walk_in_any_coverage = false, door_tour = false, room_entered_near_seat = false, room_memory = false;
