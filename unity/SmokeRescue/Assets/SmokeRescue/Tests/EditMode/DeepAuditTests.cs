@@ -18,7 +18,7 @@ namespace SmokeRescue.Tests.EditMode
    for(int i=0;i<g.Count;i++)g.ObserveFree(i);
    var heat=(float[])typeof(OccupancyGrid).GetField("heat",flags).GetValue(g);
    heat[g.Cell(new Vector2(0,-.5f))]=500;
-   g.PrepareNavigation();
+   typeof(OccupancyGrid).GetMethod("PrepareNavigation", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(g, null);
    var crumbs=(List<Vector2>)typeof(RobotBrain).GetField("breadcrumbs",flags).GetValue(b);
    crumbs.Add(new Vector2(0,-1));crumbs.Add(Vector2.zero);
    typeof(RobotBrain).GetField("home",flags).SetValue(b,new Vector2(0,-1));
@@ -36,7 +36,7 @@ namespace SmokeRescue.Tests.EditMode
    var b=new RobotBrain(Calibration(),c,"A",0);var g=Map(b);var flags=BindingFlags.Instance|BindingFlags.NonPublic;
    for(int i=0;i<g.Count;i++)
    {var p=g.Centre(i); if(Mathf.Abs(p.x)<.4f&&p.y<.5f&&p.y> -2)g.ObserveFree(i);else g.ObserveOccupied(i);}
-   var heat=(float[])typeof(OccupancyGrid).GetField("heat",flags).GetValue(g);heat[g.Cell(new Vector2(0,-.5f))]=500;g.PrepareNavigation();
+   var heat=(float[])typeof(OccupancyGrid).GetField("heat",flags).GetValue(g);heat[g.Cell(new Vector2(0,-.5f))]=500;typeof(OccupancyGrid).GetMethod("PrepareNavigation", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(g, null);
    typeof(RobotBrain).GetField("home",flags).SetValue(b,new Vector2(0,-1));
    ((GridPlanner)typeof(RobotBrain).GetField("planner",flags).GetValue(b)).Home=new Vector2(0,-1);
    var crumbs=(List<Vector2>)typeof(RobotBrain).GetField("breadcrumbs",flags).GetValue(b);crumbs.Add(new Vector2(0,-1));crumbs.Add(Vector2.zero);
