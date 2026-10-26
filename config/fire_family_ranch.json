@@ -602,8 +602,8 @@
     "quench_keeps_growth_share_reason": "A cell water put out keeps its share of its origin's alpha t^2 growth budget while it stays out, so the growth cap does not hand that share to the cells still burning. Without it, a fire with the cap binding returned to exactly its budget after water put out most of its cells, which no fire model does: FDS reduces the burning rate where water lands and moves no heat elsewhere (FDS Technical Reference Guide, reduction of pyrolysis rate due to water)."
   },
   "spread": {
-    "growth_alpha_kw_s2": 0.01172,
-    "growth_alpha_kw_s2_reason": "Medium design-fire coefficient per independent configured origin. NFPA 72, National Fire Alarm Code, 2002 edition, Annex B, pp.72-168 to 72-169, equations B.4/B.5 give Q=alpha*(t-tv)^2 and alpha=1055/tg^2; choosing tg=300 s gives 0.0117222, rounded here to the requested 0.01172 kW/s^2, or 1054.8 kW at 300 s. https://previewnorm.com/nfpa/NFPA%2072-2002%20PDF.pdf . One budget is shared by all cells descended from that origin, across rooms. Mass loss cannot exceed burning fuel capacity. Step energy integrates the quadratic exactly. Zero explicitly selects the legacy uncapped model for diagnostic configurations; older files without this field retain that behaviour. No growth clock ignites a new room. Accessed 2026-10-23.",
+    "growth_alpha_kw_s2": 0.00293,
+    "growth_alpha_kw_s2_reason": "Owner, 26 Oct 21:35: the three film houses use the NFPA 72 slow t-squared growth, tg = 600 s, alpha = 1055/600^2 = 0.00293 kW/s^2 (same source as the medium value). Unity takes of 26 Oct: under medium growth the fire reached the bedroom door on the family ranch hallway by 60-120 s and the robots' 1.2 m fire margin closed the hallway to half the house (2 of 5 people at 270 s); on seed 934 it reached robot B's hallway by 214 s and B could not walk out. A house-difficulty choice for the films, not a robot change; the shared config/fire.json keeps medium for the benchmarks.",
     "neighbour_heat_per_s": 0.028,
     "surface_cooling_per_s": 0.012,
     "gas_surface_heat_per_s": 0.05,
