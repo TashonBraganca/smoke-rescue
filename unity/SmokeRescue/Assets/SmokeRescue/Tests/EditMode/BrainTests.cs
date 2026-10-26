@@ -2117,15 +2117,15 @@ namespace SmokeRescue.Tests.EditMode
         {
             // rgb_person_confirms. Seed 934 (24 Oct 04:53), robot B: YOLO11m 0.75 at 3.5 m on the kitchen floor, never confirmed
             // while the agent inspected thermal wall patches.
-            int Confirmed(bool whole, float gap)
+            int Confirmed(bool whole, float gap, float conf = .55f, bool second = true)
             {
-                var s = Settings(); s.rgb_person_confirms = true;
+                var s = Settings(); s.rgb_person_confirms = true; s.person_rgb_single_confirm = .7f;
                 var b = new RobotBrain(Calibration(), s, "A", 0) { AgentConfirms = true };
                 var all = new List<BrainEvent>();
                 for (int tick = 0; tick <= 40; tick++)
                 {
                     double t = tick / 20.0; Motion(b, t); b.OnAirTemperature(t, 20);
-                    if (tick == 1) b.OnPersonSighting(t, 10f, 3.5f, .55f, whole, gap);   // one sighting, just over 0.5
+                    if (tick == 1 || (second && tick == 3)) b.OnPersonSighting(t, 10f, 3.5f, conf, whole, gap);
                     b.Step(t, .05f); all.AddRange(b.DrainEvents());
                 }
                 return all.Count(e => e.kind == "survivor_confirmed");
@@ -2134,6 +2134,9 @@ namespace SmokeRescue.Tests.EditMode
             Assert.That(Confirmed(true, float.NaN), Is.EqualTo(1), "a box running off the bottom of the image confirms");
             Assert.That(Confirmed(true, 1f), Is.Zero, "control: a box hanging 1 m above the floor (a picture) does not");
             Assert.That(Confirmed(false, -.2f), Is.Zero, "control: a box cut by the image side does not");
+            // person_rgb_single_confirm (26 Oct, three-bed ranch live: a one-frame ghost at 0.545 was confirmed 5.5 m from anyone).
+            Assert.That(Confirmed(true, -.2f, .55f, false), Is.Zero, "one weak frame alone does not confirm");
+            Assert.That(Confirmed(true, -.2f, .75f, false), Is.EqualTo(1), "one strong frame confirms");
         }
 
         [Test]

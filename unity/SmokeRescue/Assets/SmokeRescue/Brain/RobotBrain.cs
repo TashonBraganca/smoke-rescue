@@ -1076,7 +1076,10 @@ namespace SmokeRescue.Brain
             // person_confirm_max_range_m is a confirmed person: no second sighting, no thermal check, no agent round. The
             // range itself is the 3D check: the vision service measures it on depth or LiDAR returns inside the box and gives
             // none for floor-only depth, so an empty box never arrives here.
-            if (c.rgb_person_confirms && wholeBox && rangeM <= c.person_confirm_max_range_m &&
+            // person_rgb_single_confirm: one weak frame alone is not a person (26 Oct, three-bed ranch live: robot A confirmed a
+            // ghost from one frame at 0.545, 5.5 m from anyone); it stays a candidate the robot walks up to and looks at again.
+            bool enoughFrames = nearest.observations.Count >= c.person_rgb_sightings || confidence >= c.person_rgb_single_confirm;
+            if (c.rgb_person_confirms && wholeBox && enoughFrames && rangeM <= c.person_confirm_max_range_m &&
                 (float.IsNaN(floorGapM) || floorGapM <= c.person_rgb_floor_max_m))
                 ConfirmFromColour(t, nearest, confidence, rangeM, floorGapM);
         }
