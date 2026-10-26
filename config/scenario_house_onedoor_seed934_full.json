@@ -5,8 +5,8 @@
   "duration_s": 600,
   "duration_s_reason": "Owner, 25 Oct 03:00: demo videos end with the house searched and both robots walked out; the recording stops when both are out (one second after both finish) or at 600 s.",
   "time_limit": true,
-  "search_s": 480,
-  "search_s_reason": "Owner, 25 Oct 03:00: every demo video ends with both robots out. With the search deadline at 480 s, return_home_at_end starts each robot's walk out in time to be out by then; leave_when_done takes them out sooner if nothing is left to search.",
+  "search_s": 300,
+  "search_s_reason": "Owner, 26 Oct: 4 of 5 found is acceptable; both robots must walk out. Take of 26 Oct 17:33: fire reached the hallway on robot B's way out from 214 s (105 fire cells there by 480 s); B started the 480 s walk out, found no route and stayed inside. Every person found in that take was found by 208 s. At 300 s the walk out starts while the hallway is passable.",
   "search_area": [
     0,
     0,

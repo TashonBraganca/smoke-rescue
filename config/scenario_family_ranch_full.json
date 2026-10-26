@@ -5,8 +5,8 @@
   "duration_s": 600,
   "duration_s_reason": "Owner, 25 Oct 03:00: demo videos end with the house searched and both robots walked out; the recording stops when both are out (one second after both finish) or at 600 s.",
   "time_limit": true,
-  "search_s": 480,
-  "search_s_reason": "Owner, 25 Oct 03:00: every demo video ends with both robots out. With the search deadline at 480 s, return_home_at_end starts each robot's walk out in time to be out by then; leave_when_done takes them out sooner if nothing is left to search.",
+  "search_s": 330,
+  "search_s_reason": "Owner, 26 Oct: 4 of 5 people found is acceptable; both robots walking out is not optional. Headless family ranch (fixed build) found its last person at 279 s; 330 s keeps that find and halves the take (Unity takes ran about 3 h for 600 s).",
   "search_area": [
     0,
     0,
@@ -106,10 +106,10 @@
         14.32388973236084,
         7.442147254943848
       ],
-      "yaw": 14.433733940124512,
+      "yaw": 90,
       "pose": "lying_on_side",
       "at_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation.",
-      "yaw_reason": "Copied from seed 934 full mission unless stated otherwise. The mission lasts at most 600 s with a 480 s search deadline; launch geometry is rotated to the only entrance. Survivor positions pass the conservative world validator; yaw is a chosen pose orientation."
+      "yaw_reason": "Turn the lying body along the bathroom so its full bounds stay inside the east wall without moving its centre (Codex layout audit 26 Oct: at yaw 14.4 the body reached 0.26 m into the east wall and outside the footprint)."
     },
     {
       "id": "s2",

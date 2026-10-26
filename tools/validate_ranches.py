@@ -113,7 +113,7 @@ def validate(plan,fire,sc):
             bodies.append(body)
         assert not room_paths(room,[d for d in plan['doors'] if room['id'] in d['between']],furniture+bodies,body_fire,targets=bodies,require_all=True), 'Person blocks a 0.9 m room path'
     assert all(not inside(r['spawn']['at'],fp) for r in sc['robots'])
-    assert sc['search_area']==fp and sc['duration_s']==600 and sc['search_s']==480 and sc['time_limit']
+    assert sc['search_area']==fp and sc['duration_s']==600 and 0<sc['search_s']<=480 and sc['time_limit']
     assert all(r['control']=='autonomous' and r['route']==[] for r in sc['robots'])
     assert 1<=len(fire['ignitions'])<=2
     for f in fire['ignitions']:
