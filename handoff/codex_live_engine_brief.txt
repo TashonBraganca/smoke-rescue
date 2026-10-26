@@ -1,0 +1,32 @@
+Brief: update the live AWS engine for judge houses 4 and 5 to tonight's brain (from opencv-a2, 26 Oct 21:10 IST).
+Report to /Volumes/Tashon/opencv/smoke-rescue/handoff/codex_live_engine_report.txt. Plain text, no em dashes, no .md.
+
+Owner approved this job tonight. Work in the backend worktree /Volumes/Tashon/opencv/smoke-rescue-ryor (branch ryor-26oct).
+Read its handoff/codex_backend_only_brief.txt and handoff/codex_backend_report.txt first: you built that pipeline (engine
+e49251258d1a, 15 gated EASY replays, 3 passed and installed in /Volumes/Tashon/opencv/showcase/site-next/public/rescue-data).
+
+Rules: do NOT touch /Volumes/Tashon/opencv/smoke-rescue/unity (a Unity recording runs; never trigger a Unity compile),
+do not edit overnight-25oct, do not kill processes you did not start, do not deploy the website (owner runs deploy.sh),
+do not change AWS stacks other than smoke-rescue-ryor, do not create CloudFront. Disk: about 40 GB free and Unity takes need
+most of it: keep your total new files and docker images under 8 GB and delete only what you created. CPU: run at most 2
+headless sims at once at the lowest priority the sandbox allows. Never put the owner's email in any request.
+
+Job, in order, stop at the first step you cannot do and write exact commands for opencv-a2 to run:
+1. Bring the brain and config of overnight-25oct at 30b94a69 into ryor-26oct: Brain/*.cs, World/*.cs needed by the engine,
+   config/brain.json and any new config keys (enter_first, entry_keep_out, rgb_candidate_near_search, trail and
+   clear-way fixes, exit_watch_inside false). Merge or copy; keep ryor's own engine/page code. Run the logic tests the way
+   ryor builds them; all must pass. Commit on ryor-26oct.
+2. Rebuild the engine (tools/ryor/build_engine.sh). Run the gated EASY replays for Bungalow (hx_46bfe067cc) and Corner
+   house (hx_cb9d3d6726) with 1 and 2 robots (3 robots only if time allows; the site hides 3 unless it passes). Gate as
+   before: every room entered, both/all robots out, 0 false confirmations, engine git recorded. Report each run's people,
+   rooms, returns, times. Compare with the e4925125 results; a regression on any passing setup is a stop: keep the old
+   replays and report.
+3. Only if step 2 passes at least as well as before: install the passing replays and update missions.json "engine" and the
+   gallery available_replays in /Volumes/Tashon/opencv/showcase/site-next/public/rescue-data (keep the old files under a
+   backup folder you create), run `npx next build` there and the existing browser check (tools/ryor/browser_backend.cjs or
+   browser_v2_integration.cjs) on the replays.
+4. Build and push the linux/arm64 image (tools/ryor/build_image.sh <git-tag>) and update the smoke-rescue-ryor stack's task
+   definition to it, the way the previous deploy did. If the sandbox blocks docker, ECR or AWS calls, write the exact
+   commands instead. Do not start live Fargate runs beyond one smoke test of one setup, and report its cost.
+Lead the report with what is live now, what passed, what failed and what is left. Keep token use lean; if you hit a usage
+limit, write what is done and what is left first.

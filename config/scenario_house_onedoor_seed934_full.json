@@ -143,7 +143,9 @@
     "spread": true,
     "head_start_s": 320.0,
     "note": "Whole-house fire from config/fire.json, ignited 320 s before the robots enter (head_start_s).",
-    "head_start_s_reason": "The fire has burned for a fire department's benchmark response time before the robots enter: NFPA 1710 (2020) 4.1.2.1, turnout under 80 s plus first-engine travel 240 s, 320 s on 90 % of calls (fems.dc.gov/page/fire-response-time; firefighternation.com, Engine Company Staffing & NFPA 1710/NIST Research). It leaves out detection and call handling, so the real fire would be older. Under the NFPA 72 medium t-squared growth (config/fire.json) the fire is about 1.2 MW at entry; headless model: foyer upper gas past 60 C at entry, hallway 60 C about 54 s and living room 200 C about 130 s after entry. Owner, 23 Oct: the fire looked too mild in a 480 s run."
+    "head_start_s_reason": "The fire has burned for a fire department's benchmark response time before the robots enter: NFPA 1710 (2020) 4.1.2.1, turnout under 80 s plus first-engine travel 240 s, 320 s on 90 % of calls (fems.dc.gov/page/fire-response-time; firefighternation.com, Engine Company Staffing & NFPA 1710/NIST Research). It leaves out detection and call handling, so the real fire would be older. Under the NFPA 72 medium t-squared growth (config/fire.json) the fire is about 1.2 MW at entry; headless model: foyer upper gas past 60 C at entry, hallway 60 C about 54 s and living room 200 C about 130 s after entry. Owner, 23 Oct: the fire looked too mild in a 480 s run.",
+    "config_file": "fire_onedoor_934.json",
+    "config_file_reason": "Copy of config/fire.json with the slow growth curve for the film (see its growth_alpha_kw_s2_reason)."
   },
   "obstacles": [
     {
