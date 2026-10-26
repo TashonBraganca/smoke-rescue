@@ -368,6 +368,18 @@ namespace SmokeRescue.Brain
                     // A deadline return cut on the way is the same: retreat and search on, never hold (held-out seed 919,
                     // robot B held 20 s in cool air when fire cut its route home after a deadline return began).
                     if (path.Count > 0) returnBlockedSince = double.NaN;
+                    if (path.Count == 0 && EndReturn && c.end_return_breadcrumbs)
+                    {
+                        // end_return_breadcrumbs (owner, 26 Oct): no planned route home, so walk back over the floor this body
+                        // already walked in on, minus any cell now on fire.
+                        var crumbs = BreadcrumbRoute();
+                        if (crumbs.Count > 0)
+                        {
+                            SetPath(crumbs, false); lastPlan = t; returnBlockedSince = double.NaN;
+                            Emit(t, "return_via_trail", "No planned route home: walk back along this robot's own trail.", "points", crumbs.Count,
+                                "length_m", PathLength(crumbs));
+                        }
+                    }
                     if (path.Count == 0 && EndReturn)
                     {
                         if (double.IsNaN(returnBlockedSince)) { returnBlockedSince = t; lastReturnBlockedLog = double.NegativeInfinity; }
@@ -1170,11 +1182,36 @@ namespace SmokeRescue.Brain
         /// goals, up to 2.5 m) reached through walls and hid unrelated frontiers in the next room (#27, Codex review).</summary>
         /// <summary>Where this robot's body has stood: a pose every cell of travel, the most recent body_track_poses.</summary>
         readonly List<BrainPose> bodyTrack = new List<BrainPose>();
+        /// <summary>end_return_breadcrumbs: every point this body stood on since launch, breadcrumb_spacing_m apart, oldest first.</summary>
+        readonly List<Vector2> breadcrumbs = new List<Vector2>();
+        /// <summary>The way home along this robot's own trail: from the trail point nearest to it back to the first one, jumping
+        /// over loops (a later point near an earlier one), refused if any point is now within the body radius of measured fire.
+        /// Empty when there is no trail or fire covers it.</summary>
+        List<Vector2> BreadcrumbRoute()
+        {
+            var route = new List<Vector2>(); if (breadcrumbs.Count < 2) return route;
+            var at = motion.Pose.position; int k = 0; float best = float.PositiveInfinity;
+            for (int i = 0; i < breadcrumbs.Count; i++) { float d = Vector2.Distance(breadcrumbs[i], at); if (d < best) { best = d; k = i; } }
+            if (best > c.breadcrumb_join_m) return route;
+            while (true)
+            {
+                var p = breadcrumbs[k]; int cell = grid.Cell(p);
+                if (cell >= 0 && grid.FireDistance(cell) <= c.robot_radius_m) { route.Clear(); return route; }
+                route.Add(p); if (k == 0) break;
+                int j = k - 1;
+                for (int m = 0; m < k - 1; m++) if (Vector2.Distance(breadcrumbs[m], p) <= c.breadcrumb_spacing_m * 1.5f) { j = m; break; }
+                k = j;
+            }
+            if (Vector2.Distance(route[route.Count - 1], home) > c.breadcrumb_spacing_m) route.Add(home);
+            return route;
+        }
         void NoteBodyTrack()
         {
             var pose = motion.Pose;
             if (bodyTrack.Count > 0 && Vector2.Distance(bodyTrack[bodyTrack.Count - 1].position, pose.position) < grid.CellM) return;
             bodyTrack.Add(pose); if (bodyTrack.Count > c.body_track_poses) bodyTrack.RemoveAt(0);
+            if (breadcrumbs.Count == 0 || Vector2.Distance(breadcrumbs[breadcrumbs.Count - 1], pose.position) >= c.breadcrumb_spacing_m)
+                breadcrumbs.Add(pose.position);
         }
         /// <summary>p lies inside this robot's body (the capsule, body_half_length_m and body_radius_m) at a pose it has held.</summary>
         bool OwnBodyWasAt(Vector2 p)
