@@ -2320,6 +2320,42 @@ namespace SmokeRescue.Tests.EditMode
         }
 
         [Test]
+        public void WithNoPlannedRouteHomeTheRobotWalksBackAlongItsOwnTrail()
+        {
+            // end_return_breadcrumbs (owner, 26 Oct). A searched 4 x 4 m room whose doorway to the start pad is mapped as wall
+            // (a noisy map), so the planner finds no route home; the robot walked in through that doorway, so its own trail
+            // leads out. Control: without the fallback there is no route.
+            int Points(bool crumbs, out bool viaTrail)
+            {
+                var c = Settings(); c.grid_size_m = 12; c.search_requires_ceiling = false; c.stay_inside = true; c.leave_when_done = true;
+                c.mission_time_limit_s = 1000; c.end_return_breadcrumbs = crumbs; c.breadcrumb_spacing_m = .5f; c.breadcrumb_join_m = 1.5f;
+                var b = new RobotBrain(Calibration(), c, "A", 0); var g = Map(b);
+                var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+                var searched = (bool[])typeof(OccupancyGrid).GetField("observed", flags).GetValue(g);
+                for (int i = 0; i < g.Count; i++)
+                {
+                    var p = g.Centre(i);
+                    if (Mathf.Abs(p.x) <= 2 && Mathf.Abs(p.y) <= 2) { g.ObserveFree(i); searched[i] = true; }
+                    else if (Mathf.Abs(p.x) <= 2.3f && Mathf.Abs(p.y) <= 2.3f) g.ObserveOccupied(i);   // walls, doorway included
+                    else if (Mathf.Abs(p.x) <= .7f && p.y < -2.3f && p.y >= -4.2f) { g.ObserveFree(i); searched[i] = true; }
+                }
+                Vector2 pad = new Vector2(0, -3.5f);
+                typeof(RobotBrain).GetField("home", flags).SetValue(b, pad);
+                ((GridPlanner)typeof(RobotBrain).GetField("planner", flags).GetValue(b)).Home = pad;
+                var trail = (List<Vector2>)typeof(RobotBrain).GetField("breadcrumbs", flags).GetValue(b);
+                for (float y = -3.5f; y <= 0.01f; y += .5f) trail.Add(new Vector2(0, y));
+                var events = new List<BrainEvent>(); int points = 0;
+                for (int i = 0; i <= 20 * 25; i++) { DriveTick(b, i); events.AddRange(b.DrainEvents()); points = Math.Max(points, b.Snapshot().path.Length); }
+                viaTrail = events.Any(e => e.kind == "return_via_trail");
+                return points;
+            }
+            Assert.That(Points(true, out bool via), Is.GreaterThan(0), "walks out along its trail");
+            Assert.That(via, Is.True, "return_via_trail is logged");
+            Assert.That(Points(false, out bool viaOff), Is.Zero, "control: no route without the fallback");
+            Assert.That(viaOff, Is.False);
+        }
+
+        [Test]
         public void TheWalkOutWhenDoneCrossesTheEntranceLock()
         {
             // Seed 934 full mission (25 Oct 11:25): with the floor at the way in locked, the leave-when-done return found no
