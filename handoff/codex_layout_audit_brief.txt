@@ -1,0 +1,31 @@
+Brief: layout audit of all 5 judge houses (from opencv-a2, 26 Oct 17:05 IST). Report to handoff/codex_layout_audit_report.txt.
+Plain text, no em dashes, no .md files. READ-ONLY on config/, unity/, Brain code (a Unity recording runs). No commits except
+your report and any new script under tools/diag/. At most 1 headless sim at a time if you need one. No RunPod, no AWS.
+
+Owner's goal: the robots must never get stuck, must enter and see every room, find every person, and both walk out, in all
+5 houses on the judge site: our three (one-door seed 934 config/scenario_house_onedoor_seed934_full.json, family ranch
+config/scenario_family_ranch_full.json, long ranch config/scenario_long_ranch_full.json) and the two live HouseExpo houses
+(hx_46bfe067cc Bungalow, hx_cb9d3d6726 Corner house; gallery and worlds under /Volumes/Tashon/opencv/smoke-rescue-ryor and
+/Volumes/Tashon/opencv/showcase/site-next/public/rescue-data/gallery.json). Layout changes are allowed (owner approved moving
+furniture so it does not wall off rooms or hide people); robot code is not part of this job.
+
+Already done (uncommitted, in config/): long ranch beds in lr_bed3 and lr_bed4 turned 90 deg against the north wall with
+measured mesh size 1.5 x 2.05 m (fire_long_ranch.json). tools/validate_ranches.py now fails only its person path check,
+whose 0.75 m wall inset + 0.45 m inflation cannot pass any 3 m deep bedroom with furniture; say if you agree and propose a
+robot-body check instead (robot_radius_m 0.25, body_radius_m 0.18 in config/brain.json; planner passes cells with obstacle
+distance > 0.8 x robot_radius).
+
+For each house, using the real geometry (Unity floor plan + furniture mesh bounds from tools/random_layout_assets.json, not
+padded estimates, and the headless world from tools/headless_world.py where it applies):
+1. Every doorway and room: passable for a 0.5 m wide robot with 0.1 m margin? List debris/obstacles that block a door
+   (example: one-door headless world has obstacle_wood_pile in front of the 0.8 m bathroom door; check whether the Unity
+   scenario has it too and whether the Unity and headless person positions differ: headless s2 (-4.4, 10.2) vs Unity oracle
+   s2 (-6.89, 11.22) in the gate frame).
+2. Every person: from reachable floor, is there a standing point within 4.5 m with a clear line of sight to her body centre
+   at camera height (config/sensors camera mount) not blocked by walls or furniture taller than the camera? Give the best
+   such point and its distance.
+3. Narrow spots where two robots would meet head on (pinch points under 1.2 m on the main route), and whether the route
+   from every room back to the entrance stays clear.
+4. For every failure, the smallest furniture move or rotation (with coordinates) that fixes it without making the house
+   trivial, and a one-line *_reason text for the config.
+Lead with failures, by house. Keep token use lean; if you hit a usage limit, write what you have first.
