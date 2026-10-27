@@ -103,6 +103,7 @@ Lambda front; read them on a local instance.
 
 A robot that is not ours can post its own frame: POST /perceive/people with JSON {"rgb_b64": PNG or JPEG as base64,
 "depth_b64": optional 16-bit depth PNG, "depth_scale": depth units per metre (1000), "intrinsics": {"fx","fy","cx","cy"},
+"min_conf": 0.25}. See examples/robot_client.py."""
 
 _INLINE_PEOPLE = {"requestBody": {"content": {"application/json": {"schema": {
     "type": "object",

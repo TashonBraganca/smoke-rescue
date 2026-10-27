@@ -1,5 +1,6 @@
 """Build a vision.Frame from images a robot sends over the network, rather than from a recording folder.
 
+Used by the HTTP route POST /perceive/people (inline frame), so it runs the same OpenCV 5
 code the simulated robots run. Images arrive as PNG or JPEG bytes:
 
     rgb      8-bit colour image (required for people and visibility)

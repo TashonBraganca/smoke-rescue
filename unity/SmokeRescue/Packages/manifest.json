@@ -46,7 +46,7 @@
     "com.unity.ugui": "2.6.0",
     "com.unity.cloud.gltfast": "6.20.0",
     "com.unity.nuget.newtonsoft-json": "3.2.2",
-    "com.unity.robotics.urdf-importer": "https://github.com/Unity-Technologies/URDF-Importer.git?path=/com.unity.robotics.urdf-importer#v0.5.2",
+    "com.unity.robotics.urdf-importer": "https://github.com/Unity-Technologies/URDF-Importer.git?path=/com.unity.robotics.urdf-importer#v0.5.2"
   },
   "testables": [
     "com.unity.test-framework"

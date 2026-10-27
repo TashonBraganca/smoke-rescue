@@ -1,14 +1,5 @@
 {
   "dependencies": {
-      "depth": 0,
-      "source": "git",
-      "dependencies": {
-        "com.unity.nuget.newtonsoft-json": "3.2.1",
-        "com.unity.editorcoroutines": "1.0.0",
-        "com.unity.test-framework": "1.3.3"
-      },
-      "hash": "382a43a30f4dab4c7f02d770b4ec7d084813bbe4"
-    },
     "com.unity.animation.rigging": {
       "version": "6.6.0",
       "depth": 0,

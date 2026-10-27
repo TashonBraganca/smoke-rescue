@@ -244,6 +244,7 @@ ALL_TOOLS = PERCEPTION + ACTIONS
 
 # Tools that the code refuses outright on a heat event (go_to, explore_frontier, turn_to_face: "no exploring during a heat
 # event") and tools with no use there. Offering them only draws calls that are refused; tool-calling accuracy also falls
+# with the number of tools and arguments offered (ROS bag tool-calling benchmark, arXiv 2511.03497, eight models).
 _NOT_ON_HEAT = {"go_to", "approach_fire", "explore_frontier", "turn_to_face", "approach_candidate", "open_door", "clear_debris", "extract_survivor",
                 "propose_plan", "answer_proposal", "request_human_approval", "check_indoors", "measure_opening"}
 

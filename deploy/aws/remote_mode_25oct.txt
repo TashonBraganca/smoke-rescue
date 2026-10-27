@@ -19,6 +19,7 @@ Live counts and latencies: curl -s http://127.0.0.1:8095/forwarder/stats
 Pointing Unity at it
 Unity reads SMOKE_AGENT_URL when a recording starts (RecorderMenu.cs). The editor must be launched with
 SMOKE_AGENT_URL=http://127.0.0.1:8095 in its environment (for example from Unity Hub started in a shell that exports it).
+Do not use port 8090: the Unity editor itself listens on [::1]:8090. Use 127.0.0.1, not localhost: the
 forwarder binds IPv4 only.
 
 What was verified, with numbers (replay of data/recordings/unity_house_onedoor_seed934_full_BEST_0318)
