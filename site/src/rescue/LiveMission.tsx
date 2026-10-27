@@ -53,19 +53,21 @@ export default function LiveMission({ house, robots, config, onReset }: { house:
       const end = latest?.frames.at(-1)?.t || 0;
       const elapsed = document.hidden ? 0 : (now - previous) / 1000;
       // A live stream arrives at about real time: follow it smoothly instead of racing ahead and stalling.
-      const speed = latest?.validated ? rate * (quiet(latest, clock.current) ? 2 : 1) : Math.max(1, Math.min(8, (end - clock.current) * 0.8));
+      // A recorded replay plays at about the pace of a live run (3x, quiet stretches 6x); a finished live run catches up at 8x.
+      const base = replay ? 3 : rate;
+      const speed = latest?.validated ? base * (quiet(latest, clock.current) ? 2 : 1) : Math.max(1, Math.min(8, (end - clock.current) * 0.8));
       previous = now; clock.current = Math.min(end, advanceClock(clock.current, elapsed, speed, latest?.duration_s || 180));
       if (now - lastUi > 80 || clock.current >= (latest?.duration_s || 180)) { setT(clock.current); lastUi = now; }
       if (clock.current >= (latest?.duration_s || 180) && latest?.validated) setPlaying(false); else id = requestAnimationFrame(tick);
     };
     id = requestAnimationFrame(tick); return () => cancelAnimationFrame(id);
-  }, [visible, playing, rate]);
+  }, [visible, playing, rate, replay]);
   const again = () => { clock.current = 0; setT(0); setPlaying(true); };
   const found = run?.frames.slice(0, Math.floor(t * 2) + 1).flatMap(f => f.found) || [];
   const foundCount = house.people_truth.filter(person => found.some(p => Math.hypot(p.x - person.x, p.y - person.y) <= 1.5)).length;
   const done = visible && t >= (run?.duration_s || 180) && !!run?.validated;
   const waiting = visible && playing && !run.validated && t >= (run.frames.at(-1)?.t || 0);
-  return <Stage title={house.name} status={error ? 'error' : !setupDone ? 'setup' : done ? 'done' : 'running'} clock={t} tag={`${replay ? 'Recorded replay of this setup' : 'Live on AWS'} · ${robots} ${robots === 1 ? 'robot' : 'robots'}`} onReset={onReset}>
+  return <Stage title={house.name} status={error ? 'error' : !setupDone ? 'setup' : done ? 'done' : 'running'} clock={done && run ? run.score.time_s : t} tag={`${replay ? 'Recorded replay of this setup' : 'Live on AWS'} · ${robots} ${robots === 1 ? 'robot' : 'robots'}`} onReset={onReset}>
     <div className="absolute inset-0 flex flex-col gap-3 overflow-y-auto p-3 md:grid md:grid-rows-[minmax(0,1.35fr)_minmax(0,1fr)] md:overflow-hidden" data-setup={visible ? run?.setup : undefined} data-first-frame={firstFrame} style={{ opacity: visible ? 1 : 0, transition: 'opacity 0.9s var(--ease-out-quart)' }}>
       <div className="relative min-h-[46dvh] overflow-hidden rounded-2xl border border-white/[0.07] bg-[#0d0a15] md:min-h-0">
         {run && <Scene house={house} run={run} robots={robots} clock={clock} time={t} overview={overview} running reduced={reduced} onReady={noop} onFrame={onFrame} />}

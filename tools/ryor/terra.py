@@ -87,7 +87,7 @@ class Worker:
                 os.environ['AZURE_OPENAI_MAX_ATTEMPTS'] = '1'  # No hidden retries past the daily reservation.
                 os.environ['AZURE_OPENAI_TIMEOUT_S'] = str(TIMEOUT_S)
                 from agent_backend import AzureOpenAIBackend
-                self.backend = AzureOpenAIBackend(deployment='gpt-5.6-terra', reasoning_effort='low', timeout=TIMEOUT_S)
+                self.backend = AzureOpenAIBackend(deployment=os.environ.get('TERRA_AZURE_DEPLOYMENT', 'places-alchemy-terra'), reasoning_effort='low', timeout=TIMEOUT_S)
         return self.backend
 
     def decide(self, obs):

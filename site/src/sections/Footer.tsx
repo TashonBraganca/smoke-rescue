@@ -18,6 +18,15 @@ export default function Footer() {
         >
           SMOKE RESCUE
         </motion.p>
+        <nav aria-label="Project links" className="flex flex-wrap justify-center gap-3 text-callout font-bold">
+          {[
+            ["Code on GitHub", "https://github.com/TashonBraganca/smoke-rescue"],
+            ["Technical report", "https://github.com/TashonBraganca/smoke-rescue/blob/main/report/Smoke_Rescue_Technical_Report.pdf"],
+            ["System and results", "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/"],
+          ].map(([label, href]) => (
+            <a key={href} href={href} target="_blank" rel="noopener" className="rounded-full border border-line2 px-5 py-2.5 text-ink transition-colors hover:border-heat hover:text-heat">{label}</a>
+          ))}
+        </nav>
         <details className="group justify-self-center text-center text-footnote text-mute">
           <summary className="mx-auto w-fit cursor-pointer list-none rounded-full border border-line px-3 py-1.5 font-semibold transition-colors hover:text-ink [&::-webkit-details-marker]:hidden">
             Credits
