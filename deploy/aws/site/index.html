@@ -3,54 +3,70 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Smoke Rescue recorded runs, agent decisions, evaluation metrics, and OpenCV 5 image tools.">
-<title>Smoke Rescue | Recorded results</title>
+<meta name="description" content="Smoke Rescue: architecture, deployed AWS system, measured results, recorded runs and agent decisions.">
+<title>Smoke Rescue | System and results</title>
 <link rel="stylesheet" href="style.css">
 <script src="app.js" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to results</a>
-<header class="masthead"><a href="#about" class="wordmark">Smoke Rescue</a><span>OpenCV 5 / Recorded results</span><div><span id="health" role="status">API checking</span> <button id="refresh-health" type="button">Check API</button></div></header>
-<nav aria-label="Sections"><a href="#about">System</a><a href="#walkthrough">Walkthrough</a><a href="#trace">Decisions</a><a href="#metrics">Comparison</a><a href="#try-tools">Try OpenCV 5</a></nav>
+<header class="masthead"><a href="#about" class="wordmark">Smoke Rescue</a><span>OpenCV 5 / System and results</span><div><span id="health" role="status">API checking</span> <button id="refresh-health" type="button">Check API</button></div></header>
+<nav aria-label="Sections"><a href="#about">System</a><a href="#results">Results</a><a href="#walkthrough">Walkthrough</a><a href="#trace">Decisions</a><a href="#metrics">Comparison</a></nav>
 <main id="main">
 <section id="about" aria-labelledby="about-title">
-<p class="eyebrow">Two robots. One smoke-filled building.</p>
+<p class="eyebrow">Two robot dogs. One burning house. No map.</p>
 <h1 id="about-title">Search through smoke.<br>Inspect every decision.</h1>
-<p class="intro">Smoke Rescue simulates two rescue robots searching a burning building in Unity on a Mac. Each robot uses its own RGB-D, thermal and IMU sensors, a reflex brain, and an LLM agent that calls OpenCV 5 tools before issuing evidence-backed orders. A commander coordinates the search over a lossy radio, while recorded traces and offline evaluation let you inspect what happened.</p>
+<p class="intro">Smoke Rescue sends two quadruped robots into a burning house they have never seen. Each robot runs the same onboard brain: it explores room by room, finds people with OpenCV 5 colour and thermal detection, and builds a map it shares with its partner over a lossy radio. OpenCV 5 ORB place recognition corrects the shared map when one robot sees a place the other already mapped. Terra, a GPT-5.6 agent, reads each robot's report a few times per mission and suggests the next room to search; the brain checks every suggestion and keeps moving while Terra thinks. When the search is done, both robots walk out along their own trail.</p>
 <figure class="architecture" tabindex="0" role="group" aria-label="System architecture diagram. Scroll horizontally on small screens.">
-<svg viewBox="0 0 1000 560" role="img" aria-labelledby="arch-title arch-desc">
-<title id="arch-title">Smoke Rescue architecture and AWS deployment design</title>
-<desc id="arch-desc">Unity on the Mac simulates robot A and robot B with RGB-D, thermal and IMU sensors. Each has a reflex brain and an LLM agent using OpenCV 5 tools. The commander coordinates over lossy radio. Recordings feed ORB-SLAM3 on OpenCV 5 and offline evaluation. AWS CloudFront serves S3 results and routes API calls to Fargate ARM64 agents and OpenCV tools. Fargate calls Bedrock. Batch runs SLAM. Budgets and alarms monitor AWS.</desc>
+<svg viewBox="0 0 1000 600" role="img" aria-labelledby="arch-title arch-desc">
+<title id="arch-title">Smoke Rescue robot brain and its AWS deployment</title>
+<desc id="arch-desc">Robot A and robot B each have RGB-D, thermal and IMU sensors and the same reflex brain. OpenCV 5 detects people and recognises places. The robots share one map over a lossy radio. Terra, GPT-5.6, suggests search targets that the brain checks. The same brain runs in Unity on a Mac for the filmed houses and in a headless simulator on AWS for live missions. On AWS, Amplify serves the judge website, a Lambda Function URL serves this report and the mission API, ECS Fargate ARM64 runs one engine task per live mission, S3 stores runs and checked replays, DynamoDB holds run and Terra limits, the engine calls GPT-5.6 Terra on Azure OpenAI, AWS Batch runs offline SLAM, and a budget alarm caps spend at 55 dollars a month.</desc>
 <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z"/></marker></defs>
-<rect class="zone" x="10" y="10" width="590" height="540" rx="8"/><text class="svg-label" x="30" y="42">MAC / UNITY SIMULATION</text>
-<rect x="30" y="64" width="255" height="76"/><text x="45" y="93">Robot A</text><text class="svg-small" x="45" y="119">RGB-D · Thermal · IMU</text>
-<rect x="320" y="64" width="255" height="76"/><text x="335" y="93">Robot B</text><text class="svg-small" x="335" y="119">RGB-D · Thermal · IMU</text>
-<path class="flow" d="M157 140V167M447 140V167"/>
-<rect x="30" y="170" width="255" height="70"/><text x="45" y="198">Reflex brain A</text><text class="svg-small" x="45" y="221">Navigation / safety / map</text>
-<rect x="320" y="170" width="255" height="70"/><text x="335" y="198">Reflex brain B</text><text class="svg-small" x="335" y="221">Navigation / safety / map</text>
-<path class="flow" d="M157 240V267M447 240V267"/>
-<rect class="agent-box" x="30" y="270" width="255" height="70"/><text x="45" y="298">LLM agent A</text><text class="svg-small" x="45" y="321">OpenCV 5 tools → orders</text>
-<rect class="agent-box" x="320" y="270" width="255" height="70"/><text x="335" y="298">LLM agent B</text><text class="svg-small" x="335" y="321">OpenCV 5 tools → orders</text>
-<path class="flow" d="M157 340V370H447V340M302 370V397"/>
-<text class="svg-small" x="203" y="391">Lossy radio / shared context</text>
-<rect x="170" y="400" width="270" height="54"/><text x="190" y="434">Commander / approvals</text>
-<rect x="30" y="478" width="545" height="51"/><text class="svg-small" x="45" y="509">Recordings → ORB-SLAM3 on OpenCV 5 → evaluation</text>
-<rect class="zone" x="620" y="10" width="370" height="540" rx="8"/><text class="svg-label" x="640" y="42">AWS / DEPLOYMENT DESIGN</text>
-<rect x="645" y="64" width="320" height="54"/><text x="665" y="98">CloudFront</text>
-<path class="flow" d="M730 118V157M885 118V237"/><text class="svg-small" x="894" y="188">/api/*</text>
-<rect x="645" y="160" width="185" height="55"/><text class="svg-small" x="660" y="192">S3 / site + runs</text>
-<rect class="agent-box" x="645" y="240" width="320" height="76"/><text x="660" y="270">Fargate ARM64</text><text class="svg-small" x="660" y="295">Agent + OpenCV 5 API</text>
-<path class="flow" d="M805 316V347"/>
-<rect x="645" y="350" width="320" height="50"/><text x="665" y="382">Amazon Bedrock</text>
-<rect x="645" y="420" width="320" height="50"/><text x="665" y="452">AWS Batch / SLAM</text>
-<rect x="645" y="490" width="320" height="39"/><text class="svg-small" x="665" y="515">Budgets + alarms</text>
-<path class="flow remote" d="M575 305H642M575 504H607V445H642"/>
+<rect class="zone" x="10" y="10" width="560" height="580" rx="8"/><text class="svg-label" x="30" y="42">ROBOT BRAIN / SAME CODE IN UNITY AND ON AWS</text>
+<rect x="30" y="64" width="240" height="70"/><text x="45" y="92">Robot A</text><text class="svg-small" x="45" y="117">RGB-D · thermal · IMU</text>
+<rect x="310" y="64" width="240" height="70"/><text x="325" y="92">Robot B</text><text class="svg-small" x="325" y="117">RGB-D · thermal · IMU</text>
+<path class="flow" d="M150 134V159M430 134V159"/>
+<rect x="30" y="162" width="240" height="70"/><text x="45" y="190">Reflex brain A</text><text class="svg-small" x="45" y="215">Explore · safety · rooms</text>
+<rect x="310" y="162" width="240" height="70"/><text x="325" y="190">Reflex brain B</text><text class="svg-small" x="325" y="215">Explore · safety · rooms</text>
+<path class="flow" d="M150 232V257M430 232V257"/>
+<rect x="30" y="260" width="520" height="62"/><text x="45" y="287">OpenCV 5 perception</text><text class="svg-small" x="45" y="310">Colour + thermal person detection · ORB place recognition</text>
+<path class="flow" d="M290 322V347"/>
+<rect x="30" y="350" width="520" height="62"/><text x="45" y="377">Shared map over a lossy radio</text><text class="svg-small" x="45" y="400">Map merge · loop closures · room claims · people found</text>
+<path class="flow" d="M290 412V437"/>
+<rect class="agent-box" x="30" y="440" width="520" height="62"/><text x="45" y="467">Terra agent (GPT-5.6)</text><text class="svg-small" x="45" y="490">Suggests the next room · the brain rechecks every order</text>
+<rect x="30" y="522" width="250" height="50"/><text class="svg-small" x="45" y="552">Unity on a Mac → 3 filmed houses</text>
+<rect x="300" y="522" width="250" height="50"/><text class="svg-small" x="315" y="552">Headless engine → live on AWS</text>
+<rect class="zone" x="590" y="10" width="400" height="580" rx="8"/><text class="svg-label" x="610" y="42">AWS / DEPLOYED IN US-EAST-1</text>
+<rect x="610" y="64" width="360" height="50"/><text x="625" y="95">Amplify · judge website</text>
+<path class="flow" d="M790 114V135"/>
+<rect x="610" y="138" width="360" height="62"/><text x="625" y="165">Lambda Function URL</text><text class="svg-small" x="625" y="188">This report + mission API</text>
+<path class="flow" d="M790 200V221"/>
+<rect class="agent-box" x="610" y="224" width="360" height="62"/><text x="625" y="251">ECS Fargate ARM64</text><text class="svg-small" x="625" y="274">One engine task per live mission</text>
+<rect x="610" y="306" width="175" height="62"/><text class="svg-small" x="625" y="332">S3 · runs and</text><text class="svg-small" x="625" y="354">checked replays</text>
+<rect x="795" y="306" width="175" height="62"/><text class="svg-small" x="810" y="332">DynamoDB · run</text><text class="svg-small" x="810" y="354">and Terra limits</text>
+<rect x="610" y="388" width="360" height="62"/><text x="625" y="415">GPT-5.6 Terra</text><text class="svg-small" x="625" y="438">Azure OpenAI, called from the engine</text>
+<rect x="610" y="470" width="360" height="42"/><text class="svg-small" x="625" y="497">AWS Batch · offline SLAM jobs</text>
+<rect x="610" y="526" width="360" height="42"/><text class="svg-small" x="625" y="553">Budget alarm · 55 USD a month</text>
+<path class="flow remote" d="M550 547H580V255H607M550 466H572V419H607"/>
 </svg>
-<figcaption>Recorded simulation, not a live robot feed. The sample uses local Qwen3 through Ollama. AWS deployment is configured in the repository; this diagram does not prove deployment. SLAM and ground-truth scoring run offline.</figcaption>
+<figcaption>Deployed and running on 27 October 2026. Live missions run the brain in a headless simulator on Fargate; it has no rendered camera images, so the website draws the streamed robot poses, maps and finds in 3D. The three filmed houses are recordings of the same brain in Unity HDRP. A Bedrock path for Terra is built and waits on the model's Marketplace agreement.</figcaption>
 </figure>
 </section>
+<section id="results" aria-labelledby="results-title">
+<p class="eyebrow">Measured results</p><h2 id="results-title">What the robots did</h2>
+<div class="table-wrap" role="region" aria-label="Filmed mission results" tabindex="0"><table>
+<thead><tr><th scope="col">Filmed house (Unity)</th><th scope="col">People found</th><th scope="col">False finds</th><th scope="col">Both robots out</th><th scope="col">Mission time</th></tr></thead>
+<tbody>
+<tr><td>Three-bed ranch</td><td>5 of 5</td><td>0</td><td>Yes, at 365 s and 375 s</td><td>6:16</td></tr>
+<tr><td>L-shaped ranch</td><td>4 of 5</td><td>0</td><td>Yes, at 369 s and 413 s</td><td>6:53</td></tr>
+<tr><td>One-door house</td><td>4 of 5</td><td>0</td><td>Yes, along their own trail, at 454 s and 463 s</td><td>7:44</td></tr>
+</tbody></table></div>
+<p>On 39 real floor plans the brain had never seen (HouseExpo, headless simulator, 25 October 2026), two robots sharing one map found 99% of people and one robot found 92% (p = 0.002). Map merging measured robot B's start tilt as 2.42 degrees against a true 2.39 degrees, with no duplicated people.</p>
+<p class="muted">Live missions on AWS last 180 simulated seconds, run at most two at a time, and allow Terra up to 20 decisions each. If AWS cannot start a run, the website plays a checked recording of the same setup and says so.</p>
+<p><a href="https://main.dyhvyjxo1bz4g.amplifyapp.com/rescue/">Run a live mission on the judge website</a></p>
+</section>
 <section id="walkthrough" aria-labelledby="video-title">
-<div class="section-heading"><div><p class="eyebrow">01 / Recorded evidence</p><h2 id="video-title">Watch the search</h2></div><div class="run-control"><label for="run">Choose a run</label><select id="run" disabled><option>Loading runs</option></select></div></div>
+<div class="section-heading"><div><p class="eyebrow">01 / Recorded evidence</p><h2 id="video-title">Watch an agent test run</h2></div><div class="run-control"><label for="run">Choose a run</label><select id="run" disabled><option>Loading runs</option></select></div></div>
 <p id="run-status" role="status">Loading the run catalog.</p>
 <video id="video" controls playsinline preload="metadata" aria-label="Recorded Smoke Rescue walkthrough" aria-describedby="video-note"></video>
 <p id="video-status" role="status"></p><p id="video-note" class="muted">Walkthroughs show recorded robot views and decisions. Use fullscreen to inspect the camera panels. Simulation timestamps in the trace may differ from video playback time. The trace below provides searchable decision text.</p>
@@ -66,13 +82,6 @@
 <p class="eyebrow">03 / Offline evaluation</p><h2 id="metrics-title">With and without agents</h2>
 <p id="metrics-status" role="status">Choose a run to load metrics.</p><div id="metrics-table" class="table-wrap" role="region" aria-label="Run comparison table" tabindex="0"></div>
 <p class="muted">Values come from brain.compare_runs. Agent counters come from the run summary and can differ from the executed calls in the trace. Search area is a coverage proxy within 2.5 m of the true paths, sampled on a 0.5 m grid. It is not verified visible floor area. A survivor match uses a 1.5 m threshold. Compare duration and scenario before drawing conclusions; a short test does not establish a rescue benefit.</p>
-</section>
-<section id="try-tools" aria-labelledby="tools-title">
-<p class="eyebrow">04 / Live image tools</p><h2 id="tools-title">Try OpenCV 5 yourself</h2>
-<p>Upload an RGB PNG for visibility measurements, or a single-channel 16-bit thermal PNG encoded as kelvin × 10. These image-only endpoints do not run the full depth-based agent tools or issue robot orders.</p>
-<form id="try"><div><label for="tool">OpenCV tool</label><select id="tool"><option value="assess_visibility">assess_visibility / RGB PNG</option><option value="scan_thermal">scan_thermal / 16-bit thermal PNG</option></select></div><div><label for="file">PNG image, up to 10 MiB</label><input id="file" type="file" accept="image/png,.png" required aria-describedby="upload-note"></div><button id="send" type="submit">Analyze image</button></form>
-<p id="upload-note" class="muted">The image is sent to the agent API at this address. A plain Python static server serves the recorded results but has no API. Thermal pixels must encode temperature, not a colourized preview.</p>
-<p id="upload-status" role="status">No image submitted.</p><pre id="out" tabindex="0" aria-label="OpenCV JSON response">The JSON response will appear here.</pre>
 </section>
 </main><footer>Smoke Rescue / Simulation evidence and inspectable agent decisions. <a href="runs/README.txt">Run file format and publishing instructions</a></footer>
 </body>

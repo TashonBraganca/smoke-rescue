@@ -52,7 +52,9 @@ export default function LiveMission({ house, robots, config, onReset }: { house:
       const latest = current.current;
       const end = latest?.frames.at(-1)?.t || 0;
       const elapsed = document.hidden ? 0 : (now - previous) / 1000;
-      previous = now; clock.current = Math.min(end, advanceClock(clock.current, elapsed, rate * (quiet(latest, clock.current) ? 2 : 1), latest?.duration_s || 180));
+      // A live stream arrives at about real time: follow it smoothly instead of racing ahead and stalling.
+      const speed = latest?.validated ? rate * (quiet(latest, clock.current) ? 2 : 1) : Math.max(1, Math.min(8, (end - clock.current) * 0.8));
+      previous = now; clock.current = Math.min(end, advanceClock(clock.current, elapsed, speed, latest?.duration_s || 180));
       if (now - lastUi > 80 || clock.current >= (latest?.duration_s || 180)) { setT(clock.current); lastUi = now; }
       if (clock.current >= (latest?.duration_s || 180) && latest?.validated) setPlaying(false); else id = requestAnimationFrame(tick);
     };
@@ -68,7 +70,7 @@ export default function LiveMission({ house, robots, config, onReset }: { house:
       <div className="relative min-h-[46dvh] overflow-hidden rounded-2xl border border-white/[0.07] bg-[#0d0a15] md:min-h-0">
         {run && <Scene house={house} run={run} robots={robots} clock={clock} time={t} overview={overview} running reduced={reduced} onReady={noop} onFrame={onFrame} />}
         {visible && run && <>
-          <div className="pointer-events-none absolute left-4 top-4 flex items-center gap-2">{!replay && !done && <span className="flex items-center gap-2 rounded-full bg-[#c0392b] px-3 py-1.5 text-[12px] font-extrabold tracking-wide text-white"><span className="h-2 w-2 animate-pulse rounded-full bg-white" />LIVE · AWS</span>}<span className="rounded-full border border-white/10 bg-stage/80 px-4 py-1.5 text-[13px] font-extrabold text-whiteheat backdrop-blur">{done ? run.score.people_found : foundCount} / {house.people} people found</span></div>
+          <div className="pointer-events-none absolute left-4 top-4 flex items-center gap-2">{!replay && !done && <span className="flex items-center gap-2 rounded-full bg-[#c0392b] px-3 py-1.5 text-[12px] font-extrabold tracking-wide text-white"><span className="h-2 w-2 animate-pulse rounded-full bg-white" />LIVE · AWS Fargate · us-east-1</span>}<span className="rounded-full border border-white/10 bg-stage/80 px-4 py-1.5 text-[13px] font-extrabold text-whiteheat backdrop-blur">{done ? run.score.people_found : foundCount} / {house.people} people found</span></div>
           <div className="pointer-events-none absolute right-4 top-4 flex gap-2"><button className={chip} onClick={() => setOverview(!overview)}>{overview ? 'Follow robots' : 'Full house'}</button></div>
           {!done && <div className="pointer-events-none absolute inset-x-0 bottom-0 px-5 pb-4 pt-12" style={{ background: 'linear-gradient(to top, #0d0a15, transparent)' }}>
             <p data-caption aria-live="polite" className="max-w-[70ch] text-lg font-semibold">{caption(house, run, t)}</p>

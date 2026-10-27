@@ -80,7 +80,7 @@ export default function LiveDash({ house, run, t, live }: { house: House; run: R
       </div>
     </section>
     <section className={panel} aria-label="Team radio">
-      <div className="flex items-baseline justify-between gap-3 border-b border-white/[0.07] pb-3"><p className="flex items-baseline gap-3"><span className="text-[15px] font-bold uppercase tracking-wide">Team radio</span><span className="hidden text-[12px] text-mute sm:inline">what the robots tell each other</span></p><p className="flex items-center gap-1.5 text-[12px] text-sub"><span className={`h-2 w-2 rounded-full ${live ? 'bg-[#3fd28a]' : 'bg-mute'}`} />{live ? 'streaming from AWS' : 'radio link up'}</p></div>
+      <div className="flex items-baseline justify-between gap-3 border-b border-white/[0.07] pb-3"><p className="flex items-baseline gap-3"><span className="text-[15px] font-bold uppercase tracking-wide">Team radio</span><span className="hidden text-[12px] text-mute sm:inline">what the robots tell each other</span></p><p className="flex items-center gap-1.5 text-[12px] text-sub"><span className={`h-2 w-2 rounded-full ${live ? 'animate-pulse bg-[#3fd28a]' : 'bg-mute'}`} />{live ? `streaming from AWS · ${run.frames.length} frames` : 'radio link up'}</p></div>
       <ol ref={radio} className="mt-2 min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
         {events.length === 0 && <li className="py-2 text-[13px] text-mute">Waiting for the first radio message...</li>}
         {events.map((item, i) => {

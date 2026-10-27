@@ -184,26 +184,6 @@
       $('metrics-status').textContent = 'No comparison loaded.';
     }
   }
-  $('try').addEventListener('submit', async event => {
-    event.preventDefault();
-    const file = $('file').files[0], tool = $('tool').value;
-    $('out').textContent = '';
-    try {
-      if (!file || file.size > 10 * 1024 * 1024) throw new Error('Choose a PNG no larger than 10 MiB.');
-      const header = new Uint8Array(await file.slice(0, 33).arrayBuffer());
-      if ([137,80,78,71,13,10,26,10].some((n, i) => header[i] !== n) || header.length < 33) throw new Error('The file is not a PNG.');
-      if (tool === 'scan_thermal' && (header[24] !== 16 || header[25] !== 0)) throw new Error('Thermal input must be a single-channel 16-bit PNG encoded as kelvin × 10.');
-      if (tool === 'assess_visibility' && (header[24] !== 8 || ![2,6].includes(header[25]))) throw new Error('Visibility input must be an 8-bit RGB or RGBA PNG.');
-      $('send').disabled = true; $('upload-status').textContent = 'Sending image to OpenCV.';
-      const response = await fetch('/api/vision/' + tool, {method: 'POST', headers: {'Content-Type': 'image/png'}, body: file, signal: AbortSignal.timeout(60000)});
-      const text = await response.text();
-      let data;
-      try { data = json(JSON.parse(text)); } catch (_) { data = text; }
-      $('out').textContent = data;
-      $('upload-status').textContent = response.ok ? `Analysis complete / HTTP ${response.status}` : `API rejected the request / HTTP ${response.status}`;
-    } catch (error) { $('upload-status').textContent = `Analysis unavailable. ${error.message}`; }
-    finally { $('send').disabled = false; }
-  });
   $('refresh-health').addEventListener('click', health);
   $('run').addEventListener('change', loadRun);
   ['robot', 'tool-filter'].forEach(id => $(id).addEventListener('change', () => { visible = 30; renderTrace(); }));
