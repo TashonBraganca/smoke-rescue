@@ -362,7 +362,8 @@ def ready_cache(key):
         st = s3_json(cache_prefix(key) + 'status.json')
         if not st or st.get('state') != 'done' or not st.get('validated'):
             return None
-        if st.get('engine', {}).get('image') != ENGINE:
+        image = st.get('engine', {}).get('image') or ''
+        if image != ENGINE and not image.startswith(ENGINE + '-'):  # a063dfa1-terra3 is the same brain build with a new Terra client
             return None
         proof = st.get('gate') or {}
         if not proof.get('all_out') or proof.get('false_confirmations') != 0 or proof.get('engine_git') != st.get('engine', {}).get('git'):
@@ -461,12 +462,12 @@ def validate(rec, st, prefix):
         return 'house not in gallery'
     if st.get('setup') != rec['setup']:
         return 'recording belongs to a different setup'
-    mission_s = g['mission_s']
+    mission_s = house.get('mission_s') or g['mission_s']  # a house may set its own live mission length (27 Oct: 300 s for the HouseExpo houses)
     n = int(st.get('chunks', 0))
     sim_t = float(st.get('sim_t') or 0)
     if not math.isfinite(sim_t) or sim_t != mission_s:
         return 'sim_t %.1f < %.0f' % (sim_t, mission_s)
-    if not 1 <= n <= int(math.ceil(mission_s / 10)) + 1:  # 180 s, 10 s chunks, inclusive final frame.
+    if not 1 <= n <= int(math.ceil(mission_s / 10)) + 1:  # 10 s chunks, inclusive final frame.
         return 'invalid chunk count'
     got = chunks(prefix, 0, n)
     if len(got) != n or n == 0:
