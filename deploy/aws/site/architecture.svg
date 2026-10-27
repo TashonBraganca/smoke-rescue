@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" width="1600" height="1000" font-family="-apple-system, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif">
+<defs><marker id="hg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#6b7a90"/></marker><marker id="ht" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#a78bfa"/></marker><marker id="ho" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#ff9900"/></marker><marker id="hm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#22c5e0"/></marker><marker id="hc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#3fd28a"/></marker></defs>
+<rect width="1600" height="1000" fill="#0b0d12"/>
+<text x="48" y="58" font-size="30" font-weight="700" fill="#eef1f6">Smoke Rescue · system architecture</text>
+<text x="48" y="88" font-size="16.5" fill="#9aa5b4">One robot brain. It runs in Unity for the three filmed houses and on AWS Fargate for live missions.</text>
+<rect x="32" y="112" width="1536" height="440" rx="22" fill="#10141c" stroke="#222a37"/>
+<text x="60" y="148" font-size="14" font-weight="700" letter-spacing="1.6" fill="#9aa5b4">ON EACH ROBOT · C# BRAIN AT 60 HZ</text>
+<rect x="60" y="168" width="270" height="112" rx="14" fill="#161b25" stroke="#2a3343" stroke-width="1.2"/>
+<rect x="60" y="182" width="4" height="84" rx="2" fill="#f6a31c"/>
+<text x="82" y="202" font-size="21" font-weight="650" fill="#eef1f6">Robot A</text>
+<text x="82" y="230" font-size="15.5" fill="#9aa5b4">RGB-D camera · thermal</text>
+<text x="82" y="254" font-size="15.5" fill="#9aa5b4">planar LiDAR · IMU</text>
+<rect x="400" y="168" width="280" height="112" rx="14" fill="#161b25" stroke="#2a3343" stroke-width="1.2"/>
+<rect x="400" y="182" width="4" height="84" rx="2" fill="#f6a31c"/>
+<text x="422" y="202" font-size="21" font-weight="650" fill="#eef1f6">Reflex brain</text>
+<text x="422" y="230" font-size="15.5" fill="#9aa5b4">explore · stay safe</text>
+<text x="422" y="254" font-size="15.5" fill="#9aa5b4">walk out on its own trail</text>
+<rect x="750" y="168" width="330" height="112" rx="14" fill="#161b25" stroke="#2a3343" stroke-width="1.2"/>
+<rect x="750" y="182" width="4" height="84" rx="2" fill="#3fd28a"/>
+<text x="772" y="202" font-size="21" font-weight="650" fill="#eef1f6">OpenCV 5</text>
+<text x="772" y="230" font-size="15.5" fill="#9aa5b4">YOLO11m person check (cv2.dnn)</text>
+<text x="772" y="254" font-size="15.5" fill="#9aa5b4">ORB keyframes · TSDF 3D map</text>
+<path d="M330 224H396" fill="none" stroke="#6b7a90" stroke-width="2" marker-end="url(#hg)"/>
+<path d="M680 224H746" fill="none" stroke="#6b7a90" stroke-width="2" marker-end="url(#hg)"/>
+<rect x="60" y="392" width="270" height="112" rx="14" fill="#161b25" stroke="#2a3343" stroke-width="1.2"/>
+<rect x="60" y="406" width="4" height="84" rx="2" fill="#2f9be0"/>
+<text x="82" y="426" font-size="21" font-weight="650" fill="#eef1f6">Robot B</text>
+<text x="82" y="454" font-size="15.5" fill="#9aa5b4">RGB-D camera · thermal</text>
+<text x="82" y="478" font-size="15.5" fill="#9aa5b4">planar LiDAR · IMU</text>
+<rect x="400" y="392" width="280" height="112" rx="14" fill="#161b25" stroke="#2a3343" stroke-width="1.2"/>
+<rect x="400" y="406" width="4" height="84" rx="2" fill="#2f9be0"/>
+<text x="422" y="426" font-size="21" font-weight="650" fill="#eef1f6">Reflex brain</text>
+<text x="422" y="454" font-size="15.5" fill="#9aa5b4">explore · stay safe</text>
+<text x="422" y="478" font-size="15.5" fill="#9aa5b4">walk out on its own trail</text>
+<rect x="750" y="392" width="330" height="112" rx="14" fill="#161b25" stroke="#2a3343" stroke-width="1.2"/>
+<rect x="750" y="406" width="4" height="84" rx="2" fill="#3fd28a"/>
+<text x="772" y="426" font-size="21" font-weight="650" fill="#eef1f6">OpenCV 5</text>
+<text x="772" y="454" font-size="15.5" fill="#9aa5b4">YOLO11m person check (cv2.dnn)</text>
+<text x="772" y="478" font-size="15.5" fill="#9aa5b4">ORB keyframes · TSDF 3D map</text>
+<path d="M330 448H396" fill="none" stroke="#6b7a90" stroke-width="2" marker-end="url(#hg)"/>
+<path d="M680 448H746" fill="none" stroke="#6b7a90" stroke-width="2" marker-end="url(#hg)"/>
+<rect x="430" y="300" width="220" height="72" rx="14" fill="#161b25" stroke="#a78bfa" stroke-width="1.6" stroke-dasharray="7 6"/>
+<text x="452" y="334" font-size="18" font-weight="650" fill="#eef1f6">Terra · GPT-5.6</text>
+<text x="452" y="358" font-size="14" fill="#9aa5b4">suggests the next room</text>
+<path d="M540 300V284" fill="none" stroke="#a78bfa" stroke-width="2" stroke-dasharray="6 6" marker-end="url(#ht)"/>
+<path d="M540 372V388" fill="none" stroke="#a78bfa" stroke-width="2" stroke-dasharray="6 6" marker-end="url(#ht)"/>
+<text x="672" y="332" font-size="13.5" fill="#a78bfa">advises only.</text>
+<text x="672" y="352" font-size="13.5" fill="#a78bfa">The brain rechecks</text>
+<text x="672" y="372" font-size="13.5" fill="#a78bfa">every order.</text>
+<rect x="1160" y="168" width="380" height="336" rx="14" fill="#161b25" stroke="#2a3343" stroke-width="1.2"/>
+<rect x="1160" y="182" width="4" height="308" rx="2" fill="#22c5e0"/>
+<text x="1182" y="202" font-size="21" font-weight="650" fill="#eef1f6">Shared map</text>
+<text x="1182" y="226" font-size="15.5" fill="#9aa5b4">sent over a lossy radio, 8 KB per message</text>
+<circle cx="1190" cy="284" r="4" fill="#22c5e0"/>
+<text x="1206" y="289" font-size="16" fill="#eef1f6">7.6 KB ORB keyframes from each robot</text>
+<circle cx="1190" cy="332" r="4" fill="#22c5e0"/>
+<text x="1206" y="337" font-size="16" fill="#eef1f6">ORB match + RANSAC links the two maps</text>
+<circle cx="1190" cy="380" r="4" fill="#22c5e0"/>
+<text x="1206" y="385" font-size="16" fill="#eef1f6">LiDAR check before each link</text>
+<circle cx="1190" cy="428" r="4" fill="#22c5e0"/>
+<text x="1206" y="433" font-size="16" fill="#eef1f6">room claims · people found · fire</text>
+<path d="M1080 224H1156" fill="none" stroke="#22c5e0" stroke-width="2" marker-end="url(#hm)"/>
+<path d="M1080 448H1156" fill="none" stroke="#22c5e0" stroke-width="2" marker-end="url(#hm)"/>
+<text x="60" y="532" font-size="14" fill="#9aa5b4">Runs in</text>
+<rect x="124" y="512" width="349.9" height="30" rx="15" fill="#eef1f6" fill-opacity="0.12" stroke="#eef1f6" stroke-opacity="0.55"/>
+<text x="298.95" y="532" font-size="14" font-weight="600" fill="#eef1f6" text-anchor="middle">Unity 6 HDRP on a Mac → 3 filmed houses</text>
+<rect x="487.9" y="512" width="406.59999999999997" height="30" rx="15" fill="#ff9900" fill-opacity="0.12" stroke="#ff9900" stroke-opacity="0.55"/>
+<text x="691.1999999999999" y="532" font-size="14" font-weight="600" fill="#ff9900" text-anchor="middle">Headless engine on AWS Fargate → live missions</text>
+<rect x="32" y="584" width="1536" height="384" rx="22" fill="#10141c" stroke="#ff9900" stroke-opacity="0.45"/>
+<text x="60" y="620" font-size="14" font-weight="700" letter-spacing="1.6" fill="#ff9900">DEPLOYED ON AWS · US-EAST-1</text>
+<rect x="60" y="650" width="210" height="100" rx="14" fill="#161b25" stroke="#2a3343" stroke-width="1.2"/>
+<text x="82" y="684" font-size="21" font-weight="650" fill="#eef1f6">Judge's browser</text>
+<text x="82" y="712" font-size="15.5" fill="#9aa5b4">picks a house</text>
+<text x="82" y="736" font-size="15.5" fill="#9aa5b4">watches it run</text>
+<rect x="360" y="650" width="210" height="100" rx="14" fill="#161b25" stroke="#2a3343" stroke-width="1.2"/>
+<rect x="360" y="664" width="4" height="72" rx="2" fill="#ff9900"/>
+<text x="382" y="684" font-size="21" font-weight="650" fill="#eef1f6">Amplify</text>
+<text x="382" y="712" font-size="15.5" fill="#9aa5b4">judge website</text>
+<text x="382" y="736" font-size="15.5" fill="#9aa5b4">3D view · map · radio</text>
+<rect x="660" y="650" width="240" height="100" rx="14" fill="#161b25" stroke="#2a3343" stroke-width="1.2"/>
+<rect x="660" y="664" width="4" height="72" rx="2" fill="#ff9900"/>
+<text x="682" y="684" font-size="19.5" font-weight="650" fill="#eef1f6">Lambda Function URL</text>
+<text x="682" y="712" font-size="15.5" fill="#9aa5b4">mission API</text>
+<text x="682" y="736" font-size="15.5" fill="#9aa5b4">report page</text>
+<rect x="990" y="650" width="280" height="100" rx="14" fill="#161b25" stroke="#2a3343" stroke-width="1.2"/>
+<rect x="990" y="664" width="4" height="72" rx="2" fill="#ff9900"/>
+<text x="1012" y="684" font-size="21" font-weight="650" fill="#eef1f6">ECS Fargate ARM64</text>
+<text x="1012" y="712" font-size="15.5" fill="#9aa5b4">one engine task per mission</text>
+<text x="1012" y="736" font-size="15.5" fill="#9aa5b4">runs the same robot brain</text>
+<rect x="1360" y="650" width="180" height="100" rx="14" fill="#161b25" stroke="#a78bfa" stroke-width="1.6" stroke-dasharray="7 6"/>
+<text x="1382" y="684" font-size="19.5" font-weight="650" fill="#eef1f6">Azure OpenAI</text>
+<text x="1382" y="712" font-size="15.5" fill="#9aa5b4">GPT-5.6 Terra</text>
+<text x="1382" y="736" font-size="15.5" fill="#9aa5b4">outside AWS</text>
+<path d="M270 700H356" fill="none" stroke="#6b7a90" stroke-width="2" marker-end="url(#hg)"/>
+<text x="315" y="688" font-size="13.5" fill="#9aa5b4" text-anchor="middle">loads</text>
+<path d="M570 700H656" fill="none" stroke="#6b7a90" stroke-width="2" marker-end="url(#hg)"/>
+<text x="615" y="688" font-size="13.5" fill="#9aa5b4" text-anchor="middle">start, poll</text>
+<path d="M900 700H986" fill="none" stroke="#6b7a90" stroke-width="2" marker-end="url(#hg)"/>
+<text x="945" y="688" font-size="13.5" fill="#9aa5b4" text-anchor="middle">starts task</text>
+<path d="M1270 700H1356" fill="none" stroke="#a78bfa" stroke-width="2" stroke-dasharray="6 6" marker-end="url(#ht)"/>
+<text x="1315" y="688" font-size="13.5" fill="#9aa5b4" text-anchor="middle">≤ 20 calls</text>
+<rect x="990" y="800" width="120" height="92" rx="14" fill="#161b25" stroke="#2a3343" stroke-width="1.2"/>
+<rect x="990" y="814" width="4" height="64" rx="2" fill="#ff9900"/>
+<text x="1012" y="834" font-size="19" font-weight="650" fill="#eef1f6">S3</text>
+<text x="1012" y="862" font-size="15.5" fill="#9aa5b4">frames and</text>
+<text x="1012" y="886" font-size="15.5" fill="#9aa5b4">replays</text>
+<rect x="1125" y="800" width="145" height="92" rx="14" fill="#161b25" stroke="#2a3343" stroke-width="1.2"/>
+<rect x="1125" y="814" width="4" height="64" rx="2" fill="#ff9900"/>
+<text x="1147" y="834" font-size="19" font-weight="650" fill="#eef1f6">DynamoDB</text>
+<text x="1147" y="862" font-size="15.5" fill="#9aa5b4">run and</text>
+<text x="1147" y="886" font-size="15.5" fill="#9aa5b4">Terra limits</text>
+<path d="M1050 750V796" fill="none" stroke="#6b7a90" stroke-width="2" marker-end="url(#hg)"/>
+<path d="M1197 750V796" fill="none" stroke="#6b7a90" stroke-width="2" marker-end="url(#hg)"/>
+<path d="M990 846H780V754" fill="none" stroke="#6b7a90" stroke-width="2" marker-end="url(#hg)"/>
+<text x="885" y="836" font-size="13.5" fill="#9aa5b4" text-anchor="middle">frames every 1.5 s</text>
+<path d="M691.1999999999999 542V568H1130V646" fill="none" stroke="#ff9900" stroke-width="2" stroke-dasharray="6 6" marker-end="url(#ho)"/>
+<text x="1142" y="626" font-size="13.5" fill="#9aa5b4" text-anchor="start">same code</text>
+<rect x="60" y="800" width="250" height="92" rx="14" fill="#161b25" stroke="#2a3343" stroke-width="1.2"/>
+<text x="82" y="834" font-size="19" font-weight="650" fill="#eef1f6">AWS Batch</text>
+<text x="82" y="862" font-size="15.5" fill="#9aa5b4">offline SLAM jobs</text>
+<rect x="330" y="800" width="250" height="92" rx="14" fill="#161b25" stroke="#2a3343" stroke-width="1.2"/>
+<text x="352" y="834" font-size="19" font-weight="650" fill="#eef1f6">Budget alarm</text>
+<text x="352" y="862" font-size="15.5" fill="#9aa5b4">55 USD a month</text>
+<text x="60" y="940" font-size="14" fill="#9aa5b4">If AWS cannot start a run, the website plays a checked recording of the same setup and labels it on screen.</text>
+</svg>

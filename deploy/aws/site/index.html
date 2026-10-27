@@ -17,39 +17,8 @@
 <p class="eyebrow">Two robot dogs. One burning house. No map.</p>
 <h1 id="about-title">Search through smoke.<br>Inspect every decision.</h1>
 <p class="intro">Smoke Rescue sends two quadruped robots into a burning house they have never seen. Each robot runs the same onboard brain: it explores room by room, finds people with OpenCV 5 colour and thermal detection, and builds a map it shares with its partner over a lossy radio. OpenCV 5 ORB place recognition corrects the shared map when one robot sees a place the other already mapped. Terra, a GPT-5.6 agent, reads each robot's report a few times per mission and suggests the next room to search; the brain checks every suggestion and keeps moving while Terra thinks. When the search is done, both robots walk out along their own trail.</p>
-<figure class="architecture" tabindex="0" role="group" aria-label="System architecture diagram. Scroll horizontally on small screens.">
-<svg viewBox="0 0 1000 600" role="img" aria-labelledby="arch-title arch-desc">
-<title id="arch-title">Smoke Rescue robot brain and its AWS deployment</title>
-<desc id="arch-desc">Robot A and robot B each have RGB-D, thermal and IMU sensors and the same reflex brain. OpenCV 5 detects people and recognises places. The robots share one map over a lossy radio. Terra, GPT-5.6, suggests search targets that the brain checks. The same brain runs in Unity on a Mac for the filmed houses and in a headless simulator on AWS for live missions. On AWS, Amplify serves the judge website, a Lambda Function URL serves this report and the mission API, ECS Fargate ARM64 runs one engine task per live mission, S3 stores runs and checked replays, DynamoDB holds run and Terra limits, the engine calls GPT-5.6 Terra on Azure OpenAI, AWS Batch runs offline SLAM, and a budget alarm caps spend at 55 dollars a month.</desc>
-<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z"/></marker></defs>
-<rect class="zone" x="10" y="10" width="560" height="580" rx="8"/><text class="svg-label" x="30" y="42">ROBOT BRAIN / SAME CODE IN UNITY AND ON AWS</text>
-<rect x="30" y="64" width="240" height="70"/><text x="45" y="92">Robot A</text><text class="svg-small" x="45" y="117">RGB-D · thermal · IMU</text>
-<rect x="310" y="64" width="240" height="70"/><text x="325" y="92">Robot B</text><text class="svg-small" x="325" y="117">RGB-D · thermal · IMU</text>
-<path class="flow" d="M150 134V159M430 134V159"/>
-<rect x="30" y="162" width="240" height="70"/><text x="45" y="190">Reflex brain A</text><text class="svg-small" x="45" y="215">Explore · safety · rooms</text>
-<rect x="310" y="162" width="240" height="70"/><text x="325" y="190">Reflex brain B</text><text class="svg-small" x="325" y="215">Explore · safety · rooms</text>
-<path class="flow" d="M150 232V257M430 232V257"/>
-<rect x="30" y="260" width="520" height="62"/><text x="45" y="287">OpenCV 5 perception</text><text class="svg-small" x="45" y="310">Colour + thermal person detection · ORB place recognition</text>
-<path class="flow" d="M290 322V347"/>
-<rect x="30" y="350" width="520" height="62"/><text x="45" y="377">Shared map over a lossy radio</text><text class="svg-small" x="45" y="400">Map merge · loop closures · room claims · people found</text>
-<path class="flow" d="M290 412V437"/>
-<rect class="agent-box" x="30" y="440" width="520" height="62"/><text x="45" y="467">Terra agent (GPT-5.6)</text><text class="svg-small" x="45" y="490">Suggests the next room · the brain rechecks every order</text>
-<rect x="30" y="522" width="250" height="50"/><text class="svg-small" x="45" y="552">Unity on a Mac → 3 filmed houses</text>
-<rect x="300" y="522" width="250" height="50"/><text class="svg-small" x="315" y="552">Headless engine → live on AWS</text>
-<rect class="zone" x="590" y="10" width="400" height="580" rx="8"/><text class="svg-label" x="610" y="42">AWS / DEPLOYED IN US-EAST-1</text>
-<rect x="610" y="64" width="360" height="50"/><text x="625" y="95">Amplify · judge website</text>
-<path class="flow" d="M790 114V135"/>
-<rect x="610" y="138" width="360" height="62"/><text x="625" y="165">Lambda Function URL</text><text class="svg-small" x="625" y="188">This report + mission API</text>
-<path class="flow" d="M790 200V221"/>
-<rect class="agent-box" x="610" y="224" width="360" height="62"/><text x="625" y="251">ECS Fargate ARM64</text><text class="svg-small" x="625" y="274">One engine task per live mission</text>
-<rect x="610" y="306" width="175" height="62"/><text class="svg-small" x="625" y="332">S3 · runs and</text><text class="svg-small" x="625" y="354">checked replays</text>
-<rect x="795" y="306" width="175" height="62"/><text class="svg-small" x="810" y="332">DynamoDB · run</text><text class="svg-small" x="810" y="354">and Terra limits</text>
-<rect x="610" y="388" width="360" height="62"/><text x="625" y="415">GPT-5.6 Terra</text><text class="svg-small" x="625" y="438">Azure OpenAI, called from the engine</text>
-<rect x="610" y="470" width="360" height="42"/><text class="svg-small" x="625" y="497">AWS Batch · offline SLAM jobs</text>
-<rect x="610" y="526" width="360" height="42"/><text class="svg-small" x="625" y="553">Budget alarm · 55 USD a month</text>
-<path class="flow remote" d="M550 547H580V255H607M550 466H572V419H607"/>
-</svg>
-<figcaption>Deployed and running on 27 October 2026. Live missions run the brain in a headless simulator on Fargate; it has no rendered camera images, so the website draws the streamed robot poses, maps and finds in 3D. The three filmed houses are recordings of the same brain in Unity HDRP. A Bedrock path for Terra is built and waits on the model's Marketplace agreement.</figcaption>
+<figure class="architecture"><img src="architecture.svg" width="1600" height="1000" style="width:100%;height:auto;display:block;border-radius:12px" alt="Smoke Rescue architecture. Top: on each robot, sensors feed a C# reflex brain and OpenCV 5 perception, Terra (GPT-5.6) suggests rooms that the brain rechecks, and both robots build one shared map over a lossy radio. Bottom: on AWS us-east-1, the judge's browser loads the Amplify website, the Lambda mission API starts one ECS Fargate ARM64 engine task per mission, the task writes frames to S3 and limits to DynamoDB and calls GPT-5.6 Terra on Azure OpenAI.">
+<figcaption>Deployed and running on 27 October 2026. Live missions run the brain in a headless simulator on Fargate. It has no rendered camera images, so the website draws the streamed robot poses, maps and finds in 3D. The three filmed houses are recordings of the same brain in Unity HDRP.</figcaption>
 </figure>
 </section>
 <section id="results" aria-labelledby="results-title">
