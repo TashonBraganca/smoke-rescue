@@ -17,7 +17,7 @@
 <p class="eyebrow">Two robot dogs. One burning house. No map.</p>
 <h1 id="about-title">Search through smoke.<br>Inspect every decision.</h1>
 <p class="intro">Smoke Rescue sends two quadruped robots into a burning house they have never seen. Each robot runs the same onboard brain: it explores room by room, finds people with OpenCV 5 colour and thermal detection, and builds a map it shares with its partner over a lossy radio. OpenCV 5 ORB place recognition corrects the shared map when one robot sees a place the other already mapped. Terra, a GPT-5.6 agent, reads each robot's report a few times per mission and suggests the next room to search; the brain checks every suggestion and keeps moving while Terra thinks. When the search is done, both robots walk out along their own trail.</p>
-<figure class="architecture"><img src="architecture.svg" width="1600" height="1000" style="width:100%;height:auto;display:block;border-radius:12px" alt="Smoke Rescue architecture. Top: on each robot, sensors feed a C# reflex brain and OpenCV 5 perception, Terra (GPT-5.6) suggests rooms that the brain rechecks, and both robots build one shared map over a lossy radio. Bottom: on AWS us-east-1, the judge's browser loads the Amplify website, the Lambda mission API starts one ECS Fargate ARM64 engine task per mission, the task writes frames to S3 and limits to DynamoDB and calls GPT-5.6 Terra on Azure OpenAI.">
+<figure class="architecture"><img src="architecture.svg" width="1600" height="1000" style="width:100%;height:auto;display:block;border-radius:12px" alt="Smoke Rescue architecture. Top: on each robot, sensors feed a C# reflex brain and OpenCV 5, Terra suggests rooms that the brain checks, and both robots build one shared map over a lossy radio. Bottom: on AWS, the judge website on Amplify calls a Lambda mission API, which launches an ECS Fargate task that runs the robot brain, stores frames in S3, tracks runs in DynamoDB and asks GPT-5.6 Terra for room suggestions.">
 <figcaption>Deployed and running on 27 October 2026. Live missions run the brain in a headless simulator on Fargate. It has no rendered camera images, so the website draws the streamed robot poses, maps and finds in 3D. The three filmed houses are recordings of the same brain in Unity HDRP.</figcaption>
 </figure>
 </section>
@@ -31,7 +31,7 @@
 <tr><td>One-door house</td><td>4 of 5</td><td>0</td><td>Yes, along their own trail, at 454 s and 463 s</td><td>7:44</td></tr>
 </tbody></table></div>
 <p>On 39 real floor plans the brain had never seen (HouseExpo, headless simulator, 25 October 2026), two robots sharing one map found 99% of people and one robot found 92% (p = 0.002). Map merging measured robot B's start tilt as 2.42 degrees against a true 2.39 degrees, with no duplicated people.</p>
-<p class="muted">Live missions on AWS last 180 simulated seconds, run at most two at a time, and allow Terra up to 20 decisions each. If AWS cannot start a run, the website plays a checked recording of the same setup and says so.</p>
+
 <p><a href="https://main.dyhvyjxo1bz4g.amplifyapp.com/rescue/">Run a live mission on the judge website</a></p>
 </section>
 <section id="walkthrough" aria-labelledby="video-title">
