@@ -1,0 +1,319 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Smoke Rescue "Run your own rescue" (tools/ryor/CONTRACT.txt). Private runs bucket, engine ECR repo, Fargate ARM64
+  task definition for one headless mission, DynamoDB table for per-IP limits and mission records, failure alarm.
+  The mission API itself lives in the site Lambda (stack smoke-rescue-site), which attaches LambdaPolicyArn.
+  Deploy with deploy/aws/deploy_ryor.sh.
+
+Parameters:
+  ClusterName:
+    Type: String
+    Default: smoke-rescue
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Default: vpc-068c8e196666ec000
+  ImageTag:
+    Type: String
+    Default: latest
+    Description: Tag in the smoke-rescue/ryor-engine ECR repo.
+  ImageUri:
+    Type: String
+    Default: ""
+    Description: >-
+      Full image URI that replaces the ECR repo image when set. Used for the stand-in container before the engine image
+      exists (e.g. public.ecr.aws/aws-cli/aws-cli:2.17.0).
+  StandInScript:
+    Type: String
+    Default: ""
+    Description: When set, the container runs ["bash", "-c", StandInScript] instead of its own entrypoint (tests only).
+  StandInSleep:
+    Type: String
+    Default: "4"
+    Description: Seconds the stand-in waits between chunks.
+  Cpu:
+    Type: String
+    Default: "2048"
+    Description: Two robot sensing threads fit on two vCPUs. The API overrides this to four for trio missions.
+  MemoryMb:
+    Type: String
+    Default: "4096"
+    Description: Fargate's supported two-vCPU memory size, with room for three detached brain grids and replay buffers.
+  SiteLogGroup:
+    Type: String
+    Default: /aws/lambda/smoke-rescue-site
+  AlarmTopicArn:
+    Type: String
+    Default: arn:aws:sns:us-east-1:968000946565:smoke-rescue-alarms
+    Description: SNS topic from stack smoke-rescue-budget. Empty for no notification.
+  TerraSecretArn:
+    Type: String
+    Default: arn:aws:secretsmanager:us-east-1:968000946565:secret:smoke-rescue/azure-mUTy2N
+    Description: Existing Azure agent credential. Only the mission task reads it, never the public Lambda.
+
+Conditions:
+  HasImageUri: !Not [!Equals [!Ref ImageUri, ""]]
+  HasStandIn: !Not [!Equals [!Ref StandInScript, ""]]
+  HasTopic: !Not [!Equals [!Ref AlarmTopicArn, ""]]
+
+Resources:
+  RunsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub "smoke-rescue-ryor-runs-${AWS::AccountId}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+      OwnershipControls:
+        Rules: [{ ObjectOwnership: BucketOwnerEnforced }]
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-live-missions
+            Status: Enabled
+            Prefix: ryor/missions/
+            ExpirationInDays: 7
+          - Id: abort-multipart
+            Status: Enabled
+            AbortIncompleteMultipartUpload: { DaysAfterInitiation: 1 }
+          - Id: expire-custom-recordings
+            Status: Enabled
+            Prefix: ryor/cache-custom/
+            ExpirationInDays: 7
+          - Id: expire-placement-requests
+            Status: Enabled
+            Prefix: ryor/requests/
+            ExpirationInDays: 7
+      Tags: [{ Key: Project, Value: smoke-rescue }]
+
+  EngineRepo:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: smoke-rescue/ryor-engine
+      # Placement cache identities include the engine tag. A tag must never silently name different bytes.
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration: { ScanOnPush: true }
+      LifecyclePolicy:
+        LifecyclePolicyText: >-
+          {"rules":[{"rulePriority":1,"description":"keep the 10 newest images",
+          "selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":10},
+          "action":{"type":"expire"}}]}
+      Tags: [{ Key: Project, Value: smoke-rescue }]
+
+  TaskLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/smoke-rescue-ryor
+      RetentionInDays: 14
+
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ecs-tasks.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: pull-and-log
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: "*"
+              - Effect: Allow
+                Action: [ecr:BatchGetImage, ecr:GetDownloadUrlForLayer, ecr:BatchCheckLayerAvailability]
+                Resource: !GetAtt EngineRepo.Arn
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !Sub "${TaskLogs.Arn}"
+
+  # Each engine writes mission files, reads submitted scene bytes and reserves bounded Terra steps.
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ecs-tasks.amazonaws.com }
+            Action: sts:AssumeRole
+            Condition:
+              ArnLike: { "aws:SourceArn": !Sub "arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:*" }
+      Policies:
+        - PolicyName: write-missions
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: s3:PutObject
+                Resource: !Sub "${RunsBucket.Arn}/ryor/missions/*"
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub "${RunsBucket.Arn}/ryor/requests/*"
+              - Effect: Allow
+                Action: [dynamodb:TransactWriteItems, dynamodb:UpdateItem]
+                Resource: !GetAtt Table.Arn
+                Condition:
+                  ForAllValues:StringLike: { "dynamodb:LeadingKeys": ["terra#*"] }
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Ref TerraSecretArn
+              # GPT-5.6 Terra on Amazon Bedrock (TERRA_BACKEND=bedrock); the Azure secret above stays as the rollback.
+              - Effect: Allow
+                Action: bedrock:InvokeModel
+                Resource: !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/openai.gpt-5.6-terra"
+
+  TaskSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ryor engine tasks, egress only (ECR pull, S3, logs). No ingress.
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      Tags: [{ Key: Project, Value: smoke-rescue }]
+
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: smoke-rescue-ryor
+      RequiresCompatibilities: [FARGATE]
+      NetworkMode: awsvpc
+      Cpu: !Ref Cpu
+      Memory: !Ref MemoryMb
+      RuntimePlatform: { CpuArchitecture: ARM64, OperatingSystemFamily: LINUX }
+      ExecutionRoleArn: !GetAtt ExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
+      ContainerDefinitions:
+        - Name: engine
+          Image: !If [HasImageUri, !Ref ImageUri, !Sub "${EngineRepo.RepositoryUri}:${ImageTag}"]
+          Essential: true
+          EntryPoint: !If [HasStandIn, [bash, -c], !Ref "AWS::NoValue"]
+          Command: !If [HasStandIn, [!Ref StandInScript], !Ref "AWS::NoValue"]
+          StopTimeout: 10
+          # MISSION_ID, SETUP, BUCKET and PREFIX come from the API as overrides on every run. HARD_LIMIT_S is the
+          # engine's own exit (tools/ryor/entry.py); the API stops the task at 600 s regardless.
+          Environment:
+            - { Name: BUCKET, Value: !Ref RunsBucket }
+            - { Name: HARD_LIMIT_S, Value: "540" }
+            - { Name: IMAGE_TAG, Value: !If [HasImageUri, !Ref ImageUri, !Ref ImageTag] }
+            - { Name: STANDIN_SLEEP, Value: !Ref StandInSleep }
+            - { Name: RYOR_TABLE, Value: !Ref Table }
+            - { Name: TERRA_SECRET_ARN, Value: !Ref TerraSecretArn }
+            - { Name: TERRA_BACKEND, Value: azure }              # bedrock needs the GPT-5.6 Terra Marketplace agreement (27 Oct: not active)
+            - { Name: TERRA_REASONING_EFFORT, Value: medium }
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref TaskLogs
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: engine
+      Tags: [{ Key: Project, Value: smoke-rescue }]
+
+  # pk "ip#<ip>#<hour>" counts POSTs per source IP per clock hour; pk "m#<id>" is one mission record; pk "lock" serialises
+  # the cap check with RunTask. Every item carries ttl (epoch s).
+  Table:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: smoke-rescue-ryor
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions: [{ AttributeName: pk, AttributeType: S }]
+      KeySchema: [{ AttributeName: pk, KeyType: HASH }]
+      TimeToLiveSpecification: { AttributeName: ttl, Enabled: true }
+      Tags: [{ Key: Project, Value: smoke-rescue }]
+
+  # Everything the mission API in the site Lambda needs, attached by the site stack.
+  LambdaPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: smoke-rescue-site Lambda access for the ryor mission API.
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: ecs:RunTask
+            Resource: !Sub "arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:task-definition/smoke-rescue-ryor:*"
+            Condition:
+              ArnEquals: { "ecs:cluster": !Sub "arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:cluster/${ClusterName}" }
+          - Effect: Allow
+            Action: [ecs:StopTask, ecs:DescribeTasks]
+            Resource: !Sub "arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:task/${ClusterName}/*"
+          - Effect: Allow
+            Action: ecs:ListTasks
+            Resource: "*"
+            Condition:
+              ArnEquals: { "ecs:cluster": !Sub "arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:cluster/${ClusterName}" }
+          - Effect: Allow
+            Action: iam:PassRole
+            Resource: [!GetAtt ExecutionRole.Arn, !GetAtt TaskRole.Arn]
+            Condition:
+              StringEquals: { "iam:PassedToService": ecs-tasks.amazonaws.com }
+          - Effect: Allow
+            Action: [dynamodb:GetItem, dynamodb:PutItem, dynamodb:UpdateItem, dynamodb:DeleteItem]
+            Resource: !GetAtt Table.Arn
+          - Effect: Allow
+            Action: s3:GetObject
+            Resource: !Sub "${RunsBucket.Arn}/ryor/*"
+          - Effect: Allow
+            Action: s3:PutObject
+            Resource: [!Sub "${RunsBucket.Arn}/ryor/requests/*", !Sub "${RunsBucket.Arn}/ryor/cache/*", !Sub "${RunsBucket.Arn}/ryor/cache-custom/*"]
+          - Effect: Allow
+            Action: s3:ListBucket
+            Resource: !GetAtt RunsBucket.Arn
+            Condition:
+              StringLike: { "s3:prefix": ["ryor/*"] }
+
+  # "RYOR_FAIL <mission> <reason>" from the API or the engine counts as one failure.
+  LambdaFailFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref SiteLogGroup
+      FilterPattern: '"RYOR_FAIL"'
+      MetricTransformations:
+        - { MetricNamespace: SmokeRescue/Ryor, MetricName: RyorFail, MetricValue: "1", DefaultValue: 0 }
+
+  TaskFailFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref TaskLogs
+      FilterPattern: '"RYOR_FAIL"'
+      MetricTransformations:
+        - { MetricNamespace: SmokeRescue/Ryor, MetricName: RyorFail, MetricValue: "1", DefaultValue: 0 }
+
+  FailAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: smoke-rescue-ryor-fail
+      AlarmDescription: A live mission failed, timed out or failed validation (RYOR_FAIL lines); the judge saw the recorded fallback.
+      Namespace: SmokeRescue/Ryor
+      MetricName: RyorFail
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: !If [HasTopic, [!Ref AlarmTopicArn], !Ref "AWS::NoValue"]
+
+Outputs:
+  RunsBucketName: { Value: !Ref RunsBucket }
+  EngineRepositoryUri: { Value: !GetAtt EngineRepo.RepositoryUri }
+  TaskDefinitionFamily: { Value: smoke-rescue-ryor }
+  TaskDefinitionArn: { Value: !Ref TaskDefinition }
+  ClusterName: { Value: !Ref ClusterName }
+  TaskSecurityGroupId: { Value: !Ref TaskSecurityGroup }
+  TaskLogGroup: { Value: !Ref TaskLogs }
+  TableName: { Value: !Ref Table }
+  LambdaPolicyArn: { Value: !Ref LambdaPolicy }
+  ImageInUse: { Value: !If [HasImageUri, !Ref ImageUri, !Sub "${EngineRepo.RepositoryUri}:${ImageTag}"] }
+  ImageLabel: { Value: !If [HasImageUri, !Ref ImageUri, !Ref ImageTag] }

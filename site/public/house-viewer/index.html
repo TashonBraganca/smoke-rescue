@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ranch house viewer</title>
+<style>
+:root{--bg:#f3f1ec;--panel:#ffffffd9;--ink:#1f2326;--muted:#5a6168;--line:#c9c4b8;--accent:#c4510a;--btn:#fff;--btn-on:#1f2326;--btn-on-ink:#fff;--sky:#cfe3f0}
+@media (prefers-color-scheme:dark){:root{--bg:#14171a;--panel:#1d2226e6;--ink:#e8e6e1;--muted:#a0a7ae;--line:#3a4249;--accent:#ff8a3d;--btn:#242a2f;--btn-on:#e8e6e1;--btn-on-ink:#14171a;--sky:#1c2833}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,Segoe UI,sans-serif;overflow-x:hidden}
+body{display:flex;flex-direction:column;padding:12px 16px;gap:8px;min-height:100vh}
+h1{font-size:18px;margin:0}
+.bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+button{font:inherit;color:var(--ink);background:var(--btn);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer;min-height:36px}
+button[aria-pressed=true]{background:var(--btn-on);color:var(--btn-on-ink);border-color:var(--btn-on)}
+#stage{position:relative;min-width:0;width:100%;flex:1;min-height:360px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--sky)}
+canvas{position:absolute;left:0;top:0;width:100%;height:100%;display:block;touch-action:none}
+#legend{position:absolute;left:8px;bottom:8px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:12px;max-width:calc(100% - 16px)}
+#legend span{display:inline-flex;align-items:center;gap:5px;margin-right:10px;white-space:nowrap}
+#legend i{width:11px;height:11px;border-radius:3px;display:inline-block;border:1px solid #0004}
+#hint{position:absolute;right:8px;top:8px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:4px 9px;font-size:12px;color:var(--muted)}
+#pad{position:absolute;right:10px;bottom:10px;display:none;grid-template-columns:repeat(3,44px);gap:4px}
+#pad button{padding:0;min-height:44px;opacity:.85}
+p.cap{margin:0;color:var(--muted);font-size:12px}
+#err{display:none;position:fixed;left:16px;right:16px;top:60px;background:#b00020;color:#fff;padding:8px;border-radius:6px;z-index:9;white-space:pre-wrap;font-size:12px}
+</style></head><body>
+<h1>Ranch house viewer</h1>
+<div class="bar">
+<button id="bFam" aria-pressed="true">Three-bed ranch</button>
+<button id="bLong" aria-pressed="false">Long ranch</button>
+<button id="bRoof" aria-pressed="false">Roof</button>
+<button id="bCut" aria-pressed="false">Walls cut to 1.2 m</button>
+<button id="bWalk" aria-pressed="false">Walk inside</button>
+<button id="bReset">Reset view</button>
+</div>
+<div id="stage"><canvas id="c"></canvas>
+<div id="hint">Drag to orbit, pinch or wheel to zoom</div>
+<div id="legend"></div>
+<div id="pad"><span></span><button data-k="w">&#9650;</button><span></span><button data-k="a">&#9664;</button><button data-k="s">&#9660;</button><button data-k="d">&#9654;</button></div></div>
+<p class="cap">Generated from the same floorplan JSON Unity builds the house from; furniture shown as boxes.</p>
+<div id="err"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+// House data lives in houses.json next to this page, so a redesigned house is swapped by replacing that file.
+let HOUSES={};
+</script>
+<script>
+window.addEventListener('error',e=>{const d=document.getElementById('err');d.style.display='block';d.textContent+=(e.message||'error')+'\n';document.title='ERR';});
+const $=id=>document.getElementById(id);
+const canvas=$('c'),stage=$('stage');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+const scene=new THREE.Scene();
+const dark=true;  // embedded in the dark Smoke Rescue sitescene.background=new THREE.Color(dark?0x1c2833:0xcfe3f0);
+const camera=new THREE.PerspectiveCamera(55,1,0.05,300);
+const orbit=new THREE.OrbitControls(camera,canvas);
+orbit.enableDamping=true;orbit.maxPolarAngle=Math.PI*0.495;
+scene.add(new THREE.HemisphereLight(0xffffff,0x6b705a,0.75));
+const sun=new THREE.DirectionalLight(0xfff2dd,0.7);sun.position.set(-10,25,-8);scene.add(sun);
+
+// Furniture sizes in metres [w along local x, h, d along local z] and colour. Assumed, not from the JSON.
+const SIZES={apartment_modern_sofa:[2.0,0.8,0.9,0x6d7f99],blue_double_bed:[1.6,0.55,2.0,0x3b6fb6],
+ clawfoot_bathtub:[1.7,0.55,0.75,0xe8ecef],console_table_with_vase:[1.0,0.8,0.4,0x8a5a36],
+ stove_and_hood:[0.7,1.0,0.65,0x444a50],tall_steel_fridge:[0.75,1.8,0.7,0xaab3ba],utility_washer:[0.6,0.85,0.6,0xdfe3e6]};
+const FLOOR={wood_oak_planks:0x8f6a45,ceramic_tiles_checker:0xaec4cf,carpet:0x8e8a9a};
+const WALLC={paint_warm_grey_textured:0xd8d2c8,ceramic_tiles_large_white:0xf1f1ee};
+
+let house=null,key='family',groups={},roofOn=false,cut=false,walk=false,H=null;
+const world=new THREE.Group();scene.add(world);
+const mat=(c,o)=>new THREE.MeshLambertMaterial(Object.assign({color:c},o||{}));
+function box(w,h,d,c,x,y,z,m){const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m||mat(c));mesh.position.set(x,y,z);return mesh}
+function label(text,color,size){const cv=document.createElement('canvas');cv.width=256;cv.height=64;const g=cv.getContext('2d');
+ g.font='bold 30px system-ui,sans-serif';g.textAlign='center';g.textBaseline='middle';
+ const w=Math.min(250,g.measureText(text).width+24);g.fillStyle='rgba(20,23,26,.72)';g.fillRect(128-w/2,8,w,48);
+ g.fillStyle=color||'#fff';g.fillText(text,128,33);
+ const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv),depthTest:false,transparent:true}));
+ s.scale.set(size||2.2,(size||2.2)/4,1);s.renderOrder=10;return s}
+
+// Merge room edges into wall lines, then cut doors.
+function wallSegments(h){
+  const lines={}; // key axis:coord -> intervals
+  const add=(axis,c,a,b)=>{const k=axis+':'+c;(lines[k]=lines[k]||[]).push([Math.min(a,b),Math.max(a,b)])};
+  h.rooms.forEach(r=>{const [x0,z0,x1,z1]=r.rect;add('z',z0,x0,x1);add('z',z1,x0,x1);add('x',x0,z0,z1);add('x',x1,z0,z1)});
+  const out=[];const [fx0,fz0,fx1,fz1]=h.footprint;
+  Object.keys(lines).forEach(k=>{
+    const [axis,cs]=k.split(':');const c=parseFloat(cs);
+    const iv=lines[k].sort((p,q)=>p[0]-q[0]);const m=[];
+    iv.forEach(i=>{const l=m[m.length-1];if(l&&i[0]<=l[1]+1e-6)l[1]=Math.max(l[1],i[1]);else m.push([i[0],i[1]])});
+    const ext=axis==='z'?(Math.abs(c-fz0)<1e-6||Math.abs(c-fz1)<1e-6):(Math.abs(c-fx0)<1e-6||Math.abs(c-fx1)<1e-6);
+    m.forEach(i=>out.push({axis,c,a:i[0],b:i[1],ext}));
+  });
+  return out;
+}
+function buildWalls(h,H){
+  const g=new THREE.Group();const [fx0,fz0,fx1,fz1]=h.footprint;
+  wallSegments(h).forEach(s=>{
+    const t=s.ext?h.ext_t:h.int_t;let c=s.c;
+    if(s.ext){ // keep outer face on the footprint line
+      if(s.axis==='z') c+= (Math.abs(c-fz0)<1e-6?1:-1)*t/2; else c+=(Math.abs(c-fx0)<1e-6?1:-1)*t/2;
+    }
+    const ext=h.ext_t/2; // extend ends to close corners
+    let a=s.a,b=s.b; 
+    a-= (Math.abs(a-(s.axis==='z'?fx0:fz0))<1e-6)?0:t/2; b+= (Math.abs(b-(s.axis==='z'?fx1:fz1))<1e-6)?0:t/2;
+    // doors on this line
+    const ds=h.doors.filter(d=>d.wall===s.axis&&Math.abs((s.axis==='z'?d.at[1]:d.at[0])-s.c)<1e-6)
+      .map(d=>{const p=s.axis==='z'?d.at[0]:d.at[1];return[p-d.width/2,p+d.width/2]})
+      .filter(d=>d[0]>=s.a-1e-6&&d[1]<=s.b+1e-6).sort((p,q)=>p[0]-q[0]);
+    const wc=WALLC[(h.rooms[0]||{}).walls]||0xd8d2c8;const col=s.ext?0xe6dfd2:wc;
+    const piece=(p,q,y0,y1)=>{if(q-p<1e-4||y1-y0<1e-4)return;
+      const len=q-p,mid=(p+q)/2,hh=y1-y0,yy=(y0+y1)/2;
+      g.add(s.axis==='z'?box(len,hh,t,col,mid,yy,c):box(t,hh,len,col,c,yy,mid))};
+    let cur=a;
+    ds.forEach(d=>{piece(cur,d[0],0,H);piece(d[0],d[1],Math.min(h.door_h,H),H);cur=d[1]});
+    piece(cur,b,0,H);
+  });
+  return g;
+}
+function buildRoof(h){
+  const [x0,z0,x1,z1]=h.footprint,e=0.45,pitch=22*Math.PI/180,Y=h.wall_height;
+  const zm=(z0+z1)/2,half=(z1-z0)/2+e,rise=half*Math.tan(pitch);
+  const X0=x0-e,X1=x1+e,Z0=z0-e,Z1=z1+e;
+  const v=[X0,Y,Z0, X1,Y,Z0, X1,Y+rise,zm, X0,Y+rise,zm,   X0,Y+rise,zm, X1,Y+rise,zm, X1,Y,Z1, X0,Y,Z1];
+  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(v,3));
+  geo.setIndex([0,2,1,0,3,2,4,6,5,4,7,6]);geo.computeVertexNormals();
+  const g=new THREE.Group();g.add(new THREE.Mesh(geo,new THREE.MeshLambertMaterial({color:0x7a4b3a,side:THREE.DoubleSide})));
+  const tri=new THREE.BufferGeometry();
+  tri.setAttribute('position',new THREE.Float32BufferAttribute([x0,Y,Z0+e, x0,Y,Z1-e, x0,Y+rise*(1-e/half),zm, x1,Y,Z0+e, x1,Y+rise*(1-e/half),zm, x1,Y,Z1-e],3));
+  tri.setIndex([0,2,1,3,4,5]);tri.computeVertexNormals();
+  g.add(new THREE.Mesh(tri,new THREE.MeshLambertMaterial({color:0xcfc6b6,side:THREE.DoubleSide})));
+  return g;
+}
+function clearWorld(){while(world.children.length){const o=world.children.pop();o.traverse(n=>{if(n.geometry)n.geometry.dispose()})}}
+function build(k){
+  key=k;house=HOUSES[k];const h=house;clearWorld();groups={};
+  const [x0,z0,x1,z1]=h.footprint,W=x1-x0,D=z1-z0;
+  const lawn=new THREE.Mesh(new THREE.PlaneGeometry(400,400),mat(0x5f8a4c));lawn.rotation.x=-Math.PI/2;lawn.position.set(W/2,-0.12,D/2);world.add(lawn);
+  const door=h.doors.find(d=>d.between.includes('outside'));const dx=door.at[0];
+  const drive=box(3.2,0.04,16,0x8d8f93,dx,-0.1,-8);world.add(drive);
+  world.add(box(door.width+0.8,0.12,1.0,0xb0a99a,dx,-0.06,-0.5)); // porch slab
+  h.rooms.forEach(r=>{const [a,b,c,d]=r.rect;world.add(box(c-a,0.1,d-b,FLOOR[r.floor]||0xbbbbbb,(a+c)/2,-0.05,(b+d)/2))});
+  groups.walls=new THREE.Group();world.add(groups.walls);
+  groups.roof=buildRoof(h);world.add(groups.roof);
+  const items=new THREE.Group();world.add(items);
+  h.landmarks.forEach(l=>{const s=SIZES[l.kind]||[0.8,0.8,0.8,0xff00ff];
+    const m=box(s[0],s[1],s[2],s[3],0,s[1]/2,0);const p=new THREE.Group();p.add(m);
+    if(l.kind==='stove_and_hood'){p.add(box(0.7,0.35,0.45,0x2b3035,0,2.0,-0.1))}
+    if(l.kind==='blue_double_bed'){p.add(box(1.6,0.12,0.6,0xf0ede6,0,0.6,0.7))}
+    p.position.set(l.at[0],0,l.at[1]);p.rotation.y=l.yaw*Math.PI/180;items.add(p)});
+  h.people.forEach(p=>{const lying=/lying|curled/.test(p.pose);
+    const m=mat(0xff2bd6,{emissive:0x661055});
+    const len=lying?1.2:0.9,mesh=new THREE.Group();
+    mesh.add(new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.18,len,12),m));
+    [len/2,-len/2].forEach(y=>{const sp=new THREE.Mesh(new THREE.SphereGeometry(0.18,12,8),m);sp.position.y=y;mesh.add(sp)});
+    if(lying){mesh.rotation.z=Math.PI/2;mesh.position.set(p.at[0],0.2,p.at[1]);mesh.rotation.order='YXZ';mesh.rotation.y=p.yaw*Math.PI/180}
+    else mesh.position.set(p.at[0],0.65,p.at[1]);
+    world.add(mesh);const l=label(p.id,'#ff9bea',1.2);l.position.set(p.at[0],1.8,p.at[1]);world.add(l)});
+  const f=h.fire;const fm=new THREE.Mesh(new THREE.SphereGeometry(Math.max(f.r,0.3),20,14),new THREE.MeshBasicMaterial({color:0xff8a1a}));
+  fm.position.set(f.at[0],0.6,f.at[1]);world.add(fm);
+  const fl=new THREE.PointLight(0xff7a1a,1.2,6);fl.position.copy(fm.position);world.add(fl);
+  const fg=new THREE.Mesh(new THREE.SphereGeometry(0.55,20,14),new THREE.MeshBasicMaterial({color:0xff9a30,transparent:true,opacity:0.28}));fg.position.copy(fm.position);world.add(fg);
+  const fL=label('fire origin','#ffb066',2.0);fL.position.set(f.at[0],1.3,f.at[1]);world.add(fL);
+  h.robots.forEach(r=>{const d=new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.4,0.03,32),mat(parseInt(r.color.slice(1),16)));
+    d.position.set(r.at[0],0.04,r.at[1]);world.add(d);
+    const l=label(r.id.replace('robot_','Robot ')+' pad',r.color,1.9);l.position.set(r.at[0],0.8,r.at[1]);world.add(l)});
+  h.rooms.forEach(r=>{const l=label(r.name,'#ffffff',2.4);l.position.set((r.rect[0]+r.rect[2])/2,2.3,(r.rect[1]+r.rect[3])/2);world.add(l);(groups.rl=groups.rl||[]).push(l)});
+  groups.walls.add(buildWalls(h,cut?1.2:h.wall_height));
+  applyToggles();resetView();
+  $('bFam').setAttribute('aria-pressed',k==='family');$('bLong').setAttribute('aria-pressed',k==='long');
+  if(!location.hash)history.replaceState(null,'','#'+k);
+}
+function rebuildWalls(){while(groups.walls.children.length)groups.walls.remove(groups.walls.children[0]);groups.walls.add(buildWalls(house,cut?1.2:house.wall_height))}
+function applyToggles(){groups.roof.visible=roofOn;}
+function resetView(){
+  setWalk(false);const [x0,z0,x1,z1]=house.footprint,W=x1-x0,D=z1-z0;
+  const cx=W/2,cz=D/2,r=Math.max(W,D);
+  orbit.target.set(cx,0.8,cz);camera.position.set(cx-r*0.2,r*1.15,-r*0.55);orbit.update();
+}
+const keys={};let yaw=0,pitch=0;
+function setWalk(on){walk=on;$('bWalk').setAttribute('aria-pressed',on);orbit.enabled=!on;$('pad').style.display=on?'grid':'none';
+  groups.rl.forEach(l=>l.visible=!on);$('hint').textContent=on?'Drag to look, WASD or arrows to move':'Drag to orbit, pinch or wheel to zoom';
+  if(on){const door=house.doors.find(d=>d.between.includes('outside'));
+    camera.position.set(door.at[0],1.6,0.8);yaw=Math.PI;pitch=0;camera.rotation.order='YXZ';}
+  else{camera.rotation.order='XYZ'}}
+let drag=null;
+canvas.addEventListener('pointerdown',e=>{if(walk){drag={x:e.clientX,y:e.clientY};canvas.setPointerCapture(e.pointerId)}});
+canvas.addEventListener('pointermove',e=>{if(walk&&drag){yaw-=(e.clientX-drag.x)*0.005;pitch=Math.max(-1.2,Math.min(1.2,pitch-(e.clientY-drag.y)*0.005));drag={x:e.clientX,y:e.clientY}}});
+canvas.addEventListener('pointerup',()=>drag=null);canvas.addEventListener('pointercancel',()=>drag=null);
+const kmap={ArrowUp:'w',ArrowDown:'s',ArrowLeft:'a',ArrowRight:'d',w:'w',a:'a',s:'s',d:'d',W:'w',A:'a',S:'s',D:'d'};
+addEventListener('keydown',e=>{if(kmap[e.key]){keys[kmap[e.key]]=true;if(walk)e.preventDefault()}});
+addEventListener('keyup',e=>{if(kmap[e.key])keys[kmap[e.key]]=false});
+document.querySelectorAll('#pad button').forEach(b=>{const k=b.dataset.k;
+  b.addEventListener('pointerdown',e=>{keys[k]=true;e.preventDefault()});['pointerup','pointerleave','pointercancel'].forEach(t=>b.addEventListener(t,()=>keys[k]=false))});
+$('bFam').onclick=()=>build('family');$('bLong').onclick=()=>build('long');
+$('bRoof').onclick=()=>{roofOn=!roofOn;$('bRoof').setAttribute('aria-pressed',roofOn);applyToggles()};
+$('bCut').onclick=()=>{cut=!cut;$('bCut').setAttribute('aria-pressed',cut);rebuildWalls()};
+$('bWalk').onclick=()=>{if(walk){setWalk(false)}else{setWalk(true)}};
+$('bReset').onclick=resetView;
+$('legend').innerHTML=[['#b98a56','Wood floor'],['#aec4cf','Tile floor'],['#ff2bd6','Person'],['#ff8a1a','Fire origin'],['#F2A900','Robot A pad'],['#2FA3E6','Robot B pad'],['#3b6fb6','Furniture box']]
+ .map(([c,t])=>`<span><i style="background:${c}"></i>${t}</span>`).join('');
+let last=performance.now();
+function resize(){const w=stage.clientWidth,h=stage.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}
+addEventListener('resize',resize);
+function loop(t){const dt=Math.min(0.05,(t-last)/1000);last=t;
+  if(walk){camera.rotation.set(pitch,yaw,0);
+    const sp=1.4*dt;
+    const f=(keys.w?1:0)-(keys.s?1:0),r=(keys.d?1:0)-(keys.a?1:0);
+    camera.position.x+=(-Math.sin(yaw)*f+Math.cos(yaw)*r)*sp;
+    camera.position.z+=(-Math.cos(yaw)*f-Math.sin(yaw)*r)*sp;
+    camera.position.y=1.6;
+  } else orbit.update();
+  renderer.render(scene,camera);requestAnimationFrame(loop)}
+resize();
+fetch('houses.json',{cache:'no-cache'}).then(r=>r.json()).then(j=>{HOUSES=j;
+  if(HOUSES.family)$('bFam').textContent=HOUSES.family.name;if(HOUSES.long)$('bLong').textContent=HOUSES.long.name;
+  build(location.hash.indexOf('long')===1?'long':'family');
+  if(location.hash.indexOf('walk')>0){setWalk(true);}
+  if(location.hash.indexOf('roof')>0){roofOn=true;applyToggles();}
+  if(location.hash.indexOf('cut')>0){cut=true;rebuildWalls();}
+});
+requestAnimationFrame(loop);
+</script></body></html>

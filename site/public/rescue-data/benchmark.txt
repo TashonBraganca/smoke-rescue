@@ -1,0 +1,17 @@
+Benchmark data/runs/real_layouts_25oct: 78 runs scored, 0 missing
+Seen seeds (grep of config/brain.json, config/perception.json strings and data/evidence/*.txt): [5001, 5002, 5003, 5004, 5005, 5006, 5007, 5008, 5009, 5010, 5011, 5012, 5013, 5014, 5015, 5016, 5017, 5018, 5019, 5020, 5021, 5022, 5023, 5024, 5025, 5026, 5027, 5028]
+
+== unseen: 39 houses (hx_035feb0125, hx_0839153e91, hx_0e6ea164a9, hx_1782cb1872, hx_2f1f4383e4, hx_37aa2c6194, hx_3f05f244a0, hx_444439c703, hx_46bfe067cc, hx_5e70138c77, hx_612f77ec9d, hx_63f9e6a422, hx_6b22fe6c3f, hx_6e10635d7c, hx_92b9dc40cf, hx_9515d4a230, hx_974eb4297e, hx_9e870de851, hx_a10cd8521e, hx_aa4860070d, hx_aeb16501b7, hx_b0e22f086d, hx_b75342c6e5, hx_b8ef56df00, hx_c6536e2794, hx_cb9d3d6726, hx_ce454d45fe, hx_d014f29df1, hx_d118716054, hx_d4de7a1b8c, hx_d56de8c558, hx_da3eec59ac, hx_dad1851b27, hx_dd7d4beea2, hx_e3a17f7182, hx_ea02e5378a, hx_edd7ba1581, hx_eeb51537a0, hx_f9334620b3) ==
+variant      n                rooms %                cover %               people %                  false               t_conf s                  T90 s              overlap %                all out
+full        39      99.2 [97.9,100.0]       96.9 [95.2,98.1]      99.0 [97.4,100.0]          0.0 [0.0,0.0]       67.2 [56.8,79.1]    291.6 [260.2,323.1]       65.6 [57.1,73.6]          0.6 [0.5,0.8]
+one_robot   39       93.9 [89.4,97.4]       90.2 [86.5,93.1]       92.3 [86.7,96.4]          0.0 [0.0,0.0]      94.5 [78.0,111.8]    244.5 [204.9,290.2]                      -          0.9 [0.8,1.0]
+paired full minus variant: mean [95 % CI] p(Wilcoxon, per-house means)
+-one_robot     +5.3 [+2.3,+8.8] p0.002  +6.7 [+4.5,+9.2] p0.0 +6.7 [+3.1,+11.3] p0.002    +0.0 [+0.0,+0.0] p- -27.3 [-41.8,-10.8] p0.0 +47.1 [+0.8,+90.4] p0.0087                      - -0.3 [-0.5,-0.1] p0.0027
+
+== all: 39 houses (hx_035feb0125, hx_0839153e91, hx_0e6ea164a9, hx_1782cb1872, hx_2f1f4383e4, hx_37aa2c6194, hx_3f05f244a0, hx_444439c703, hx_46bfe067cc, hx_5e70138c77, hx_612f77ec9d, hx_63f9e6a422, hx_6b22fe6c3f, hx_6e10635d7c, hx_92b9dc40cf, hx_9515d4a230, hx_974eb4297e, hx_9e870de851, hx_a10cd8521e, hx_aa4860070d, hx_aeb16501b7, hx_b0e22f086d, hx_b75342c6e5, hx_b8ef56df00, hx_c6536e2794, hx_cb9d3d6726, hx_ce454d45fe, hx_d014f29df1, hx_d118716054, hx_d4de7a1b8c, hx_d56de8c558, hx_da3eec59ac, hx_dad1851b27, hx_dd7d4beea2, hx_e3a17f7182, hx_ea02e5378a, hx_edd7ba1581, hx_eeb51537a0, hx_f9334620b3) ==
+variant      n                rooms %                cover %               people %                  false               t_conf s                  T90 s              overlap %                all out
+full        39      99.2 [97.9,100.0]       96.9 [95.2,98.1]      99.0 [97.4,100.0]          0.0 [0.0,0.0]       67.2 [56.9,78.9]    291.6 [260.3,323.8]       65.6 [57.1,73.7]          0.6 [0.5,0.8]
+one_robot   39       93.9 [89.5,97.3]       90.2 [86.5,93.0]       92.3 [87.2,96.4]          0.0 [0.0,0.0]      94.5 [78.2,111.7]    244.5 [203.6,289.6]                      -          0.9 [0.8,1.0]
+paired full minus variant: mean [95 % CI] p(Wilcoxon, per-house means)
+-one_robot     +5.3 [+2.3,+8.8] p0.002  +6.7 [+4.5,+9.3] p0.0 +6.7 [+3.1,+11.3] p0.002    +0.0 [+0.0,+0.0] p- -27.3 [-41.7,-10.7] p0.0 +47.1 [+1.0,+90.9] p0.0087                      - -0.3 [-0.5,-0.1] p0.0027
+

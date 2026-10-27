@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+/* Design tokens. Night palette taken from the thermal camera's inferno scale; one accent (heat orange).
+   Type scale follows Apple's: large display sizes with tight tracking, 17px body. */
+@theme {
+  --color-bg: #0b0612;
+  --color-stage: #0e0817;
+  --color-panel: #170d22;
+  --color-line: #2b1c3a;
+  --color-line2: #3b2850;
+  --color-ink: #f7eedf;
+  --color-sub: #cdbcc9;
+  --color-mute: #8f7e95;
+  --color-heat: #f98c0a;
+  --color-heat-ink: #1a0a00;
+  --color-amber: #fcb040;
+  --color-coal: #bc3754;
+  --color-violet: #57106e;
+  --color-whiteheat: #fcffa4;
+
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-stencil: var(--font-saira-stencil), Impact, "Arial Narrow", sans-serif;
+
+  --text-display: clamp(3.2rem, 8.2vw, 7.5rem);
+  --text-display--line-height: 0.95;
+  --text-display--letter-spacing: -0.045em;
+  --text-title1: clamp(2.4rem, 5.2vw, 4.5rem);
+  --text-title1--line-height: 1;
+  --text-title1--letter-spacing: -0.035em;
+  --text-title2: clamp(1.8rem, 3.4vw, 2.75rem);
+  --text-title2--line-height: 1.05;
+  --text-title2--letter-spacing: -0.03em;
+  --text-title3: 1.5rem;
+  --text-title3--line-height: 1.2;
+  --text-title3--letter-spacing: -0.02em;
+  --text-body: 1.0625rem;
+  --text-body--line-height: 1.55;
+  --text-callout: 1rem;
+  --text-footnote: 0.8125rem;
+
+  --ease-spring: cubic-bezier(0.2, 0.9, 0.25, 1);
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  background: var(--color-bg);
+  scrollbar-width: thin;
+  scrollbar-color: #3b2850 transparent;
+}
+html.lenis, html.lenis body { height: auto; }
+.lenis.lenis-smooth { scroll-behavior: auto !important; }
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-thumb { background: #3b2850; border-radius: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+::selection { background: var(--color-heat); color: var(--color-heat-ink); }
+:focus-visible { outline: 2px solid var(--color-amber); outline-offset: 3px; }
+
+.gutter {
+  padding-left: max(20px, env(safe-area-inset-left, 0px));
+  padding-right: max(20px, env(safe-area-inset-right, 0px));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* Mission setup sequence and stage */
+@keyframes setup-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes setup-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes setup-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes setup-ping { from { transform: scale(1); opacity: 0.8; } to { transform: scale(3.4); opacity: 0; } }
+@keyframes setup-spin { to { transform: rotate(360deg); } }
+.setup-ping { transform-box: fill-box; transform-origin: center; animation: setup-ping 1.6s var(--ease-out-quart) infinite; }

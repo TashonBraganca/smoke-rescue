@@ -85,18 +85,21 @@ class OllamaBackend:
 class BedrockBackend:
     """Amazon Bedrock Converse API with tool use. Needs AWS credentials with bedrock:InvokeModel on the model."""
 
-    def __init__(self, model: str, region: str | None = None, max_tokens: int = 1024):
+    def __init__(self, model: str, region: str | None = None, max_tokens: int = 1024, reasoning_effort: str | None = None,
+                 read_timeout: float = 20):
         import boto3
         from botocore.config import Config
 
         self.model = model
         self.max_tokens = max_tokens
+        # OpenAI reasoning models on Bedrock take reasoning_effort as an extra field and reject a fixed temperature.
+        self.effort = reasoning_effort
         # ECS supplies task-role credentials. Force SigV4 rather than a Bedrock bearer token.
         # Bound retries; four model rounds share the proxy's 120 second read allowance.
         self.client = boto3.client(
             "bedrock-runtime",
             region_name=region or os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION", "us-east-1"),
-            config=Config(signature_version="v4", connect_timeout=3, read_timeout=20,
+            config=Config(signature_version="v4", connect_timeout=3, read_timeout=read_timeout,
                           retries={"mode": "standard", "total_max_attempts": 1}),
         )
 
@@ -107,8 +110,10 @@ class BedrockBackend:
                                                "inputSchema": {"json": t["function"]["parameters"]}}} for t in tools]}
         start = time.perf_counter()
         kwargs = {"toolConfig": tool_config} if tools else {}
-        out = self.client.converse(modelId=self.model, system=system, messages=convo,
-                                   inferenceConfig={"maxTokens": self.max_tokens, "temperature": 0}, **kwargs)
+        if self.effort:
+            kwargs["additionalModelRequestFields"] = {"reasoning_effort": self.effort}
+        inference = {"maxTokens": self.max_tokens} if self.effort else {"maxTokens": self.max_tokens, "temperature": 0}
+        out = self.client.converse(modelId=self.model, system=system, messages=convo, inferenceConfig=inference, **kwargs)
         content = out["output"]["message"]["content"]
         text = "".join(c.get("text", "") for c in content)
         calls = [ToolCall(c["toolUse"]["name"], c["toolUse"].get("input") or {}) for c in content if "toolUse" in c]

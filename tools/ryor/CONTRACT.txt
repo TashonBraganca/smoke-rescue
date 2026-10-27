@@ -1,0 +1,126 @@
+Run your own rescue: the contract between engine, AWS and page (brief handoff/inbox_rescue/01_run_your_own_rescue.txt).
+Owner of this file: session opencv-eb. Change it only together with every side that reads it.
+
+1. Setup space
+  house       gallery id: "family_ranch", "long_ranch", "onedoor_934", and "hx_<10 hex>" for HouseExpo houses (about 24).
+  robots      1, 2 or 3 (robot_A, robot_B, robot_C; pads in one queue behind the door, 1.2 m apart).
+  difficulty  "easy" | "medium" | "hard". Fire head start before the robots enter: 0 / 90 / 180 s. Smoke: the person
+              detector's world-side visibility limit: 6.0 (no limit beyond the brain's own 6 m) / 4.0 / 2.5 m.
+  mission     180 simulated s; brain setting mission_time_limit_s 140: the brain searches until 140 s, then walks out.
+  seed        fixed per house (the generator's people and fire). The brain-only recording is deterministic. Live Terra orders can change the search:
+              same house + robots + difficulty gives the same brain-only mission, not necessarily the same Terra mission.
+  setup key   "<house>__r<robots>__<difficulty>", e.g. "hx_035feb0125__r2__hard".
+
+2. Gallery file (static, served by the page): gallery.json
+  {"v":1, "mission_s":180, "difficulties":{"easy":{"head_start_s":0,"visibility_m":6.0,"label":"..."},...},
+   "houses":[{"id","name","source":"ours"|"HouseExpo","source_id","licence","rooms":int,"floor_m2":float,
+              "people":int, "bounds":[xmin,ymin,xmax,ymax],
+              "walls":[[x1,y1,x2,y2],...],            gate frame, metres, viewer only
+              "rooms_poly":[{"id","kind","poly":[[x,y],...]}],
+              "door":[x,y], "pads":[[x,y],...]}],
+   "citation":"..."}
+  Frame: the robots' gate frame. Robot A's pad at (0,0), facing +y, x to its right. y up on screen.
+
+3. Replay (what the page draws). Written in chunks so the page can play while the run is still going.
+  S3 (runs bucket) layout, prefix ryor/:
+    ryor/cache/<setup key>/status.json, chunk_0000.json ...      precomputed, never expires (lifecycle excludes cache/)
+    ryor/missions/<mission id>/status.json, chunk_0000.json ...  live, expire after 7 days
+  status.json:
+    {"v":1,"mission":"<id>","setup":"<key>","state":"starting"|"running"|"done"|"failed",
+     "source":"live"|"recorded", "chunks":int, "sim_t":float, "updated":iso,
+     "error":null|"reason", "score":null|{...see below}, "engine":{"git":"sha","image":"tag"}}
+  chunk_NNNN.json covers sim time [10*N, 10*N+10) s:
+    {"v":1,"chunk":N,"t0":10N,"frames":[frame,...]}
+  frame (every 0.5 s of sim time):
+    {"t":12.5,
+     "robots":[{"id":"robot_A","x":..,"y":..,"yaw":deg,"state":"explore","out":false}],   true pose, viewer only
+     "seen":{"robot_A":[cell,...], ...},     cells newly marked searched on THAT robot's own brain map since the last frame;
+                                             cell = iy*500 + ix, grid origin (-25,-25) m, 0.1 m cells, gate frame
+     "fire":[[x,y,r],...],                   flame regions, gate frame, simulator truth, viewer only
+     "found":[{"id":"c1","x":..,"y":..,"by":"robot_A"}],  new confirmations (brain's own estimate of the spot)
+     "events":[{"robot":"robot_A","kind":"map_shared","text":"short plain sentence"}]}
+    Event kinds the page highlights: map_shared (frame link moment), survivor_confirmed, survivor_from_peer,
+    room_marked_fire, mission_complete (robot walking out), robot out (state "out" when a robot is back outside).
+  score (in the final status.json):
+    {"people_found":int,"people_total":int,"time_s":float (all robots out, or 180),
+     "coverage_pct":float (team union of searched cells over the house's floor cells),
+     "robots_out":int, "false_confirmations":int}
+    The page adds "same house with 1 robot: ..." by reading ryor/cache/<house>__r1__<difficulty>/status.json score.
+
+4. HTTP API (public site Lambda Function URL, CORS for the Amplify origin):
+  POST /api/mission            body {"house","robots","difficulty"}
+     -> 200 {"mission":"<id>","source":"live","poll":"/api/mission/<id>"}
+     -> 200 {"mission":"cache:<setup key>","source":"recorded","reason":"busy"|"rate_limited"|"disabled"}  fallback
+     -> 400 bad setup
+  GET  /api/mission/<id>?from=N
+     -> 200 {"status":{...status.json},"chunks":[chunk N, N+1, ... up to 6]}
+     A live mission that failed, timed out (hard limit 600 s wall) or failed validation answers
+       {"status":{...,"state":"failed","fallback":"cache:<setup key>"}} and the page switches to the cached replay,
+       labelled "recorded run of this exact setup".
+  GET  /api/mission/health    -> {"ok":true,"running":n,"cap":n,"cache_setups":n,"engine":"tag"}
+
+5. Validation (engine side writes it, API checks it again before serving a live result as done):
+  frames present for every 0.5 s up to sim_t, sim_t reaches 180, every robot pose inside the house bounds + 3 m,
+  every robot id in the setup present. A failed check sets state "failed" with the reason.
+
+6. Placement and preparation extension, 26 Oct 2026
+  POST /api/mission also accepts placement={people:[[x,y],...],fire:[x,y]}, prepare=true|false and terra=true|false.
+  Null placement uses the existing generator and fixed seed. Custom points snap to the 0.25 m fire grid.
+  The shared tools/ryor/placement.py validator checks finite coordinates, up to five people, room/wall/furniture
+  margins, people apart, combustible floor for the fire, and the existing validate_ranches.room_paths check.
+  Both people and the fire must leave the 0.9 m door paths clear. The engine revalidates the stored placement.
+  Custom key = base setup key + "__p" + first 20 hex of SHA256 over canonical JSON containing the base key,
+  placement bytes, engine image label and validator revision 2. All values affecting that scene enter its identity.
+  POST /api/mission/validate performs these checks without starting compute. Bad placements return 400 with a
+  plain error. A non-preparation POST without a validated recording returns 409 and needs_prepare=true.
+  prepare=true starts a brain-only mission. GET validates its final result, copies chunks to the cache, then
+  publishes status last. Its response includes setup and preparing=true. A ready prepare hit answers immediately
+  with prepared=true and the cache id. Custom preparation consumes the same launch, concurrency and IP budgets.
+  No different placement is substituted when a custom recording is unavailable. Capacity refusal before the
+  first recording exists returns 429 and keeps the scene in the editor. The judge can correct or retry it.
+  API result validation now requires exactly 361 frames at t=0,0.5,...,180, every expected robot, finite bounded
+  poses, valid map cells/fire markers, person markers only at or after their corresponding confirmation, and
+  score counts consistent with the scene and final robot states. Only validated recordings may be promised.
+  Default recordings use ryor/cache/<base>/ and persist. Custom recordings use ryor/cache-custom/<key>/ and
+  expire after seven days. Submitted scene bytes use ryor/requests/<key>.json, also with seven-day expiry.
+  status.json adds validated, terra and, for custom scenes, placement. terra means the live agent was enabled;
+  each failed, expired or budget-refused decision is described by an agent_unavailable/agent_decision caption.
+  The final score matches distinct confirmation markers to distinct true people within 1.5 m, one to one.
+  Unmatched or repeated markers count as false_confirmations. During replay the UI labels them People reported.
+  The final result labels the evaluator's matched count People found. No unconfirmed truth marker is drawn.
+  A custom scene has no default one-robot comparison, since a different placement would invalidate it.
+
+7. Live Terra extension
+  Four checkpoints per robot, at 15,45,75,105 simulated seconds, produce sensor-only agent_observation records.
+  Each contains the robot's estimated pose, sensed room/frontier summaries, confirmed people, sensed fire and
+  received radio peer state. Neither world geometry nor unobserved people/fire enters an observation.
+  tools/ryor/terra.py uses the same AzureOpenAIBackend module as brain.agent.server, with gpt-5.6-terra.
+  Headless mode exposes only explore_frontier and continue_search, never a camera tool or arbitrary coordinates.
+  Frontier coordinates come from this robot's offered, proven-indoor frontiers, not from model-generated points.
+  A background worker makes one completion with a 15 s timeout and 2,000 completion-token cap. Simulation never
+  waits on it. Replies older than 30 simulated seconds are discarded. The main simulation thread applies valid
+  replies through existing RobotBrain.AgentExplore; the brain retains heat, collision and return safety.
+  The agent runs inside the per-mission Fargate task, rather than requiring the shared agent ECS service to stay
+  at one. This is an intentional hosting adaptation to the scale-to-zero requirement. The existing shared
+  service stays at zero. Its camera-agent loop is not represented as running in this headless mode.
+  DynamoDB transactions reserve at most 20 steps per mission and 100 steps per UTC day before a model call.
+  This implementation's checkpoint schedule currently uses at most 12. Credential/model/time failures and
+  exhausted budgets leave the brain searching and write a caption. Full sensor-only observations and answers
+  are retained in the private mission prefix as terra_audit.json; replay captions contain no credentials.
+  Live outcomes can vary with Terra. A fallback is explicitly a recorded brain-only run of the same scene,
+  not a claim that it repeats the live Terra decisions. ?mission=<id> reopens a stored run without a POST;
+  completed live runs are labelled Saved live run, separately from the recorded brain-only fallback.
+
+8. Capacity and readiness
+  Two DynamoDB conditional slot rows include pending launches, independent of ECS ListTasks consistency.
+  A 90 s launch lease exceeds the Lambda's 70 s timeout. RunTask uses an idempotency token. There are at most
+  150 launch attempts per UTC day and six POST attempts per source IP per clock hour. Ready cache hits during
+  preparation do not start compute. Pair/single missions reserve 2 vCPU and 4 GB; trio missions 4 vCPU and 8 GB.
+  The task exits after 540 s of engine execution; the API stops tasks older than 600 s, including when polled,
+  and an EventBridge rule runs a one-minute backstop. Live/custom objects expire after seven days.
+  Health includes cache_expected, ready_setups and the model/launch limits. The page disables Start for default
+  setups whose recordings are not ready, while still allowing floor-plan inspection and custom preparation.
+  tools/ryor/audit_cache.py verifies each published recording and writes ryor/cache_manifest.json. Changed
+  result status or validation code triggers a fresh full-frame audit. watch_cache.py exits after all 243 pass.
+  Costs and their limits are in handoff/codex_ryor_costs.txt. Monetary figures are dated estimates, not an
+  account-wide billing kill switch. The one-off precompute batch is separate from normal public launch quotas.

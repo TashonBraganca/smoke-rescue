@@ -1,0 +1,659 @@
+{
+ "version": 1,
+ "units": "m",
+ "origin": "south-west outer corner of the house at Unity world (0, 0, 0). x points east, z points north, y up.",
+ "wall_height": 2.8,
+ "exterior_wall_thickness": 0.25,
+ "interior_wall_thickness": 0.15,
+ "door_height": 2.1,
+ "footprint": [
+  0,
+  0,
+  20,
+  14
+ ],
+ "rooms": [
+  {
+   "id": "living",
+   "name": "Living room",
+   "rect": [
+    0,
+    0,
+    8,
+    6
+   ],
+   "floor": "wood_oak_planks",
+   "walls": "wallpaper_deep_green",
+   "ceiling": "plaster_white"
+  },
+  {
+   "id": "foyer",
+   "name": "Foyer",
+   "rect": [
+    8,
+    0,
+    12,
+    6
+   ],
+   "floor": "stone_tiles_large",
+   "walls": "paint_warm_grey_textured",
+   "ceiling": "plaster_white"
+  },
+  {
+   "id": "kitchen",
+   "name": "Kitchen and dining",
+   "rect": [
+    12,
+    0,
+    20,
+    6
+   ],
+   "floor": "ceramic_tiles_checker",
+   "walls": "subway_tiles_white_and_paint",
+   "ceiling": "plaster_white"
+  },
+  {
+   "id": "hallway",
+   "name": "Hallway",
+   "rect": [
+    0,
+    6,
+    20,
+    8
+   ],
+   "floor": "wood_herringbone",
+   "walls": "wallpaper_hallway_damask",
+   "ceiling": "plaster_white"
+  },
+  {
+   "id": "bedroom_1",
+   "name": "Main bedroom",
+   "rect": [
+    0,
+    8,
+    5,
+    14
+   ],
+   "floor": "carpet_beige",
+   "walls": "wallpaper_blue_floral",
+   "ceiling": "plaster_white"
+  },
+  {
+   "id": "bathroom",
+   "name": "Bathroom",
+   "rect": [
+    5,
+    8,
+    8,
+    11
+   ],
+   "floor": "mosaic_tiles_teal",
+   "walls": "ceramic_tiles_large_white",
+   "ceiling": "plaster_white"
+  },
+  {
+   "id": "closet",
+   "name": "Walk-in closet",
+   "rect": [
+    5,
+    11,
+    8,
+    14
+   ],
+   "floor": "carpet_grey",
+   "walls": "paint_white_textured",
+   "ceiling": "plaster_white"
+  },
+  {
+   "id": "study",
+   "name": "Study",
+   "rect": [
+    8,
+    8,
+    12,
+    14
+   ],
+   "floor": "wood_dark_walnut",
+   "walls": "wood_panels_mahogany",
+   "ceiling": "plaster_white"
+  },
+  {
+   "id": "bedroom_2",
+   "name": "Kids bedroom",
+   "rect": [
+    12,
+    8,
+    16,
+    14
+   ],
+   "floor": "wood_light_maple",
+   "walls": "wallpaper_yellow_stripes",
+   "ceiling": "plaster_white"
+  },
+  {
+   "id": "laundry",
+   "name": "Laundry and utility",
+   "rect": [
+    16,
+    8,
+    20,
+    14
+   ],
+   "floor": "concrete_sealed",
+   "walls": "brick_painted_white",
+   "ceiling": "concrete_rough"
+  }
+ ],
+ "doors": [
+  {
+   "id": "d_front",
+   "between": [
+    "outside",
+    "foyer"
+   ],
+   "wall": "z",
+   "at": [
+    10.0,
+    0.0
+   ],
+   "width": 1.0,
+   "state": "open",
+   "note": "front entrance"
+  },
+  {
+   "id": "d_living_foyer",
+   "between": [
+    "living",
+    "foyer"
+   ],
+   "wall": "x",
+   "at": [
+    8.0,
+    3.0
+   ],
+   "width": 1.6,
+   "state": "removed",
+   "note": "wide cased opening"
+  },
+  {
+   "id": "d_foyer_kitchen",
+   "between": [
+    "foyer",
+    "kitchen"
+   ],
+   "wall": "x",
+   "at": [
+    12.0,
+    3.5
+   ],
+   "width": 1.2,
+   "state": "removed"
+  },
+  {
+   "id": "d_foyer_hall",
+   "between": [
+    "foyer",
+    "hallway"
+   ],
+   "wall": "z",
+   "at": [
+    10.0,
+    6.0
+   ],
+   "width": 1.6,
+   "state": "removed",
+   "note": "archway"
+  },
+  {
+   "id": "d_bed1_hall",
+   "between": [
+    "bedroom_1",
+    "hallway"
+   ],
+   "wall": "z",
+   "at": [
+    2.5,
+    8.0
+   ],
+   "width": 0.9,
+   "state": "open",
+   "note": "identical hallway door, look-alike on purpose"
+  },
+  {
+   "id": "d_bath_hall",
+   "between": [
+    "bathroom",
+    "hallway"
+   ],
+   "wall": "z",
+   "at": [
+    6.5,
+    8.0
+   ],
+   "width": 0.8,
+   "state": "open",
+   "note": "identical hallway door, look-alike on purpose. robot_C uses it in the 3-robot scenario"
+  },
+  {
+   "id": "d_bed1_closet",
+   "between": [
+    "bedroom_1",
+    "closet"
+   ],
+   "wall": "x",
+   "at": [
+    5.0,
+    12.5
+   ],
+   "width": 0.8,
+   "state": "open",
+   "note": "closet is a dead end"
+  },
+  {
+   "id": "d_study_hall",
+   "between": [
+    "study",
+    "hallway"
+   ],
+   "wall": "z",
+   "at": [
+    10.0,
+    8.0
+   ],
+   "width": 0.9,
+   "state": "open",
+   "note": "identical hallway door, look-alike on purpose"
+  },
+  {
+   "id": "d_bed2_hall",
+   "between": [
+    "bedroom_2",
+    "hallway"
+   ],
+   "wall": "z",
+   "at": [
+    14.0,
+    8.0
+   ],
+   "width": 0.9,
+   "state": "open",
+   "note": "identical hallway door, look-alike on purpose"
+  },
+  {
+   "id": "d_laundry_hall",
+   "between": [
+    "laundry",
+    "hallway"
+   ],
+   "wall": "z",
+   "at": [
+    18.0,
+    8.0
+   ],
+   "width": 0.9,
+   "state": "open",
+   "note": "identical hallway door, look-alike on purpose"
+  }
+ ],
+ "landmarks": [
+  {
+   "room": "living",
+   "kind": "red_velvet_sofa",
+   "at": [
+    3.0,
+    1.2
+   ],
+   "yaw": 0
+  },
+  {
+   "room": "living",
+   "kind": "brick_fireplace",
+   "at": [
+    0.35,
+    3.0
+   ],
+   "yaw": 90
+  },
+  {
+   "room": "living",
+   "kind": "large_rug_patterned",
+   "at": [
+    3.5,
+    3.0
+   ],
+   "yaw": 0
+  },
+  {
+   "room": "foyer",
+   "kind": "coat_rack_with_coats",
+   "at": [
+    8.6,
+    0.6
+   ],
+   "yaw": 0
+  },
+  {
+   "room": "foyer",
+   "kind": "large_landscape_painting",
+   "at": [
+    11.85,
+    5.2
+   ],
+   "yaw": 270
+  },
+  {
+   "room": "foyer",
+   "kind": "console_table_with_vase",
+   "at": [
+    8.4,
+    5.0
+   ],
+   "yaw": 90
+  },
+  {
+   "room": "kitchen",
+   "kind": "kitchen_island",
+   "at": [
+    16.0,
+    3.0
+   ],
+   "yaw": 90
+  },
+  {
+   "room": "kitchen",
+   "kind": "tall_steel_fridge",
+   "at": [
+    19.5,
+    5.2
+   ],
+   "yaw": 270
+  },
+  {
+   "room": "kitchen",
+   "kind": "dining_table_six_chairs",
+   "at": [
+    14.0,
+    1.8
+   ],
+   "yaw": 0
+  },
+  {
+   "room": "kitchen",
+   "kind": "stove_and_hood",
+   "at": [
+    17.5,
+    0.4
+   ],
+   "yaw": 0
+  },
+  {
+   "room": "hallway",
+   "kind": "framed_family_photos",
+   "at": [
+    5.0,
+    6.1
+   ],
+   "yaw": 0
+  },
+  {
+   "room": "hallway",
+   "kind": "grandfather_clock",
+   "at": [
+    19.6,
+    7.0
+   ],
+   "yaw": 270
+  },
+  {
+   "room": "bedroom_1",
+   "kind": "blue_double_bed",
+   "at": [
+    2.5,
+    12.5
+   ],
+   "yaw": 180
+  },
+  {
+   "room": "bedroom_1",
+   "kind": "tall_wardrobe",
+   "at": [
+    0.4,
+    9.5
+   ],
+   "yaw": 90
+  },
+  {
+   "room": "bathroom",
+   "kind": "clawfoot_bathtub",
+   "at": [
+    6.5,
+    10.4
+   ],
+   "yaw": 90
+  },
+  {
+   "room": "bathroom",
+   "kind": "sink_with_mirror",
+   "at": [
+    7.65,
+    9.0
+   ],
+   "yaw": 270
+  },
+  {
+   "room": "closet",
+   "kind": "clothes_racks_both_sides",
+   "at": [
+    6.5,
+    12.8
+   ],
+   "yaw": 0
+  },
+  {
+   "room": "study",
+   "kind": "floor_to_ceiling_bookshelves",
+   "at": [
+    8.3,
+    11.0
+   ],
+   "yaw": 90
+  },
+  {
+   "room": "study",
+   "kind": "wooden_desk_with_lamp",
+   "at": [
+    10.0,
+    13.2
+   ],
+   "yaw": 180
+  },
+  {
+   "room": "study",
+   "kind": "antique_globe",
+   "at": [
+    11.5,
+    9.0
+   ],
+   "yaw": 0
+  },
+  {
+   "room": "bedroom_2",
+   "kind": "bunk_bed",
+   "at": [
+    14.0,
+    13.0
+   ],
+   "yaw": 180
+  },
+  {
+   "room": "bedroom_2",
+   "kind": "toy_chest_and_toys",
+   "at": [
+    12.6,
+    9.0
+   ],
+   "yaw": 90
+  },
+  {
+   "room": "laundry",
+   "kind": "washer_and_dryer",
+   "at": [
+    19.5,
+    11.0
+   ],
+   "yaw": 270
+  },
+  {
+   "room": "laundry",
+   "kind": "water_heater_and_pipes",
+   "at": [
+    16.5,
+    13.5
+   ],
+   "yaw": 90
+  },
+  {
+   "room": "hallway",
+   "kind": "hallway_art_a",
+   "at": [
+    1.2,
+    6.14
+   ],
+   "yaw": 0
+  },
+  {
+   "room": "hallway",
+   "kind": "hallway_art_b",
+   "at": [
+    7.0,
+    6.14
+   ],
+   "yaw": 0
+  },
+  {
+   "room": "hallway",
+   "kind": "hallway_art_c",
+   "at": [
+    13.0,
+    6.14
+   ],
+   "yaw": 0
+  },
+  {
+   "room": "hallway",
+   "kind": "hallway_art_d",
+   "at": [
+    18.6,
+    6.14
+   ],
+   "yaw": 0
+  },
+  {
+   "room": "hallway",
+   "kind": "hallway_art_e",
+   "at": [
+    4.4,
+    7.86
+   ],
+   "yaw": 180
+  },
+  {
+   "room": "hallway",
+   "kind": "hallway_art_f",
+   "at": [
+    8.3,
+    7.86
+   ],
+   "yaw": 180
+  },
+  {
+   "room": "hallway",
+   "kind": "hallway_art_g",
+   "at": [
+    12.0,
+    7.79
+   ],
+   "yaw": 180
+  },
+  {
+   "room": "hallway",
+   "kind": "hallway_art_h",
+   "at": [
+    16.0,
+    7.86
+   ],
+   "yaw": 180
+  },
+  {
+   "room": "bedroom_1",
+   "kind": "bedroom1_art_dartboard",
+   "at": [
+    4.895,
+    9.6
+   ],
+   "yaw": 270
+  },
+  {
+   "room": "bedroom_1",
+   "kind": "bedroom1_art_clock",
+   "at": [
+    4.815,
+    10.7
+   ],
+   "yaw": 270
+  }
+ ],
+ "fires": [
+  {
+   "id": "f_kitchen",
+   "room": "kitchen",
+   "at": [
+    17.5,
+    1.2
+   ],
+   "intensity": 1.0
+  },
+  {
+   "id": "f_living",
+   "room": "living",
+   "at": [
+    1.2,
+    3.0
+   ],
+   "intensity": 0.7
+  },
+  {
+   "id": "f_bedroom2",
+   "room": "bedroom_2",
+   "at": [
+    15.2,
+    11.5
+   ],
+   "intensity": 0.5
+  }
+ ],
+ "emergency_lights": [
+  {
+   "at": [
+    10.0,
+    7.0
+   ],
+   "note": "hallway centre"
+  },
+  {
+   "at": [
+    10.0,
+    1.0
+   ],
+   "note": "foyer by front door"
+  },
+  {
+   "at": [
+    18.0,
+    13.0
+   ],
+   "note": "laundry by back door"
+  }
+ ],
+ "clear_path_rule": "Keep a 0.9 m wide clear path through every door and between every door and the room centre."
+}
