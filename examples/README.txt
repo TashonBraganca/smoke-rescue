@@ -34,6 +34,7 @@ at the top of /docs lists which routes are public on AWS.
 
 Send a frame from a robot (standard library only, about 30 lines):
 
+    python3 examples/robot_client.py <rgb.png> <depth.png> \
         --url http://127.0.0.1:8095
     1 people (2267.0 ms, OpenCV 5.0.0)
       conf 0.93  bearing +17.5 deg  range 2.06 m  box [407, 383, 142, 95]
