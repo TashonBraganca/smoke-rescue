@@ -27,7 +27,7 @@ export async function assessVisibility(img: Blob): Promise<{ v: Visibility; roun
   fd.append("image", img, "photo.jpg");
   const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 30000), t0 = performance.now();
   try {
-    const r = await fetch(`${API}/api/vision/assess_visibility`, { method: "POST", body: fd, signal: ctl.signal });
+    const r = await fetch(`${API}/api/vision/assess_visibility/`, { method: "POST", body: fd, signal: ctl.signal });
     if (!r.ok) throw new Error(`The server answered ${r.status}. Try again in a moment.`);
     const v = (await r.json()) as Visibility;
     if (typeof v.laplacian_var !== "number") throw new Error("The server answered, but without measurements.");

@@ -20,7 +20,7 @@
     $('health').textContent = 'API checking';
     $('refresh-health').disabled = true;
     try {
-      const data = JSON.parse(await request('/api/health'));
+      const data = JSON.parse(await request('/api/health/'));
       if (data.status !== 'ok') throw new Error('Service did not report ok');
       $('health').textContent = `API healthy / OpenCV ${data.opencv || 'unknown'} / ${data.backend || 'unknown'} / ${data.model || 'model unspecified'} / approvals ${data.approval_mode || 'unknown'}`;
       $('health').dataset.state = 'ok';
