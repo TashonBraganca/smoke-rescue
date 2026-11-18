@@ -1,0 +1,14 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "npm ci",
+  "buildCommand": "npm run build",
+  "outputDirectory": "out",
+  "trailingSlash": true,
+  "functions": {
+    "api/**/*.py": { "maxDuration": 30, "memory": 1024, "excludeFiles": "{node_modules,public,out,src,.next}/**" }
+  },
+  "headers": [
+    { "source": "/(film|evidence)/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=86400" }] }
+  ]
+}

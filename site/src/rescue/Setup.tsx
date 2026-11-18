@@ -5,10 +5,10 @@ import { fireRoom } from './missions';
 import type { House } from './data';
 export const ROBOT_COLOR = ['#f6a31c', '#2f9be0', '#3fd28a'];
 const TOTAL_MS = 5200, HOLD_MS = 650;
-// Each line names a real input of this mission. The sequence runs while the film buffers or AWS starts the run.
+// Each line names a real input of this mission. The sequence runs while the film or recording loads.
 export function setupSteps(house: House, robots: number, live: boolean) {
   return [
-    live ? 'Starting the simulation on AWS' : 'Loading the Unity house',
+    live ? 'Loading the recorded simulation' : 'Loading the Unity house',
     `Floor plan: ${house.rooms} rooms, ${house.people} people inside`,
     fireRoom(house),
     ...Array.from({ length: robots }, (_, i) => `Robot ${'ABC'[i]} online: camera, thermal, LiDAR`),
@@ -58,7 +58,7 @@ export default function Setup({ house, robots, live, ready, onDone }: { house: H
             <span className={finished ? 'text-sub' : 'font-semibold text-ink'}>{s}</span>
           </li>;
         })}</ol>
-        {complete && !ready && <p role="status" className="mt-5 text-footnote text-sub">{live ? 'Waiting for the first frames from AWS...' : 'Loading the mission...'}</p>}
+        {complete && !ready && <p role="status" className="mt-5 text-footnote text-sub">{live ? 'Loading the recording...' : 'Loading the mission...'}</p>}
         <div className="mt-7 h-[3px] overflow-hidden rounded-full bg-white/[0.07]"><div className="h-full rounded-full bg-heat" style={{ width: `${(100 * Math.min(shown, steps.length - (complete && ready ? 0 : 0.5))) / steps.length}%`, transition: 'width .6s var(--ease-out-quart)' }} /></div>
       </div>
     </div>

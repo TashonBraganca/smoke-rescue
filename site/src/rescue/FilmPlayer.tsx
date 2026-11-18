@@ -55,7 +55,7 @@ export default function FilmPlayer({ house, config, onReset }: { house: House; c
     {status === 'done' && film && <ResultCard title={film.allOut === true ? 'Both robots are out.' : film.allOut === false ? 'The mission ended before both robots were out.' : 'Exit result awaiting the recording.'}
       stats={[[film.peopleFound != null ? `${film.peopleFound}/${film.peopleTotal}` : '-', 'People found'], [film.missionSeconds != null ? timeLabel(film.missionSeconds) : '-', 'Mission time'], [film.allOut ? '2/2' : '-', 'Robots out']]}
       note={<><p className="text-callout text-sub">On 39 real floor plans it never saw, two robots sharing one map found 99% of people; one robot found 92% (p = 0.002).</p><p className="mt-2 text-footnote text-mute">Headless simulation benchmark, 25 October 2026. <a className="underline" href="/rescue-data/benchmark.txt">Read the results</a>.</p></>}>
-      <a className={`${button} border-heat bg-heat text-heat-ink hover:bg-amber`} href="/rescue/?mode=live">Run a live simulation on AWS</a><button className={button} onClick={onReset}>Try another house</button><Link className={button} href="/#built">How it works</Link>
+      <a className={`${button} border-heat bg-heat text-heat-ink hover:bg-amber`} href="/rescue/?mode=live">Watch a simulation in a real floor plan</a><button className={button} onClick={onReset}>Try another house</button><Link className={button} href="/#built">How it works</Link>
     </ResultCard>}
   </Stage>;
 }

@@ -47,10 +47,10 @@ export default function TryIt() {
   return (
     <section id="try" className="gutter py-[clamp(96px,14vw,176px)]" aria-label="Try OpenCV 5 on your own photo">
       <div className="mx-auto grid max-w-[1200px] gap-10">
-        <RiseHead eyebrow="Try it, live on AWS" title="Run OpenCV 5 on your own photo." />
+        <RiseHead eyebrow="Try it, live" title="Run OpenCV 5 on your own photo." />
         <p className="max-w-[60ch] text-body text-sub">
           This is one of the OpenCV checks the robots&apos; AI runs on a camera frame (509 times in our recorded runs): can it trust what it sees, or is smoke hiding too much?
-          Pick a photo, or one of the robot&apos;s own frames. It goes to our server on AWS, OpenCV 5 measures it, and the numbers come back here.
+          Pick a photo, or one of the robot&apos;s own frames. It goes to our server, OpenCV 5 measures it, and the numbers come back here.
         </p>
 
         <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr]">
@@ -69,7 +69,7 @@ export default function TryIt() {
                 <span className="text-callout text-mute">or use the buttons below</span>
               </div>
             )}
-            {busy && <span className="absolute bottom-4 left-4 rounded-full bg-stage/90 px-3 py-1.5 text-footnote font-bold text-amber">Measuring on AWS…</span>}
+            {busy && <span className="absolute bottom-4 left-4 rounded-full bg-stage/90 px-3 py-1.5 text-footnote font-bold text-amber">Measuring…</span>}
           </div>
 
           <div className="grid content-start gap-5">
@@ -113,7 +113,7 @@ export default function TryIt() {
 
             {s.phase === "done" && (
               <p className="text-callout text-sub">
-                Ran on AWS Graviton (arm64), OpenCV {s.v.opencv}: {s.v.ms.toFixed(1)} ms of OpenCV work, {Math.round(s.rt)} ms round trip from your browser.
+                Ran on our server, OpenCV {s.v.opencv}: {s.v.ms.toFixed(1)} ms of OpenCV work, {Math.round(s.rt)} ms round trip from your browser.
               </p>
             )}
             {s.phase === "error" && <p role="alert" className="text-callout font-semibold text-coal">{s.msg}</p>}

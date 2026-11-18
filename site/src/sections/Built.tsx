@@ -11,9 +11,9 @@ const LOOP = [
 ] as const;
 
 const AWS = [
-  ["AWS Amplify", "Hosts this site"],
-  ["AWS Lambda on Graviton", "OpenCV 5 vision API, arm64"],
-  ["Amazon ECS on Fargate", "The robots' agent service, arm64"],
+  ["Amazon ECS on Fargate", "The robots' agent service and live missions, arm64 (judging period)"],
+  ["AWS Lambda on Graviton", "OpenCV 5 vision API, arm64 (judging period)"],
+  ["Vercel", "Hosts this site and the OpenCV 5 photo check today"],
 ] as const;
 
 type Geo = { w: number; h: number; links: string[]; heads: string[]; back: string; backHead: string; flow: string; label: { x: number; y: number } | null };
@@ -174,7 +174,7 @@ export default function Built() {
           </div>
 
           <div className="rounded-[28px] border border-line bg-stage p-5 sm:p-8">
-            <span className="text-footnote font-extrabold uppercase tracking-[0.16em] text-mute">On AWS</span>
+            <span className="text-footnote font-extrabold uppercase tracking-[0.16em] text-mute">Where it runs</span>
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
               {AWS.map(([name, role], i) => (
                 <motion.div

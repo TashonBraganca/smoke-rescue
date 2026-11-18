@@ -20,9 +20,8 @@ export default function Footer() {
         </motion.p>
         <nav aria-label="Project links" className="flex flex-wrap justify-center gap-3 text-callout font-bold">
           {[
-            ["Code on GitHub", "https://github.com/TashonBraganca/smoke-rescue"],
-            ["Technical report", "https://github.com/TashonBraganca/smoke-rescue/blob/main/report/Smoke_Rescue_Technical_Report.pdf"],
-            ["System and results", "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws/"],
+            ["Technical report", "/report/Smoke_Rescue_Technical_Report.pdf"],
+            ["System and results", "/system/"],
           ].map(([label, href]) => (
             <a key={href} href={href} target="_blank" rel="noopener" className="rounded-full border border-line2 px-5 py-2.5 text-ink transition-colors hover:border-heat hover:text-heat">{label}</a>
           ))}

@@ -1,5 +1,5 @@
-// Our live vision API on AWS (Lambda Function URL in front of the agent service). CORS allows this site's origin.
-export const API = "https://ajfjm7evl33gu6ptprty6hfthq0ukygx.lambda-url.us-east-1.on.aws";
+// The OpenCV 5 vision check runs as a Vercel Python function on this same site (api/vision/assess_visibility.py).
+export const API = "";
 
 export type Visibility = { laplacian_var: number; rms_contrast: number; dark_channel: number; opencv: string; ms: number };
 

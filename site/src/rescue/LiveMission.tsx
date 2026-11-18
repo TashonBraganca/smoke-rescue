@@ -3,7 +3,6 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { advanceClock, caption, exitCaption, keyFor, loadRecording, timeLabel, type House, type Recording } from './data';
-import { startLive } from './live';
 import type { MissionConfig } from './missions';
 import LiveDash from './LiveDash';
 import Setup from './Setup';
@@ -16,7 +15,7 @@ const noop = () => {};
 const quiet = (run: Recording | null, t: number) => !!run && run.frames.slice(Math.floor(t * 2), Math.floor(t * 2) + 12).every(f => f.events.length === 0 && f.found.length === 0);
 export default function LiveMission({ house, robots, config, onReset }: { house: House; robots: number; config: MissionConfig; onReset: () => void }) {
   const [run, setRun] = useState<Recording | null>(null), [setupDone, setSetupDone] = useState(false), [playing, setPlaying] = useState(true), [overview, setOverview] = useState(false), [reduced, setReduced] = useState(false);
-  const [t, setT] = useState(0), [rate] = useState(8), [replay, setReplay] = useState(false), [error, setError] = useState(''), [firstFrame, setFirstFrame] = useState(0);
+  const [t, setT] = useState(0), [rate] = useState(8), [replay] = useState(true), [error, setError] = useState(''), [firstFrame, setFirstFrame] = useState(0);
   const clock = useRef(0), current = useRef<Recording | null>(null);
   const onFrame = () => { if (!firstFrame) setFirstFrame(performance.now()); };
   const finishSetup = useCallback(() => setSetupDone(true), []);
@@ -29,9 +28,8 @@ export default function LiveMission({ house, robots, config, onReset }: { house:
   useEffect(() => {
     const controller = new AbortController();
     const update = (r: Recording) => { if (!controller.signal.aborted) { current.current = r; setRun(r); } };
-    startLive(house, robots, config.engine, controller.signal, update).catch(async () => {
-      if (controller.signal.aborted) return;
-      setReplay(true);
+    // The live AWS mission service was retired after judging; every setup plays its checked, precomputed replay.
+    (async () => {
       try {
         if (!config.engine || !house.available_replays?.includes(robots)) throw Error('A checked replay is not ready.');
         const fallback = await loadRecording(keyFor(house, robots));
@@ -39,9 +37,9 @@ export default function LiveMission({ house, robots, config, onReset }: { house:
         if (controller.signal.aborted) return;
         clock.current = 0; setT(0); setPlaying(true); update(fallback);
       } catch {
-        if (!controller.signal.aborted) { current.current = null; setRun(null); setError('The live run is unavailable, and a checked replay of this setup is not ready yet. Please choose another house or try again later.'); }
+        if (!controller.signal.aborted) { current.current = null; setRun(null); setError('A checked replay of this setup is not ready yet. Please choose another house.'); }
       }
-    });
+    })();
     return () => controller.abort();
   }, [house, robots, config.engine]);
   const visible = setupDone && !!run && !error;
@@ -76,7 +74,7 @@ export default function LiveMission({ house, robots, config, onReset }: { house:
           <div className="pointer-events-none absolute right-4 top-4 flex gap-2"><button className={chip} onClick={() => setOverview(!overview)}>{overview ? 'Follow robots' : 'Full house'}</button></div>
           {!done && <div className="pointer-events-none absolute inset-x-0 bottom-0 px-5 pb-4 pt-12" style={{ background: 'linear-gradient(to top, #0d0a15, transparent)' }}>
             <p data-caption aria-live="polite" className="max-w-[70ch] text-lg font-semibold">{caption(house, run, t)}</p>
-            <p data-source className="mt-1 text-[12px] text-mute">{waiting ? 'Receiving the next frames from AWS...' : replay ? 'The live run was unavailable. This is a precomputed brain-only simulation with the same house, people, fire and robot count.' : 'Robot paths, confirmations and fire stream from the simulator on AWS. Smoke haze and furniture height are illustrations.'} {house.source === 'HouseExpo' && <>Floor plan from HouseExpo (MIT), <a className="pointer-events-auto underline" href="/rescue-data/houseexpo-license.txt">license</a>.</>}</p>
+            <p data-source className="mt-1 text-[12px] text-mute">{waiting ? 'Loading the next frames...' : replay ? 'A precomputed brain-only simulation recorded on our AWS engine, replayed here.' : 'Robot paths, confirmations and fire stream from the simulator on AWS. Smoke haze and furniture height are illustrations.'} {house.source === 'HouseExpo' && <>Floor plan from HouseExpo (MIT), <a className="pointer-events-auto underline" href="/rescue-data/houseexpo-license.txt">license</a>.</>}</p>
           </div>}
         </>}
       </div>

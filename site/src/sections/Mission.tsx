@@ -16,7 +16,7 @@ const Turntable = dynamic(() => import("@/three/Turntable"), { ssr: false });
 const HousePreview = dynamic(() => import("@/three/HousePreview"), { ssr: false });
 const EASE = [0.2, 0.9, 0.25, 1] as const;
 const TEAM = SKIN_NAMES.slice(0, 2);
-// The judge flow lives on /rescue/: the picked house opens there and its mission starts at once (its film, or a live AWS run).
+// The judge flow lives on /rescue/: the picked house opens there and its mission starts at once (its film, or a recorded simulation).
 const RESCUE_ID: Record<HouseId, string> = { family_ranch: 'family_ranch', long_ranch: 'long_ranch', '934': 'onedoor_934', '5008': 'hx_46bfe067cc', '5009': 'hx_cb9d3d6726' };
 
 export default function Mission() {
